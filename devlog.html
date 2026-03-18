@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>📢 G-DSP 개발기록 | 2026.03.18 업데이트</title>
+<style>
+body{
+    font-family: Arial, sans-serif;
+    background:#f4f6f8;
+    margin:0;
+    padding:40px;
+    color:#333;
+}
+.container{
+    max-width:900px;
+    margin:auto;
+    background:white;
+    padding:40px;
+    border-radius:10px;
+    box-shadow:0 5px 20px rgba(0,0,0,0.1);
+}
+.header{
+    background:#0a2a60;
+    color:white;
+    padding:20px;
+    border-radius:8px;
+    margin-bottom:30px;
+}
+.header h1{
+    margin:0;
+    font-size:26px;
+}
+.header p{
+    margin:6px 0 0 0;
+    font-size:14px;
+    opacity:.9;
+}
+h2{
+    border-left:6px solid #2c7be5;
+    padding-left:12px;
+}
+.section{ margin-top:30px; }
+ul{ line-height:1.8; }
+.footer{
+    margin-top:40px;
+    padding-top:20px;
+    border-top:1px solid #ddd;
+    font-size:15px;
+    color:#555;
+}
+.dev{
+    font-weight:bold;
+    font-size:18px;
+    color:#000;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="header">
+<h1>📢 G-DSP 개발기록</h1>
+<p>2026.03.18 업데이트</p>
+</div>
+
+<div class="section">
+<h2>프로젝트 시작</h2>
+<p>
+G-DSP는 토목·측량·인허가 업무를 하나의 웹 플랫폼에서 처리하기 위해 시작된 프로젝트이다.
+여러 사이트를 이동해야 하는 기존 업무 방식을 개선하고, 지도 조회 · 토지정보 조회 · 도면 수량 산출 · 민원 관리 등을
+하나의 시스템에서 처리하는 것을 목표로 개발을 시작하였다.
+</p>
+</div>
+
+<div class="section">
+<h2>오늘 구현된 기능</h2>
+<ul>
+<li>로그인 화면 (현재는 빈칸으로 바로 입장)</li>
+<li>지번 입력 → 용도지역 / 지목 / 건폐율 자동 표시</li>
+<li>검색 시 지도 위치 자동 이동</li>
+<li>지도 서비스 탭 전환</li>
+<li>외부 행정 사이트 바로가기</li>
+<li>DXF 도면 수량 자동 산출</li>
+<li>민원 접수번호 관리</li>
+<li>담당자 연락처 검색</li>
+<li>작업 이력 자동 저장</li>
+<li>문의 글 등록 기능</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>지도 시스템</h2>
+<ul>
+<li>VWorld 일반지도 / 위성지도</li>
+<li>카카오 일반지도 / 위성지도 / 로드뷰</li>
+<li>네이버 지도</li>
+<li>국토정보 플랫폼</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>DXF 도면 기능</h2>
+<ul>
+<li>.dxf 파일 업로드</li>
+<li>레이어별 수량 계산</li>
+<li>색상 분류</li>
+<li>mm / m 단위 전환</li>
+<li>CSV 저장</li>
+<li>PDF 인쇄</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>업무 관리 기능</h2>
+
+<p><b>담당자 연락처</b></p>
+<ul>
+<li>총 138명 등록</li>
+<li>검색 기능</li>
+<li>전화번호 클릭 통화</li>
+</ul>
+
+<p><b>민원 접수 관리</b></p>
+<ul>
+<li>접수번호 등록</li>
+<li>접수중 / 보완중 / 완료 상태 관리</li>
+<li>10개 지역 관리</li>
+</ul>
+
+</div>
+
+<div class="footer">
+<div class="dev">개발자 유영대</div>
+G-DSP Project Start : 2026.03.18
+</div>
+
+</div>
+
+</body>
+</html>
