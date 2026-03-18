@@ -1155,8 +1155,46 @@ var regItems=[];
 var MAP_CFG={'vworld':{url:'https://map.vworld.kr/map/maps.do?basemap=GRAPHIC&ver=2.0&zoom=13',cover:true},'vworld-sat':{url:'https://map.vworld.kr/map/maps.do?basemap=SATELLITE&ver=2.0&zoom=13',cover:true},'kakao':{url:'https://map.kakao.com/',cover:false},'kakao-sat':{url:'https://map.kakao.com/?map_type=SKYVIEW',cover:false},'kakao-road':{url:'https://map.kakao.com/?map_type=ROADVIEW',cover:false},'naver':{url:'https://map.naver.com/',cover:false},'ngii':{url:'https://map.ngii.go.kr/ms/map/NlipMap.do',cover:false},'toolbox':{url:'https://toolbox.ooa.studio/map',cover:false}};
 var MAP_NAMES={'vworld':'VWorld 일반','vworld-sat':'VWorld 위성','kakao':'카카오 일반','kakao-sat':'카카오 위성','kakao-road':'카카오 로드뷰','naver':'네이버지도','ngii':'국토정보플랫폼','toolbox':'지번통합지도'};
 var curMapKey='vworld';
-function doLogin(){var id=document.getElementById('loginId').value||'유영대';document.getElementById('loginScreen').style.display='none';document.getElementById('app').classList.add('show');document.getElementById('tbUser').textContent=id||'유영대';var d=new Date(),h=d.getHours(),m=d.getMinutes(),hh=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;setText('actT0',hh);var days=['일','월','화','수','목','금','토'];setText('dashDate',d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+days[d.getDay()]+')');loadSettings();renderRcp();renderHist();var reg=document.getElementById('rcpRegion');if(reg)reg.addEventListener('change',function(){var el=document.getElementById('customUrlRow');if(el)el.style.display=this.value==='custom'?'block':'none';});}
-function doLogout(){if(!confirm('로그아웃 하시겠습니까?'))return;document.getElementById('app').classList.remove('show');document.getElementById('loginScreen').style.display='flex';document.getElementById('loginId').value='';document.getElementById('loginPw').value='';}
+function doLogin(){
+  var id=(document.getElementById('loginId').value||'').trim();
+  var loginScreen=document.getElementById('loginScreen');
+  var app=document.getElementById('app');
+
+  if(loginScreen){
+    loginScreen.style.display='none';
+    loginScreen.style.pointerEvents='none';
+  }
+  if(app){
+    app.classList.add('show');
+    app.style.display='grid';
+    app.style.pointerEvents='auto';
+  }
+
+  document.getElementById('tbUser').textContent=id||'유영대';
+
+  var d=new Date(),h=d.getHours(),m=d.getMinutes(),hh=(h<10?'0':'')+h+':'+(m<10?'0':'')+m;
+  setText('actT0',hh);
+  var days=['일','월','화','수','목','금','토'];
+  setText('dashDate',d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+days[d.getDay()]+')');
+
+  loadSettings();
+  renderRcp();
+  renderHist();
+
+  var reg=document.getElementById('rcpRegion');
+  if(reg && !reg.dataset.bound){
+    reg.addEventListener('change',function(){
+      var el=document.getElementById('customUrlRow');
+      if(el)el.style.display=this.value==='custom'?'block':'none';
+    });
+    reg.dataset.bound='1';
+  }
+
+  setTimeout(function(){
+    window.open('devlog.html','devlog','width=900,height=700');
+  },150);
+}
+function doLogout(){if(!confirm('로그아웃 하시겠습니까?'))return;document.getElementById('app').classList.remove('show');document.getElementById('app').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginScreen').style.pointerEvents='auto';document.getElementById('loginId').value='';document.getElementById('loginPw').value='';}
 document.getElementById('loginPw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('mainSearch').addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
 function toggleCat(el,catId){var isOn=el.classList.contains('on');el.classList.toggle('on',!isOn);var sub=document.getElementById(catId);if(sub)sub.classList.toggle('on',!isOn);}
@@ -1211,41 +1249,7 @@ function renderHist(){
 function hideHist(i){histItems[i].hidden=true;localStorage.setItem('gdsp_hist',JSON.stringify(histItems));renderHist();toast('숨겼습니다 (언제든 다시 표시 가능)');}
 function showAllHist(){histItems.forEach(function(h){h.hidden=false;});localStorage.setItem('gdsp_hist',JSON.stringify(histItems));renderHist();}
 function delHist(i){if(!confirm('이 항목을 삭제하시겠습니까?'))return;histItems.splice(i,1);localStorage.setItem('gdsp_hist',JSON.stringify(histItems));renderHist();}
-function printHist(i){var h=histItems[i];var w=window.open('','_blank');w.document.write('<html><body style="font-family:sans-serif;padding:20px"><h3>작업 이력</h3><p>'+h.date+' '+h.time+'</p><p>'+h.txt+'</p>
-<script>
-window.addEventListener("load", function(){
-    window.open('devlog.html','devlog','width=900,height=700');
-});
-</script>
-
-
-<script>
-function doLogin(){
-  const id = document.getElementById("loginId").value;
-  const pw = document.getElementById("loginPw").value;
-
-  // allow empty login
-  if(id === "" && pw === ""){
-      document.getElementById("loginScreen").style.display="none";
-      document.getElementById("app").classList.add("show");
-      return;
-  }
-
-  // admin login
-  if(id === "admin" && pw === "1234"){
-      document.getElementById("loginScreen").style.display="none";
-      document.getElementById("app").classList.add("show");
-  }else{
-      alert("아이디 또는 비밀번호가 틀렸습니다");
-  }
-}
-
-function doLogout(){
-  location.reload();
-}
-</script>
-
-</body></html>');w.document.close();w.print();}
+function printHist(i){var h=histItems[i];var w=window.open('','_blank');w.document.write('<html><body style="font-family:sans-serif;padding:20px"><h3>작업 이력</h3><p>'+h.date+' '+h.time+'</p><p>'+h.txt+'</p></body></html>');w.document.close();w.print();}
 function clearHist(){
   if(!confirm('작업 이력 전체를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')){return;}
   if(!confirm('정말로 삭제하시겠습니까? 한 번 더 확인합니다.')){return;}
@@ -1532,41 +1536,7 @@ function changeStatus(i,s){rcpItems[i].status=s;localStorage.setItem('gdsp_rcp',
 function saveNote(i,v){rcpItems[i].note=v;localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));}
 function saveReqDate(i,v){rcpItems[i].reqDate=v;localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));}
 function saveDoneDate(i,v){rcpItems[i].doneDate=v;localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));}
-function printRcpItem(i){var item=rcpItems[i];var w=window.open('','_blank');w.document.write('<html><body style="font-family:Noto Sans KR,sans-serif;padding:20px"><h2>민원 진행사항</h2><table border="1" cellpadding="8" style="border-collapse:collapse;width:100%"><tr><td>지역</td><td>'+item.region+'</td></tr><tr><td>이름</td><td>'+item.name+'</td></tr><tr><td>접수번호</td><td>'+item.num+'</td></tr><tr><td>상태</td><td>'+(item.status||'접수중')+'</td></tr><tr><td>보완내용</td><td>'+(item.note||'—')+'</td></tr><tr><td>요청일</td><td>'+(item.reqDate||'—')+'</td></tr><tr><td>완료일</td><td>'+(item.doneDate||'—')+'</td></tr></table>
-<script>
-window.addEventListener("load", function(){
-    window.open('devlog.html','devlog','width=900,height=700');
-});
-</script>
-
-
-<script>
-function doLogin(){
-  const id = document.getElementById("loginId").value;
-  const pw = document.getElementById("loginPw").value;
-
-  // allow empty login
-  if(id === "" && pw === ""){
-      document.getElementById("loginScreen").style.display="none";
-      document.getElementById("app").classList.add("show");
-      return;
-  }
-
-  // admin login
-  if(id === "admin" && pw === "1234"){
-      document.getElementById("loginScreen").style.display="none";
-      document.getElementById("app").classList.add("show");
-  }else{
-      alert("아이디 또는 비밀번호가 틀렸습니다");
-  }
-}
-
-function doLogout(){
-  location.reload();
-}
-</script>
-
-</body></html>');w.document.close();w.print();}
+function printRcpItem(i){var item=rcpItems[i];var w=window.open('','_blank');w.document.write('<html><body style="font-family:Noto Sans KR,sans-serif;padding:20px"><h2>민원 진행사항</h2><table border="1" cellpadding="8" style="border-collapse:collapse;width:100%"><tr><td>지역</td><td>'+item.region+'</td></tr><tr><td>이름</td><td>'+item.name+'</td></tr><tr><td>접수번호</td><td>'+item.num+'</td></tr><tr><td>상태</td><td>'+(item.status||'접수중')+'</td></tr><tr><td>보완내용</td><td>'+(item.note||'—')+'</td></tr><tr><td>요청일</td><td>'+(item.reqDate||'—')+'</td></tr><tr><td>완료일</td><td>'+(item.doneDate||'—')+'</td></tr></table></body></html>');w.document.close();w.print();}
 function getStatusClass(s){return s==='보완중'?'rs-sup':s==='완료'?'rs-done':'rs-ing';}
 function getStatusTxt(s){return s||'접수중';}
 function openRcp(){
@@ -2507,39 +2477,5 @@ var _ao=document.getElementById('aboutOverlay');if(_ao)_ao.addEventListener('cli
 }catch(e){console.warn('DXF:',e);}
 
 </script>
-
-<script>
-window.addEventListener("load", function(){
-    window.open('devlog.html','devlog','width=900,height=700');
-});
-</script>
-
-
-<script>
-function doLogin(){
-  const id = document.getElementById("loginId").value;
-  const pw = document.getElementById("loginPw").value;
-
-  // allow empty login
-  if(id === "" && pw === ""){
-      document.getElementById("loginScreen").style.display="none";
-      document.getElementById("app").classList.add("show");
-      return;
-  }
-
-  // admin login
-  if(id === "admin" && pw === "1234"){
-      document.getElementById("loginScreen").style.display="none";
-      document.getElementById("app").classList.add("show");
-  }else{
-      alert("아이디 또는 비밀번호가 틀렸습니다");
-  }
-}
-
-function doLogout(){
-  location.reload();
-}
-</script>
-
 </body>
 </html>
