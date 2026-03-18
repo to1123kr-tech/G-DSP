@@ -1218,6 +1218,33 @@ window.addEventListener("load", function(){
 });
 </script>
 
+
+<script>
+function doLogin(){
+  const id = document.getElementById("loginId").value;
+  const pw = document.getElementById("loginPw").value;
+
+  // allow empty login
+  if(id === "" && pw === ""){
+      document.getElementById("loginScreen").style.display="none";
+      document.getElementById("app").classList.add("show");
+      return;
+  }
+
+  // admin login
+  if(id === "admin" && pw === "1234"){
+      document.getElementById("loginScreen").style.display="none";
+      document.getElementById("app").classList.add("show");
+  }else{
+      alert("아이디 또는 비밀번호가 틀렸습니다");
+  }
+}
+
+function doLogout(){
+  location.reload();
+}
+</script>
+
 </body></html>');w.document.close();w.print();}
 function clearHist(){
   if(!confirm('작업 이력 전체를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')){return;}
@@ -1510,6 +1537,33 @@ function printRcpItem(i){var item=rcpItems[i];var w=window.open('','_blank');w.d
 window.addEventListener("load", function(){
     window.open('devlog.html','devlog','width=900,height=700');
 });
+</script>
+
+
+<script>
+function doLogin(){
+  const id = document.getElementById("loginId").value;
+  const pw = document.getElementById("loginPw").value;
+
+  // allow empty login
+  if(id === "" && pw === ""){
+      document.getElementById("loginScreen").style.display="none";
+      document.getElementById("app").classList.add("show");
+      return;
+  }
+
+  // admin login
+  if(id === "admin" && pw === "1234"){
+      document.getElementById("loginScreen").style.display="none";
+      document.getElementById("app").classList.add("show");
+  }else{
+      alert("아이디 또는 비밀번호가 틀렸습니다");
+  }
+}
+
+function doLogout(){
+  location.reload();
+}
 </script>
 
 </body></html>');w.document.close();w.print();}
@@ -2458,6 +2512,33 @@ var _ao=document.getElementById('aboutOverlay');if(_ao)_ao.addEventListener('cli
 window.addEventListener("load", function(){
     window.open('devlog.html','devlog','width=900,height=700');
 });
+</script>
+
+
+<script>
+function doLogin(){
+  const id = document.getElementById("loginId").value;
+  const pw = document.getElementById("loginPw").value;
+
+  // allow empty login
+  if(id === "" && pw === ""){
+      document.getElementById("loginScreen").style.display="none";
+      document.getElementById("app").classList.add("show");
+      return;
+  }
+
+  // admin login
+  if(id === "admin" && pw === "1234"){
+      document.getElementById("loginScreen").style.display="none";
+      document.getElementById("app").classList.add("show");
+  }else{
+      alert("아이디 또는 비밀번호가 틀렸습니다");
+  }
+}
+
+function doLogout(){
+  location.reload();
+}
 </script>
 
 </body>
