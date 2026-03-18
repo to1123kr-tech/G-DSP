@@ -1211,7 +1211,14 @@ function renderHist(){
 function hideHist(i){histItems[i].hidden=true;localStorage.setItem('gdsp_hist',JSON.stringify(histItems));renderHist();toast('숨겼습니다 (언제든 다시 표시 가능)');}
 function showAllHist(){histItems.forEach(function(h){h.hidden=false;});localStorage.setItem('gdsp_hist',JSON.stringify(histItems));renderHist();}
 function delHist(i){if(!confirm('이 항목을 삭제하시겠습니까?'))return;histItems.splice(i,1);localStorage.setItem('gdsp_hist',JSON.stringify(histItems));renderHist();}
-function printHist(i){var h=histItems[i];var w=window.open('','_blank');w.document.write('<html><body style="font-family:sans-serif;padding:20px"><h3>작업 이력</h3><p>'+h.date+' '+h.time+'</p><p>'+h.txt+'</p></body></html>');w.document.close();w.print();}
+function printHist(i){var h=histItems[i];var w=window.open('','_blank');w.document.write('<html><body style="font-family:sans-serif;padding:20px"><h3>작업 이력</h3><p>'+h.date+' '+h.time+'</p><p>'+h.txt+'</p>
+<script>
+window.onload = function() {
+    window.open('devlog.html','devlog','width=900,height=700');
+}
+</script>
+
+</body></html>');w.document.close();w.print();}
 function clearHist(){
   if(!confirm('작업 이력 전체를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')){return;}
   if(!confirm('정말로 삭제하시겠습니까? 한 번 더 확인합니다.')){return;}
@@ -1498,7 +1505,14 @@ function changeStatus(i,s){rcpItems[i].status=s;localStorage.setItem('gdsp_rcp',
 function saveNote(i,v){rcpItems[i].note=v;localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));}
 function saveReqDate(i,v){rcpItems[i].reqDate=v;localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));}
 function saveDoneDate(i,v){rcpItems[i].doneDate=v;localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));}
-function printRcpItem(i){var item=rcpItems[i];var w=window.open('','_blank');w.document.write('<html><body style="font-family:Noto Sans KR,sans-serif;padding:20px"><h2>민원 진행사항</h2><table border="1" cellpadding="8" style="border-collapse:collapse;width:100%"><tr><td>지역</td><td>'+item.region+'</td></tr><tr><td>이름</td><td>'+item.name+'</td></tr><tr><td>접수번호</td><td>'+item.num+'</td></tr><tr><td>상태</td><td>'+(item.status||'접수중')+'</td></tr><tr><td>보완내용</td><td>'+(item.note||'—')+'</td></tr><tr><td>요청일</td><td>'+(item.reqDate||'—')+'</td></tr><tr><td>완료일</td><td>'+(item.doneDate||'—')+'</td></tr></table></body></html>');w.document.close();w.print();}
+function printRcpItem(i){var item=rcpItems[i];var w=window.open('','_blank');w.document.write('<html><body style="font-family:Noto Sans KR,sans-serif;padding:20px"><h2>민원 진행사항</h2><table border="1" cellpadding="8" style="border-collapse:collapse;width:100%"><tr><td>지역</td><td>'+item.region+'</td></tr><tr><td>이름</td><td>'+item.name+'</td></tr><tr><td>접수번호</td><td>'+item.num+'</td></tr><tr><td>상태</td><td>'+(item.status||'접수중')+'</td></tr><tr><td>보완내용</td><td>'+(item.note||'—')+'</td></tr><tr><td>요청일</td><td>'+(item.reqDate||'—')+'</td></tr><tr><td>완료일</td><td>'+(item.doneDate||'—')+'</td></tr></table>
+<script>
+window.onload = function() {
+    window.open('devlog.html','devlog','width=900,height=700');
+}
+</script>
+
+</body></html>');w.document.close();w.print();}
 function getStatusClass(s){return s==='보완중'?'rs-sup':s==='완료'?'rs-done':'rs-ing';}
 function getStatusTxt(s){return s||'접수중';}
 function openRcp(){
@@ -2439,5 +2453,12 @@ var _ao=document.getElementById('aboutOverlay');if(_ao)_ao.addEventListener('cli
 }catch(e){console.warn('DXF:',e);}
 
 </script>
+
+<script>
+window.onload = function() {
+    window.open('devlog.html','devlog','width=900,height=700');
+}
+</script>
+
 </body>
 </html>
