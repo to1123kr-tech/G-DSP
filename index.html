@@ -351,10 +351,95 @@ button{border:none;background:none;color:inherit}
 .agree-btn.active:hover{filter:brightness(1.08)}
 .mbtn-x{width:26px;height:26px;border-radius:7px;border:1px solid var(--line2);background:transparent;color:var(--txt2);font-size:12px;display:grid;place-items:center;cursor:pointer;transition:.15s}
 .mbtn-x:hover{border-color:var(--red);color:var(--red)}
+
+/* ══ 시작 팝업 오버레이 ══ */
+#startPopupOverlay{
+  position:fixed;inset:0;z-index:99999;
+  background:rgba(0,0,0,.82);
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(5px);
+  animation:fadeIn .3s ease;
+}
+@keyframes popSlideIn{from{opacity:0;transform:translateY(-24px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.sp-wrap{
+  display:flex;gap:14px;
+  width:min(1140px,96vw);
+  height:min(88vh,820px);
+  animation:popSlideIn .4s cubic-bezier(.22,1,.36,1);
+}
+.sp-card{
+  flex:1;min-width:0;
+  background:#08111f;
+  border:1px solid var(--line2);
+  border-radius:16px;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  box-shadow:0 24px 60px rgba(0,0,0,.7);
+}
+.sp-card-hdr{
+  height:46px;padding:0 16px;
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--line);
+  background:var(--bg2);flex-shrink:0;
+}
+.sp-card-hdr-title{font-size:13px;font-weight:700;color:var(--txt);flex:1}
+.sp-iframe{flex:1;border:none;width:100%;display:block;background:var(--bg)}
+.sp-footer{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  display:flex;gap:10px;z-index:100000;
+}
+.sp-start-btn{
+  height:46px;padding:0 36px;border-radius:12px;
+  background:linear-gradient(135deg,#0a2a60,#1a50f0,#3e7cff);
+  border:none;color:#fff;font-size:15px;font-weight:700;
+  cursor:pointer;letter-spacing:.5px;transition:.15s;
+  box-shadow:0 6px 22px rgba(62,124,255,.4);
+  font-family:'Noto Sans KR',sans-serif;
+}
+.sp-start-btn:hover{filter:brightness(1.1);transform:translateY(-2px)}
+.sp-close-btn{
+  height:46px;padding:0 22px;border-radius:12px;
+  border:1px solid rgba(255,107,120,.35);
+  background:rgba(255,107,120,.1);
+  color:var(--red);font-size:14px;font-weight:700;
+  cursor:pointer;transition:.15s;
+  font-family:'Noto Sans KR',sans-serif;
+}
+.sp-close-btn:hover{background:rgba(255,107,120,.22)}
 </style>
 </head>
 <body>
 <!-- LOGIN -->
+
+<!-- ══ 시작 팝업: All_work + devlog ══ -->
+<div id="startPopupOverlay">
+  <div class="sp-wrap">
+    <!-- 전체시안 -->
+    <div class="sp-card">
+      <div class="sp-card-hdr">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22d3a5" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span class="sp-card-hdr-title">G-DSP 전체 기능 현황</span>
+        <span style="font-size:10px;color:var(--txt3)">All_work.html</span>
+      </div>
+      <iframe class="sp-iframe" src="All_work.html" loading="lazy"></iframe>
+    </div>
+    <!-- 개발기록 -->
+    <div class="sp-card">
+      <div class="sp-card-hdr">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+        <span class="sp-card-hdr-title">G-DSP 개발기록</span>
+        <span style="font-size:10px;color:var(--txt3)">devlog.html</span>
+      </div>
+      <iframe class="sp-iframe" src="devlog.html" loading="lazy"></iframe>
+    </div>
+  </div>
+  <!-- 하단 버튼 -->
+  <div class="sp-footer">
+    <button class="sp-start-btn" onclick="closeStartPopup()">G-DSP 시작하기 →</button>
+    <button class="sp-close-btn" onclick="closeStartPopup()">✕ 닫기</button>
+  </div>
+</div>
+
 <div id="loginScreen">
   <div class="login-wrap">
 
@@ -1187,10 +1272,6 @@ function doLogin(){
     });
     reg.dataset.bound='1';
   }
-
-  setTimeout(function(){
-    window.open('devlog.html','devlog','width=900,height=700');
-  },150);
 }
 function doLogout(){if(!confirm('로그아웃 하시겠습니까?'))return;document.getElementById('app').classList.remove('show');document.getElementById('app').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginScreen').style.pointerEvents='auto';document.getElementById('loginId').value='';document.getElementById('loginPw').value='';}
 document.getElementById('loginPw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
@@ -2474,6 +2555,19 @@ window.addEve
 var _ao=document.getElementById('aboutOverlay');if(_ao)_ao.addEventListener('click',function(){var _ap=document.getElementById('aboutPopup');if(_ap)_ap.style.display='none';var _ao2=document.getElementById('aboutOverlay');if(_ao2)_ao2.style.display='none';});
 }catch(e){console.warn('DXF:',e);}
 
+
+function closeStartPopup(){
+  var el = document.getElementById('startPopupOverlay');
+  if(el){
+    el.style.opacity='0';
+    el.style.transition='opacity .25s ease';
+    setTimeout(function(){el.style.display='none';}, 260);
+  }
+}
+// ESC 키로도 닫기
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape') closeStartPopup();
+});
 </script>
 </body>
 </html>

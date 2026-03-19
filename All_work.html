@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>G-DSP 전체 기능 현황 시안</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#04080f;--bg2:#060d18;--card:#0a1220;--line:#112038;--line2:#1e3555;--txt:#d8eaff;--txt2:#607a9e;--txt3:#2d4060;--blue:#3e7cff;--blue2:#60a5fa;--green:#22d3a5;--red:#ff6b78;--gold:#f1c65b;--neon:#00f0ff;--purple:#a78bfa;--orange:#f97316}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt);font-size:13px;min-height:100vh;padding:24px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.wrap{max-width:1200px;margin:0 auto;animation:fadeIn .5s ease}
+
+/* 헤더 */
+.hdr{display:flex;align-items:center;gap:16px;padding:18px 22px;background:var(--card);border:1px solid var(--line2);border-radius:14px;margin-bottom:20px}
+.hdr-logo{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900;color:var(--neon);letter-spacing:2px}
+.hdr-divider{width:1px;height:30px;background:var(--line2)}
+.hdr-info{flex:1}
+.hdr-title{font-size:16px;font-weight:900;color:var(--txt);margin-bottom:2px}
+.hdr-sub{font-size:11px;color:var(--txt3)}
+.hdr-stats{display:flex;gap:10px}
+.stat{text-align:center;padding:6px 14px;background:var(--bg2);border:1px solid var(--line);border-radius:8px}
+.stat-n{font-size:20px;font-weight:900;margin-bottom:1px}
+.stat-l{font-size:9px;color:var(--txt3)}
+
+/* 범례 */
+.legend{display:flex;gap:8px;flex-wrap:wrap;padding:10px 14px;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:9px;margin-bottom:18px}
+.leg{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt2);padding:3px 8px;border-radius:5px}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+
+/* 그리드 */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-bottom:24px}
+
+/* 챕터 카드 */
+.ch-card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ch-hdr{display:flex;align-items:center;gap:10px;padding:12px 15px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--line);cursor:pointer;user-select:none;transition:.15s}
+.ch-hdr:hover{background:rgba(62,124,255,.05)}
+.ch-num-box{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#0044aa,#00d4ff);display:grid;place-items:center;font-size:12px;font-weight:900;color:#001830;flex-shrink:0}
+.ch-title{flex:1;font-size:13px;font-weight:700;color:var(--txt)}
+.ch-done{font-size:10px;font-weight:700;color:var(--green);background:rgba(34,211,165,.1);border:1px solid rgba(34,211,165,.2);padding:2px 8px;border-radius:10px}
+.ch-arr{font-size:12px;color:var(--txt3);transition:.2s;margin-left:4px}
+.ch-hdr.open .ch-arr{transform:rotate(90deg);color:var(--neon)}
+.ch-items{padding:10px;display:flex;flex-direction:column;gap:4px}
+.ch-items.hidden{display:none}
+
+/* 항목 */
+.item{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid transparent;transition:.15s}
+.item:hover{border-color:var(--line2);background:rgba(255,255,255,.02)}
+.item-num{font-size:9px;font-weight:700;color:var(--neon);min-width:32px;flex-shrink:0;font-family:monospace;margin-top:2px}
+.item-txt{flex:1;font-size:12px;color:var(--txt2);line-height:1.5}
+.item-txt b{color:var(--txt)}
+.item-tag{flex-shrink:0}
+.tag{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;display:inline-block}
+.t-done{background:rgba(34,211,165,.15);border:1px solid rgba(34,211,165,.4);color:#00ffcc}
+.t-part{background:rgba(241,198,91,.1);border:1px solid rgba(241,198,91,.25);color:var(--gold)}
+.t-api{background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.25);color:var(--blue2)}
+.t-server{background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);color:var(--purple)}
+.t-todo{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--txt3)}
+.t-review{background:rgba(255,107,120,.08);border:1px solid rgba(255,107,120,.2);color:var(--red)}
+
+/* 진행바 */
+.progress-wrap{margin-bottom:20px}
+.progress-title{font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:8px}
+.progress-bar{height:10px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--neon));border-radius:10px;transition:.6s ease}
+.progress-info{display:flex;justify-content:space-between;font-size:10px;color:var(--txt3);margin-top:4px}
+
+/* 하단 메모 */
+.memo-section{margin-top:20px;padding:16px 18px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.memo-title{font-size:13px;font-weight:700;color:var(--txt2);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.memo-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.memo-col h4{font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:7px;letter-spacing:.5px;text-transform:uppercase}
+.memo-item{font-size:11px;color:var(--txt2);padding:5px 8px;border-left:2px solid var(--line2);margin-bottom:4px;line-height:1.5}
+.memo-item.important{border-color:var(--gold);color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 헤더 -->
+  <div class="hdr">
+    <div class="hdr-logo">G-DSP</div>
+    <div class="hdr-divider"></div>
+    <div class="hdr-info">
+      <div class="hdr-title">전체 기능 현황 시안</div>
+      <div class="hdr-sub">Geo Data &amp; Spatial Platform · 개발자 유영대 · 2026.03.19</div>
+    </div>
+    <div class="hdr-stats">
+      <div class="stat"><div class="stat-n" style="color:var(--green)">21</div><div class="stat-l">구현완료</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--gold)">5</div><div class="stat-l">부분가능</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--blue2)">8</div><div class="stat-l">API필요</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--purple)">4</div><div class="stat-l">서버필요</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--txt2)">73</div><div class="stat-l">전체</div></div>
+    </div>
+  </div>
+
+  <!-- 진행률 -->
+  <div class="progress-wrap">
+    <div class="progress-title">전체 구현 진행률</div>
+    <div class="progress-bar"><div class="progress-fill" style="width:29%"></div></div>
+    <div class="progress-info"><span>HTML 가능 항목 기준 21/55개 (38%)</span><span>전체 기준 21/73개 (29%)</span></div>
+  </div>
+
+  <!-- 범례 -->
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:var(--green)"></div>✅ 구현완료</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--gold)"></div>🟡 부분구현</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--blue2)"></div>🔑 API 필요</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--purple)"></div>🖥 서버 필요</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--txt3)"></div>⬜ 미구현</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--red)"></div>🔍 기술검토</div>
+  </div>
+
+  <!-- 챕터 그리드 -->
+  <div class="grid" id="chGrid"></div>
+
+  <!-- 메모 -->
+  <div class="memo-section">
+    <div class="memo-title">📌 개발 메모 및 우선순위</div>
+    <div class="memo-grid">
+      <div class="memo-col">
+        <h4>우선 개발 항목</h4>
+        <div class="memo-item important">8-06 민원 조회 자동 크롤링 → 서버(Python+Selenium) 필요</div>
+        <div class="memo-item important">2-01/02 토지이용·건축물대장 API 실제 연동 → data.go.kr</div>
+        <div class="memo-item">3-01~09 분할 모드 고도화 (스냅·면적맞춤·다중필지)</div>
+        <div class="memo-item">1-09 수치지형도 실제 다운로드 → 국토정보 로그인 연동</div>
+        <div class="memo-item">5-04 레이어 숨김·표시 (DXF 눈 아이콘)</div>
+      </div>
+      <div class="memo-col">
+        <h4>현황 메모</h4>
+        <div class="memo-item">API 키는 localStorage에 저장됨 → 실제 호출 코드 별도 개발 필요</div>
+        <div class="memo-item">VWorld 지도: API 키 없이 기본 타일 로드 가능</div>
+        <div class="memo-item">DXF 수량산출: 완전 작동 (실제 업무 사용 가능)</div>
+        <div class="memo-item">담당자 연락처 138명: 수동 입력 DB (별도 수정 예정)</div>
+        <div class="memo-item important">크롤링 CORS 제한: 브라우저만으로 타 도메인 접근 불가</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var DATA = [
+  {ch:'1',title:'지도 및 기본 기능',color:'#3e7cff',items:[
+    {n:'1-01',txt:'지도 종류 구분 — 영상·일반·위성 탭',tag:'api'},
+    {n:'1-02',txt:'지도 탭 추가 — VWorld·카카오·네이버·국토정보 등 8종',tag:'done'},
+    {n:'1-03',txt:'범례 — 건물·지적·도각 표시',tag:'todo'},
+    {n:'1-04',txt:'도각 선택 — 클릭 이동, 수치지형도 연동',tag:'done'},
+    {n:'1-05',txt:'등고선 기능',tag:'part'},
+    {n:'1-06',txt:'지번검색 자동연동',tag:'done'},
+    {n:'1-07',txt:'반경 선택 100m~500m / 직접입력',tag:'done'},
+    {n:'1-08',txt:'도각 추가/삭제',tag:'done'},
+    {n:'1-09',txt:'수치지형도 다운로드 — 국토정보 연동',tag:'api'},
+    {n:'1-10',txt:'지적도 다운로드 — 영역 선택',tag:'done'},
+    {n:'1-11',txt:'지도 필지 선택 — 우클릭 하이라이트',tag:'todo'},
+  ]},
+  {ch:'2',title:'토지·건축물 발급',color:'#22d3a5',items:[
+    {n:'2-01',txt:'토지이용 자동 미리보기',tag:'api'},
+    {n:'2-02',txt:'건축물대장 자동 미리보기',tag:'api'},
+    {n:'2-03',txt:'건축물대장 미리보기 팝업',tag:'todo'},
+    {n:'2-04',txt:'미리보기 +/- 버튼',tag:'todo'},
+    {n:'2-05',txt:'PDF 인쇄',tag:'todo'},
+    {n:'2-06',txt:'법적고지 표시',tag:'todo'},
+    {n:'2-07',txt:'발급 서비스 버튼 — 정부24·등기소·토지이음',tag:'done'},
+    {n:'2-08',txt:'등기부등본 조회 팝업',tag:'part'},
+    {n:'2-09',txt:'등기부 양식 만들기 (엑셀 자동 변환)',tag:'todo'},
+    {n:'2-10',txt:'지번 목록 관리',tag:'done'},
+    {n:'2-11',txt:'일괄 등록 + 엑셀 자동 생성',tag:'todo'},
+    {n:'2-12',txt:'주요 사이트 추가 버튼',tag:'todo'},
+  ]},
+  {ch:'3',title:'분할 모드',color:'#f1c65b',items:[
+    {n:'3-01',txt:'필지 선택 (단일/다중)',tag:'todo'},
+    {n:'3-02',txt:'분할선 다중 선택',tag:'todo'},
+    {n:'3-03',txt:'스냅 기능',tag:'todo'},
+    {n:'3-04',txt:'이동 단위 지정',tag:'todo'},
+    {n:'3-05',txt:'분할선 이동 (방향키)',tag:'todo'},
+    {n:'3-06',txt:'필지별 면적 계산',tag:'todo'},
+    {n:'3-07',txt:'면적 합계 버튼',tag:'todo'},
+    {n:'3-08',txt:'다중 필지 합계',tag:'todo'},
+    {n:'3-09',txt:'면적 맞춤 기능',tag:'todo'},
+    {n:'3-10',txt:'가분할선 DXF 다운로드',tag:'todo'},
+    {n:'3-11',txt:'인쇄 기능',tag:'done'},
+    {n:'3-12',txt:'배경 삽입/삭제',tag:'todo'},
+    {n:'3-13',txt:'선 그리기 종료/취소',tag:'todo'},
+  ]},
+  {ch:'4',title:'API 설정',color:'#ff6b78',items:[
+    {n:'4-01',txt:'VWorld API 키 입력/저장/삭제/테스트',tag:'done'},
+    {n:'4-02',txt:'국토정보플랫폼 아이디/비번 저장',tag:'done'},
+    {n:'4-03',txt:'삭제·저장 버튼',tag:'done'},
+    {n:'4-04',txt:'연결 상태 표시 (초록/빨강/회색)',tag:'done'},
+    {n:'4-05',txt:'국토정보 로그인 테스트',tag:'done'},
+    {n:'4-06',txt:'국토정보 테스트 다운로드',tag:'api'},
+    {n:'4-07',txt:'건축물대장 API 키 입력/테스트',tag:'done'},
+    {n:'4-08',txt:'건축물대장 실제 테스트',tag:'api'},
+    {n:'4-09',txt:'토지이용확인원 API 키 입력/테스트',tag:'done'},
+    {n:'4-10',txt:'연결 성공 시 샘플 팝업',tag:'api'},
+  ]},
+  {ch:'5',title:'DXF 수량산출',color:'#a78bfa',items:[
+    {n:'5-01',txt:'파일 업로드 (드래그&드롭)',tag:'done'},
+    {n:'5-02',txt:'단위 변환 mm↔m',tag:'done'},
+    {n:'5-03',txt:'색상/레이어 탭 전환',tag:'done'},
+    {n:'5-04',txt:'레이어/색상 숨김·표시 (눈 아이콘)',tag:'todo'},
+    {n:'5-05',txt:'셀프측정 버튼',tag:'done'},
+    {n:'5-06',txt:'선 긋기/종료/취소',tag:'done'},
+    {n:'5-07',txt:'선 삭제 (X 버튼)',tag:'todo'},
+    {n:'5-08',txt:'보정 기능 (기준선→실제길이)',tag:'done'},
+    {n:'5-09',txt:'법적고지 표시',tag:'todo'},
+    {n:'5-10',txt:'결과 저장 (엑셀)',tag:'todo'},
+    {n:'5-11',txt:'결과 저장 (DXF)',tag:'todo'},
+    {n:'5-12',txt:'도면 수량 단위 불일치 해결',tag:'part'},
+  ]},
+  {ch:'6',title:'공간정보 변환',color:'#f97316',items:[
+    {n:'6-01',txt:'좌표계 선택 (EPSG)',tag:'done'},
+    {n:'6-02',txt:'DXF 파일 업로드',tag:'done'},
+    {n:'6-03',txt:'현재지번 변환 버튼',tag:'part'},
+    {n:'6-04',txt:'변환 실행 버튼',tag:'done'},
+    {n:'6-05',txt:'결과 미리보기',tag:'part'},
+    {n:'6-06',txt:'결과 폴더 열기',tag:'server'},
+    {n:'6-07',txt:'지번검색 연동',tag:'done'},
+    {n:'6-08',txt:'출력폴더 지정',tag:'server'},
+  ]},
+  {ch:'7',title:'담당자 연락처',color:'#06b6d4',items:[
+    {n:'7-01',txt:'화성시 조직도 연동',tag:'done'},
+    {n:'7-02',txt:'시청 연락처 크롤링 후 재정렬',tag:'server'},
+    {n:'7-03',txt:'내장 연락처 DB 138명 검색',tag:'done'},
+    {n:'7-04',txt:'연락처 추가/수정/삭제',tag:'todo'},
+  ]},
+  {ch:'8',title:'민원 진행조회',color:'#22d3a5',items:[
+    {n:'8-01',txt:'지역 선택 드롭다운 (10개 지역)',tag:'done'},
+    {n:'8-02',txt:'접수번호 조회 (하이퍼링크)',tag:'done'},
+    {n:'8-03',txt:'접수번호 자동 추가·중복 방지',tag:'done'},
+    {n:'8-04',txt:'이름 수정 가능',tag:'todo'},
+    {n:'8-05',txt:'이름+접수번호 직접 추가',tag:'done'},
+    {n:'8-06',txt:'조회 내용 자동 크롤링',tag:'server'},
+    {n:'8-07',txt:'상태 선택 (접수중/보완중/완료)',tag:'done'},
+    {n:'8-08',txt:'보완 내용 입력창 펼침',tag:'done'},
+    {n:'8-09',txt:'보완 캡처 내용 입력',tag:'part'},
+    {n:'8-10',txt:'3단계 목록 관리',tag:'done'},
+    {n:'8-11',txt:'완료 버튼',tag:'done'},
+    {n:'8-12',txt:'복원 버튼',tag:'done'},
+    {n:'8-13',txt:'삭제 버튼',tag:'done'},
+    {n:'8-14',txt:'localStorage 저장',tag:'done'},
+  ]},
+  {ch:'9',title:'기타 고도화',color:'#8b5cf6',items:[
+    {n:'9-01',txt:'즐겨찾기 대시보드',tag:'todo'},
+    {n:'9-02',txt:'버전/이력 관리',tag:'todo'},
+    {n:'9-03',txt:'협업 기능',tag:'review'},
+    {n:'9-04',txt:'알림 기능 (토스트/뱃지)',tag:'done'},
+    {n:'9-05',txt:'모바일/태블릿 최적화',tag:'todo'},
+  ]},
+];
+
+var TL = {done:'✅ 구현완료',part:'🟡 부분구현',api:'🔑 API 필요',server:'🖥 서버 필요',todo:'⬜ 미구현',review:'🔍 기술검토'};
+var TC = {done:'t-done',part:'t-part',api:'t-api',server:'t-server',todo:'t-todo',review:'t-review'};
+
+function build() {
+  var html = '';
+  DATA.forEach(function(ch) {
+    var done = ch.items.filter(function(i){return i.tag==='done';}).length;
+    html += '<div class="ch-card">';
+    html += '<div class="ch-hdr" onclick="toggle(this)">';
+    html += '<div class="ch-num-box">'+ch.ch+'</div>';
+    html += '<div class="ch-title">'+ch.title+'</div>';
+    html += '<div class="ch-done">'+done+'/'+ch.items.length+'</div>';
+    html += '<span class="ch-arr">›</span>';
+    html += '</div>';
+    html += '<div class="ch-items hidden">';
+    ch.items.forEach(function(item) {
+      html += '<div class="item">';
+      html += '<span class="item-num">'+item.n+'</span>';
+      html += '<span class="item-txt">'+item.txt+'</span>';
+      html += '<div class="item-tag"><span class="tag '+TC[item.tag]+'">'+TL[item.tag]+'</span></div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+  document.getElementById('chGrid').innerHTML = html;
+}
+
+function toggle(el) {
+  el.classList.toggle('open');
+  el.nextElementSibling.classList.toggle('hidden');
+}
+
+build();
+// 모든 챕터 자동 펼치기
+setTimeout(function(){
+  document.querySelectorAll('.ch-hdr').forEach(function(h){toggle(h);});
+}, 50);
+</script>
+</body>
+</html>
