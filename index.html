@@ -371,7 +371,13 @@ button{border:none;background:none;color:inherit}
 .rcp-chk{width:16px;height:16px;accent-color:var(--blue);cursor:pointer;flex-shrink:0;margin-top:1px}
 
 /* 다크/라이트 토글 */
-.theme-toggle{display:flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:7px;border:1px solid var(--line2);background:#fff;color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;transition:.15s}
+.menu-card{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:18px 14px 16px;cursor:pointer;transition:.18s;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;user-select:none}
+.menu-card:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 6px 24px rgba(62,124,255,.13)}
+.menu-card-ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex-shrink:0}
+.menu-card-ico svg{width:22px;height:22px}
+.menu-card-name{font-size:13px;font-weight:700;color:var(--txt);line-height:1.3}
+.menu-card-cat{font-size:10px;color:var(--txt3);margin-top:2px}
+#cardBtn.on{background:var(--blue);color:#fff;border-color:var(--blue)}
 .theme-toggle:hover{color:var(--txt);background:var(--bg2)}
 
 /* ── 다크 모드 오버라이드 ── */
@@ -616,7 +622,8 @@ body.dark .toast{background:#08111f}
     </div>
     <div class="hdr-right">
       <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙 다크</button>
-      <button class="hbtn" onclick="showView('api')">설정</button>
+      <button class="theme-toggle" onclick="toggleCardView()" id="cardBtn">⊞ 카드형</button>
+
       <button class="hbtn" onclick="doLogout()">로그아웃</button>
       <div class="hbtn-user" id="tbUser">유영대</div>
     </div>
@@ -719,6 +726,15 @@ body.dark .toast{background:#08111f}
   <div class="content">
 
     <!-- ① 대시보드 -->
+    <!-- 카드형 뷰 -->
+    <div class="view" id="view-card">
+      <div style="padding:20px">
+        <div style="font-size:16px;font-weight:800;color:var(--txt);margin-bottom:6px">전체 메뉴</div>
+        <div style="font-size:12px;color:var(--txt3);margin-bottom:20px">카드를 클릭하면 해당 기능으로 이동합니다</div>
+        <div id="cardGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px"></div>
+      </div>
+    </div>
+
     <div class="view on" id="view-dash">
       <div class="panel-hdr">
         <svg style="width:14px;height:14px;color:var(--neon)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -1848,6 +1864,48 @@ function hideCrawlGuide(){
   if(el) el.style.display='none';
 }
 /* ===== 테마 토글 ===== */
+var _cardViewOn=false;
+var CARD_MENUS=[
+  {name:'대시보드',cat:'핵심기능',color:'#3e7cff',bg:'rgba(62,124,255,.12)',view:'dash',svg:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>'},
+  {name:'통합 지도',cat:'핵심기능',color:'#3e7cff',bg:'rgba(62,124,255,.12)',view:'geo',svg:'<polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>'},
+  {name:'지번 검색',cat:'핵심기능',color:'#3e7cff',bg:'rgba(62,124,255,.12)',view:'geo',svg:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'},
+  {name:'도각 선택',cat:'핵심기능',color:'#3e7cff',bg:'rgba(62,124,255,.12)',view:'geo',svg:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>'},
+  {name:'수치지형도',cat:'다운로드·발급',color:'#22d3a5',bg:'rgba(34,211,165,.12)',view:'geo',svg:'<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'},
+  {name:'지적도',cat:'다운로드·발급',color:'#22d3a5',bg:'rgba(34,211,165,.12)',view:'jideok',svg:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/>'},
+  {name:'건축물대장',cat:'다운로드·발급',color:'#22d3a5',bg:'rgba(34,211,165,.12)',view:'bld',svg:'<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'},
+  {name:'등기부등본',cat:'다운로드·발급',color:'#22d3a5',bg:'rgba(34,211,165,.12)',view:'reg',svg:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>'},
+  {name:'DXF 수량산출',cat:'도면·변환',color:'#a78bfa',bg:'rgba(167,139,250,.12)',view:'dxf',svg:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>'},
+  {name:'공간정보 변환',cat:'도면·변환',color:'#a78bfa',bg:'rgba(167,139,250,.12)',view:'conv',svg:'<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/>'},
+  {name:'산e랑 변환',cat:'도면·변환',color:'#a78bfa',bg:'rgba(167,139,250,.12)',view:'conv',svg:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>'},
+  {name:'민원 진행조회',cat:'업무관리',color:'#00f0ff',bg:'rgba(0,240,255,.10)',view:'rcp',svg:'<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>'},
+  {name:'담당자 연락처',cat:'업무관리',color:'#00f0ff',bg:'rgba(0,240,255,.10)',view:'con',svg:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>'},
+  {name:'작업 이력',cat:'업무관리',color:'#00f0ff',bg:'rgba(0,240,255,.10)',view:'hist',svg:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'},
+  {name:'API 키 설정',cat:'설정',color:'#94a3b8',bg:'rgba(148,163,184,.12)',view:'api',svg:'<circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/>'},
+  {name:'문의 게시판',cat:'설정',color:'#94a3b8',bg:'rgba(148,163,184,.12)',view:'inquiry',svg:'<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>'},
+];
+function renderCardGrid(){
+  var g=document.getElementById('cardGrid');if(!g)return;
+  g.innerHTML=CARD_MENUS.map(function(m){
+    return '<div class="menu-card" onclick="showView(\''+m.view+'\');toggleCardView(false)">'
+      +'<div class="menu-card-ico" style="background:'+m.bg+'"><svg viewBox="0 0 24 24" fill="none" stroke="'+m.color+'" stroke-width="2">'+m.svg+'</svg></div>'
+      +'<div><div class="menu-card-name">'+m.name+'</div><div class="menu-card-cat">'+m.cat+'</div></div>'
+      +'</div>';
+  }).join('');
+}
+function toggleCardView(force){
+  _cardViewOn=(force===undefined)?!_cardViewOn:force;
+  var btn=document.getElementById('cardBtn');
+  if(_cardViewOn){
+    renderCardGrid();
+    document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
+    var cv=document.getElementById('view-card');if(cv)cv.classList.add('on');
+    if(btn){btn.textContent='✕ 닫기';btn.classList.add('on');}
+  } else {
+    document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
+    var dv=document.getElementById('view-dash');if(dv)dv.classList.add('on');
+    if(btn){btn.textContent='⊞ 카드형';btn.classList.remove('on');}
+  }
+}
 function toggleTheme(){
   var isDark=document.body.classList.toggle('dark');
   var btn=document.getElementById('themeBtn');
