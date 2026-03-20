@@ -2011,15 +2011,29 @@ function closeSettings(){showView("dash");}function doSearch(){
   }
   var vwKey=localStorage.getItem('gdsp_vworld')||'';
   if(vwKey){
-    var vwUrl='https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:900913&size=10&page=1&query='+encodeURIComponent('화성시 '+q)+'&type=parcel&format=json&errorformat=json&key='+vwKey;
-    proxyFetch(vwUrl)
+    var vwUrl='https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:900913&size=10&page=1&query='+encodeURIComponent('화성시 '+q)+'&type=ADDRESS&format=json&errorformat=json&key='+vwKey;
+    fetch(vwUrl)
       .then(function(r){return r.json();})
       .then(function(d){
         var items=d.response&&d.response.result&&d.response.result.items;
         if(items&&items.length){
           var item=items[0];
-          var pnu=item.id||'';
-          applySearch(pnu);
+          // ADDRESS 타입: id 또는 zipcode에 PNU 포함
+          var pnu=item.id||item.zipcode||'';
+          // point 좌표로 parcel 재검색해서 정확한 PNU 획득
+          var pt=item.point;
+          if(pt&&pt.x&&pt.y&&vwKey){
+            fetch('https://api.vworld.kr/req/address?service=address&request=getAddress&version=2.0&crs=EPSG:900913&point='+pt.x+','+pt.y+'&type=parcel&key='+vwKey)
+              .then(function(r2){return r2.json();})
+              .then(function(d2){
+                var res=d2.response&&d2.response.result&&d2.response.result[0];
+                var realPnu=res&&res.zipcode||pnu;
+                applySearch(realPnu);
+              })
+              .catch(function(){applySearch(pnu);});
+          } else {
+            applySearch(pnu);
+          }
         } else {
           applySearch('');
         }
