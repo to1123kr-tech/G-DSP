@@ -623,7 +623,7 @@ body.dark .toast{background:#08111f}
     <div class="hdr-right">
       <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙 다크</button>
       <button class="theme-toggle" onclick="toggleCardView()" id="cardBtn">⊞ 카드형</button>
-
+      <button class="hbtn" onclick="showView('api')">설정</button>
       <button class="hbtn" onclick="doLogout()">로그아웃</button>
       <div class="hbtn-user" id="tbUser">유영대</div>
     </div>
@@ -1906,6 +1906,11 @@ function toggleCardView(force){
     if(btn){btn.textContent='⊞ 카드형';btn.classList.remove('on');}
   }
 }
+// API 프록시 함수 (CORS 우회)
+function proxyFetch(url){
+  var proxyBase=localStorage.getItem('gdsp_crawl_server')||'https://g-dsp.onrender.com';
+  return fetch(proxyBase+'/api/proxy?url='+encodeURIComponent(url));
+}
 function toggleTheme(){
   var isDark=document.body.classList.toggle('dark');
   var btn=document.getElementById('themeBtn');
@@ -2006,7 +2011,8 @@ function closeSettings(){showView("dash");}function doSearch(){
   }
   var vwKey=localStorage.getItem('gdsp_vworld')||'';
   if(vwKey){
-    fetch('https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:900913&size=10&page=1&query='+encodeURIComponent('화성시 '+q)+'&type=parcel&format=json&errorformat=json&key='+vwKey)
+    var vwUrl='https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:900913&size=10&page=1&query='+encodeURIComponent('화성시 '+q)+'&type=parcel&format=json&errorformat=json&key='+vwKey;
+    proxyFetch(vwUrl)
       .then(function(r){return r.json();})
       .then(function(d){
         var items=d.response&&d.response.result&&d.response.result.items;
@@ -2270,7 +2276,7 @@ function callBldApi(){
   var ji=String(parseInt(currentPnu.substring(15,19))||0).padStart(4,'0');
   var url='https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?serviceKey='+encodeURIComponent(apiKey)
     +'&sigunguCd='+sigunguCd+'&bjdongCd='+bjdongCd+'&platGbCd='+platGbCd+'&bun='+bun+'&ji='+ji+'&numOfRows=5&pageNo=1&_type=json';
-  fetch(url)
+  proxyFetch(url)
     .then(function(r){return r.json();})
     .then(function(data){
       var items=(data.response&&data.response.body&&data.response.body.items&&data.response.body.items.item)||[];

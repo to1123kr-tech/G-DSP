@@ -90,6 +90,38 @@ def health():
     return jsonify({"ok": True, "message": "G-DSP 로컬 서버 실행 중"})
 
 
+# ── 외부 API 프록시 (CORS 우회) ──
+@app.route("/api/proxy", methods=["GET", "POST", "OPTIONS"])
+def api_proxy():
+    if request.method == "OPTIONS":
+        return "", 204
+
+    import requests as req
+    from urllib.parse import urlparse
+
+    target_url = request.args.get("url") or (request.get_json(silent=True) or {}).get("url")
+    if not target_url:
+        return jsonify({"ok": False, "error": "url 파라미터가 필요합니다."}), 400
+
+    # 허용 도메인만 통과 (보안)
+    allowed = ["api.vworld.kr", "apis.data.go.kr", "api.data.go.kr"]
+    host = urlparse(target_url).hostname or ""
+    if not any(host == a or host.endswith("." + a) for a in allowed):
+        return jsonify({"ok": False, "error": "허용되지 않은 도메인: " + host}), 403
+
+    try:
+        if request.method == "POST":
+            resp = req.post(target_url, json=request.get_json(silent=True), timeout=10)
+        else:
+            resp = req.get(target_url, timeout=10)
+        try:
+            return jsonify(resp.json())
+        except Exception:
+            return resp.text, resp.status_code, {"Content-Type": "text/plain; charset=utf-8"}
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 if __name__ == "__main__":
     print("=" * 55)
     print("  G-DSP 로컬 크롤링 서버")
