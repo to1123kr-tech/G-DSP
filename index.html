@@ -2181,9 +2181,10 @@ function testApi(key){
         setText('apiRes',ok?'✓ 건축물대장 API 정상 연결됨':'✗ 키 오류: '+code);
       })
       .catch(function(){
+        // CORS 차단 시 키 길이로 형식만 확인
         var ok=apiKey.length>20;
         if(st){st.className='cbadge '+(ok?'cb-ok':'cb-err');st.textContent=ok?'형식 OK':'키 오류';}
-        setText('apiRes',ok?'형식 확인됨 (공공데이터포털 인증키)':'키 형식 오류');
+        setText('apiRes',ok?'형식 확인됨 ✓ (GitHub Pages 환경 — API 조회 버튼으로 실제 연결 확인)':'키 형식 오류');
       });
   } else {
     setTimeout(function(){
