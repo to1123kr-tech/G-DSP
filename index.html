@@ -1925,7 +1925,46 @@ function closeSettings(){showView("dash");}function doSearch(){
     toast(q+' — 기관 검색: 지도에서 확인하세요');
     showView('geo');setTimeout(function(){switchMap('kakao',null);},100);
     armed=true;currentJibun=q;setText('mapT',q);setText('mapD','기관 검색 — 카카오맵으로 이동');return;
-  }armed=true;currentJibun='화성시 '+q;currentPnu='4159125325'+Math.floor(10000000000+Math.random()*90000000000);var yds=['제1종일반주거','제2종일반주거','준주거','일반상업','준공업','농림'];var jms=['대','전','답','임야','공장','도로'];var yd=yds[Math.floor(Math.random()*yds.length)],jm=jms[Math.floor(Math.random()*jms.length)];var gonsi=(Math.floor(500+Math.random()*1200)*1000).toLocaleString()+' 원/m²';setText('rcTitle',q+' 검색 결과');setText('rcJibun',currentJibun);setText('rcYd',yd);setText('rcJm',jm);setText('rcBcr','60%');setText('rcFar','200%');setText('rcGonsi',gonsi);setText('rcUse','업무시설');var rc=document.getElementById('rcCard');if(rc)rc.classList.add('on');setText('gJibun',currentJibun);setText('gYongdo',yd);setText('gBcr','60%');setText('gFar','200%');setText('gJimok',jm);setText('gGonsi',gonsi);setText('gUse','업무시설');setText('gFloor','지상 4층');setText('gArea','1,240 m²');setText('gYear','2008년');setText('bJibun',currentJibun);setText('bUse','업무시설');setText('bFloor','지상 4층');setText('bBcArea','620 m²');setText('bArea','1,240 m²');setText('bYear','2008년');setText('bldJibun',currentJibun);var ri=document.getElementById('regJibun');if(ri)ri.value=currentJibun;var tb=document.getElementById('rc-toolbox');if(tb)tb.href='https://toolbox.ooa.studio/map?pnu='+currentPnu;var gt=document.getElementById('gToolboxLink');if(gt)gt.href='https://toolbox.ooa.studio/map?pnu='+currentPnu;var lt=document.getElementById('landToolbox');if(lt)lt.href='https://toolbox.ooa.studio/map?pnu='+currentPnu;var lb=document.getElementById('landBanner');if(lb)lb.classList.add('on');addTile('3761'+Math.floor(2000+Math.random()*9000));addAct(q+' 검색됨','방금');addHistItem('검색: '+q);var dot=document.getElementById('sDot');if(dot)dot.className='s-dot s-on';setText('sTxt','연동됨');showView('geo');setTimeout(function(){switchMap(curMapKey,document.querySelector('.mp-btn.on'));},100);toast('✓ '+q+' — 전체 연동 완료','ok');}
+  }
+  var searchJibun='화성시 '+q;
+  function applySearch(pnu){
+    armed=true;currentJibun=searchJibun;currentPnu=pnu||'';
+    setText('rcTitle',q+' 검색 결과');setText('rcJibun',currentJibun);
+    setText('gJibun',currentJibun);setText('bJibun',currentJibun);setText('bldJibun',currentJibun);
+    var ri=document.getElementById('regJibun');if(ri)ri.value=currentJibun;
+    if(pnu){
+      var tb=document.getElementById('rc-toolbox');if(tb)tb.href='https://toolbox.ooa.studio/map?pnu='+pnu;
+      var gt=document.getElementById('gToolboxLink');if(gt)gt.href='https://toolbox.ooa.studio/map?pnu='+pnu;
+      var lt=document.getElementById('landToolbox');if(lt)lt.href='https://toolbox.ooa.studio/map?pnu='+pnu;
+    }
+    var lb=document.getElementById('landBanner');if(lb)lb.classList.add('on');
+    var rc=document.getElementById('rcCard');if(rc)rc.classList.add('on');
+    addTile('3761'+Math.floor(2000+Math.random()*9000));
+    addAct(q+' 검색됨','방금');addHistItem('검색: '+q);
+    var dot=document.getElementById('sDot');if(dot)dot.className='s-dot s-on';
+    setText('sTxt','연동됨');showView('geo');
+    setTimeout(function(){switchMap(curMapKey,document.querySelector('.mp-btn.on'));},100);
+    toast('✓ '+q+' — 연동 완료'+(pnu?' (PNU확인)':''),'ok');
+  }
+  var vwKey=localStorage.getItem('gdsp_vworld')||'';
+  if(vwKey){
+    fetch('https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:900913&size=10&page=1&query='+encodeURIComponent('화성시 '+q)+'&type=parcel&format=json&errorformat=json&key='+vwKey)
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var items=d.response&&d.response.result&&d.response.result.items;
+        if(items&&items.length){
+          var item=items[0];
+          var pnu=item.id||'';
+          applySearch(pnu);
+        } else {
+          applySearch('');
+        }
+      })
+      .catch(function(){applySearch('');});
+  } else {
+    applySearch('');
+  }
+}
 function setText(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
 function addAct(txt,time){var list=document.getElementById('actList');if(!list)return;var d=document.createElement('div');d.className='act';d.innerHTML='<div class="act-d" style="background:var(--neon)"></div><div class="act-t">'+txt+'</div><div class="act-tm">'+time+'</div>';list.insertBefore(d,list.firstChild);if(list.children.length>8)list.removeChild(list.lastChild);}
 function addTile(code){var box=document.getElementById('tileBox');if(!box||box.querySelector('[data-c="'+code+'"]'))return;var d=document.createElement('div');d.className='tile-row';d.dataset.c=code;d.innerHTML='<span style="color:var(--neon);font-size:10px">▪</span><span>'+code+'</span><button onclick="this.parentNode.remove()" style="margin-left:auto;color:var(--txt3);font-size:12px;background:none;border:none;cursor:pointer">×</button>';box.appendChild(d);}
