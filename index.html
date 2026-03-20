@@ -2388,7 +2388,7 @@ function renderInq(){
   }).join('');
 }
 var _tt;
-function toast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');clearTimeout(_tt);_tt=setTimeout(function(){t.classList.remove('show');},2400);}
+function toast(msg,type){var t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:99999;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.4)';document.body.appendChild(t);}t.textContent=msg;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';t.style.background=type==='err'?'#991b1b':type==='ok'?'#0f766e':'#1e293b';clearTimeout(_tt);_tt=setTimeout(function(){t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2400);}
 try{
 
 // ── ACI 팔레트 ──────────────────────────────────────
