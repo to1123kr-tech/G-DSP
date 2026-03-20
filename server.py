@@ -18,9 +18,17 @@ G-DSP 로컬 프록시 서버
 from flask import Flask, request, jsonify, send_file
 from flask import make_response
 import os
+import requests as req
+from urllib.parse import urlparse
 
 # hwaseong_crawl.py 와 같은 폴더에 있어야 함
-from hwaseong_crawl import crawl_minwon
+try:
+    from hwaseong_crawl import crawl_minwon
+    HAS_CRAWL = True
+except Exception:
+    HAS_CRAWL = False
+    def crawl_minwon(no):
+        return {"ok": False, "error": "크롤러 모듈 없음"}
 
 app = Flask(__name__)
 
@@ -95,9 +103,6 @@ def health():
 def api_proxy():
     if request.method == "OPTIONS":
         return "", 204
-
-    import requests as req
-    from urllib.parse import urlparse
 
     target_url = request.args.get("url") or (request.get_json(silent=True) or {}).get("url")
     if not target_url:
