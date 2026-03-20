@@ -1059,8 +1059,8 @@ body.dark .toast{background:#08111f}
           <div class="bld-card" style="grid-column:1/3">
             <div class="bld-card-t">발급 서비스</div>
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px">
-              <a class="issue-btn" href="https://www.gov.kr/mw/AA020InfoCappView.do?CappBizCD=14400000020" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>건축물대장<span class="issue-btn-arr">›</span></a>
-              <a class="issue-btn" href="https://luris.molit.go.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>토지이용확인원<span class="issue-btn-arr">›</span></a>
+              <a class="issue-btn" href="https://www.eais.go.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>건축물대장<span class="issue-btn-arr">›</span></a>
+              <a class="issue-btn" href="https://www.eum.go.kr/web/am/amMain.jsp" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>토지이용확인원<span class="issue-btn-arr">›</span></a>
               <a class="issue-btn" href="https://www.iros.go.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>인터넷등기소<span class="issue-btn-arr">›</span></a>
               <a class="issue-btn" href="https://plus.gov.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>정부24<span class="issue-btn-arr">›</span></a>
             </div>
@@ -2156,6 +2156,51 @@ function loadSettings(){
       if(st){st.className='cbadge '+(ok?'cb-ok':'cb-err');st.textContent=ok?'✓ 연결됨':'✗ 미연결';}
     });
   },800);
+}
+function callBldApi(){
+  if(!armed){toast('먼저 지번을 검색하세요','err');return;}
+  var apiKey=localStorage.getItem('gdsp_building')||'';
+  if(!apiKey){toast('건축물대장 API 키를 설정에서 먼저 입력하세요','err');return;}
+  var jibun=(document.getElementById('bJibun')?document.getElementById('bJibun').textContent:'').trim();
+  if(!jibun||jibun==='—'){toast('지번 정보가 없습니다. 지번을 먼저 검색하세요','err');return;}
+  if(!currentPnu||currentPnu.length<19){toast('PNU 정보 없음 — 지번 검색을 다시 해주세요','err');return;}
+  toast('건축물대장 API 조회 중...','ok');
+  var sigunguCd=currentPnu.substring(0,5);
+  var bjdongCd=currentPnu.substring(5,10);
+  var platGbCd=currentPnu.substring(10,11);
+  var bun=String(parseInt(currentPnu.substring(11,15))||0).padStart(4,'0');
+  var ji=String(parseInt(currentPnu.substring(15,19))||0).padStart(4,'0');
+  var url='https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?serviceKey='+encodeURIComponent(apiKey)
+    +'&sigunguCd='+sigunguCd+'&bjdongCd='+bjdongCd+'&platGbCd='+platGbCd+'&bun='+bun+'&ji='+ji+'&numOfRows=5&pageNo=1&_type=json';
+  fetch(url)
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var items=(data.response&&data.response.body&&data.response.body.items&&data.response.body.items.item)||[];
+      if(!Array.isArray(items))items=[items];
+      if(!items.length||!items[0]||!items[0].platPlc){
+        // PNU가 더미값이므로 VWorld로 실제 주소 조회 시도
+        var vwKey=localStorage.getItem('gdsp_vworld')||'';
+        if(vwKey){
+          fetch('https://api.vworld.kr/req/address?service=address&request=getCoord&version=2.0&crs=epsg:4326&address='+encodeURIComponent(jibun)+'&refine=true&simple=false&key='+vwKey)
+            .then(function(r2){return r2.json();})
+            .then(function(d2){toast('조회 결과 없음 — 지번을 정확히 입력 후 다시 검색해주세요','err');})
+            .catch(function(){toast('조회 결과 없음','err');});
+        } else {
+          toast('조회 결과 없음 — VWorld API 키도 확인해주세요','err');
+        }
+        return;
+      }
+      var d=items[0];
+      var use=d.mainPurpsCdNm||d.etcPurps||'—';
+      var floor=(d.grndFlrCnt?'지상 '+d.grndFlrCnt+'층':'—')+(d.ugrndFlrCnt&&d.ugrndFlrCnt>0?' / 지하 '+d.ugrndFlrCnt+'층':'');
+      var bcArea=d.bcAr?parseFloat(d.bcAr).toLocaleString()+' m²':'—';
+      var totArea=d.totArea?parseFloat(d.totArea).toLocaleString()+' m²':'—';
+      var year=d.useAprDay?d.useAprDay.substring(0,4)+'년':'—';
+      setText('bUse',use);setText('bFloor',floor);setText('bBcArea',bcArea);setText('bArea',totArea);setText('bYear',year);
+      setText('gUse',use);setText('gFloor',floor);setText('gArea',totArea);setText('gYear',year);
+      toast('✓ 건축물대장 조회 완료 ('+d.platPlc+')','ok');
+    })
+    .catch(function(e){toast('API 조회 실패: '+e.message,'err');});
 }
 function searchReg(){var j=document.getElementById('regJibun').value.trim();if(!j){toast('지번을 입력하세요','err');return;}setText('regUniq','1101-'+Math.floor(1000000+Math.random()*9000000));setText('regOwner','홍길동 (예시)');toast('등기 조회 — 실제 데이터는 인터넷등기소 API 필요');addHistItem('등기 조회: '+j);}
 function addRegToList(){var j=document.getElementById('regJibun').value.trim();if(!j){toast('지번을 입력하세요','err');return;}regItems.push(j);renderRegList();toast(j+' 추가됨','ok');}
