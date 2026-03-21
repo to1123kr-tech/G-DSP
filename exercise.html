@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -65,7 +66,7 @@ function saveKey(){
 async function testApi(){
   let key=localStorage.getItem("gemini")
   let r=await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key="+key,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key="+key,
     {
       method:"POST",
       headers:{"Content-Type":"application/json"},
@@ -109,7 +110,7 @@ async function runOCR(){
   else prompt="사진 설명"
 
   let r=await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key="+key,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key="+key,
     {
       method:"POST",
       headers:{"Content-Type":"application/json"},
