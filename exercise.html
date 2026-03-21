@@ -61,6 +61,7 @@ input{width:100%;padding:12px;border:none;border-radius:10px;background:#333;col
 let type=null
 let file=null
 let last=""
+let loading=false
 
 function saveKey(){
 let k=document.getElementById("key").value
@@ -71,7 +72,14 @@ alert("저장됨")
 async function testApi(){
 
 let key=localStorage.getItem("gemini")
+if(!key){ alert("API 키 먼저 저장"); return }
 
+let el=document.getElementById("apiStatus")
+if(el.innerText=="⏳ 테스트 중...") return  // 중복 방지
+
+el.innerText="⏳ 테스트 중..."
+
+try{
 let r=await fetch(
 "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key="+key,
 {
@@ -84,8 +92,14 @@ contents:[{parts:[{text:"hello"}]}]
 
 let j=await r.json()
 
-document.getElementById("apiStatus").innerText =
-JSON.stringify(j).substring(0,150)
+if(j.error){
+el.innerText="❌ "+j.error.code+": "+j.error.message.substring(0,80)
+} else {
+el.innerText="✅ 정상: "+j.candidates?.[0]?.content?.parts?.[0]?.text
+}
+} catch(e){
+el.innerText="❌ 네트워크 오류"
+}
 
 }
 
@@ -125,12 +139,15 @@ r.readAsDataURL(file)
 
 async function runOCR(){
 
+if(loading) return  // 중복 호출 방지
+
 let key=localStorage.getItem("gemini")
 
-if(!file){
-alert("사진 선택")
-return
-}
+if(!key){ alert("API 키 먼저 저장"); return }
+if(!file){ alert("사진 선택"); return }
+
+loading=true
+document.getElementById("result").innerText = "⏳ 읽는 중..."
 
 let base=await toBase64(file)
 
@@ -147,6 +164,8 @@ prompt="체중이나 숫자 정보만 읽어라"
 
 else
 prompt="이미지 설명"
+
+try{
 
 let r=await fetch(
 "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key="+key,
@@ -165,9 +184,18 @@ parts:[
 
 let j=await r.json()
 
+if(j.error){
+last="오류: "+j.error.code+" "+j.error.message.substring(0,60)
+} else {
 last=j.candidates?.[0]?.content?.parts?.[0]?.text || "읽기 실패"
+}
+
+} catch(e){
+last="네트워크 오류: "+e.message
+}
 
 document.getElementById("result").innerText = last
+loading=false
 
 }
 
