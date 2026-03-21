@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>운동 기록 테스트2</title>
+<title>운동 기록 테스트</title>
 <style>
 body{margin:0;background:#111;color:#fff;font-family:Arial}
 .wrap{max-width:420px;margin:auto;padding:20px}
@@ -17,9 +17,11 @@ input{width:100%;padding:12px;border:none;border-radius:10px;background:#333;col
 .preview{width:100%;margin-top:10px;border-radius:10px;display:none}
 </style>
 </head>
+
 <body>
 <div class="wrap">
-<h1>운동 기록 테스트2</h1>
+
+<h1>운동 기록 OCR 테스트</h1>
 
 <div class="card">
 <h3>API 설정</h3>
@@ -32,12 +34,13 @@ input{width:100%;padding:12px;border:none;border-radius:10px;background:#333;col
 </div>
 
 <div class="card">
-<h3>업로드</h3>
+<h3>사진 업로드</h3>
+
 <div class="row">
-<button onclick="pick('내사진')">내사진</button>
 <button onclick="pick('운동')">운동</button>
 <button onclick="pick('걸음')">걸음</button>
 <button onclick="pick('인바디')">인바디</button>
+<button onclick="pick('사진')">내사진</button>
 </div>
 
 <input id="file" type="file" accept="image/*" style="display:none">
@@ -50,93 +53,136 @@ input{width:100%;padding:12px;border:none;border-radius:10px;background:#333;col
 
 <div id="result" class="result">결과 없음</div>
 </div>
+
 </div>
 
 <script>
+
 let type=null
 let file=null
 let last=""
 
 function saveKey(){
-  let k=document.getElementById("key").value
-  localStorage.setItem("gemini",k)
-  alert("저장됨")
+let k=document.getElementById("key").value
+localStorage.setItem("gemini",k)
+alert("저장됨")
 }
 
 async function testApi(){
-  let key=localStorage.getItem("gemini")
-  let r=await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key="+key,
-    {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({contents:[{parts:[{text:"ok"}]}]})
-    }
-  )
-  let j=await r.json()
-  document.getElementById("apiStatus").innerText=JSON.stringify(j).substring(0,120)
+
+let key=localStorage.getItem("gemini")
+
+let r=await fetch(
+"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key="+key,
+{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+contents:[{parts:[{text:"hello"}]}]
+})
+})
+
+let j=await r.json()
+
+document.getElementById("apiStatus").innerText =
+JSON.stringify(j).substring(0,150)
+
 }
 
 function pick(t){
-  type=t
-  document.getElementById("file").click()
+
+type=t
+document.getElementById("file").click()
+
 }
 
-document.getElementById("file").onchange=e=>{
-  file=e.target.files[0]
-  let url=URL.createObjectURL(file)
-  let img=document.getElementById("preview")
-  img.src=url
-  img.style.display="block"
+document.getElementById("file").onchange = e=>{
+
+file=e.target.files[0]
+
+let url=URL.createObjectURL(file)
+
+let img=document.getElementById("preview")
+
+img.src=url
+img.style.display="block"
+
 }
 
 function toBase64(file){
-  return new Promise((res,rej)=>{
-    let r=new FileReader()
-    r.onload=()=>res(r.result.split(",")[1])
-    r.readAsDataURL(file)
-  })
+
+return new Promise((res,rej)=>{
+
+let r=new FileReader()
+
+r.onload=()=>res(r.result.split(",")[1])
+
+r.readAsDataURL(file)
+
+})
+
 }
 
 async function runOCR(){
-  let key=localStorage.getItem("gemini")
-  if(!file)return alert("사진 선택")
-  let base=await toBase64(file)
 
-  let prompt=""
-  if(type=="운동") prompt="이 이미지에서 운동 시간 하나만 읽어라. 예: 1:00"
-  else if(type=="걸음") prompt="걸음수 숫자만"
-  else if(type=="인바디") prompt="숫자만 요약"
-  else prompt="사진 설명"
+let key=localStorage.getItem("gemini")
 
-  let r=await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key="+key,
-    {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        contents:[{
-          parts:[
-            {text:prompt},
-            {inline_data:{mime_type:"image/jpeg",data:base}}
-          ]
-        }]
-      })
-    }
-  )
+if(!file){
+alert("사진 선택")
+return
+}
 
-  let j=await r.json()
-  last=j.candidates?.[0]?.content?.parts?.[0]?.text || "읽기 실패"
-  document.getElementById("result").innerText=last
+let base=await toBase64(file)
+
+let prompt=""
+
+if(type=="운동")
+prompt="이 이미지에서 운동 시간을 읽어라. 예: 1:00"
+
+else if(type=="걸음")
+prompt="걸음수 숫자만 읽어라"
+
+else if(type=="인바디")
+prompt="체중이나 숫자 정보만 읽어라"
+
+else
+prompt="이미지 설명"
+
+let r=await fetch(
+"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key="+key,
+{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+contents:[{
+parts:[
+{text:prompt},
+{inline_data:{mime_type:"image/jpeg",data:base}}
+]
+}]
+})
+})
+
+let j=await r.json()
+
+last=j.candidates?.[0]?.content?.parts?.[0]?.text || "읽기 실패"
+
+document.getElementById("result").innerText = last
+
 }
 
 function edit(){
-  let v=prompt("수정",last)
-  if(v){
-    last=v
-    document.getElementById("result").innerText=v
-  }
+
+let v=prompt("수정",last)
+
+if(v){
+last=v
+document.getElementById("result").innerText=v
 }
+
+}
+
 </script>
+
 </body>
 </html>
