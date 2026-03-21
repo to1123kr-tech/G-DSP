@@ -811,12 +811,10 @@ body.dark .toast{background:#08111f}
             <div class="gsec">
               <div class="gsec-t">지도 선택</div>
               <div class="map-picker">
-                <button class="mp-btn on" onclick="switchMap('kakao',this)">카카오<br>일반</button>
-                <button class="mp-btn" onclick="switchMap('kakao-sat',this)">카카오<br>위성</button>
+                <button class="mp-btn on" onclick="switchMap('kakao',this)">카카오<br>지도</button>
                 <button class="mp-btn" onclick="switchMap('naver',this)">네이버<br>지도</button>
-                <button class="mp-btn" onclick="switchMap('vworld',this)">VWorld<br>일반</button>
-                <button class="mp-btn" onclick="switchMap('vworld-sat',this)">VWorld<br>위성</button>
-                <button class="mp-btn" onclick="switchMap('toolbox',this)">지번<br>통합지도</button>
+                <button class="mp-btn" onclick="switchMap('vworld',this)">VWorld<br>지도</button>
+                <button class="mp-btn" onclick="openVWorldNewTab()">VWorld<br>새탭열기</button>
               </div>
             </div>
             <div class="gsec">
@@ -1339,7 +1337,7 @@ body.dark .toast{background:#08111f}
           </div>
           <div style="font-size:12px;color:var(--txt3);margin-bottom:10px;line-height:1.9;background:var(--bg2);padding:10px 12px;border-radius:8px">
             💻 <b>내 컴퓨터에서 실행</b>: <code style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid var(--line2);font-size:12px">http://localhost:5050</code><br>
-            ☁️ <b>Railway 서버 이용 시</b>: Railway에서 발급된 주소 입력<br>
+            ☁️ <b>오라클 서버</b>: <code style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid var(--line2);font-size:12px">http://168.107.15.68:5050</code><br>
             <span style="color:var(--gold);font-size:11px">※ 서버가 연결되어야 ↻갱신 버튼이 실제로 작동합니다</span>
           </div>
           <div class="api-row2">
@@ -1940,15 +1938,18 @@ var histItems=JSON.parse(localStorage.getItem('gdsp_hist')||'[]');
 var regItems=[];
 var MAP_CFG={
   'kakao':{url:'https://map.kakao.com/',cover:false},
-  'kakao-sat':{url:'https://map.kakao.com/?map_type=SKYVIEW',cover:false},
-  'kakao-road':{url:'https://map.kakao.com/?map_type=ROADVIEW',cover:false},
   'naver':{url:'https://map.naver.com/',cover:false},
   'vworld':{url:'https://map.vworld.kr/map/maps.do?basemap=GRAPHIC&ver=2.0&zoom=13',cover:false},
-  'vworld-sat':{url:'https://map.vworld.kr/map/maps.do?basemap=SATELLITE&ver=2.0&zoom=13',cover:false},
-  'ngii':{url:'https://map.ngii.go.kr/ms/map/NlipMap.do',cover:false},
-  'toolbox':{url:'https://toolbox.ooa.studio/map',cover:false}
+  'ngii':{url:'https://map.ngii.go.kr/ms/map/NlipMap.do',cover:false}
 };
-var MAP_NAMES={'kakao':'카카오 일반','kakao-sat':'카카오 위성','kakao-road':'카카오 로드뷰','naver':'네이버지도','vworld':'VWorld 일반','vworld-sat':'VWorld 위성','ngii':'국토정보플랫폼','toolbox':'지번통합지도'};
+var MAP_NAMES={'kakao':'카카오 지도','naver':'네이버 지도','vworld':'VWorld 지도','ngii':'국토정보플랫폼'};
+// VWorld는 iframe 차단이 있어 새 탭으로 여는 버튼 제공
+function openVWorldNewTab(){
+  var url='https://map.vworld.kr/map/maps.do?basemap=GRAPHIC&ver=2.0&zoom=13';
+  if(armed&&currentJibun)url+='&address='+encodeURIComponent(currentJibun);
+  window.open(url,'_blank');
+  toast('VWorld 새 탭에서 열었습니다','ok');
+}
 var curMapKey='kakao';
 function doLogin(){
   var id=(document.getElementById('loginId').value||'').trim();
@@ -1991,10 +1992,8 @@ document.getElementById('mainSearch').addEventListener('keydown',function(e){if(
 function toggleCat(el,catId){var isOn=el.classList.contains('on');el.classList.toggle('on',!isOn);var sub=document.getElementById(catId);if(sub)sub.classList.toggle('on',!isOn);}
 function showView(name,el){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('on')});if(el)el.classList.add('on');document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on')});var v=document.getElementById('view-'+name);if(v)v.classList.add('on');if(name==='con')renderCon('');if(name==='jideok')setTimeout(initJdCanvas,100);if(name==='rcp')renderRcp();if(name==='hist')renderHist();}
 function switchMap(key,btn){document.querySelectorAll('.mp-btn').forEach(function(b){b.classList.remove('on')});if(btn)btn.classList.add('on');curMapKey=key;var cfg=MAP_CFG[key];if(!cfg)return;var url=cfg.url;if(armed){
-    if(key==='toolbox'&&currentPnu)url='https://toolbox.ooa.studio/map?pnu='+currentPnu;
-    else if((key==='vworld'||key==='vworld-sat')&&currentJibun)url=cfg.url+'&address='+encodeURIComponent(currentJibun);
+    if(key==='vworld'&&currentJibun)url=cfg.url+'&address='+encodeURIComponent(currentJibun);
     else if(key==='kakao'&&currentJibun)url='https://map.kakao.com/?q='+encodeURIComponent(currentJibun);
-    else if(key==='kakao-sat'&&currentJibun)url='https://map.kakao.com/?map_type=SKYVIEW&q='+encodeURIComponent(currentJibun);
     else if(key==='naver'&&currentJibun)url='https://map.naver.com/v5/search/'+encodeURIComponent(currentJibun);
   }var iframe=document.getElementById('mapIframe');if(iframe)iframe.src=url;var cover=document.getElementById('mapCover');if(cover)cover.style.display=cfg.cover?'block':'none';setText('mapT',MAP_NAMES[key]||key);setText('mapD',armed?currentJibun+' 연동됨':'지번 검색 후 자동 연동');setText('mapActiveLabel',MAP_NAMES[key]||key);}
 function resetMap(){switchMap(curMapKey,document.querySelector('.mp-btn.on'));}
