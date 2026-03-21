@@ -33,25 +33,71 @@ ul{line-height:2}
 
 <div class="header">
   <h1>📢 G-DSP 개발기록</h1>
-  <p>최종 업데이트: 2026.03.20</p>
+  <p>최종 업데이트: 2026.03.21</p>
 </div>
 
 <!-- 현재 상태 통계 -->
 <div class="section">
 <h2>현재 구현 현황</h2>
 <div class="stat-row">
-  <div class="stat-box" style="background:#d1fae5;color:#065f46"><div class="num">30</div><div class="lbl">구현완료</div></div>
+  <div class="stat-box" style="background:#d1fae5;color:#065f46"><div class="num">38</div><div class="lbl">구현완료</div></div>
   <div class="stat-box" style="background:#fef3c7;color:#92400e"><div class="num">4</div><div class="lbl">부분구현</div></div>
   <div class="stat-box" style="background:#dbeafe;color:#1e40af"><div class="num">5</div><div class="lbl">API필요</div></div>
   <div class="stat-box" style="background:#ede9fe;color:#5b21b6"><div class="num">2</div><div class="lbl">서버필요</div></div>
   <div class="stat-box" style="background:#f3f4f6;color:#374151"><div class="num">80</div><div class="lbl">전체항목</div></div>
-  <div class="stat-box" style="background:#1d4ed8;color:#fff"><div class="num">37.5%</div><div class="lbl">전체진행률</div></div>
+  <div class="stat-box" style="background:#1d4ed8;color:#fff"><div class="num">47.5%</div><div class="lbl">전체진행률</div></div>
 </div>
 </div>
 
 <!-- 업데이트 로그 -->
 <div class="section">
 <h2>업데이트 로그</h2>
+
+<div class="log-item">
+  <div class="log-date">2026.03.21</div>
+  <div class="log-content">
+    <b>카카오 지도 JavaScript API 직접 임베드</b> <span class="badge done">완료</span><br>
+    기존 iframe 방식 → 카카오 지도 JS API 직접 임베드로 전환. 지도만 깔끔하게 표시.<br>
+    • 일반 / 위성 / 위성+라벨 전환 버튼<br>
+    • 지적도 오버레이 (USE_DISTRICT)<br>
+    • 지번 검색 → 지도 자동 이동 + 마커 표시<br>
+    • 지도 클릭 시 좌표 표시<br>
+    • 지형 절대고도 조회 팝업 (Open-Elevation API)
+  </div>
+</div>
+
+<div class="log-item">
+  <div class="log-date">2026.03.21</div>
+  <div class="log-content">
+    <b>오라클 클라우드 서버 영구 운영 설정</b> <span class="badge done">완료</span><br>
+    • systemd gdsp.service 등록 — SSH 끊겨도, 재부팅해도 자동 실행<br>
+    • GitHub crontab 연동 — 5분마다 git pull로 자동 최신화<br>
+    • http://168.107.15.68:5050 에서 index.html 직접 서빙<br>
+    • 카카오 API 도메인 4개 등록 (168.107.15.68:5050 포함)
+  </div>
+</div>
+
+<div class="log-item">
+  <div class="log-date">2026.03.21</div>
+  <div class="log-content">
+    <b>건축물대장 API 버그 수정 + VWorld 연결 해결</b> <span class="badge done">완료</span><br>
+    • vwKey undefined 버그 완전 제거<br>
+    • 직접 fetch → CORS 차단 시 프록시 서버 폴백 방식으로 개선<br>
+    • VWorld API 키 정상 확인 (브라우저 직접 호출 OK)<br>
+    • data.go.kr 키 1개로 건축물대장/토지이용 모두 사용 가능 확인
+  </div>
+</div>
+
+<div class="log-item">
+  <div class="log-date">2026.03.21</div>
+  <div class="log-content">
+    <b>UI 개선 및 정리</b> <span class="badge done">완료</span><br>
+    • 지도 버튼 3개로 단순화 (일반/위성/위성+라벨)<br>
+    • 시작 팝업 제거 (iframe 로드 지연 문제 해결)<br>
+    • 서버 문구 Railway → 오라클 서버로 수정<br>
+    • 카카오 SDK https:// 고정 (HTTP 환경 대응)
+  </div>
+</div>
 
 <div class="log-item">
   <div class="log-date">2026.03.20</div>
@@ -130,6 +176,9 @@ ul{line-height:2}
   <li>⚙️ API 키 설정 — VWorld·건축물대장·국토정보 실제 테스트</li>
   <li>☁️ Railway 클라우드 배포 — PC 없이도 24시간 민원 자동 갱신</li>
   <li>🎨 라이트/다크 테마 전환</li>
+  <li>🗺 카카오 지도 API 직접 임베드 — 일반/위성/위성+라벨/지적도 오버레이</li>
+  <li>📐 지형 절대고도 조회 팝업 — DEM 기반 참고값</li>
+  <li>☁️ 오라클 서버 영구 운영 — systemd + GitHub 자동 동기화</li>
 </ul>
 </div>
 
@@ -137,17 +186,20 @@ ul{line-height:2}
 <div class="section">
 <h2>남은 주요 작업</h2>
 <ul>
+  <li>🖱 지도 클릭 → 필지 선택 기능 (VWorld WFS 연동)</li>
   <li>🔑 토지이용확인원 API 실제 연동 (data.go.kr)</li>
   <li>📥 수치지형도 자동 다운로드 (국토정보플랫폼 로그인 연동)</li>
   <li>✏️ 분할 모드 고도화 (스냅·면적맞춤·다중필지)</li>
   <li>📊 등기부등본 엑셀 자동 생성</li>
   <li>📱 담당자 연락처 추가/수정/삭제 기능</li>
+  <li>🏔 국토정보플랫폼 Selenium 크롤링 (수치지형도 자동화)</li>
+  <li>🗺 VWorld 연속지적도 WMS 오버레이 (정밀 지적도)</li>
 </ul>
 </div>
 
 <div class="footer">
   <div class="dev">개발자 유영대</div>
-  G-DSP Project Start : 2026.03.18 | 현재 버전 : 2026.03.20
+  G-DSP Project Start : 2026.03.18 | 현재 버전 : 2026.03.21
 </div>
 
 </div>

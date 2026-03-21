@@ -84,10 +84,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
     <div class="hdr-divider"></div>
     <div class="hdr-info">
       <div class="hdr-title">전체 기능 현황 시안</div>
-      <div class="hdr-sub">Geo Data &amp; Spatial Platform · 개발자 유영대 · 2026.03.20</div>
+      <div class="hdr-sub">Geo Data &amp; Spatial Platform · 개발자 유영대 · 2026.03.21</div>
     </div>
     <div class="hdr-stats">
-      <div class="stat"><div class="stat-n" style="color:var(--green)">30</div><div class="stat-l">구현완료</div></div>
+      <div class="stat"><div class="stat-n" style="color:var(--green)">38</div><div class="stat-l">구현완료</div></div>
       <div class="stat"><div class="stat-n" style="color:var(--gold)">4</div><div class="stat-l">부분가능</div></div>
       <div class="stat"><div class="stat-n" style="color:var(--blue2)">5</div><div class="stat-l">API필요</div></div>
       <div class="stat"><div class="stat-n" style="color:var(--purple)">2</div><div class="stat-l">서버필요</div></div>
@@ -98,8 +98,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
   <!-- 진행률 -->
   <div class="progress-wrap">
     <div class="progress-title">전체 구현 진행률</div>
-    <div class="progress-bar"><div class="progress-fill" style="width:43%"></div></div>
-    <div class="progress-info"><span>HTML 가능 항목 기준 30/60개 (50%)</span><span>전체 기준 30/80개 (37.5%)</span></div>
+    <div class="progress-bar"><div class="progress-fill" style="width:55%"></div></div>
+    <div class="progress-info"><span>HTML 가능 항목 기준 38/60개 (63%)</span><span>전체 기준 38/80개 (47.5%)</span></div>
   </div>
 
   <!-- 범례 -->
@@ -122,6 +122,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
       <div class="memo-col">
         <h4>우선 개발 항목</h4>
         <div class="memo-item important">✅ 8-06 민원 자동 크롤링 완료 — hwaseong_crawl.py + server.py</div>
+        <div class="memo-item important">✅ 1-12 카카오 지도 JS API 직접 임베드 — 지적도 오버레이 + 고도 조회</div>
+        <div class="memo-item important">✅ 오라클 서버 영구 운영 — systemd 자동시작 + GitHub crontab 동기화</div>
         <div class="memo-item important">✅ 2-02 건축물대장 API 실제 연동 완료 — 지번 검색 후 자동 조회</div>
         <div class="memo-item">3-01~09 분할 모드 고도화 (스냅·면적맞춤·다중필지)</div>
         <div class="memo-item">1-09 수치지형도 실제 다운로드 → 국토정보 로그인 연동</div>
@@ -133,7 +135,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
         <div class="memo-item">VWorld 지도: API 키 없이 기본 타일 로드 가능</div>
         <div class="memo-item">DXF 수량산출: 완전 작동 (실제 업무 사용 가능)</div>
         <div class="memo-item">담당자 연락처 138명: 수동 입력 DB (별도 수정 예정)</div>
-        <div class="memo-item important">✅ CORS 해결: 로컬 server.py 또는 Railway 클라우드 서버로 해결</div>
+        <div class="memo-item important">✅ CORS 해결: 오라클 서버 프록시 경유 — http://168.107.15.68:5050</div>
       </div>
     </div>
   </div>
@@ -144,7 +146,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 var DATA = [
   {ch:'1',title:'지도 및 기본 기능',color:'#3e7cff',items:[
     {n:'1-01',txt:'지도 종류 구분 — 영상·일반·위성 탭',tag:'api'},
-    {n:'1-02',txt:'지도 탭 추가 — VWorld·카카오·네이버·국토정보 등 8종',tag:'done'},
+    {n:'1-02',txt:'지도 탭 추가 — 카카오 JS API 직접 임베드 (일반/위성/위성+라벨)',tag:'done'},
     {n:'1-03',txt:'범례 — 건물·지적·도각 표시',tag:'todo'},
     {n:'1-04',txt:'도각 선택 — 클릭 이동, 수치지형도 연동',tag:'done'},
     {n:'1-05',txt:'등고선 기능',tag:'part'},
@@ -154,6 +156,8 @@ var DATA = [
     {n:'1-09',txt:'수치지형도 다운로드 — 국토정보 연동',tag:'api'},
     {n:'1-10',txt:'지적도 다운로드 — 영역 선택',tag:'done'},
     {n:'1-11',txt:'지도 필지 선택 — 우클릭 하이라이트',tag:'todo'},
+    {n:'1-12',txt:'지적도 오버레이 (카카오 USE_DISTRICT)',tag:'done'},
+    {n:'1-13',txt:'지형 절대고도 조회 팝업 (Open-Elevation API)',tag:'done'},
   ]},
   {ch:'2',title:'토지·건축물 발급',color:'#22d3a5',items:[
     {n:'2-01',txt:'토지이용 자동 미리보기',tag:'api'},
@@ -195,7 +199,7 @@ var DATA = [
     {n:'4-08',txt:'건축물대장 실제 테스트 (실제 API 호출)',tag:'done'},
     {n:'4-09',txt:'토지이용확인원 API 키 입력/테스트',tag:'done'},
     {n:'4-10',txt:'연결 성공/실패 상태 배지 표시',tag:'done'},
-    {n:'4-11',txt:'민원 자동갱신 서버 URL 설정 (Railway/로컬)',tag:'done'},
+    {n:'4-11',txt:'민원 자동갱신 서버 URL 설정 (오라클/로컬)',tag:'done'},
     {n:'4-12',txt:'서버 자동 연결 확인 (로그인 시)',tag:'done'},
   ]},
   {ch:'5',title:'DXF 수량산출',color:'#a78bfa',items:[
@@ -256,7 +260,8 @@ var DATA = [
     {n:'9-03',txt:'협업 기능',tag:'review'},
     {n:'9-04',txt:'알림 기능 (토스트/뱃지)',tag:'done'},
     {n:'9-06',txt:'라이트/다크 테마 전환',tag:'done'},
-    {n:'9-07',txt:'Railway 클라우드 배포 지원',tag:'done'},
+    {n:'9-07',txt:'오라클 서버 영구 운영 — systemd + GitHub 자동 동기화',tag:'done'},
+    {n:'9-08',txt:'카카오 지도 JS API 직접 임베드 (iframe 탈피)',tag:'done'},
     {n:'9-05',txt:'모바일/태블릿 최적화',tag:'todo'},
   ]},
 ];
