@@ -1,42 +1,205 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>운동앱 테스트</title>
+<title>운동 기록 테스트</title>
 <style>
-body{
-  background:#111;
-  color:white;
-  font-family:Arial;
-  text-align:center;
-  padding-top:60px;
-}
-.box{
-  background:#222;
-  margin:20px;
-  padding:30px;
-  border-radius:12px;
-  font-size:22px;
-}
-button{
-  padding:15px 25px;
-  font-size:18px;
-  border:none;
-  border-radius:10px;
-  background:#3a3a3a;
-  color:white;
-}
+body{margin:0;background:#111;color:#fff;font-family:Arial,sans-serif}
+.wrap{max-width:420px;margin:0 auto;padding:18px 16px 90px}
+h1{font-size:28px;text-align:center;margin:18px 0 24px}
+.card{background:#1d1d1f;border-radius:18px;padding:16px;margin-bottom:14px}
+.title{font-size:20px;font-weight:700;margin-bottom:12px}
+.sub{font-size:13px;color:#bbb;margin-top:8px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{width:100%;border:none;border-radius:14px;padding:16px 12px;background:#2c2c30;color:#fff;font-size:17px}
+button:active{transform:scale(.99)}
+input[type=password], input[type=text]{width:100%;box-sizing:border-box;border:none;border-radius:12px;padding:14px;background:#2c2c30;color:#fff;font-size:16px}
+.preview{width:100%;border-radius:14px;margin-top:12px;display:none}
+.result{white-space:pre-wrap;text-align:left;background:#141416;border-radius:14px;padding:14px;font-size:16px;min-height:84px}
+.ok{color:#6ee787}
+.bad{color:#ff8c8c}
+.bottom{position:fixed;left:0;right:0;bottom:0;background:#000;padding:10px 12px}
+.bottom .mini{max-width:420px;margin:0 auto;font-size:13px;color:#bbb;text-align:center}
+.hidden{display:none}
 </style>
 </head>
-
 <body>
+<div class="wrap">
+  <h1>운동 기록 테스트1</h1>
 
-<div class="box">테스트1 : 새 파일 정상 표시</div>
-<div class="box">테스트2 : 버튼 동작 확인</div>
+  <div class="card">
+    <div class="title">API 설정</div>
+    <input id="apiKey" type="password" placeholder="Gemini API KEY 입력">
+    <div class="row" style="margin-top:10px">
+      <button onclick="saveKey()">저장</button>
+      <button onclick="testApi()">API 테스트</button>
+    </div>
+    <div class="row">
+      <button onclick="deleteKey()">삭제</button>
+      <button onclick="fillSaved()">불러오기</button>
+    </div>
+    <div id="apiStatus" class="sub">상태 없음</div>
+  </div>
 
-<button onclick="alert('버튼 정상 작동')">테스트 버튼</button>
+  <div class="card">
+    <div class="title">업로드</div>
+    <div class="row">
+      <button onclick="pickType('내사진')">내사진</button>
+      <button onclick="pickType('운동')">운동</button>
+      <button onclick="pickType('걸음')">걸음</button>
+      <button onclick="pickType('인바디')">인바디</button>
+    </div>
+    <input id="fileInput" type="file" accept="image/*" class="hidden">
+    <img id="preview" class="preview">
+    <div id="pickedType" class="sub">선택 없음</div>
+  </div>
 
+  <div class="card">
+    <div class="title">OCR 결과</div>
+    <div id="ocrResult" class="result">아직 실행 안 함</div>
+    <div class="row" style="margin-top:10px">
+      <button onclick="runOCR()">OCR 실행</button>
+      <button onclick="editResult()">수정</button>
+    </div>
+    <div class="sub">운동은 시간만 읽기, 걸음은 숫자만 읽기, 인바디는 숫자 요약</div>
+  </div>
+</div>
+
+<div class="bottom">
+  <div class="mini">테스트2 : 먼저 API 테스트 → 사진 업로드 → OCR 실행</div>
+</div>
+
+<script>
+let currentType = '';
+let currentFile = null;
+let lastText = '';
+
+function maskKey(k){
+  if(!k) return '저장된 키 없음';
+  return '저장됨 ****' + k.slice(-4);
+}
+
+function saveKey(){
+  const k = document.getElementById('apiKey').value.trim();
+  if(!k){ alert('API 키 입력'); return; }
+  localStorage.setItem('gemini_key', k);
+  document.getElementById('apiStatus').innerHTML = '<span class="ok">' + maskKey(k) + '</span>';
+  document.getElementById('apiKey').value = '';
+}
+
+function deleteKey(){
+  localStorage.removeItem('gemini_key');
+  document.getElementById('apiKey').value = '';
+  document.getElementById('apiStatus').textContent = '키 삭제됨';
+}
+
+function fillSaved(){
+  const k = localStorage.getItem('gemini_key') || '';
+  document.getElementById('apiStatus').innerHTML = k ? '<span class="ok">' + maskKey(k) + '</span>' : '저장된 키 없음';
+}
+
+async function testApi(){
+  const key = localStorage.getItem('gemini_key');
+  if(!key){ alert('먼저 API 키 저장'); return; }
+  const box = document.getElementById('apiStatus');
+  box.textContent = '테스트 중...';
+  try{
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + key,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:'ok만 답해'}]}]})
+    });
+    const data = await res.json();
+    if(res.ok){
+      box.innerHTML = '<span class="ok">API 정상 작동</span>';
+    }else{
+      box.innerHTML = '<span class="bad">API 오류: ' + (data.error?.message || 'unknown') + '</span>';
+    }
+  }catch(e){
+    box.innerHTML = '<span class="bad">API 연결 실패</span>';
+  }
+}
+
+function pickType(type){
+  currentType = type;
+  document.getElementById('pickedType').textContent = '선택: ' + type;
+  document.getElementById('fileInput').click();
+}
+
+document.getElementById('fileInput').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  currentFile = file;
+  const url = URL.createObjectURL(file);
+  const img = document.getElementById('preview');
+  img.src = url;
+  img.style.display = 'block';
+});
+
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function runOCR(){
+  const key = localStorage.getItem('gemini_key');
+  const out = document.getElementById('ocrResult');
+  if(!key){ alert('먼저 API 키 저장'); return; }
+  if(!currentFile){ alert('먼저 사진 선택'); return; }
+  if(!currentType){ alert('종류 먼저 선택'); return; }
+  out.textContent = '읽는 중...';
+
+  const base64 = await fileToBase64(currentFile);
+  let prompt = '';
+  if(currentType === '운동'){
+    prompt = '이 이미지에서 운동 시간 하나만 찾아라. 답은 시간 하나만. 예: 1:00 또는 00:45';
+  }else if(currentType === '걸음'){
+    prompt = '이 이미지에서 걸음수 숫자 하나만 찾아라. 답은 숫자만.';
+  }else if(currentType === '인바디'){
+    prompt = '이 이미지에서 보이는 주요 숫자만 짧게 줄바꿈으로 정리해라.';
+  }else{
+    prompt = '이 이미지를 짧게 설명해라.';
+  }
+
+  try{
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + key,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{
+          parts:[
+            {text: prompt},
+            {inline_data:{mime_type: currentFile.type || 'image/jpeg', data: base64}}
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    if(res.ok){
+      lastText = data.candidates?.[0]?.content?.parts?.[0]?.text || '결과 없음';
+      out.textContent = lastText;
+    }else{
+      out.textContent = 'API 오류\n' + (data.error?.message || 'unknown');
+    }
+  }catch(e){
+    out.textContent = 'API 연결 실패';
+  }
+}
+
+function editResult(){
+  const v = prompt('수정', lastText || '');
+  if(v !== null){
+    lastText = v;
+    document.getElementById('ocrResult').textContent = v;
+  }
+}
+
+fillSaved();
+</script>
 </body>
 </html>
