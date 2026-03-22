@@ -1283,6 +1283,7 @@ async function deleteAllPhotos(){
   );
 }
 
+async function deleteIb(){
   if(!curIbId)return;await dbDel('photos',curIbId);closeModal('mIbDetail');toast('삭제됨');
   allPhotos=await dbAll('photos');renderInbodyPage();
 }
