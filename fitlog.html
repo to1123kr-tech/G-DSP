@@ -120,7 +120,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 .dateLabel{font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text2);}
 .ampmGroup{margin-bottom:10px;}
 .ampmLabel{font-size:11px;font-weight:600;margin-bottom:6px;}
-.photoGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}
+.photoGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;}
 .pThumbWrap{aspect-ratio:1;border-radius:10px;overflow:hidden;cursor:pointer;position:relative;}
 .pThumbWrap img{width:100%;height:100%;object-fit:cover;}
 /* 좌하단 오전/오후 뱃지 */
@@ -361,6 +361,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
             <button class="vModeBtn active" data-mode="browse" onclick="setViewMode('browse',this)">📋 목록</button>
             <button class="vModeBtn" data-mode="compare" onclick="setViewMode('compare',this)">↔ 비교</button>
             <button class="vModeBtn" data-mode="overlap" onclick="setViewMode('overlap',this)">⊕ 겹침</button>
+            <button class="vModeBtn" style="color:var(--danger);border-color:rgba(239,68,68,.3);margin-left:auto;" onclick="deleteAllPhotos()">🗑 사진전체삭제</button>
           </div>
           <div id="myPhotoList"></div>
           <div id="myPhotoEmpty" class="emptyState"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><p>등록된 내 사진이 없어요</p></div>
@@ -640,7 +641,29 @@ function parseExifDate(file){
 function toDateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function getAmPm(d){return d.getHours()<12?'am':'pm';}
 function ampmKr(ap){return ap==='am'?'오전':'오후';}
-function readDataUrl(f){return new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(f);});}
+// 이미지 리사이즈 압축 (긴 변 1080px, quality 0.82)
+function readDataUrl(f){
+  return new Promise(r=>{
+    const fr=new FileReader();
+    fr.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const MAX=1080;
+        let w=img.width,h=img.height;
+        if(w>MAX||h>MAX){
+          if(w>h){h=Math.round(h*MAX/w);w=MAX;}
+          else{w=Math.round(w*MAX/h);h=MAX;}
+        }
+        const c=document.createElement('canvas');
+        c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        r(c.toDataURL('image/jpeg',0.82));
+      };
+      img.src=e.target.result;
+    };
+    fr.readAsDataURL(f);
+  });
+}
 
 // ── 업로드 ──
 document.getElementById('upZone').onclick=()=>document.getElementById('fileInput').click();
@@ -1240,7 +1263,23 @@ async function openIbDetail(id){
     <button class="btnSecondary" style="margin-top:10px" onclick="openEditModal('${id}')">✏️ 수정</button>`;
   openModal('mIbDetail');
 }
-async function deleteIb(){
+async function deleteAllPhotos(){
+  allPhotos=await dbAll('photos');
+  const photoOnly=allPhotos.filter(p=>p.type==='myphoto'||p.type==='running');
+  if(!photoOnly.length){toast('삭제할 사진이 없어요');return;}
+  showConfirm(
+    '사진 전체 삭제',
+    `내사진·런닝 사진 ${photoOnly.length}장을 모두 삭제할까요?\n걸음수·인바디 기록은 유지돼요.`,
+    async()=>{
+      for(const p of photoOnly) await dbDel('photos',p.id);
+      allPhotos=await dbAll('photos');
+      toast(`${photoOnly.length}장 삭제 완료!`);
+      renderPhotoPage();
+      renderCalendar();
+    }
+  );
+}
+
   if(!curIbId)return;await dbDel('photos',curIbId);closeModal('mIbDetail');toast('삭제됨');
   allPhotos=await dbAll('photos');renderInbodyPage();
 }
