@@ -272,7 +272,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 <body>
 <div id="app">
   <div id="hdr">
-    <h1>오늘도 해보자!!</h1>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <h1>오늘도 해보자!!</h1>
+      <div id="soberChip"></div>
+    </div>
     <div class="hdrBtns">
       <button class="iBtn" id="themeBtn">
         <svg id="icoSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
@@ -283,6 +286,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     </div>
   </div>
   <div class="bkBanner hidden" id="bkBanner"><p>📦 마지막 백업 후 3일이 지났어요</p><button onclick="doBackup()">지금 백업</button></div>
+  <!-- 응원 메시지 -->
+  <div id="cheerBanner" style="
+    margin:8px 12px 0;padding:10px 14px;border-radius:12px;
+    background:linear-gradient(135deg,rgba(59,130,246,.1),rgba(236,72,153,.1));
+    border:1px solid rgba(139,92,246,.2);
+    font-size:12px;font-weight:600;color:var(--text2);
+    display:flex;align-items:center;gap:8px;
+  "><span id="cheerIcon" style="font-size:18px;"></span><span id="cheerText"></span></div>
 
   <div id="pages">
     <!-- 달력 -->
@@ -1256,6 +1267,63 @@ function toast(msg){
   clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),2200);
 }
 
+// ── 금주 디데이 ──
+function renderSoberDay(){
+  const start=new Date(2025,10,1);
+  const diff=Math.floor((new Date()-start)/(1000*60*60*24));
+  document.getElementById('soberChip').innerHTML=`<div style="
+    display:inline-flex;align-items:center;gap:3px;
+    padding:3px 8px;border-radius:20px;
+    background:linear-gradient(135deg,#6366f1,#8b5cf6);
+    color:#fff;font-size:11px;font-weight:800;
+    box-shadow:0 2px 6px rgba(99,102,241,.4);
+    white-space:nowrap;
+  ">🍶 D+${diff}</div>`;
+}
+
+// ── 랜덤 응원 메시지 ──
+function renderCheer(){
+  const msgs=[
+    {i:'🔥',t:'오늘도 불태워버려!!'},
+    {i:'💪',t:'근육은 배신하지 않는다!'},
+    {i:'🏆',t:'포기는 나중에 해도 늦지 않아!'},
+    {i:'😤',t:'힘들면 쉬어가, 근데 멈추진 마!'},
+    {i:'🚀',t:'오늘의 땀이 내일의 몸을 만든다!'},
+    {i:'👊',t:'어제보다 1%만 더!'},
+    {i:'🎯',t:'목표가 있으면 흔들리지 마!'},
+    {i:'⚡',t:'지금 이 순간이 가장 젊다!'},
+    {i:'🦁',t:'사자처럼 덤벼라!'},
+    {i:'😎',t:'멋있어지는 중이잖아!'},
+    {i:'🏃',t:'달리면 기분이 좋아진다, 진짜로!'},
+    {i:'🌅',t:'오늘 운동하면 내일 내가 고마워한다!'},
+    {i:'💥',t:'폭발적으로 가자!!'},
+    {i:'🎸',t:'몸이 악기면 넌 록스타!'},
+    {i:'🧨',t:'빵! 오늘도 터트려버려!'},
+    {i:'🥊',t:'때려라! 지방을!'},
+    {i:'🌊',t:'물처럼 꾸준하게, 파도처럼 강하게!'},
+    {i:'🐉',t:'용처럼 타올라라!'},
+    {i:'🎪',t:'인생은 쇼! 몸은 무대!'},
+    {i:'🍖',t:'고기 먹고 싶으면 운동부터!'},
+    {i:'👑',t:'왕의 몸은 왕의 노력에서 나온다!'},
+    {i:'🌋',t:'화산처럼 폭발하라!'},
+    {i:'🤸',t:'몸이 말을 들을 때까지 굴려라!'},
+    {i:'🎭',t:'드라마틱하게 변해버려!'},
+    {i:'🛸',t:'넌 이미 남다른 사람!'},
+    {i:'🍺❌',t:`금주 ${Math.floor((new Date()-new Date(2025,10,1))/(864e5))}일째! 진짜 대단해!!`},
+    {i:'🧠',t:'의지력이 근육보다 강하다!'},
+    {i:'🌟',t:'별처럼 빛나는 몸 만드는 중!'},
+    {i:'😂',t:'나중에 거울 보고 깜짝 놀랄 준비해!'},
+    {i:'🏋️',t:'무게는 늘고 몸무게는 줄고!'},
+  ];
+  // 날짜 기준 시드로 매일 다른 메시지
+  const today=new Date();
+  const seed=today.getFullYear()*10000+today.getMonth()*100+today.getDate();
+  const idx=seed%msgs.length;
+  const m=msgs[idx];
+  document.getElementById('cheerIcon').textContent=m.i;
+  document.getElementById('cheerText').textContent=m.t;
+}
+
 // ── 초기화 ──
 function doExit(){
   // 파일로 열 때는 window.close()가 안되므로 강제로 빈페이지로
@@ -1272,6 +1340,8 @@ async function init(){
   const today=toDateStr(new Date());
   document.getElementById('qStepsDate').value=today;
   document.getElementById('qIbDate').value=today;
+  renderSoberDay();
+  renderCheer();
   await checkBackup();
   allPhotos=await dbAll('photos');
   renderCalendar();
