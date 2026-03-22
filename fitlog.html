@@ -71,7 +71,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 .calRunAm:active,.calRunPm:active{opacity:.65;}
 .calRunEmpty{display:block;width:100%;height:18px;margin-bottom:2px;}
 .calStepBox{margin-top:3px;border-radius:6px;overflow:hidden;background:var(--bg3);position:relative;height:16px;}
-.calStepFill{height:100%;background:var(--steps);border-radius:6px;transition:width .4s;}
+.calStepFill{height:100%;background:rgba(139,92,246,.35);border-radius:6px;transition:width .4s;}
 .calStepNum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:var(--text);}
 .calStepEmpty{background:var(--bg3);opacity:.35;}
 
@@ -850,17 +850,26 @@ function buildDateGroups(photos,type){
   const grouped={};
   photos.forEach(p=>{if(!grouped[p.dateStr])grouped[p.dateStr]={am:[],pm:[]};grouped[p.dateStr][p.ampm].push(p);});
   return Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).map(date=>{
-    const d=grouped[date];let inner='';
-    ['am','pm'].forEach(ap=>{
-      if(!d[ap].length)return;
-      const lbl=ap==='am'?`<span style="color:var(--am)">● 오전</span>`:`<span style="color:var(--pm)">● 오후</span>`;
-      inner+=`<div class="ampmGroup"><div class="ampmLabel">${lbl}</div><div class="photoGrid">${
-        d[ap].map(p=>{
-          const rOv=p.runTime?`<span class="pRunOverlay">${p.runTime}분</span>`:'';
-          return `<div class="pThumbWrap" onclick="openPhotoSlide('${p.id}','${type}')"><img src="${p.dataUrl}" loading="lazy"><span class="pAmpOverlay ${ap}">${ampmKr(ap)}</span>${rOv}</div>`;
-        }).join('')
-      }</div></div>`;
-    });
+    const d=grouped[date];
+    const mkCol=(ap)=>{
+      const lbl=ap==='am'
+        ?`<div style="font-size:10px;font-weight:700;color:var(--am);margin-bottom:5px;">● 오전</div>`
+        :`<div style="font-size:10px;font-weight:700;color:var(--pm);margin-bottom:5px;">● 오후</div>`;
+      const imgs=d[ap].map(p=>{
+        const rOv=p.runTime?`<span class="pRunOverlay">${p.runTime}분</span>`:'';
+        return `<div class="pThumbWrap" onclick="openPhotoSlide('${p.id}','${type}')"><img src="${p.dataUrl}" loading="lazy"><span class="pAmpOverlay ${ap}">${ampmKr(ap)}</span>${rOv}</div>`;
+      }).join('');
+      return `<div style="flex:1;min-width:0;">${lbl}<div class="photoGrid">${imgs||'<div style="aspect-ratio:1;border-radius:10px;background:var(--bg3);opacity:.3;"></div>'}</div></div>`;
+    };
+    const hasAm=d.am.length>0, hasPm=d.pm.length>0;
+    let inner='';
+    if(hasAm&&hasPm){
+      inner=`<div style="display:flex;gap:8px;">${mkCol('am')}${mkCol('pm')}</div>`;
+    } else if(hasAm){
+      inner=`<div style="display:flex;gap:8px;">${mkCol('am')}<div style="flex:1;min-width:0;"><div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:5px;">● 오후</div><div style="aspect-ratio:1;max-width:33%;border-radius:10px;background:var(--bg3);opacity:.2;"></div></div></div>`;
+    } else {
+      inner=`<div style="display:flex;gap:8px;"><div style="flex:1;min-width:0;"><div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:5px;">● 오전</div><div style="aspect-ratio:1;max-width:33%;border-radius:10px;background:var(--bg3);opacity:.2;"></div></div>${mkCol('pm')}</div>`;
+    }
     return `<div class="dateGroup"><div class="dateLabel">📅 ${date}</div>${inner}</div>`;
   }).join('');
 }
@@ -1009,14 +1018,54 @@ async function openOvViewer(){
   allPhotos=await dbAll('photos');
   const my=[...allPhotos.filter(p=>p.type==='myphoto')].sort((a,b)=>b.dateStr.localeCompare(a.dateStr));
   if(my.length<2){toast('내 사진이 2장 이상 필요합니다');resetViewMode();return;}
-  // 겹침: 수정버튼 없음
-  document.getElementById('ovBody').innerHTML=`
-    <img src="${my[1].dataUrl}" style="max-width:100%;max-height:100%;object-fit:contain;position:absolute;">
-    <img id="ovTop" src="${my[0].dataUrl}" style="max-width:100%;max-height:100%;object-fit:contain;position:absolute;opacity:.6;">
-    <div style="position:absolute;top:10px;left:10px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:3px 9px;border-radius:6px">뒤: ${my[1].dateStr.slice(5)} ${ampmKr(my[1].ampm)}</div>
-    <div style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:3px 9px;border-radius:6px">앞: ${my[0].dateStr.slice(5)} ${ampmKr(my[0].ampm)}</div>`;
-  document.getElementById('ovSlider').value=60;
-  document.getElementById('ovSlider').oninput=e=>{document.getElementById('ovTop').style.opacity=e.target.value/100;};
+  // 선택 그리드 먼저
+  let ovSelA=null, ovSelB=null;
+  const renderOvPick=()=>{
+    document.getElementById('ovBody').innerHTML=`
+      <div style="width:100%;height:100%;overflow-y:auto;padding:8px;">
+        <div style="color:rgba(255,255,255,.55);font-size:12px;text-align:center;padding:6px 0 8px">뒤(A) · 앞(B) 각각 선택하세요</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;" id="ovPickGrid">
+          ${my.map(p=>`<div class="cmpPickItem" id="ovp-${p.id}" onclick="ovPick('${p.id}')">
+            <img src="${p.dataUrl}">
+            <div class="cmpPickLbl" id="ovpl-${p.id}"></div>
+            <div style="position:absolute;bottom:4px;left:4px;font-size:8px;font-weight:700;color:#fff;background:rgba(0,0,0,.6);padding:2px 5px;border-radius:4px">${p.dateStr.slice(5)} ${ampmKr(p.ampm)}</div>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    // 이미 선택된 것 복원
+    if(ovSelA){document.getElementById('ovp-'+ovSelA.id)?.classList.add('selA');const l=document.getElementById('ovpl-'+ovSelA.id);if(l){l.textContent='뒤';l.classList.add('on');}}
+    if(ovSelB){document.getElementById('ovp-'+ovSelB.id)?.classList.add('selB');const l=document.getElementById('ovpl-'+ovSelB.id);if(l){l.textContent='앞';l.classList.add('on');}}
+  };
+  window.ovPick=(id)=>{
+    const p=my.find(x=>x.id===id);if(!p)return;
+    if(!ovSelA){
+      ovSelA=p;
+      document.getElementById('ovp-'+id)?.classList.add('selA');
+      const l=document.getElementById('ovpl-'+id);if(l){l.textContent='뒤';l.classList.add('on');}
+    } else if(!ovSelB&&id!==ovSelA.id){
+      ovSelB=p;
+      document.getElementById('ovp-'+id)?.classList.add('selB');
+      const l=document.getElementById('ovpl-'+id);if(l){l.textContent='앞';l.classList.add('on');}
+      setTimeout(()=>showOvView(ovSelA,ovSelB),300);
+    } else {
+      // 초기화
+      ovSelA=null;ovSelB=null;
+      document.querySelectorAll('.cmpPickItem').forEach(el=>el.classList.remove('selA','selB'));
+      document.querySelectorAll('.cmpPickLbl').forEach(el=>{el.textContent='';el.classList.remove('on');});
+    }
+  };
+  const showOvView=(a,b)=>{
+    document.getElementById('ovBody').innerHTML=`
+      <img src="${a.dataUrl}" style="max-width:100%;max-height:100%;object-fit:contain;position:absolute;">
+      <img id="ovTop" src="${b.dataUrl}" style="max-width:100%;max-height:100%;object-fit:contain;position:absolute;opacity:.6;">
+      <div style="position:absolute;top:10px;left:10px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:3px 9px;border-radius:6px">뒤: ${a.dateStr.slice(5)} ${ampmKr(a.ampm)}</div>
+      <div style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,.65);color:#fff;font-size:10px;padding:3px 9px;border-radius:6px">앞: ${b.dateStr.slice(5)} ${ampmKr(b.ampm)}</div>
+      <button onclick="ovSelA=null;ovSelB=null;renderOvPick()" style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;padding:8px 18px;border-radius:20px;font-size:12px;cursor:pointer;font-family:inherit;backdrop-filter:blur(6px)">다시 선택</button>`;
+    document.getElementById('ovSlider').value=60;
+    document.getElementById('ovSlider').oninput=e=>{document.getElementById('ovTop').style.opacity=e.target.value/100;};
+  };
+  window.renderOvPick=renderOvPick;
+  renderOvPick();
   document.getElementById('pg-photo').style.visibility='hidden';
   document.getElementById('ovViewer').classList.add('open');
 }
