@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FIT LOG</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;500;700&family=Roboto+Mono:wght@400;700&display=swap');
+:root{--am:#4FC3F7;--pm:#FF8A65;--green:#69F0AE;--bg:#0A0A0F;--bg2:#13131A;--bg3:#1C1C28;--border:rgba(255,255,255,0.08);--text:#F0F0F8;--sub:#888899}
+body.light{--bg:#F5F5FA;--bg2:#FFFFFF;--bg3:#EBEBF5;--border:rgba(0,0,0,0.08);--text:#1A1A2E;--sub:#888899}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:430px;margin:0 auto;overflow-x:hidden;transition:background 0.3s,color 0.3s}
+.header{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 12px;position:sticky;top:0;background:var(--bg);z-index:100;border-bottom:1px solid var(--border);transition:background 0.3s}
+.header h1{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:4px}
+.header-btns{display:flex;gap:8px}
+.icon-btn{width:38px;height:38px;border:1px solid var(--border);background:var(--bg2);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;transition:all 0.2s}
+.icon-btn:active{transform:scale(0.92)}
+.tabs{display:flex;padding:10px 20px;gap:5px}
+.tab{flex:1;padding:8px 2px;border:1px solid var(--border);background:transparent;border-radius:10px;color:var(--sub);font-size:11px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all 0.2s;font-weight:500}
+.tab.active{background:var(--bg3);color:var(--text);border-color:rgba(128,128,128,0.3)}
+.page{display:none;padding:0 20px 100px}
+.page.active{display:block}
+.today-date{font-family:'Roboto Mono',monospace;font-size:11px;color:var(--sub);letter-spacing:2px;margin-bottom:4px;padding-top:16px;text-transform:uppercase}
+.today-label{font-family:'Bebas Neue',sans-serif;font-size:40px;letter-spacing:2px;line-height:1;margin-bottom:14px}
+.today-label.am{color:var(--am)}.today-label.pm{color:var(--pm)}.today-label.none{color:var(--sub)}
+.ampm-toggle{display:flex;gap:8px;margin-bottom:14px}
+.ampm-btn{flex:1;padding:11px;border-radius:10px;border:1.5px solid transparent;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;cursor:pointer;transition:all 0.2s;background:var(--bg2);color:var(--sub)}
+.ampm-btn.am.active{background:rgba(79,195,247,0.15);border-color:var(--am);color:var(--am)}
+.ampm-btn.pm.active{background:rgba(255,138,101,0.15);border-color:var(--pm);color:var(--pm)}
+.goal-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+.goal-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.goal-label{font-size:12px;color:var(--sub);letter-spacing:1px;text-transform:uppercase}
+.goal-nums{font-family:'Roboto Mono',monospace;font-size:13px;font-weight:700}
+.goal-bar-bg{height:7px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.goal-bar-fill{height:100%;border-radius:4px;transition:width 0.6s ease;background:linear-gradient(90deg,var(--am),var(--green))}
+.goal-bar-fill.done{background:linear-gradient(90deg,var(--green),#00E676)}
+.goal-pct{font-size:10px;color:var(--sub);margin-top:4px;text-align:right;font-family:'Roboto Mono',monospace}
+.record-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
+.input-group{display:flex;gap:10px;margin-bottom:10px}
+.input-wrap{flex:1;display:flex;flex-direction:column;gap:4px}
+.input-box{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 10px;color:var(--text);font-family:'Roboto Mono',monospace;font-size:17px;text-align:center;outline:none;transition:border-color 0.2s}
+.input-box:focus{border-color:rgba(128,128,128,0.4)}
+.input-box::placeholder{color:var(--sub);font-size:13px}
+.input-label{font-size:10px;color:var(--sub);text-align:center;letter-spacing:1px;text-transform:uppercase}
+.section-title{font-size:11px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin:14px 0 8px}
+.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.photo-btn{background:var(--bg2);border:1px dashed var(--border);border-radius:14px;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;transition:all 0.2s}
+.photo-btn:active{transform:scale(0.96)}
+.photo-btn.has-photo{border-style:solid;border-color:rgba(128,128,128,0.2)}
+.photo-btn img{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0}
+.photo-btn-inner{display:flex;flex-direction:column;align-items:center;gap:6px;z-index:1}
+.photo-btn.has-photo .photo-btn-inner{display:none}
+.photo-icon{font-size:26px}
+.photo-name{font-size:10px;color:var(--sub);letter-spacing:1px;text-transform:uppercase;font-weight:500}
+.photo-overlay{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.75));padding:20px 8px 7px;display:none}
+.photo-btn.has-photo .photo-overlay{display:block}
+.photo-ocr-result{font-family:'Roboto Mono',monospace;font-size:12px;color:#fff;text-align:center}
+.ocr-status{background:var(--bg3);border-radius:10px;padding:11px 14px;margin-bottom:12px;font-size:13px;color:var(--sub);display:none;align-items:center;gap:8px}
+.ocr-status.show{display:flex}
+.ocr-status.success{color:var(--green)}.ocr-status.loading{color:var(--am)}.ocr-status.error{color:var(--pm)}
+.spin{animation:spin 1s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.save-btn{width:100%;padding:15px;border-radius:14px;border:none;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;cursor:pointer;transition:all 0.2s;margin-top:4px}
+.save-btn.am{background:var(--am);color:#000}.save-btn.pm{background:var(--pm);color:#000}.save-btn.none{background:var(--bg3);color:var(--sub)}
+.save-btn:active{transform:scale(0.97)}
+.cheer-box{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;margin-top:12px;display:none}
+.cheer-box.show{display:block}
+.cheer-label{font-size:10px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.cheer-text{font-size:15px;line-height:1.7;color:var(--text)}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-top:16px}
+.cal-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px}
+.cal-nav{width:36px;height:36px;border:1px solid var(--border);background:var(--bg2);border-radius:8px;color:var(--text);font-size:16px;cursor:pointer;transition:all 0.2s}
+.cal-nav:active{background:var(--bg3)}
+.cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px}
+.cal-weekday{text-align:center;font-size:10px;color:var(--sub);padding:3px 0;letter-spacing:1px}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-day{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;cursor:pointer;position:relative;transition:background 0.15s}
+.cal-day:hover{background:var(--bg3)}
+.cal-day.today{border:1.5px solid rgba(128,128,128,0.3)}
+.cal-day.other-month .cal-day-num{color:rgba(128,128,128,0.2)}
+.cal-day-num{font-size:13px;font-weight:500}
+.cal-dots{display:flex;gap:2px;margin-top:2px}
+.cal-dot{width:5px;height:5px;border-radius:50%}
+.cal-dot.am{background:var(--am)}.cal-dot.pm{background:var(--pm)}
+.cal-day.achieved{background:rgba(105,240,174,0.1)}
+.cal-day.achieved .cal-day-num{color:var(--green)}
+.compare-section{padding-top:16px}
+.compare-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:12px}
+.compare-upload-row{display:flex;gap:10px;margin-bottom:14px}
+.compare-upload{flex:1;background:var(--bg2);border:1px dashed var(--border);border-radius:14px;aspect-ratio:0.75;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;transition:all 0.2s}
+.compare-upload:active{transform:scale(0.97)}
+.compare-upload img{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0}
+.compare-upload-inner{display:flex;flex-direction:column;align-items:center;gap:6px;z-index:1}
+.compare-upload.has-photo .compare-upload-inner{display:none}
+.compare-label-bar{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);padding:6px;text-align:center;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#fff;z-index:2}
+.slider-compare{position:relative;border-radius:14px;overflow:hidden;aspect-ratio:0.75;margin-bottom:12px;background:var(--bg2);display:none}
+.slider-compare.show{display:block}
+.slider-before,.slider-after{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover}
+.slider-after{clip-path:inset(0 50% 0 0)}
+.slider-line{position:absolute;top:0;left:50%;width:2px;height:100%;background:#fff;transform:translateX(-50%);pointer-events:none}
+.slider-handle{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:34px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 10px rgba(0,0,0,0.5);pointer-events:none}
+.slider-label-before{position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.6);padding:3px 8px;border-radius:10px;font-size:10px;color:#fff;letter-spacing:1px;text-transform:uppercase}
+.slider-label-after{position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.6);padding:3px 8px;border-radius:10px;font-size:10px;color:#fff;letter-spacing:1px;text-transform:uppercase}
+.compare-hint{text-align:center;font-size:12px;color:var(--sub);padding:6px}
+.log-list{padding-top:14px}
+.log-item{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all 0.15s}
+.log-item:active{background:var(--bg3)}
+.log-badge{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;flex-shrink:0}
+.log-badge.am{background:rgba(79,195,247,0.15);color:var(--am)}.log-badge.pm{background:rgba(255,138,101,0.15);color:var(--pm)}
+.log-info{flex:1}
+.log-date{font-size:11px;color:var(--sub);letter-spacing:1px}
+.log-stats{font-family:'Roboto Mono',monospace;font-size:15px;font-weight:700;margin-top:2px}
+.log-extra{font-size:11px;color:var(--sub);margin-top:2px}
+.empty-msg{text-align:center;color:var(--sub);font-size:14px;padding:40px 0;line-height:2}
+.settings-section{padding-top:16px}
+.settings-title{font-size:10px;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.settings-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px}
+.settings-row{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);gap:10px}
+.settings-row:last-child{border-bottom:none}
+.settings-row-label{flex:1;font-size:14px}
+.settings-row-sub{font-size:11px;color:var(--sub);margin-top:2px}
+.settings-row-col{flex-direction:column;align-items:flex-start}
+.api-input{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);font-family:'Roboto Mono',monospace;font-size:12px;width:100%;outline:none;transition:border-color 0.2s;margin-top:8px}
+.api-input:focus{border-color:rgba(128,128,128,0.4)}
+.btn-row{display:flex;gap:8px;margin-top:8px;width:100%}
+.settings-btn{padding:9px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:13px;cursor:pointer;transition:all 0.2s;font-family:'Noto Sans KR',sans-serif}
+.settings-btn.primary{background:var(--am);color:#000;border-color:transparent;font-weight:700;flex:1}
+.settings-btn:active{transform:scale(0.96)}
+.toggle-switch{width:46px;height:26px;background:var(--bg3);border-radius:13px;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;border:1px solid var(--border)}
+.toggle-switch.on{background:var(--am)}
+.toggle-knob{position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
+.toggle-switch.on .toggle-knob{transform:translateX(20px)}
+.goal-input{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Roboto Mono',monospace;font-size:16px;width:110px;text-align:center;outline:none}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:none;align-items:flex-end}
+.modal-bg.show{display:flex}
+.modal{background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px 20px 40px;animation:slideUp 0.3s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:16px}
+.modal-close{width:100%;padding:13px;border:1px solid var(--border);background:transparent;border-radius:12px;color:var(--sub);font-size:14px;cursor:pointer;margin-top:8px;font-family:'Noto Sans KR',sans-serif}
+.modal-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.modal-stat{background:var(--bg3);border-radius:10px;padding:12px}
+.modal-stat-label{font-size:10px;color:var(--sub);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.modal-stat-val{font-family:'Roboto Mono',monospace;font-size:18px;font-weight:700}
+.toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:9px 18px;font-size:13px;color:var(--text);z-index:300;opacity:0;transition:opacity 0.3s;white-space:nowrap;pointer-events:none}
+.toast.show{opacity:1}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>FIT LOG</h1>
+  <div class="header-btns">
+    <div class="icon-btn" id="theme-btn" onclick="toggleTheme()">🌙</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('record')">기록</button>
+  <button class="tab" onclick="switchTab('calendar')">달력</button>
+  <button class="tab" onclick="switchTab('compare')">비교</button>
+  <button class="tab" onclick="switchTab('log')">히스토리</button>
+  <button class="tab" onclick="switchTab('settings')">설정</button>
+</div>
+
+<!-- 기록 -->
+<div id="page-record" class="page active">
+  <div class="today-date" id="today-date-label"></div>
+  <div class="today-label none" id="today-label">TODAY</div>
+  <div class="ampm-toggle">
+    <button class="ampm-btn am" id="btn-am" onclick="selectAmPm('am')">AM</button>
+    <button class="ampm-btn pm" id="btn-pm" onclick="selectAmPm('pm')">PM</button>
+  </div>
+  <div class="goal-card">
+    <div class="goal-row">
+      <div class="goal-label">👣 걸음수 목표</div>
+      <div class="goal-nums"><span id="goal-current">0</span> / <span id="goal-target-disp">10,000</span></div>
+    </div>
+    <div class="goal-bar-bg"><div class="goal-bar-fill" id="goal-bar" style="width:0%"></div></div>
+    <div class="goal-pct" id="goal-pct">0%</div>
+  </div>
+  <div class="record-card">
+    <div class="input-group">
+      <div class="input-wrap">
+        <input class="input-box" id="input-time" type="text" placeholder="0:00">
+        <div class="input-label">운동시간</div>
+      </div>
+      <div class="input-wrap">
+        <input class="input-box" id="input-dist" type="text" placeholder="0.00">
+        <div class="input-label">거리 km</div>
+      </div>
+    </div>
+    <div class="input-group">
+      <div class="input-wrap">
+        <input class="input-box" id="input-steps" type="text" placeholder="0" oninput="updateGoalBar()">
+        <div class="input-label">걸음수</div>
+      </div>
+      <div class="input-wrap">
+        <input class="input-box" id="input-weight" type="text" placeholder="0.0">
+        <div class="input-label">체중 kg</div>
+      </div>
+    </div>
+  </div>
+  <div class="ocr-status" id="ocr-status">
+    <span id="ocr-status-icon">⏳</span>
+    <span id="ocr-status-text">인식 중...</span>
+  </div>
+  <div class="section-title">사진 등록</div>
+  <div class="photo-grid">
+    <div class="photo-btn" id="photo-me" onclick="triggerPhoto('me')">
+      <img id="img-me" src="" style="display:none">
+      <div class="photo-btn-inner"><div class="photo-icon">🧍</div><div class="photo-name">내사진</div></div>
+      <div class="photo-overlay"><div class="photo-ocr-result" id="ocr-me"></div></div>
+    </div>
+    <div class="photo-btn" id="photo-run" onclick="triggerPhoto('run')">
+      <img id="img-run" src="" style="display:none">
+      <div class="photo-btn-inner"><div class="photo-icon">🏃</div><div class="photo-name">런닝사진</div></div>
+      <div class="photo-overlay"><div class="photo-ocr-result" id="ocr-run"></div></div>
+    </div>
+    <div class="photo-btn" id="photo-steps" onclick="triggerPhoto('steps')">
+      <img id="img-steps" src="" style="display:none">
+      <div class="photo-btn-inner"><div class="photo-icon">👟</div><div class="photo-name">걸음수</div></div>
+      <div class="photo-overlay"><div class="photo-ocr-result" id="ocr-steps"></div></div>
+    </div>
+    <div class="photo-btn" id="photo-inbody" onclick="triggerPhoto('inbody')">
+      <img id="img-inbody" src="" style="display:none">
+      <div class="photo-btn-inner"><div class="photo-icon">📊</div><div class="photo-name">인바디</div></div>
+      <div class="photo-overlay"><div class="photo-ocr-result" id="ocr-inbody"></div></div>
+    </div>
+  </div>
+  <button class="save-btn none" id="save-btn" onclick="saveRecord()">SAVE</button>
+  <div class="cheer-box" id="cheer-box">
+    <div class="cheer-label">💪 오늘의 메시지</div>
+    <div class="cheer-text" id="cheer-text"></div>
+  </div>
+</div>
+
+<!-- 달력 -->
+<div id="page-calendar" class="page">
+  <div class="cal-header">
+    <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+    <div class="cal-title" id="cal-title"></div>
+    <button class="cal-nav" onclick="changeMonth(1)">›</button>
+  </div>
+  <div class="cal-weekdays">
+    <div class="cal-weekday" style="color:#FF6B6B">일</div>
+    <div class="cal-weekday">월</div><div class="cal-weekday">화</div>
+    <div class="cal-weekday">수</div><div class="cal-weekday">목</div>
+    <div class="cal-weekday">금</div>
+    <div class="cal-weekday" style="color:var(--am)">토</div>
+  </div>
+  <div class="cal-days" id="cal-days"></div>
+</div>
+
+<!-- 비교 -->
+<div id="page-compare" class="page">
+  <div class="compare-section">
+    <div class="compare-title">BODY COMPARE</div>
+    <div class="compare-upload-row">
+      <div class="compare-upload" id="compare-before" onclick="triggerCompare('before')">
+        <img id="cmp-img-before" src="" style="display:none">
+        <div class="compare-upload-inner"><div class="photo-icon">📷</div><div class="photo-name">BEFORE</div></div>
+        <div class="compare-label-bar">BEFORE</div>
+      </div>
+      <div class="compare-upload" id="compare-after" onclick="triggerCompare('after')">
+        <img id="cmp-img-after" src="" style="display:none">
+        <div class="compare-upload-inner"><div class="photo-icon">📷</div><div class="photo-name">AFTER</div></div>
+        <div class="compare-label-bar">AFTER</div>
+      </div>
+    </div>
+    <div class="slider-compare" id="slider-compare">
+      <img class="slider-before" id="sl-before" src="">
+      <img class="slider-after" id="sl-after" src="">
+      <div class="slider-line" id="sl-line"></div>
+      <div class="slider-handle" id="sl-handle">⇔</div>
+      <div class="slider-label-before">BEFORE</div>
+      <div class="slider-label-after">AFTER</div>
+    </div>
+    <div class="compare-hint" id="compare-hint">사진 두 장을 등록하면 슬라이드 비교가 활성화됩니다</div>
+  </div>
+</div>
+
+<!-- 히스토리 -->
+<div id="page-log" class="page">
+  <div class="log-list" id="log-list"></div>
+</div>
+
+<!-- 설정 -->
+<div id="page-settings" class="page">
+  <div class="settings-section">
+    <div class="settings-title">Claude API (응원 메시지)</div>
+    <div class="settings-card">
+      <div class="settings-row settings-row-col">
+        <div class="settings-row-label">API Key<div class="settings-row-sub">console.anthropic.com → API Keys → Create Key</div></div>
+        <input class="api-input" id="api-key-input" type="password" placeholder="sk-ant-...">
+        <div class="btn-row">
+          <button class="settings-btn primary" onclick="saveApiKey()">저장</button>
+          <button class="settings-btn" onclick="testApiKey()">테스트</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-title">걸음수 목표</div>
+    <div class="settings-card">
+      <div class="settings-row">
+        <div class="settings-row-label">일일 목표 걸음수<div class="settings-row-sub">달성 시 달력 초록 표시 + 축하 효과</div></div>
+        <input class="goal-input" id="goal-input" type="number" value="10000">
+      </div>
+      <div class="settings-row" style="justify-content:flex-end">
+        <button class="settings-btn primary" onclick="saveGoal()" style="flex:none;width:80px">저장</button>
+      </div>
+    </div>
+    <div class="settings-title">테마</div>
+    <div class="settings-card">
+      <div class="settings-row">
+        <div class="settings-row-label">라이트 모드<div class="settings-row-sub" id="theme-status-sub">현재: 다크</div></div>
+        <div class="toggle-switch" id="theme-toggle" onclick="toggleTheme()"><div class="toggle-knob"></div></div>
+      </div>
+    </div>
+    <div class="settings-title">데이터</div>
+    <div class="settings-card">
+      <div class="settings-row">
+        <div class="settings-row-label">전체 기록 삭제<div class="settings-row-sub">복구 불가</div></div>
+        <button class="settings-btn" onclick="clearAll()" style="color:var(--pm)">삭제</button>
+      </div>
+    </div>
+    <div style="text-align:center;color:var(--sub);font-size:11px;margin-top:16px;letter-spacing:1px">FIT LOG v3.0 · GITHUB PAGES READY</div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept="image/*" onchange="handlePhoto(event)">
+<input type="file" id="file-compare" accept="image/*" onchange="handleCompare(event)">
+
+<div class="modal-bg" id="modal-bg" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-stat-grid" id="modal-stats"></div>
+    <button class="modal-close" onclick="closeModalDirect()">닫기</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<canvas id="confetti-canvas" style="position:fixed;inset:0;pointer-events:none;z-index:400;display:none"></canvas>
+
+<script>
+let currentAmPm=null,currentPhotoTarget=null,compareTarget=null,calYear,calMonth;
+let records=JSON.parse(localStorage.getItem('fitlog_v3_records')||'[]');
+let claudeApiKey=localStorage.getItem('fitlog_claude_api')||'';
+let stepGoal=parseInt(localStorage.getItem('fitlog_goal')||'10000');
+let isLight=localStorage.getItem('fitlog_light')==='1';
+let comparePhotos={before:null,after:null};
+const TODAY=new Date();
+const todayStr=fmtDate(TODAY);
+
+function pad(n){return String(n).padStart(2,'0')}
+function fmtDate(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+
+function init(){
+  const d=TODAY;
+  document.getElementById('today-date-label').textContent=`${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()]}`;
+  if(claudeApiKey) document.getElementById('api-key-input').value=claudeApiKey;
+  document.getElementById('goal-input').value=stepGoal;
+  if(isLight){document.body.classList.add('light');document.getElementById('theme-toggle').classList.add('on');document.getElementById('theme-btn').textContent='☀️';document.getElementById('theme-status-sub').textContent='현재: 라이트';}
+  updateGoalDisplay();
+  loadTodayRecord();
+  calYear=d.getFullYear();calMonth=d.getMonth();
+  renderCal();
+  // 현재 시간 기준 AM/PM 자동 선택
+  selectAmPm(d.getHours()<12?'am':'pm');
+}
+
+function switchTab(name){
+  const names=['record','calendar','compare','log','settings'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',names[i]===name));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(name==='calendar') renderCal();
+  if(name==='log') renderLog();
+}
+
+function toggleTheme(){
+  isLight=!isLight;
+  document.body.classList.toggle('light',isLight);
+  document.getElementById('theme-toggle').classList.toggle('on',isLight);
+  document.getElementById('theme-btn').textContent=isLight?'☀️':'🌙';
+  document.getElementById('theme-status-sub').textContent=isLight?'현재: 라이트':'현재: 다크';
+  localStorage.setItem('fitlog_light',isLight?'1':'0');
+}
+
+function selectAmPm(v){
+  currentAmPm=v;
+  document.getElementById('btn-am').classList.toggle('active',v==='am');
+  document.getElementById('btn-pm').classList.toggle('active',v==='pm');
+  const lbl=document.getElementById('today-label');
+  lbl.className='today-label '+v;
+  lbl.textContent=v.toUpperCase()+' RUN';
+  document.getElementById('save-btn').className='save-btn '+v;
+}
+
+function updateGoalBar(){
+  const s=parseInt(document.getElementById('input-steps').value)||0;
+  updateGoalDisplay(s);
+}
+function updateGoalDisplay(steps){
+  if(steps===undefined){const r=records.find(x=>x.date===todayStr);steps=parseInt(r?.steps)||0;}
+  const pct=Math.min(100,Math.round(steps/stepGoal*100));
+  document.getElementById('goal-current').textContent=steps.toLocaleString();
+  document.getElementById('goal-target-disp').textContent=stepGoal.toLocaleString();
+  document.getElementById('goal-bar').style.width=pct+'%';
+  document.getElementById('goal-pct').textContent=pct+'%';
+  document.getElementById('goal-bar').classList.toggle('done',pct>=100);
+}
+
+function triggerPhoto(type){currentPhotoTarget=type;document.getElementById('file-input').click();}
+function handlePhoto(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=(ev)=>{
+    const b64=ev.target.result,type=currentPhotoTarget;
+    // 등록 시간 기준 AM/PM 자동분류
+    selectAmPm(new Date().getHours()<12?'am':'pm');
+    const img=document.getElementById('img-'+type);
+    img.src=b64;img.style.display='block';
+    document.getElementById('photo-'+type).classList.add('has-photo');
+    if(type!=='me') runOCR(b64,type);
+  };
+  reader.readAsDataURL(file);e.target.value='';
+}
+
+async function runOCR(b64,type){
+  const status=document.getElementById('ocr-status'),icon=document.getElementById('ocr-status-icon'),text=document.getElementById('ocr-status-text');
+  status.className='ocr-status show loading';
+  icon.innerHTML='<span class="spin">⟳</span>';
+  text.textContent='OCR 인식 중... (시간이 조금 걸려요)';
+  try{
+    const result=await Tesseract.recognize(b64,'eng',{logger:()=>{}});
+    const raw=result.data.text;
+    const nums=(raw.match(/[\d,\.]+/g)||[]).map(n=>n.replace(/,/g,'')).filter(n=>n.length>0&&!isNaN(parseFloat(n)));
+    if(type==='run'){
+      const dist=nums.find(n=>n.includes('.')&&parseFloat(n)<100&&parseFloat(n)>0.1);
+      const timeMatch=raw.match(/(\d{1,2}:\d{2})/);
+      if(dist){document.getElementById('input-dist').value=dist;document.getElementById('ocr-run').textContent=dist+'km';}
+      if(timeMatch){document.getElementById('input-time').value=timeMatch[1];}
+    }else if(type==='steps'){
+      const steps=nums.map(n=>parseInt(n)).filter(n=>n>100&&n<99999).sort((a,b)=>b-a)[0];
+      if(steps){document.getElementById('input-steps').value=steps;document.getElementById('ocr-steps').textContent=steps.toLocaleString()+'걸음';updateGoalBar();}
+    }else if(type==='inbody'){
+      const weight=nums.map(n=>parseFloat(n)).filter(n=>n>=30&&n<=200)[0];
+      if(weight){document.getElementById('input-weight').value=weight;document.getElementById('ocr-inbody').textContent=weight+'kg';}
+    }
+    status.className='ocr-status show success';icon.textContent='✓';
+    text.textContent='인식 완료! 틀리면 직접 수정하세요';
+    setTimeout(()=>status.classList.remove('show'),3500);
+  }catch(err){
+    status.className='ocr-status show error';icon.textContent='✕';
+    text.textContent='인식 실패 - 직접 입력해주세요';
+    setTimeout(()=>status.classList.remove('show'),3000);
+  }
+}
+
+async function saveRecord(){
+  if(!currentAmPm){showToast('AM 또는 PM 먼저 선택해주세요');return;}
+  const time=document.getElementById('input-time').value;
+  const dist=document.getElementById('input-dist').value;
+  const steps=document.getElementById('input-steps').value;
+  const weight=document.getElementById('input-weight').value;
+  if(!time&&!dist){showToast('시간 또는 거리를 입력해주세요');return;}
+  const idx=records.findIndex(r=>r.date===todayStr&&r.ampm===currentAmPm);
+  const rec={date:todayStr,ampm:currentAmPm,time,dist,steps,weight,ts:Date.now()};
+  if(idx>=0) records[idx]=rec; else records.unshift(rec);
+  localStorage.setItem('fitlog_v3_records',JSON.stringify(records));
+  showToast(`${currentAmPm.toUpperCase()} 기록 저장 완료 ✓`);
+  const s=parseInt(steps)||0;
+  if(s>=stepGoal) setTimeout(()=>{showConfetti();showToast('🎉 걸음수 목표 달성!');},500);
+  updateGoalDisplay(s);
+  if(claudeApiKey) fetchCheer(dist,time,steps,weight);
+}
+
+async function fetchCheer(dist,time,steps,weight){
+  const box=document.getElementById('cheer-box'),textEl=document.getElementById('cheer-text');
+  box.className='cheer-box show';
+  textEl.innerHTML='<span style="color:var(--sub);font-size:13px">메시지 생성 중...</span>';
+  try{
+    const prompt=`운동 기록: ${dist?dist+'km 달리기':''}${time?' 시간 '+time:''}${steps?' 걸음수 '+steps:''}${weight?' 체중 '+weight+'kg':''}. 이 운동 기록을 보고 한국어로 따뜻하고 재미있는 응원 메시지를 2~3문장으로 써줘. 이모지 1~2개 포함.`;
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':claudeApiKey,'anthropic-version':'2023-06-01'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:200,messages:[{role:'user',content:prompt}]})
+    });
+    const data=await res.json();
+    if(data.error) throw new Error(data.error.message);
+    textEl.textContent=data.content[0].text;
+  }catch(err){
+    textEl.textContent='오늘도 운동 완료! 꾸준함이 최고예요 💪';
+  }
+}
+
+function loadTodayRecord(){
+  const r=records.find(x=>x.date===todayStr);
+  if(r){
+    if(r.ampm) selectAmPm(r.ampm);
+    document.getElementById('input-time').value=r.time||'';
+    document.getElementById('input-dist').value=r.dist||'';
+    document.getElementById('input-steps').value=r.steps||'';
+    document.getElementById('input-weight').value=r.weight||'';
+  }
+}
+
+function renderCal(){
+  document.getElementById('cal-title').textContent=`${calYear}.${pad(calMonth+1)}`;
+  const container=document.getElementById('cal-days');
+  container.innerHTML='';
+  const first=new Date(calYear,calMonth,1),last=new Date(calYear,calMonth+1,0),startDay=first.getDay();
+  for(let i=0;i<startDay;i++) container.appendChild(makeDayEl(new Date(calYear,calMonth,-startDay+i+1),true));
+  for(let d=1;d<=last.getDate();d++) container.appendChild(makeDayEl(new Date(calYear,calMonth,d),false));
+  const rem=42-(startDay+last.getDate());
+  for(let i=1;i<=rem;i++) container.appendChild(makeDayEl(new Date(calYear,calMonth+1,i),true));
+}
+
+function makeDayEl(date,otherMonth){
+  const ds=fmtDate(date),el=document.createElement('div');
+  el.className='cal-day'+(otherMonth?' other-month':'');
+  if(ds===todayStr) el.classList.add('today');
+  const hasAm=records.some(r=>r.date===ds&&r.ampm==='am');
+  const hasPm=records.some(r=>r.date===ds&&r.ampm==='pm');
+  const rec=records.find(r=>r.date===ds);
+  if(rec&&parseInt(rec.steps||0)>=stepGoal) el.classList.add('achieved');
+  const num=document.createElement('div');num.className='cal-day-num';num.textContent=date.getDate();el.appendChild(num);
+  if(hasAm||hasPm){
+    const dots=document.createElement('div');dots.className='cal-dots';
+    if(hasAm){const d=document.createElement('div');d.className='cal-dot am';dots.appendChild(d);}
+    if(hasPm){const d=document.createElement('div');d.className='cal-dot pm';dots.appendChild(d);}
+    el.appendChild(dots);
+  }
+  if(!otherMonth) el.onclick=()=>showDayModal(ds);
+  return el;
+}
+
+function showDayModal(ds){
+  const dayRecs=records.filter(r=>r.date===ds);
+  if(!dayRecs.length) return;
+  const r=dayRecs[0];
+  document.getElementById('modal-title').textContent=ds+' · '+r.ampm.toUpperCase();
+  document.getElementById('modal-stats').innerHTML=[
+    r.time?`<div class="modal-stat"><div class="modal-stat-label">운동시간</div><div class="modal-stat-val">${r.time}</div></div>`:'',
+    r.dist?`<div class="modal-stat"><div class="modal-stat-label">거리</div><div class="modal-stat-val">${r.dist}km</div></div>`:'',
+    r.steps?`<div class="modal-stat"><div class="modal-stat-label">걸음수</div><div class="modal-stat-val">${parseInt(r.steps).toLocaleString()}</div></div>`:'',
+    r.weight?`<div class="modal-stat"><div class="modal-stat-label">체중</div><div class="modal-stat-val">${r.weight}kg</div></div>`:'',
+  ].join('');
+  document.getElementById('modal-bg').classList.add('show');
+}
+
+function changeMonth(d){calMonth+=d;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}renderCal();}
+
+function triggerCompare(target){compareTarget=target;document.getElementById('file-compare').click();}
+function handleCompare(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=(ev)=>{
+    const b64=ev.target.result;
+    comparePhotos[compareTarget]=b64;
+    const img=document.getElementById('cmp-img-'+compareTarget);
+    img.src=b64;img.style.display='block';
+    document.getElementById('compare-'+compareTarget).classList.add('has-photo');
+    if(comparePhotos.before&&comparePhotos.after) initSlider();
+  };
+  reader.readAsDataURL(file);e.target.value='';
+}
+
+function initSlider(){
+  const sc=document.getElementById('slider-compare');
+  document.getElementById('sl-before').src=comparePhotos.before;
+  document.getElementById('sl-after').src=comparePhotos.after;
+  sc.classList.add('show');
+  document.getElementById('compare-hint').textContent='← 슬라이더를 좌우로 드래그하세요 →';
+  let dragging=false;
+  sc.addEventListener('mousedown',()=>dragging=true);
+  sc.addEventListener('touchstart',()=>dragging=true,{passive:true});
+  window.addEventListener('mouseup',()=>dragging=false);
+  window.addEventListener('touchend',()=>dragging=false);
+  function move(x){
+    const rect=sc.getBoundingClientRect();
+    const pct=Math.max(0,Math.min(100,(x-rect.left)/rect.width*100));
+    document.getElementById('sl-after').style.clipPath=`inset(0 ${100-pct}% 0 0)`;
+    document.getElementById('sl-line').style.left=pct+'%';
+    document.getElementById('sl-handle').style.left=pct+'%';
+  }
+  sc.addEventListener('mousemove',e=>{if(dragging)move(e.clientX);});
+  sc.addEventListener('touchmove',e=>{move(e.touches[0].clientX);},{passive:true});
+}
+
+function renderLog(){
+  const container=document.getElementById('log-list');
+  if(!records.length){container.innerHTML='<div class="empty-msg">아직 기록이 없습니다<br>운동하고 첫 기록을 남겨보세요 🏃</div>';return;}
+  container.innerHTML=[...records].sort((a,b)=>b.ts-a.ts).map(r=>`
+    <div class="log-item">
+      <div class="log-badge ${r.ampm}">${r.ampm.toUpperCase()}</div>
+      <div class="log-info">
+        <div class="log-date">${r.date}</div>
+        <div class="log-stats">${r.dist?r.dist+'km':''} ${r.time?'· '+r.time:''}</div>
+        <div class="log-extra">${r.steps?'👟 '+parseInt(r.steps).toLocaleString()+'걸음':''} ${r.weight?'⚖️ '+r.weight+'kg':''}</div>
+      </div>
+    </div>`).join('');
+}
+
+function saveApiKey(){
+  const val=document.getElementById('api-key-input').value.trim();
+  if(!val){showToast('API 키를 입력해주세요');return;}
+  claudeApiKey=val;localStorage.setItem('fitlog_claude_api',val);showToast('API 키 저장 완료 ✓');
+}
+async function testApiKey(){
+  const val=document.getElementById('api-key-input').value.trim();
+  if(!val){showToast('API 키를 입력해주세요');return;}
+  showToast('테스트 중...');
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':val,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:10,messages:[{role:'user',content:'hi'}]})});
+    const data=await res.json();
+    if(data.error) throw new Error(data.error.message);
+    showToast('API 키 정상 작동 ✓');
+  }catch(e){showToast('오류: '+e.message.substring(0,30));}
+}
+function saveGoal(){
+  const val=parseInt(document.getElementById('goal-input').value)||10000;
+  stepGoal=val;localStorage.setItem('fitlog_goal',val);
+  updateGoalDisplay();showToast(`목표 ${val.toLocaleString()}걸음 저장 ✓`);
+}
+function clearAll(){if(!confirm('모든 기록을 삭제할까요?'))return;records=[];localStorage.removeItem('fitlog_v3_records');showToast('삭제 완료');}
+function closeModal(e){if(e.target===document.getElementById('modal-bg'))closeModalDirect();}
+function closeModalDirect(){document.getElementById('modal-bg').classList.remove('show');}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+
+function showConfetti(){
+  const canvas=document.getElementById('confetti-canvas');
+  canvas.style.display='block';
+  const ctx=canvas.getContext('2d');
+  canvas.width=window.innerWidth;canvas.height=window.innerHeight;
+  const pieces=Array.from({length:80},()=>({x:Math.random()*canvas.width,y:-10,r:Math.random()*6+3,c:['#4FC3F7','#FF8A65','#69F0AE','#FFD54F','#CE93D8'][Math.floor(Math.random()*5)],vy:Math.random()*3+2,vx:(Math.random()-0.5)*2,rot:Math.random()*360}));
+  let frame=0;
+  function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);pieces.forEach(p=>{ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot*Math.PI/180);ctx.fillStyle=p.c;ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r);ctx.restore();p.y+=p.vy;p.x+=p.vx;p.rot+=3;});frame++;if(frame<120)requestAnimationFrame(draw);else canvas.style.display='none';}
+  draw();
+}
+
+init();
+</script>
+</body>
+</html>
