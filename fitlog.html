@@ -74,16 +74,22 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .cal-nav:active{background:var(--bg3)}
 .cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px}
 .cal-weekday{text-align:center;font-size:10px;color:var(--sub);padding:3px 0;letter-spacing:1px}
-.cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-.cal-day{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;cursor:pointer;position:relative;transition:background 0.15s}
-.cal-day:hover{background:var(--bg3)}
-.cal-day.today{border:1.5px solid rgba(128,128,128,0.3)}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-day{min-height:72px;display:flex;flex-direction:column;padding:5px 4px 4px;border-radius:10px;cursor:pointer;position:relative;transition:background 0.15s;background:var(--bg2);border:1px solid var(--border)}
+.cal-day:active{background:var(--bg3)}
+.cal-day.today{border:1.5px solid rgba(128,128,128,0.4)}
+.cal-day.other-month{background:transparent;border-color:transparent}
 .cal-day.other-month .cal-day-num{color:rgba(128,128,128,0.2)}
-.cal-day-num{font-size:13px;font-weight:500}
-.cal-dots{display:flex;gap:2px;margin-top:2px}
-.cal-dot{width:5px;height:5px;border-radius:50%}
-.cal-dot.am{background:var(--am)}.cal-dot.pm{background:var(--pm)}
-.cal-day.achieved{background:rgba(105,240,174,0.1)}
+.cal-day-num{font-size:13px;font-weight:700;margin-bottom:3px}
+.cal-day.today .cal-day-num{color:var(--am)}
+.cal-ampm-row{display:flex;align-items:center;gap:2px;margin-bottom:1px}
+.cal-ampm-label{font-size:9px;font-weight:700;letter-spacing:0.5px;min-width:18px}
+.cal-ampm-label.am{color:var(--am)}.cal-ampm-label.pm{color:var(--pm)}
+.cal-ampm-time{font-size:9px;color:var(--sub)}
+.cal-ampm-icon{font-size:9px;margin-left:1px}
+.cal-steps-row{display:flex;align-items:center;gap:2px;margin-top:1px}
+.cal-steps-icon{font-size:9px}
+.cal-day.achieved{background:rgba(105,240,174,0.07)}
 .cal-day.achieved .cal-day-num{color:var(--green)}
 .compare-section{padding-top:16px}
 .compare-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:12px}
@@ -143,6 +149,13 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .modal-stat{background:var(--bg3);border-radius:10px;padding:12px}
 .modal-stat-label{font-size:10px;color:var(--sub);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
 .modal-stat-val{font-family:'Roboto Mono',monospace;font-size:18px;font-weight:700}
+.modal-ampm-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;margin-bottom:12px}
+.modal-ampm-badge.am{background:rgba(79,195,247,0.15);color:var(--am)}
+.modal-ampm-badge.pm{background:rgba(255,138,101,0.15);color:var(--pm)}
+.modal-photos{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.modal-photo-item{border-radius:10px;overflow:hidden;aspect-ratio:1;background:var(--bg3);position:relative}
+.modal-photo-item img{width:100%;height:100%;object-fit:cover}
+.modal-photo-label{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.6);padding:4px 6px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#fff;text-align:center}
 .toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:9px 18px;font-size:13px;color:var(--text);z-index:300;opacity:0;transition:opacity 0.3s;white-space:nowrap;pointer-events:none}
 .toast.show{opacity:1}
 input[type=file]{display:none}
@@ -423,6 +436,8 @@ function handlePhoto(e){
     const img=document.getElementById('img-'+type);
     img.src=b64;img.style.display='block';
     document.getElementById('photo-'+type).classList.add('has-photo');
+    // 사진 저장 (날짜+ampm+타입 키)
+    localStorage.setItem('fitlog_photo_'+todayStr+'_'+currentAmPm+'_'+type, b64);
     if(type!=='me') runOCR(b64,type);
   };
   reader.readAsDataURL(file);e.target.value='';
@@ -438,10 +453,16 @@ async function runOCR(b64,type){
     const raw=result.data.text;
     const nums=(raw.match(/[\d,\.]+/g)||[]).map(n=>n.replace(/,/g,'')).filter(n=>n.length>0&&!isNaN(parseFloat(n)));
     if(type==='run'){
+      // 트레드밀 시간: MM:SS 또는 HH:MM 형식 중 가장 큰 숫자
+      const timeMatches=raw.match(/\d{1,2}:\d{2}/g)||[];
+      // 숫자 중 가장 큰 시간값 (트레드밀은 보통 제일 큰 숫자가 타이머)
+      const bestTime=timeMatches.sort((a,b)=>{
+        const toSec=t=>{const p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]);};
+        return toSec(b)-toSec(a);
+      })[0];
       const dist=nums.find(n=>n.includes('.')&&parseFloat(n)<100&&parseFloat(n)>0.1);
-      const timeMatch=raw.match(/(\d{1,2}:\d{2})/);
       if(dist){document.getElementById('input-dist').value=dist;document.getElementById('ocr-run').textContent=dist+'km';}
-      if(timeMatch){document.getElementById('input-time').value=timeMatch[1];}
+      if(bestTime){document.getElementById('input-time').value=bestTime;document.getElementById('ocr-run').textContent=(dist?dist+'km · ':'')+bestTime;}
     }else if(type==='steps'){
       const steps=nums.map(n=>parseInt(n)).filter(n=>n>100&&n<99999).sort((a,b)=>b-a)[0];
       if(steps){document.getElementById('input-steps').value=steps;document.getElementById('ocr-steps').textContent=steps.toLocaleString()+'걸음';updateGoalBar();}
@@ -474,26 +495,65 @@ async function saveRecord(){
   const s=parseInt(steps)||0;
   if(s>=stepGoal) setTimeout(()=>{showConfetti();showToast('🎉 걸음수 목표 달성!');},500);
   updateGoalDisplay(s);
-  if(claudeApiKey) fetchCheer(dist,time,steps,weight);
+  fetchCheer(dist,time,steps,weight);
 }
 
-async function fetchCheer(dist,time,steps,weight){
+function fetchCheer(dist,time,steps,weight){
   const box=document.getElementById('cheer-box'),textEl=document.getElementById('cheer-text');
+  const messages=[
+    '오늘도 해냈네요! 이 꾸준함이 쌓여서 나중에 엄청난 결과가 될 거예요. 정말 대단해요 💪',
+    '운동화 끈 묶는 그 순간이 제일 힘든 건데, 오늘도 그걸 이겨냈군요! 👟',
+    '어제의 나보다 오늘의 내가 더 강해졌습니다. 이게 바로 성장이에요 🔥',
+    '비가 와도, 피곤해도, 오늘도 나왔네요. 이런 사람이 결국 변합니다 🏃',
+    '오늘 운동은 미래의 내가 과거의 나에게 보내는 선물이에요 🎁',
+    '몸이 기억합니다. 오늘 흘린 땀을 절대 잊지 않아요 💦',
+    '완벽한 운동은 없어요. 그냥 하는 운동이 최고예요. 오늘도 최고! ⭐',
+    '3개월 후의 나를 상상해보세요. 오늘이 그 시작점이에요 📈',
+    '운동 안 한 날보다 오늘이 훨씬 낫습니다. 당연하지만 진짜예요 😤',
+    '쉬고 싶은 마음을 이긴 게 오늘의 진짜 성과예요 🏆',
+    '매일 조금씩, 그게 제일 빠른 길이에요. 오늘도 한 걸음 전진! 🚀',
+    '운동하고 나서 후회한 적 있나요? 없죠. 오늘도 잘했어요 😊',
+    '몸이 바뀌기 전에 마음이 먼저 바뀌고 있어요. 느껴지시나요? ✨',
+    '오늘 운동한 사람과 안 한 사람의 차이, 1년 후에 보입니다 👀',
+    '힘들면 힘든 만큼 더 강해지고 있다는 증거예요. 계속 가요! 💥',
+    '작은 습관이 인생을 바꿉니다. 오늘도 그 습관 지켰어요 🌱',
+    '포기하지 않는 사람이 결국 이깁니다. 오늘도 그 사람이 되었어요 🥇',
+    '땀 한 방울이 지방 한 조각을 녹입니다. 오늘도 녹였어요 🔥',
+    '운동은 배신하지 않아요. 오늘 투자한 시간은 반드시 돌아옵니다 💰',
+    '1% 더 나아지는 게 복리로 쌓입니다. 오늘의 1%가 대단해요 📊',
+    '피곤한데도 했다는 게 진짜 실력이에요. 대단합니다 🙌',
+    '오늘 운동, 내일의 나에게 고마운 일이 될 거예요 🌅',
+    '꾸준히 하는 사람이 재능 있는 사람을 이깁니다. 오늘도 증명했어요 ✊',
+    '몸이 변하는 게 보이지 않아도 내부에서 변하고 있어요. 믿어요! 💫',
+    '오늘 이 기록이 나중에 보면 얼마나 뿌듯할지. 계속 쌓아가요 📚',
+    '세상에서 가장 긴 여정도 한 걸음부터. 오늘 그 걸음 내딛었어요 👣',
+    '운동복 입는 순간 이미 절반은 성공이에요. 오늘도 완벽해요 👕',
+    '힘들었지만 했잖아요. 그게 바로 의지력이에요 💎',
+    '오늘의 땀이 내일의 미소가 됩니다. 웃을 준비 하세요 😄',
+    '포기하려던 순간을 이겨낸 게 오늘 가장 큰 성과예요 🌟',
+    '몸은 거짓말하지 않아요. 쌓인 노력이 반드시 보입니다 💪',
+    '오늘 운동 안 했으면 후회했을 텐데, 잘 결정했어요! 👍',
+    '근육은 쉬는 동안 만들어지고, 의지는 운동 중에 만들어져요 🏋️',
+    '작심삼일도 반복하면 습관이 됩니다. 오늘도 반복 성공! 🔄',
+    '자신을 이기는 사람이 가장 강한 사람이에요. 오늘 이겼어요 🏆',
+    '오늘 흘린 땀은 절대 헛되지 않아요. 몸이 다 기억해요 🧠',
+    '어떤 날은 잘 안 되는 날도 있어요. 그래도 한 거잖아요. 최고! 🌈',
+    '운동은 가장 싸고 효과 좋은 자기계발이에요. 오늘도 투자 완료 💸',
+    '5년 후의 몸은 오늘 결정됩니다. 좋은 결정 했어요! 🎯',
+    '지치면 잠깐 쉬어도 되지만 포기는 하지 마요. 오늘도 안 포기했어요 🚶',
+    '건강한 몸이 최고의 사치예요. 오늘도 그 사치를 누렸어요 👑',
+    '운동 기록을 남기는 것 자체가 대단한 의지예요 📝',
+    '오늘 뛴 거리만큼 멀어진 거 있어요. 바로 안 좋은 습관들이에요 🏃‍♂️',
+    '무거운 몸을 이끌고 나온 것 자체가 오늘의 승리예요 🎉',
+    '운동을 미루는 사람은 많고, 실제로 하는 사람은 적어요. 오늘 그 적은 사람이 됐어요 ⚡',
+    '체력이 국력이라는 말, 오늘도 국가에 기여했네요 😄🇰🇷',
+    '오늘 이 순간을 미래의 내가 고마워할 거예요. 확실해요 🙏',
+    '완벽하지 않아도 괜찮아요. 한 것 자체가 완벽이에요 ✅',
+    '내 몸은 내가 제일 잘 알아요. 오늘도 잘 돌봤어요 💝',
+    '운동은 몸만 바꾸는 게 아니라 마인드도 바꿔요. 오늘도 성장했어요 🌿',
+  ];
   box.className='cheer-box show';
-  textEl.innerHTML='<span style="color:var(--sub);font-size:13px">메시지 생성 중...</span>';
-  try{
-    const prompt=`운동 기록: ${dist?dist+'km 달리기':''}${time?' 시간 '+time:''}${steps?' 걸음수 '+steps:''}${weight?' 체중 '+weight+'kg':''}. 이 운동 기록을 보고 한국어로 따뜻하고 재미있는 응원 메시지를 2~3문장으로 써줘. 이모지 1~2개 포함.`;
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':claudeApiKey,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:200,messages:[{role:'user',content:prompt}]})
-    });
-    const data=await res.json();
-    if(data.error) throw new Error(data.error.message);
-    textEl.textContent=data.content[0].text;
-  }catch(err){
-    textEl.textContent='오늘도 운동 완료! 꾸준함이 최고예요 💪';
-  }
+  textEl.textContent=messages[Math.floor(Math.random()*messages.length)];
 }
 
 function loadTodayRecord(){
@@ -522,32 +582,87 @@ function makeDayEl(date,otherMonth){
   const ds=fmtDate(date),el=document.createElement('div');
   el.className='cal-day'+(otherMonth?' other-month':'');
   if(ds===todayStr) el.classList.add('today');
-  const hasAm=records.some(r=>r.date===ds&&r.ampm==='am');
-  const hasPm=records.some(r=>r.date===ds&&r.ampm==='pm');
-  const rec=records.find(r=>r.date===ds);
-  if(rec&&parseInt(rec.steps||0)>=stepGoal) el.classList.add('achieved');
+  const amRec=records.find(r=>r.date===ds&&r.ampm==='am');
+  const pmRec=records.find(r=>r.date===ds&&r.ampm==='pm');
+  const anyRec=amRec||pmRec;
+  if(anyRec&&parseInt(anyRec.steps||0)>=stepGoal) el.classList.add('achieved');
+
+  // 날짜 숫자
   const num=document.createElement('div');num.className='cal-day-num';num.textContent=date.getDate();el.appendChild(num);
-  if(hasAm||hasPm){
-    const dots=document.createElement('div');dots.className='cal-dots';
-    if(hasAm){const d=document.createElement('div');d.className='cal-dot am';dots.appendChild(d);}
-    if(hasPm){const d=document.createElement('div');d.className='cal-dot pm';dots.appendChild(d);}
-    el.appendChild(dots);
+
+  if(!otherMonth){
+    // AM 행
+    const amRow=document.createElement('div');amRow.className='cal-ampm-row';
+    const amLbl=document.createElement('div');amLbl.className='cal-ampm-label am';amLbl.textContent='AM';amRow.appendChild(amLbl);
+    if(amRec){
+      if(amRec.time){const t=document.createElement('div');t.className='cal-ampm-time';t.textContent=amRec.time;amRow.appendChild(t);}
+      const ic=document.createElement('div');ic.className='cal-ampm-icon';ic.textContent='✏️';amRow.appendChild(ic);
+    } else {
+      const dash=document.createElement('div');dash.className='cal-ampm-time';dash.textContent='—';amRow.appendChild(dash);
+    }
+    el.appendChild(amRow);
+
+    // PM 행
+    const pmRow=document.createElement('div');pmRow.className='cal-ampm-row';
+    const pmLbl=document.createElement('div');pmLbl.className='cal-ampm-label pm';pmLbl.textContent='PM';pmRow.appendChild(pmLbl);
+    if(pmRec){
+      if(pmRec.time){const t=document.createElement('div');t.className='cal-ampm-time';t.textContent=pmRec.time;pmRow.appendChild(t);}
+      const ic=document.createElement('div');ic.className='cal-ampm-icon';ic.textContent='✏️';pmRow.appendChild(ic);
+    } else {
+      const dash=document.createElement('div');dash.className='cal-ampm-time';dash.textContent='—';pmRow.appendChild(dash);
+    }
+    el.appendChild(pmRow);
+
+    // 걸음수 아이콘
+    if(anyRec&&anyRec.steps){
+      const sr=document.createElement('div');sr.className='cal-steps-row';
+      sr.innerHTML='<span class="cal-steps-icon">👟</span>';
+      el.appendChild(sr);
+    }
+
+    el.onclick=()=>showDayModal(ds);
   }
-  if(!otherMonth) el.onclick=()=>showDayModal(ds);
   return el;
 }
 
 function showDayModal(ds){
   const dayRecs=records.filter(r=>r.date===ds);
   if(!dayRecs.length) return;
-  const r=dayRecs[0];
-  document.getElementById('modal-title').textContent=ds+' · '+r.ampm.toUpperCase();
-  document.getElementById('modal-stats').innerHTML=[
-    r.time?`<div class="modal-stat"><div class="modal-stat-label">운동시간</div><div class="modal-stat-val">${r.time}</div></div>`:'',
-    r.dist?`<div class="modal-stat"><div class="modal-stat-label">거리</div><div class="modal-stat-val">${r.dist}km</div></div>`:'',
-    r.steps?`<div class="modal-stat"><div class="modal-stat-label">걸음수</div><div class="modal-stat-val">${parseInt(r.steps).toLocaleString()}</div></div>`:'',
-    r.weight?`<div class="modal-stat"><div class="modal-stat-label">체중</div><div class="modal-stat-val">${r.weight}kg</div></div>`:'',
-  ].join('');
+
+  // 날짜 파싱
+  const [y,m,d]=ds.split('-');
+  document.getElementById('modal-title').textContent=`${y}.${m}.${d}`;
+
+  let html='';
+  dayRecs.forEach(r=>{
+    html+=`<div class="modal-ampm-badge ${r.ampm}">${r.ampm.toUpperCase()}</div>`;
+    html+='<div class="modal-stat-grid">';
+    if(r.time) html+=`<div class="modal-stat"><div class="modal-stat-label">운동시간</div><div class="modal-stat-val" style="color:var(--${r.ampm})">${r.time}</div></div>`;
+    if(r.dist) html+=`<div class="modal-stat"><div class="modal-stat-label">거리</div><div class="modal-stat-val">${r.dist}km</div></div>`;
+    if(r.steps) html+=`<div class="modal-stat"><div class="modal-stat-label">걸음수</div><div class="modal-stat-val">${parseInt(r.steps).toLocaleString()}</div></div>`;
+    if(r.weight) html+=`<div class="modal-stat"><div class="modal-stat-label">체중</div><div class="modal-stat-val">${r.weight}kg</div></div>`;
+    html+='</div>';
+
+    // 사진들
+    const photoKeys=[
+      {key:`${ds}_${r.ampm}_me`,label:'내사진'},
+      {key:`${ds}_${r.ampm}_run`,label:'런닝'},
+      {key:`${ds}_${r.ampm}_steps`,label:'걸음수'},
+      {key:`${ds}_${r.ampm}_inbody`,label:'인바디'},
+    ];
+    const hasPhotos=photoKeys.some(p=>localStorage.getItem('fitlog_photo_'+p.key));
+    if(hasPhotos){
+      html+='<div class="modal-photos">';
+      photoKeys.forEach(p=>{
+        const src=localStorage.getItem('fitlog_photo_'+p.key);
+        if(src) html+=`<div class="modal-photo-item"><img src="${src}"><div class="modal-photo-label">${p.label}</div></div>`;
+      });
+      html+='</div>';
+    }
+    html+='<div style="height:12px"></div>';
+  });
+
+  document.getElementById('modal-stats').innerHTML=html;
   document.getElementById('modal-bg').classList.add('show');
 }
 
