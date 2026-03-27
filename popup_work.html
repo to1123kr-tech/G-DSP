@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>G-DSP — 업무 관리</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* ── 라이트(기본) ── */
+  --bg:#f5f7fa;--bg2:#eef1f6;--bg3:#e6eaf2;
+  --card:#ffffff;--line:#dde3ed;--line2:#c8d0e0;
+  --txt:#1a2540;--txt2:#3d5070;--txt3:#7a90b0;
+  --blue:#2563eb;--blue2:#3b82f6;--blue3:#1d4ed8;
+  --green:#059669;--red:#ef4444;--gold:#d97706;
+  --cyan:#0891b2;--purple:#7c3aed;--orange:#ea580c;
+  --neon:#2563eb;--neon2:#3b82f6;
+  --sidebar-w:240px;
+  --shadow:0 1px 4px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06);
+  --shadow2:0 2px 8px rgba(0,0,0,.1),0 8px 24px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+
+--shadow:0 1px 4px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06);
+--shadow2:0 2px 8px rgba(0,0,0,.1),0 8px 24px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Noto Sans KR','Malgun Gothic',sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+button,input,select,textarea{font:inherit}
+button{border:none;background:none;color:inherit;cursor:pointer}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+/* ── 다크 모드 오버라이드 ── */
+body.dark{--bg:#04080f;--bg2:#060d18;--bg3:#08111f;--card:#0a1220;--line:#112038;--line2:#1e3555;--txt:#d8eaff;--txt2:#607a9e;--txt3:#4a6080;--blue:#3e7cff;--blue2:#60a5fa;--blue3:#1a50f0;--green:#22d3a5;--red:#ff6b78;--gold:#f1c65b;--cyan:#06b6d4;--purple:#a78bfa;--orange:#f97316;--neon:#00f0ff;--shadow:0 2px 8px rgba(0,0,0,.4);--shadow2:0 8px 32px rgba(0,0,0,.6)}
+body.dark .hdr{background:linear-gradient(180deg,#06101e,#04080f);box-shadow:none}
+body.dark .sidebar{background:var(--bg2);box-shadow:none}
+body.dark .panel-hdr{background:var(--bg2);box-shadow:none}
+body.dark .rcp-search-card{background:var(--card)}
+body.dark .rcp-search-card::before{background:var(--card)}
+body.dark .rcp-item-card{background:var(--bg3);border-color:var(--line)}
+body.dark .hbtn{background:rgba(255,255,255,.04)}
+body.dark .theme-toggle{background:rgba(255,255,255,.04)}
+body.dark .ri{background:var(--bg2);color:var(--txt)}
+body.dark .rcp-region-sel{background:var(--bg2);color:var(--txt)}
+body.dark .rcp-status-sel{background:var(--bg2);color:var(--txt)}
+body.dark .rcp-sup-ta{background:var(--bg2);color:var(--txt)}
+body.dark .rcp-sup-field input[type=date]{background:var(--bg2);color:var(--txt)}
+body.dark .login-card{background:var(--card)}
+body.dark #loginScreen{background:radial-gradient(ellipse at 50% 40%,#060e22,#020508)}
+body.dark .modal{background:#08111f}
+body.dark .toast{background:#08111f}
+
+/* ══ API 설정 ══ */
+.api-view{flex:1;overflow-y:auto;padding:16px 18px}
+.api-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+.api-t{font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.api-t svg{width:13px;height:13px;color:var(--neon);flex-shrink:0}
+.api-row{display:grid;grid-template-columns:1fr 56px 56px 56px;gap:4px;margin-bottom:6px}
+.api-row2{display:grid;grid-template-columns:1fr 56px 56px;gap:4px;margin-bottom:6px}
+.mf{width:100%;height:34px;padding:0 10px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;transition:.15s}
+.mf:focus{border-color:var(--neon)}
+
+body.dark .rcp-search-card{background:var(--card)}
+body.dark .rcp-sup-ta{background:var(--bg2);color:var(--txt)}
+body.dark .ri{background:var(--bg2);color:var(--txt)}
+body.dark .rcp-item-card{background:var(--card)}
+body.dark .rcp-region-sel{background:var(--bg2);color:var(--txt)}
+body.dark .ctbl th{background:var(--bg2)}
+body.dark .ctbl td{color:var(--txt2)}
+.wrap{display:flex;flex-direction:column;height:100vh}
+.hdr{height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0}
+.hdr-logo{font-size:15px;font-weight:900;color:var(--blue);letter-spacing:1px}
+.hdr-sep{width:1px;height:18px;background:var(--line)}
+.hdr-title{font-size:14px;font-weight:700;color:var(--txt)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+.hbtn{height:30px;padding:0 11px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;transition:.15s}
+.hbtn:hover{border-color:var(--blue2);color:var(--blue2)}
+.hbtn.close{border-color:rgba(239,68,68,.3);color:var(--red)}
+.hbtn.close:hover{background:rgba(239,68,68,.08)}
+.tabs{display:flex;gap:2px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0}
+.tab{height:42px;padding:0 16px;font-size:13px;font-weight:700;color:var(--txt3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:.15s;display:flex;align-items:center;gap:7px}
+.tab:hover{color:var(--txt2)}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+.tab svg{width:14px;height:14px}
+.tab-view{display:none;flex:1;overflow:hidden;flex-direction:column}
+.tab-view.on{display:flex}
+.server-banner{display:flex;align-items:center;gap:10px;padding:8px 14px;background:rgba(239,68,68,.05);border-bottom:1px solid rgba(239,68,68,.15);font-size:12px;color:var(--red);flex-shrink:0}
+.server-banner.ok{background:rgba(5,150,105,.05);border-color:rgba(5,150,105,.15);color:var(--green)}
+.ri{width:100%;height:42px;padding:0 14px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--txt);font-size:14px;outline:none;transition:.15s}
+.ri:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.csf{height:30px;padding:0 11px;background:var(--bg3);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;transition:.15s}
+.csf:focus{border-color:var(--blue)}
+.ctbl{width:100%;border-collapse:collapse}
+.ctbl th{padding:7px 11px;font-size:10px;color:var(--txt3);text-align:left;border-bottom:1px solid var(--line2);background:var(--bg2);font-weight:700;letter-spacing:.5px;position:sticky;top:0;z-index:1}
+.ctbl td{padding:6px 11px;font-size:11px;color:var(--txt2);border-bottom:1px solid var(--line)}
+.ctbl tr:hover td{background:rgba(0,240,255,.04);color:var(--txt)}
+.ctbl td a{color:var(--blue2);text-decoration:none}
+
+/* ══ 진행조회 ══ */
+.rcp-wrap{width:100%;padding:20px 24px;box-sizing:border-box}
+.rcp-search-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:20px;position:relative;box-shadow:var(--shadow)}
+.rcp-search-card::before{content:attr(data-l);position:absolute;top:-1px;left:16px;font-size:11px;font-weight:700;color:var(--blue);background:#fff;padding:0 7px;letter-spacing:.3px}
+.ri{width:100%;height:42px;padding:0 14px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--txt);font-size:14px;outline:none;transition:.15s}
+.ri:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1);background:#fff}
+.rcp-region-row{display:flex;gap:8px;margin-bottom:12px}
+.rcp-region-sel{height:42px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--txt);padding:0 12px;outline:none;font-size:14px;flex:1;transition:.15s}
+.rcp-region-sel:focus{border-color:var(--blue);background:#fff}
+.r-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg3);border:1px solid var(--line);border-radius:9px;margin-bottom:5px;font-size:13px}
+.r-status{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px}
+.rs-ing{background:rgba(37,99,235,.1);color:#1d4ed8;border:1px solid rgba(37,99,235,.2)}
+.rs-sup{background:rgba(217,119,6,.1);color:#92400e;border:1px solid rgba(217,119,6,.25)}
+.rs-done{background:rgba(5,150,105,.1);color:#065f46;border:1px solid rgba(5,150,105,.2)}
+
+/* 진행조회 3열 가로 레이아웃 */
+.rcp-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
+.rcp-col-hdr{display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:10px;margin-bottom:12px;font-size:14px;font-weight:700}
+.rcp-col-ing .rcp-col-hdr{background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.18);color:#1d4ed8}
+.rcp-col-sup .rcp-col-hdr{background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.2);color:#92400e}
+.rcp-col-done .rcp-col-hdr{background:rgba(5,150,105,.07);border:1px solid rgba(5,150,105,.18);color:#065f46}
+
+/* 아이템 카드 — 스크린샷 스타일 */
+.rcp-item-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;transition:.2s;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.rcp-item-card:hover{border-color:var(--blue2);box-shadow:0 2px 8px rgba(37,99,235,.1)}
+.rcp-item-card.has-new{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+.rcp-item-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+.rcp-item-num{font-size:15px;font-weight:700;color:var(--txt);letter-spacing:.3px}
+.rcp-item-meta{font-size:12px;color:var(--txt3);margin-top:3px}
+.rcp-item-dday{font-size:12px;font-weight:700}
+.rcp-item-btns{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center}
+
+/* 버튼 스타일 — 스크린샷의 오렌지/붉은 조회/삭제 버튼 */
+.rcp-ibtn{height:30px;padding:0 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;border:none;display:inline-flex;align-items:center;gap:4px}
+.rcp-ibtn-query{background:#f97316;color:#fff;box-shadow:0 1px 4px rgba(249,115,22,.3)}
+.rcp-ibtn-query:hover{background:#ea580c}
+.rcp-ibtn-print{background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);color:var(--blue2)}
+.rcp-ibtn-print:hover{background:rgba(37,99,235,.15)}
+.rcp-ibtn-del{background:#ef4444;color:#fff;box-shadow:0 1px 4px rgba(239,68,68,.3)}
+.rcp-ibtn-del:hover{background:#dc2626}
+.rcp-ibtn-sup{background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);color:#92400e}
+.rcp-ibtn-sup:hover{background:rgba(217,119,6,.15)}
+
+/* 상태 셀렉트 */
+.rcp-status-sel{height:30px;padding:0 8px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;font-weight:600;outline:none;cursor:pointer}
+
+/* 보완 패널 */
+.rcp-sup-panel{overflow:hidden;max-height:0;transition:max-height .35s ease,opacity .35s ease;opacity:0}
+.rcp-sup-panel.open{max-height:500px;opacity:1}
+.rcp-sup-inner{background:rgba(217,119,6,.04);border:1px solid rgba(217,119,6,.2);border-radius:10px;padding:14px;margin-top:10px}
+.rcp-sup-label{font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.rcp-sup-ta{width:100%;min-height:80px;background:#fff;border:1px solid var(--line2);border-radius:8px;color:var(--txt);font-size:13px;padding:10px 12px;outline:none;resize:vertical;line-height:1.6;box-sizing:border-box;transition:.15s}
+.rcp-sup-ta:focus{border-color:var(--gold)}
+.rcp-sup-row{display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.rcp-sup-field{display:flex;flex-direction:column;gap:3px}
+.rcp-sup-field label{font-size:11px;color:var(--txt3);font-weight:600}
+.rcp-sup-field input[type=date]{height:32px;padding:0 10px;background:#fff;border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;transition:.15s}
+.rcp-sup-field input[type=date]:focus{border-color:var(--gold)}
+
+/* 처리기한 D-day 칩 */
+.dday-chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:20px;font-size:11px;font-weight:700;margin-left:6px}
+.dday-ok{background:rgba(5,150,105,.1);color:#065f46;border:1px solid rgba(5,150,105,.2)}
+.dday-warn{background:rgba(217,119,6,.12);color:#92400e;border:1px solid rgba(217,119,6,.25)}
+.dday-over{background:rgba(239,68,68,.1);color:#b91c1c;border:1px solid rgba(239,68,68,.2)}
+
+/* 새로운 상태 배지 애니메이션 */
+@keyframes newBadge{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.8;transform:scale(1.1)}}
+@keyframes shimmer{0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.4)}50%{box-shadow:0 0 0 4px rgba(37,99,235,.1)}}
+.new-badge{display:inline-flex;align-items:center;background:#ef4444;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:5px;animation:newBadge 1s ease-in-out infinite;vertical-align:middle}
+.rcp-item-card.has-new{animation:shimmer 2s ease-in-out infinite}
+
+/* 체크박스 */
+.rcp-chk{width:16px;height:16px;accent-color:var(--blue);cursor:pointer;flex-shrink:0;margin-top:1px}
+
+/* 다크/라이트 토글 */
+.menu-card{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:18px 14px 16px;cursor:pointer;transition:.18s;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;user-select:none}
+.menu-card:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 6px 24px rgba(62,124,255,.13)}
+.menu-card-ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex-shrink:0}
+.menu-card-ico svg{width:22px;height:22px}
+.menu-card-name{font-size:13px;font-weight:700;color:var(--txt);line-height:1.3}
+.menu-card-cat{font-size:10px;color:var(--txt3);margin-top:2px}
+
+.hist-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--card);border:1px solid var(--line);border-radius:9px;font-size:13px}
+.hist-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0}
+.hist-txt{flex:1;color:var(--txt2)}
+.hist-date{font-size:10px;color:var(--txt3);white-space:nowrap}
+.hist-btns{display:flex;gap:4px}
+.hst-btn{height:22px;padding:0 7px;border-radius:4px;border:1px solid var(--line);color:var(--txt3);font-size:10px;cursor:pointer;transition:.15s;background:transparent}
+.hst-del{border-color:rgba(239,68,68,.2);color:var(--red)}
+.hst-del:hover{background:rgba(239,68,68,.08)}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal-box{background:var(--card);border-radius:16px;padding:28px 32px;max-width:500px;width:90%;box-shadow:var(--shadow2);position:relative}
+code{background:var(--bg2);padding:2px 7px;border-radius:4px;border:1px solid var(--line2);font-size:12px;font-family:monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <span class="hdr-logo">G-DSP</span>
+    <div class="hdr-sep"></div>
+    <span class="hdr-title">📋 업무 관리</span>
+    <div class="hdr-right">
+      <button class="hbtn" id="themeBtn" onclick="toggleTheme()">🌙 다크</button>
+      <button class="hbtn close" onclick="window.close()">✕ 닫기</button>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab on" id="tab-rcp" onclick="switchTab('rcp')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>민원 진행조회
+    </button>
+    <button class="tab" id="tab-con" onclick="switchTab('con')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>담당자 연락처
+    </button>
+    <button class="tab" id="tab-hist" onclick="switchTab('hist')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>작업 이력
+    </button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding:0 4px">
+      <button onclick="printSelected()" style="height:28px;padding:0 12px;border-radius:6px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.3);color:var(--blue2);font-size:11px;font-weight:700;cursor:pointer">✦ 선택 출력</button>
+      <button onclick="rcpRefreshAll()" id="refreshBtn" style="height:28px;padding:0 12px;border-radius:6px;background:rgba(5,150,105,.06);border:1px solid rgba(5,150,105,.25);color:var(--green);font-size:11px;font-weight:700;cursor:pointer">↻ 전체 갱신</button>
+    </div>
+  </div>
+  <div class="server-banner" id="serverBanner">⚠ 서버 확인 중... — 자동 갱신 기능은 server.py 실행 필요</div>
+
+  <div class="tab-view on" id="view-rcp">
+    <div style="flex:1;overflow-y:auto;padding:16px 20px">
+      <div class="rcp-search-card" data-l="접수번호 조회">
+        <div style="font-size:12px;color:var(--txt3);margin-bottom:12px">지역을 선택하고 접수번호를 입력하세요. 조회 시 목록에 자동으로 추가됩니다.</div>
+        <div class="rcp-region-row">
+          <select class="rcp-region-sel" id="rcpRegion">
+            <option value="hwaseong">화성시</option><option value="suwon">수원시</option><option value="yongin">용인시</option>
+            <option value="ansan">안산시</option><option value="anyang">안양시</option><option value="seongnam">성남시</option>
+            <option value="bucheon">부천시</option><option value="pyeongtaek">평택시</option><option value="siheung">시흥시</option>
+            <option value="gwangmyeong">광명시</option><option value="custom">직접 입력</option>
+          </select>
+          <input id="rcpName" class="ri" placeholder="이름" style="width:110px;flex:none">
+          <input id="rcpInput" class="ri" type="text" placeholder="접수번호 (숫자만)" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter')openRcp()" style="flex:1">
+          <button onclick="openRcp()" style="height:42px;padding:0 20px;border-radius:9px;background:linear-gradient(135deg,var(--blue3),var(--blue));border:none;color:#fff;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">조회 →</button>
+        </div>
+        <div id="customUrlRow" style="display:none;margin-bottom:8px"><input class="ri" id="customUrl" placeholder="민원 조회 URL 직접 입력"></div>
+        <div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--line)">
+          <select class="rcp-region-sel" id="rcpAddRegion" style="width:110px;flex:none;height:38px;font-size:13px">
+            <option value="hwaseong">화성시</option><option value="suwon">수원시</option><option value="yongin">용인시</option>
+            <option value="ansan">안산시</option><option value="anyang">안양시</option><option value="seongnam">성남시</option>
+            <option value="bucheon">부천시</option><option value="pyeongtaek">평택시</option>
+          </select>
+          <input id="rName" class="ri" placeholder="이름" style="width:100px;flex:none;height:38px;font-size:13px">
+          <input id="rNum" class="ri" placeholder="접수번호" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter')addRcp()" style="flex:1;height:38px;font-size:13px">
+          <button onclick="addRcp()" style="height:38px;padding:0 16px;border-radius:8px;background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.25);color:var(--green);font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap">＋ 추가</button>
+        </div>
+      </div>
+      <div class="rcp-cols" id="rcpCols">
+        <div class="rcp-col rcp-col-ing"><div class="rcp-col-hdr">🟡 접수중 <span id="cnt-ing" style="margin-left:auto;font-size:12px;opacity:.7">0건</span></div><div id="rcpList-ing"></div></div>
+        <div class="rcp-col rcp-col-sup"><div class="rcp-col-hdr">🟣 보완 <span id="cnt-sup" style="margin-left:auto;font-size:12px;opacity:.7">0건</span></div><div id="rcpList-sup"></div></div>
+        <div class="rcp-col rcp-col-done"><div class="rcp-col-hdr">🟢 완료 <span id="cnt-done" style="margin-left:auto;font-size:12px;opacity:.7">0건</span></div><div id="rcpList-done"></div></div>
+      </div>
+      <div id="rcpEmpty" style="text-align:center;color:var(--txt3);font-size:14px;padding:40px 0">등록된 접수번호가 없습니다</div>
+    </div>
+  </div>
+
+  <div class="tab-view" id="view-con">
+    <div class="ctab-bar" style="padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-shrink:0">
+      <span style="font-size:12px;font-weight:700;color:var(--txt2)">화성시 담당자 연락처</span>
+      <input style="height:32px;padding:0 11px;background:var(--card);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;flex:1;max-width:300px" id="conSearch" placeholder="이름·부서·지역·업무 검색..." oninput="filterCon(this.value)">
+      <span style="font-size:11px;color:var(--txt3)" id="conCount"></span>
+    </div>
+    <div style="flex:1;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="padding:8px 11px;font-size:11px;color:var(--txt3);text-align:left;border-bottom:1px solid var(--line2);background:var(--bg2);font-weight:700;position:sticky;top:0;z-index:1">부서</th>
+          <th style="padding:8px 11px;font-size:11px;color:var(--txt3);text-align:left;border-bottom:1px solid var(--line2);background:var(--bg2);font-weight:700;position:sticky;top:0;z-index:1">직위·이름</th>
+          <th style="padding:8px 11px;font-size:11px;color:var(--txt3);text-align:left;border-bottom:1px solid var(--line2);background:var(--bg2);font-weight:700;position:sticky;top:0;z-index:1">지역</th>
+          <th style="padding:8px 11px;font-size:11px;color:var(--txt3);text-align:left;border-bottom:1px solid var(--line2);background:var(--bg2);font-weight:700;position:sticky;top:0;z-index:1">전화번호</th>
+          <th style="padding:8px 11px;font-size:11px;color:var(--txt3);text-align:left;border-bottom:1px solid var(--line2);background:var(--bg2);font-weight:700;position:sticky;top:0;z-index:1">담당업무</th>
+        </tr></thead>
+        <tbody id="conBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tab-view" id="view-hist">
+    <div style="padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:12px;font-weight:700;color:var(--txt2)">작업 이력</span>
+      <span style="font-size:11px;color:var(--txt3)" id="histCount"></span>
+      <button onclick="clearHist()" style="margin-left:auto;height:28px;padding:0 12px;border-radius:6px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--red);font-size:11px;font-weight:700;cursor:pointer">전체 삭제</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:14px 16px">
+      <div id="histList" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div id="histEmpty" style="text-align:center;color:var(--txt3);font-size:13px;padding:40px 0">작업 이력이 없습니다</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="crawlGuideModal">
+  <div class="modal-box">
+    <button onclick="hideCrawlGuide()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:20px;color:var(--txt3);cursor:pointer">✕</button>
+    <div style="font-size:18px;font-weight:700;color:var(--txt);margin-bottom:6px">⚙️ 자동 갱신 설정</div>
+    <div style="font-size:13px;color:var(--txt3);margin-bottom:16px">화성시 민원 사이트는 CORS 보안으로 직접 조회할 수 없습니다.<br>아래 로컬 서버를 실행하면 자동 갱신이 활성화됩니다.</div>
+    <div style="background:var(--bg2);border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:8px">📋 설치 (최초 1회)</div>
+      <div style="background:#1a2540;border-radius:8px;padding:10px 14px;font-family:monospace;font-size:13px;color:#60a5fa">pip install flask requests beautifulsoup4</div>
+    </div>
+    <div style="background:var(--bg2);border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:8px">▶️ 실행 (매번)</div>
+      <div style="background:#1a2540;border-radius:8px;padding:10px 14px;font-family:monospace;font-size:13px;color:#4ade80">python server.py</div>
+    </div>
+    <button onclick="hideCrawlGuide()" style="width:100%;height:42px;border-radius:9px;background:linear-gradient(135deg,var(--blue3),var(--blue));border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer">확인</button>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+var rcpItems = JSON.parse(localStorage.getItem('gdsp_rcp') || '[]');
+var histItems = JSON.parse(localStorage.getItem('gdsp_hist') || '[]');
+var CRAWL_SERVER = localStorage.getItem('gdsp_crawl_server') || 'http://localhost:5050';
+var crawlAvailable = false;
+var _tt;
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('on');});
+  document.querySelectorAll('.tab-view').forEach(function(v){v.classList.remove('on');});
+  document.getElementById('tab-'+t).classList.add('on');
+  document.getElementById('view-'+t).classList.add('on');
+  if(t==='con')renderCon('');
+  if(t==='hist')renderHist();
+}
+var _tt;
+
+var REGION_URLS={hwaseong:'http://eminwon.hscity.go.kr/emwp/gov/mogaha/ntis/web/caf/mwwd/action/CafMwWdOpenAction.do?method=selectListMwOpn&menu_id=CAFOPNWebMwOpenL&jndinm=CafMwWdOpenEJB&methodnm=selectListMwOpn&context=NTIS?method=selectListMwOpn&jndinm=CafMwWdOpenEJB&methodnm=selectListMwOpn&context=NTIS&mw_take_no=&mw_aplct_pwd=&pageIndex=1&pageSize=20&field=mw_take_no&keyword=',suwon:'https://www.suwon.go.kr/minwon/view.do?receiptNo=',yongin:'https://www.yongin.go.kr/minwon/receipt.do?receiptNo=',ansan:'https://www.ansan.go.kr/minwon/receipt.do?receiptNo=',anyang:'https://www.anyang.go.kr/minwon/receipt.do?receiptNo=',seongnam:'https://www.seongnam.go.kr/minwon/receipt.do?receiptNo=',bucheon:'https://www.bucheon.go.kr/minwon/receipt.do?receiptNo=',pyeongtaek:'https://www.pyeongtaek.go.kr/minwon/receipt.do?receiptNo=',siheung:'https://www.siheung.go.kr/minwon/receipt.do?receiptNo=',gwangmyeong:'https://www.gwangmyeong.go.kr/minwon/receipt.do?receiptNo=',custom:'custom'};
+var rcpItems=JSON.parse(localStorage.getItem('gdsp_rcp')||'[]');
+
+function calcDday(dateStr){
+  if(!dateStr) return null;
+  var now=new Date(); now.setHours(0,0,0,0);
+  var target=new Date(dateStr); target.setHours(0,0,0,0);
+  var diff=Math.round((target-now)/(1000*60*60*24));
+  if(diff===0) return 'D-day';
+  if(diff>0) return 'D-'+diff;
+  return 'D+'+Math.abs(diff)+'(초과)';
+}
+function ddayClass(dateStr){
+  if(!dateStr) return '';
+  var now=new Date(); now.setHours(0,0,0,0);
+  var target=new Date(dateStr); target.setHours(0,0,0,0);
+  var diff=Math.round((target-now)/(1000*60*60*24));
+  if(diff<=0) return 'dday-over';
+  if(diff<=7) return 'dday-warn';
+  return 'dday-ok';
+}
+
+
+function renderRcp(){
+  var empty=document.getElementById('rcpEmpty');
+  ['ing','sup','done'].forEach(function(c){
+    var el=document.getElementById('rcpList-'+c);
+    if(el) el.innerHTML='';
+    var cnt=document.getElementById('cnt-'+c);
+    if(cnt) cnt.textContent='0건';
+  });
+  if(!rcpItems.length){if(empty)empty.style.display='block';return;}
+  if(empty)empty.style.display='none';
+  var cntMap={ing:0,sup:0,done:0};
+
+  rcpItems.forEach(function(item,i){
+    var st=item.status||'접수중';
+    var col=st==='보완'?'sup':st==='완료'?'done':'ing';
+    cntMap[col]++;
+    var regionKey=item.regionKey||'hwaseong';
+    var baseUrl=REGION_URLS[regionKey]||REGION_URLS.hwaseong;
+    var suffix=regionKey==='hwaseong'?'&pageSize1=20&strt_date=20190912&end_date=20270101&pageSize2=20':'';
+    var queryUrl=baseUrl+item.num+suffix;
+
+    // D-day 칩
+    var deadlineDate=item.supDeadline||item.doneDate||'';
+    var ddayHtml='';
+    if(deadlineDate){
+      var dd=calcDday(deadlineDate);
+      var dc=ddayClass(deadlineDate);
+      ddayHtml='<span class="dday-chip '+dc+'">'+dd+'</span>';
+    }
+
+    // NEW 배지
+    var newBadge=item.isNew?'<span class="new-badge">NEW</span>':'';
+
+    // 보완 패널 (보완 열만)
+    var supPanelHtml='';
+    if(col==='sup'){
+      var supDD=item.supDeadline?calcDday(item.supDeadline):'';
+      var supDC=item.supDeadline?ddayClass(item.supDeadline):'';
+      supPanelHtml=
+        '<div class="rcp-sup-panel" id="sup-panel-'+i+'">'
+        +'<div class="rcp-sup-inner">'
+        +'<div class="rcp-sup-label">📋 보완 내용</div>'
+        +'<textarea class="rcp-sup-ta" oninput="saveNote('+i+',this.value)" placeholder="보완 내용을 입력하세요...">'+(item.note||'')+'</textarea>'
+        +'<div class="rcp-sup-row">'
+        +'<div class="rcp-sup-field"><label>완료기한 (언제까지 보완)</label><input type="date" value="'+(item.supDeadline||'')+'" oninput="saveSupDeadline('+i+',this.value)"></div>'
+        +(item.supDeadline?'<span class="dday-chip '+supDC+'" style="margin-top:18px">'+supDD+'</span>':'')
+        +'</div>'
+        +'<button onclick="printSupNote('+i+')" style="margin-top:12px;height:32px;padding:0 14px;border-radius:7px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer">📄 보완내용 출력</button>'
+        +'</div>'
+        +'</div>';
+    }
+
+    // 완료 열 — 처리기한 + D-day 표시
+    var deadlineRowHtml='';
+    if(col==='done'){
+      var doneDD=item.doneDate?calcDday(item.doneDate):'';
+      var doneDC=item.doneDate?ddayClass(item.doneDate):'';
+      deadlineRowHtml='<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+        +'<span style="font-size:12px;color:var(--txt3)">처리기한:</span>'
+        +'<input type="date" value="'+(item.doneDate||'')+'" onchange="saveDoneDate('+i+',this.value)" style="height:28px;padding:0 8px;background:var(--bg2);border:1px solid var(--line2);border-radius:6px;color:var(--txt);font-size:12px;outline:none">'
+        +(item.doneDate?'<span class="dday-chip '+doneDC+'">'+doneDD+'</span>':'')
+        +'</div>';
+    }
+
+    var cardCls='rcp-item-card'+(item.isNew?' has-new':'');
+    var cardHtml=
+      '<div class="'+cardCls+'" id="rcp-card-'+i+'">'
+      // 상단: 체크박스 + 번호 + 이름 + 지역 + NEW배지
+      +'<div class="rcp-item-top">'
+      +'<input type="checkbox" class="rcp-chk" data-idx="'+i+'">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">'
+      +'<span class="rcp-item-num">'+item.num+'</span>'+newBadge
+      +(item.minwonNm?'<span style="font-size:11px;color:var(--txt3);margin-left:4px">'+item.minwonNm+'</span>':'')
+      +'</div>'
+      +'<div class="rcp-item-meta">'+(item.name||'이름없음')+(item.region?' · '+item.region:'')+(item.date?' · '+item.date:'')+'</div>'
+      // 크롤링으로 가져온 담당자 정보
+      +(item.crawlDept||item.crawlPhone?
+        '<div style="font-size:11px;color:var(--txt3);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap">'
+        +(item.crawlDept?'<span>👤 '+item.crawlDept+'</span>':'')
+        +(item.crawlTeam?'<span style="color:var(--txt3)">'+item.crawlTeam+'</span>':'')
+        +(item.crawlPhone?'<a href="tel:'+item.crawlPhone+'" style="color:var(--blue2);text-decoration:none">📞 '+item.crawlPhone+'</a>':'')
+        +(item.lastCrawled?'<span style="color:var(--line2);font-size:10px">갱신: '+item.lastCrawled+'</span>':'')
+        +'</div>':''
+      )
+      +'</div>'
+      +'</div>'
+      // 처리상태 라벨행
+      +'<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--txt3);flex-wrap:wrap">'
+      +'<span style="font-weight:600">처리상태:</span>'
+      +'<button onclick="changeStatus('+i+',\'접수중\')" style="display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 10px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;border:2px solid '+(st==='접수중'?'#2563eb':'#dde3ed')+';background:'+(st==='접수중'?'rgba(37,99,235,.1)':'transparent')+';color:'+(st==='접수중'?'#1d4ed8':'#7a90b0')+'">'
+      +'<span style="width:8px;height:8px;border-radius:50%;background:'+(st==='접수중'?'#f59e0b':'#c8d0e0')+';display:inline-block"></span>처리중'
+      +(st==='접수중'?newBadge:'')
+      +'</button>'
+      +'<button onclick="changeStatus('+i+',\'보완\')" style="display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 10px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;border:2px solid '+(st==='보완'?'#7c3aed':'#dde3ed')+';background:'+(st==='보완'?'rgba(124,58,237,.1)':'transparent')+';color:'+(st==='보완'?'#6d28d9':'#7a90b0')+'">'
+      +'<span style="width:8px;height:8px;border-radius:50%;background:'+(st==='보완'?'#7c3aed':'#c8d0e0')+';display:inline-block"></span>보완'
+      +(st==='보완'?newBadge:'')
+      +'</button>'
+      +'<button onclick="changeStatus('+i+',\'완료\')" style="display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 10px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;border:2px solid '+(st==='완료'?'#059669':'#dde3ed')+';background:'+(st==='완료'?'rgba(5,150,105,.1)':'transparent')+';color:'+(st==='완료'?'#065f46':'#7a90b0')+'">'
+      +'<span style="width:8px;height:8px;border-radius:50%;background:'+(st==='완료'?'#059669':'#c8d0e0')+';display:inline-block"></span>해결'
+      +(st==='완료'?ddayHtml:'')
+      +(st==='완료'?newBadge:'')
+      +'</button>'
+      +'</div>'
+      // 완료 기한 행
+      +deadlineRowHtml
+      // 보완 패널
+      +supPanelHtml
+      // 하단 버튼
+      +'<div class="rcp-item-btns">'
+      +(col==='sup'?'<button class="rcp-ibtn rcp-ibtn-sup" onclick="toggleSupPanel('+i+')">▼ 보완내용</button>':'')
+      +'<button class="rcp-ibtn rcp-ibtn-query" onclick="openRcpByUrl(\''+queryUrl.replace(/'/g,"\\'")+'\')" title="민원 조회 페이지 열기">조회</button>'
+      +'<button class="rcp-ibtn" onclick="crawlItem('+i+')" style="background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);color:var(--blue);height:30px;padding:0 10px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer" title="화성시 민원시스템에서 현재 상태 가져오기">↻ 갱신</button>'
+      +'<button class="rcp-ibtn rcp-ibtn-print" onclick="printRcpItem('+i+')">출력</button>'
+      +'<button class="rcp-ibtn rcp-ibtn-del" onclick="delRcp('+i+')">삭제</button>'
+      +'</div>'
+      +'</div>';
+
+    var listEl=document.getElementById('rcpList-'+col);
+    if(listEl) listEl.insertAdjacentHTML('beforeend',cardHtml);
+  });
+
+  ['ing','sup','done'].forEach(function(c){
+    var cnt=document.getElementById('cnt-'+c);
+    if(cnt) cnt.textContent=cntMap[c]+'건';
+  });
+}
+
+function toggleSupPanel(i){
+  var panel=document.getElementById('sup-panel-'+i);
+  if(panel) panel.classList.toggle('open');
+}
+function changeStatus(i,s){
+  var prev=rcpItems[i].status;
+  rcpItems[i].status=s;
+  if(s!==prev) rcpItems[i].isNew=false; // 직접 변경 시 NEW 제거
+  localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));
+  renderRcp();
+  toast((rcpItems[i].num||'')+(rcpItems[i].name?' ('+rcpItems[i].name+')':'')+' → '+s,'ok');
+}
+function saveNote(i,v){rcpItems[i].note=v;localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));}
+function saveSupDeadline(i,v){rcpItems[i].supDeadline=v;localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));renderRcp();}
+function saveReqDate(i,v){rcpItems[i].reqDate=v;localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));}
+function saveDoneDate(i,v){rcpItems[i].doneDate=v;localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));renderRcp();}
+
+
+function printRcpItem(i){
+  var item=rcpItems[i];
+  var deadline=item.supDeadline||item.doneDate||'';
+  var dd=deadline?calcDday(deadline):'—';
+  var w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>민원 진행사항 출력</title>'
+    +'<style>body{font-family:"Noto Sans KR",sans-serif;padding:28px;color:#1a2540;max-width:600px}h2{color:#1d4ed8;font-size:20px;margin-bottom:20px;border-bottom:2px solid #2563eb;padding-bottom:10px}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:16px}'
+    +'th{background:#f0f4ff;text-align:left;padding:10px 14px;font-size:13px;color:#3d5070;border:1px solid #dde3ed;width:120px}'
+    +'td{padding:10px 14px;font-size:14px;border:1px solid #dde3ed}'
+    +'.note{white-space:pre-wrap;background:#fffbea;border-left:3px solid #d97706;padding:10px}'
+    +'footer{margin-top:20px;font-size:11px;color:#7a90b0}</style></head><body>'
+    +'<h2>민원 진행사항</h2>'
+    +'<table><tr><th>지역</th><td>'+(item.region||'—')+'</td></tr>'
+    +'<tr><th>이름</th><td>'+item.name+'</td></tr>'
+    +'<tr><th>접수번호</th><td><b>'+item.num+'</b></td></tr>'
+    +'<tr><th>처리상태</th><td>'+(item.status||'접수중')+'</td></tr>'
+    +'<tr><th>완료기한</th><td>'+deadline+'</td></tr>'
+    +'<tr><th>D-day</th><td>'+dd+'</td></tr>'
+    +'<tr><th>보완내용</th><td class="note">'+(item.note||'—')+'</td></tr></table>'
+    +'<footer>출력일시: '+new Date().toLocaleString()+'</footer>'
+    +'</body></html>');
+  w.document.close();w.print();
+}
+function printSupNote(i){
+  var item=rcpItems[i];
+  var deadline=item.supDeadline||'';
+  var dd=deadline?calcDday(deadline):'—';
+  var w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>보완내용 출력</title>'
+    +'<style>body{font-family:"Noto Sans KR",sans-serif;padding:28px;color:#1a2540;max-width:600px}h2{color:#92400e;font-size:20px;margin-bottom:20px;border-bottom:2px solid #d97706;padding-bottom:10px}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:16px}'
+    +'th{background:#fffbea;text-align:left;padding:10px 14px;font-size:13px;color:#92400e;border:1px solid #fde68a;width:120px}'
+    +'td{padding:10px 14px;font-size:14px;border:1px solid #fde68a}'
+    +'.note{white-space:pre-wrap;background:#fffbf0;min-height:80px;border-left:3px solid #d97706;padding:12px}'
+    +'.dday{font-size:22px;font-weight:900;color:'+(deadline&&new Date(deadline)<new Date()?'#ef4444':'#059669')+'}'
+    +'footer{margin-top:20px;font-size:11px;color:#7a90b0}</style></head><body>'
+    +'<h2>보완 내용</h2>'
+    +'<table><tr><th>접수번호</th><td><b>'+item.num+'</b></td></tr>'
+    +'<tr><th>이름</th><td>'+item.name+'</td></tr>'
+    +'<tr><th>완료기한</th><td>'+deadline+'&nbsp;&nbsp;<span class="dday">'+dd+'</span></td></tr>'
+    +'<tr><th>보완내용</th><td class="note">'+(item.note||'（보완 내용 없음）')+'</td></tr></table>'
+    +'<footer>출력일시: '+new Date().toLocaleString()+'</footer>'
+    +'</body></html>');
+  w.document.close();w.print();
+}
+function printSelected(){
+  var chks=document.querySelectorAll('.rcp-chk:checked');
+  if(!chks.length){toast('출력할 항목을 체크하세요','err');return;}
+  var rows='';
+  chks.forEach(function(chk){
+    var i=parseInt(chk.dataset.idx);
+    var item=rcpItems[i];
+    var deadline=item.supDeadline||item.doneDate||'';
+    var dd=deadline?calcDday(deadline):'—';
+    var stColor={'접수중':'#1d4ed8','보완':'#6d28d9','완료':'#065f46'}[item.status||'접수중']||'#333';
+    rows+='<tr>'
+      +'<td>'+(item.region||'—')+'</td>'
+      +'<td>'+item.name+'</td>'
+      +'<td style="font-weight:700">'+item.num+'</td>'
+      +'<td style="color:'+stColor+';font-weight:700">'+(item.status||'접수중')+'</td>'
+      +'<td>'+deadline+'</td>'
+      +'<td style="font-weight:700">'+dd+'</td>'
+      +'<td style="white-space:pre-wrap;max-width:200px">'+(item.note||'—')+'</td>'
+      +'</tr>';
+  });
+  var w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>민원 진행사항 목록 출력</title>'
+    +'<style>body{font-family:"Noto Sans KR",sans-serif;padding:24px}h2{color:#1d4ed8;margin-bottom:16px}'
+    +'table{width:100%;border-collapse:collapse}th{background:#1d4ed8;color:#fff;padding:9px 11px;font-size:12px;text-align:left}'
+    +'td{padding:8px 11px;font-size:12px;border:1px solid #dde3ed}tr:nth-child(even){background:#f5f7ff}'
+    +'footer{margin-top:16px;font-size:11px;color:#7a90b0}</style></head><body>'
+    +'<h2>민원 진행사항 목록 ('+chks.length+'건)</h2>'
+    +'<table><thead><tr><th>지역</th><th>이름</th><th>접수번호</th><th>상태</th><th>기한</th><th>D-day</th><th>보완내용</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table>'
+    +'<footer>출력일시: '+new Date().toLocaleString()+'</footer>'
+    +'</body></html>');
+  w.document.close();w.print();
+}
+
+function openRcp(){
+  var regionSel=document.getElementById('rcpRegion');
+  var region=regionSel?regionSel.value:'hwaseong';
+  var regionTxt=regionSel?regionSel.options[regionSel.selectedIndex].text:'화성시';
+  var num=document.getElementById('rcpInput').value.trim();
+  var name=(document.getElementById('rcpName')||{}).value||'';name=name.trim();
+  if(!num){toast('접수번호를 입력하세요','err');return;}
+  var baseUrl=REGION_URLS[region];
+  if(region==='custom'){var cu=document.getElementById('customUrl');if(cu)baseUrl=cu.value;}
+  if(!baseUrl){toast('지원하지 않는 지역입니다','err');return;}
+  var suffix=region==='hwaseong'?'&pageSize1=20&strt_date=20190912&end_date=20270101&pageSize2=20':'';
+  window.open(baseUrl+num+suffix,'_blank');
+  var existIdx=rcpItems.findIndex(function(r){return r.num===num;});
+  if(existIdx>=0){toast(num+' 은 이미 목록에 있습니다 — 조회 링크만 열었습니다');return;}
+  rcpItems.push({name:name||'이름없음',num:num,status:'접수중',regionKey:region,region:regionTxt,note:'',date:new Date().toLocaleDateString()});
+  localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));
+  renderRcp();
+  toast(num+' 목록에 추가됨','ok');
+  addHistItem('접수번호 조회: '+num+' ('+regionTxt+')');
+}
+function openRcpByUrl(url){window.open(url,'_blank');}
+function openRcpNum(btn){
+  var num=btn.dataset.num,region=btn.dataset.region||'hwaseong';
+  var baseUrl=REGION_URLS[region]||REGION_URLS.hwaseong;
+  var suffix=region==='hwaseong'?'&pageSize1=20&strt_date=20190912&end_date=20270101&pageSize2=20':'';
+  window.open(baseUrl+num+suffix,'_blank');
+}
+function addRcp(){
+  var regionSel=document.getElementById('rcpAddRegion');
+  var regionKey=regionSel?regionSel.value:'hwaseong';
+  var regionTxt=regionSel?regionSel.options[regionSel.selectedIndex].text:'화성시';
+  var name=document.getElementById('rName').value.trim();
+  var num=document.getElementById('rNum').value.trim();
+  if(!num){toast('접수번호를 입력하세요','err');return;}
+  var existIdx=rcpItems.findIndex(function(r){return r.num===num;});
+  if(existIdx>=0){toast('이미 등록된 번호입니다. 삭제 후 다시 추가하세요');return;}
+  rcpItems.push({name:name||'이름없음',num:num,status:'접수중',regionKey:regionKey,region:regionTxt,note:'',date:new Date().toLocaleDateString()});
+  localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));
+  document.getElementById('rName').value='';
+  document.getElementById('rNum').value='';
+  renderRcp();
+  toast(num+' 등록됨','ok');
+  addHistItem('접수번호 등록: '+num+' ('+regionTxt+')');
+}
+function delRcp(i){
+  if(!confirm(rcpItems[i].num+' 을(를) 삭제하시겠습니까?'))return;
+  rcpItems.splice(i,1);
+  localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));
+  renderRcp();
+  toast('삭제됐습니다');
+}
+
+var CRAWL_SERVER = localStorage.getItem('gdsp_crawl_server') || 'http://localhost:5050';
+var crawlAvailable = false; // 서버 연결 여부
+
+// 서버 연결 확인
+function checkCrawlServer(callback){
+  fetch(CRAWL_SERVER+'/api/health',{method:'GET'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      crawlAvailable=d.ok;
+      if(callback) callback(crawlAvailable);
+    })
+    .catch(function(){
+      crawlAvailable=false;
+      if(callback) callback(false);
+    });
+}
+
+// 단일 접수번호 크롤링
+function crawlOne(caseNo, callback){
+  if(!crawlAvailable){callback({ok:false,error:'서버 미연결'});return;}
+  fetch(CRAWL_SERVER+'/api/crawl',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({case_no:caseNo})
+  })
+  .then(function(r){return r.json();})
+  .then(callback)
+  .catch(function(e){callback({ok:false,error:''+e});});
+}
+
+// 크롤링 결과를 rcpItems에 반영
+function applyCrawlResult(caseNo, data){
+  var idx=rcpItems.findIndex(function(r){return r.num===caseNo;});
+  if(idx<0) return false;
+  var item=rcpItems[idx];
+  var prev=JSON.stringify({s:item.status,n:item.crawlNote,d:item.doneDate});
+
+  // 현재상태 매핑
+  var stMap={'처리중':'접수중','접수중':'접수중','완료':'완료','보완보정':'보완','진행중':'접수중'};
+  var newSt=data['현재상태']||'접수중';
+  for(var k in stMap){if(newSt.indexOf(k)>=0){newSt=stMap[k];break;}}
+
+  var changed=false;
+  // 상태가 바뀌었는지 확인
+  if(newSt && item.status!==newSt){ item.status=newSt; changed=true; }
+
+  // 보완 정보 업데이트
+  if(data['보완목록']&&data['보완목록'].length>0){
+    var sup=data['보완목록'][data['보완목록'].length-1]; // 마지막 차수
+    var newNote=sup['요구내용']||'';
+    var newDeadline=sup['요구완료일자']||'';
+    var newNoticeDate=sup['요구통보일자']||'';
+    if(item.crawlNote!==newNote){item.crawlNote=newNote;changed=true;}
+    if(newDeadline&&item.supDeadline!==newDeadline){item.supDeadline=newDeadline;changed=true;}
+    if(newNoticeDate) item.noticeDate=newNoticeDate;
+    item.supRound=sup['차수']||'1';
+    // 노트가 비어있으면 크롤링 내용으로 채움
+    if(!item.note&&newNote) item.note=newNote;
+  }
+
+  // 담당자 정보
+  if(data['최종담당자']) item.crawlDept=data['최종담당자'];
+  if(data['최종전화번호']) item.crawlPhone=data['최종전화번호'];
+  if(data['처리부서']) item.crawlTeam=data['처리부서'];
+  if(data['처리기한']&&!item.doneDate) item.doneDate=data['처리기한'];
+  if(data['민원사무명']) item.minwonNm=data['민원사무명'];
+
+  if(changed) item.isNew=true;
+  item.lastCrawled=new Date().toLocaleString();
+  rcpItems[idx]=item;
+  return changed;
+}
+
+// 전체 갱신 — 실제 크롤링
+function rcpRefreshAll(){
+  if(!rcpItems.length){toast('등록된 접수번호가 없습니다','err');return;}
+  var btn=document.querySelector('[onclick="rcpRefreshAll()"]');
+  if(btn){btn.textContent='↻ 조회중...';btn.disabled=true;}
+
+  // 서버 연결 확인 후 크롤링
+  checkCrawlServer(function(ok){
+    if(!ok){
+      // 서버 없으면 안내
+      toast('⚠ 크롤링 서버 미연결 — server.py 실행 필요');
+      if(btn){btn.textContent='↻ 전체 갱신';btn.disabled=false;}
+      showCrawlServerGuide();
+      return;
+    }
+    // 서버 연결됨 → 순차 크롤링
+    var total=rcpItems.length, done=0, changed=0;
+    toast('갱신 중 (0/'+total+')...');
+    function next(i){
+      if(i>=total){
+        localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));
+        renderRcp();
+        if(changed>0){
+          toast('⚡ '+changed+'건 상태 변경 감지됨 — NEW 확인','ok');
+        } else {
+          toast('✓ 전체 최신 상태 확인 완료');
+        }
+        if(btn){btn.textContent='↻ 전체 갱신';btn.disabled=false;}
+        return;
+      }
+      var item=rcpItems[i];
+      crawlOne(item.num,function(data){
+        done++;
+        toast('갱신 중 ('+done+'/'+total+'): '+item.num);
+        if(data.ok){
+          var c=applyCrawlResult(item.num,data);
+          if(c) changed++;
+        }
+        setTimeout(function(){next(i+1);},600);
+      });
+    }
+    next(0);
+  });
+}
+
+// 단일 카드 갱신 버튼용
+function crawlItem(i){
+  checkCrawlServer(function(ok){
+    if(!ok){toast('서버 미연결 — server.py 실행 필요','err');showCrawlServerGuide();return;}
+    var item=rcpItems[i];
+    toast('조회 중: '+item.num);
+    crawlOne(item.num,function(data){
+      if(!data.ok){toast('조회 실패: '+(data.error||'오류'),'err');return;}
+      var changed=applyCrawlResult(item.num,data);
+      localStorage.setItem('gdsp_rcp',JSON.stringify(rcpItems));
+      renderRcp();
+      toast(item.num+' 갱신 완료'+(changed?' — 변경 감지!':''),'ok');
+    });
+  });
+}
+
+// 서버 안내 팝업
+function showCrawlServerGuide(){
+  var el=document.getElementById('crawlGuideModal');
+  if(el) el.style.display='flex';
+}
+function hideCrawlGuide(){
+  var el=document.getElementById('crawlGuideModal');
+  if(el) el.style.display='none';
+}
+
+function showCrawlServerGuide(){document.getElementById('crawlGuideModal').classList.add('show');}
+function hideCrawlGuide(){document.getElementById('crawlGuideModal').classList.remove('show');}
+var sampleContacts = const sampleContacts = [
+  { dept: '만세구청', rank: '산지전용 1팀장', name: '권애란', region: '', phone: '031-5189-1270', email: '', work: '산지전용2팀 업무총괄 / 세움터 협의 / 온라인실무심의 협의(향남 운동장)', team: '산지전용' },
+  { dept: '만세구청', rank: '주무관', name: '이재학', region: '장안면/향남읍', phone: '031-5189-1284', email: 'yushin8604@korea.kr', work: '산지전용허가/협의 [장안면]/[향남읍-구문천리,상신리]', team: '산지전용' },
+  { dept: '만세구청', rank: '주무관', name: '홍세연', region: '우정읍/양감면/향남읍', phone: '031-5189-1285', email: 'senii@korea.kr', work: '산지전용허가/협의 [우정읍]/[양감면]/[향남읍-길성리,상두리,수직리,요리]', team: '산지전용' },
+  { dept: '만세구청', rank: '주무관', name: '권용찬', region: '팔탄면/향남읍', phone: '031-5189-1286', email: '', work: '산지전용허가/협의 [팔탄면]/[향남읍-행정리,방축리,제암리,하길리,평리,송곡리,관리,동오리,도이리,장짐리,발안리,증거리,갈천리,화리현리,백토리]', team: '산지전용' },
+  { dept: '만세구청', rank: '서무', name: '정준상', region: '', phone: '031-5189-4270', email: 'jjshalom@korea.kr', work: '과태료', team: '' },
+  { dept: '만세구청 출장소', rank: '산지전용 2팀장', name: '최민경', region: '', phone: '031-5189-1298', email: '', work: '산지전용1팀 업무총괄 / 민원종합실무심의 및 세움터 협의', team: '산지전용' },
+  { dept: '만세구청 출장소', rank: '주무관', name: '안지선', region: '송산/마도', phone: '031-5189-1309', email: 'berries83@korea.kr', work: '산지전용허가 및 협의 [송산]/[마도-석교,두곡,송정,슬항,해문]', team: '산지전용' },
+  { dept: '만세구청 출장소', rank: '주무관', name: '남신호', region: '서신/마도', phone: '031-5189-1310', email: '', work: '산지전용허가 및 협의 [서신,마도-쌍송,청원,백곡,금당,고모]', team: '산지전용' },
+  { dept: '만세구청 출장소', rank: '주무관', name: '이희정', region: '남양', phone: '031-5189-1311', email: '', work: '산지전용허가 및 협의 [남양]', team: '산지전용' },
+  { dept: '효행구 도시건축과', rank: '허가민원2팀장', name: '신용균', region: '봉담읍', phone: '031-5189-7693', email: '', work: '효행구청 임시출장소 (봉담읍 최루백로 165)', team: '허가민원' },
+  { dept: '효행구 도시건축과', rank: '', name: '정원교', region: '봉담/매송/비봉/정남/기배동', phone: '031-5189-7705', email: '', work: '봉담,매송,비봉,정남,기배동 산지전용협의 5000㎡ 이하', team: '산지전용' },
+  { dept: '병점구청', rank: '허가민원팀장', name: '윤??', region: '병점구', phone: '031-5189-4708', email: '', work: '허가민원팀 업무총괄 (병점3로 23)', team: '허가민원' },
+  { dept: '병점구청', rank: '', name: '배??', region: '진안/병점/반월/화산동', phone: '031-5189-4747', email: '', work: '진안,병점1,2,반월,화산동', team: '' },
+  { dept: '동탄구 도시건축과', rank: '허가민원팀장', name: '강??', region: '동탄구', phone: '031-5189-5168', email: '', work: '허가민원팀 업무총괄 (동탄역로 122)', team: '허가민원' },
+  { dept: '동탄구 도시건축과', rank: '', name: '임??', region: '동탄1~9동', phone: '031-5189-5170', email: '', work: '동탄1~9동', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '팀장', name: '이원일', region: '화성시청', phone: '031-5189-2343', email: '', work: '허가민원팀 업무총괄, 도시계획심의 5000㎡ 이상', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '김기훈', region: '', phone: '031-5189-6038', email: 'dingreend@korea.kr', work: '산지전용협의 5000㎡ 이상', team: '산지전용' },
+  { dept: '효행구 경제환경과', rank: '팀장', name: '김??', region: '', phone: '031-5189-7735', email: '', work: '산림보호팀 업무총괄', team: '' },
+  { dept: '효행구 경제환경과', rank: '', name: '장인환', region: '', phone: '031-5189-7749', email: '', work: '녹지 점용허가 및 불법행위 단속', team: '' },
+  { dept: '만세구 환경관리과', rank: '팀장', name: '박??', region: '', phone: '031-5189-1330', email: '', work: '산림보호팀 업무총괄', team: '' },
+  { dept: '만세구 환경관리과', rank: '', name: '한우진', region: '', phone: '031-5189-1350', email: '', work: '녹지 점용허가 및 불법행위 단속', team: '' },
+,
+  { dept: '만세구 허가민원2과', rank: '과장', name: '박재영', region: '', phone: '031-5189-1294', email: '', work: '허가민원2과 업무총괄', team: '' },
+  { dept: '만세구 허가민원2과', rank: '팀장', name: '최영준', region: '', phone: '031-5189-1295', email: '', work: '허가지원2팀 업무총괄 / 민원종합실무심의 및 세움터 협의', team: '' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '김종휘', region: '남양/봉양/안석', phone: '031-5189-1303', email: '', work: '개발행위허가·협의(5,000㎡미만)[남양,봉양,안석,운석,문호,장전,수완,세솔동]', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '박현웅', region: '', phone: '031-5189-1296', email: '', work: '서무,회계,기록물 관리 / 정보보안(개인정보) / 개발행위허가 취소청문', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '박지선', region: '남양/무송/화소', phone: '031-5189-1304', email: '', work: '개발행위허가·협의(5,000㎡미만)[남양,무송,화소,장덕,송탄,원전,신외,사리]', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '박기호', region: '', phone: '031-5189-1301', email: '', work: '개발행위허가·신고(건축허가,공작물축조,토지분할,형질변경 등) / 관련법 인허가 / 개발제한구역 주민지원사업', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '김영석', region: '', phone: '031-5189-1302', email: '', work: 'GB내 개발행위 지도단속 및 사후관리 / 불법행위자 고발 및 이행강제금,과태료 부과,징수 행정대집행', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '김윤대', region: '', phone: '031-5189-1302', email: '', work: 'GB내 개발행위 지도단속 및 사후관리 / 불법행위자 고발 및 이행강제금,과태료 부과,징수 행정대집행', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '팀장', name: '오수용', region: '마도/송산/서신', phone: '031-5189-1297', email: '', work: '개발행위3팀 업무총괄 / 민원종합실무심의 및 세움터 협의(마도,송산,서신)', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '장지영', region: '마도/송산', phone: '031-5189-1306', email: '', work: '개발행위 허가·협의(5,000㎡미만)[마도-송정,두곡,고모,정원,슬항,쌍송,해문,석교]', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '홍석금', region: '서신/송산', phone: '031-5189-1307', email: '', work: '개발행위 허가·협의(5,000㎡미만)[서신-공제,부백,미,광평,송교,장외,매화리/송산-삼존,고정]', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '양선아', region: '서신/마도/송산', phone: '031-5189-1308', email: '', work: '개발행위 허가·협의(5,000㎡미만)[마도-백곡,금당리/서신-용두,홍법,사곳,상안,전곡/송산-독지,전동,신전,방정]', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '박상요', region: '마산/육일/봉가', phone: '031-5189-1318', email: '', work: '개발행위 허가·협의(5,000㎡미만)[마산,육일,봉가,고포,사강,용포]', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '팀장', name: '최민경', region: '남양/마도/송산/서신', phone: '031-5189-1298', email: '', work: '산지전용2팀 업무총괄 / 민원종합실무심의 및 세움터 협의(남양,마도,송산,서신)', team: '산지전용' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '안지선', region: '송산/마도', phone: '031-5189-1309', email: 'berries83@korea.kr', work: '산지전용 허가·협의(5,000㎡미만)[송산,마도-석교,두곡,송정,슬항,해문]', team: '산지전용' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '남신호', region: '서신/마도', phone: '031-5189-1310', email: '', work: '산지전용 허가·협의(5,000㎡미만)[서신,마도-쌍송,청원,백곡,금당,고모]', team: '산지전용' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '이희정', region: '남양', phone: '031-5189-1311', email: '', work: '산지전용 허가·협의(5,000㎡미만)[남양]', team: '산지전용' },
+  { dept: '만세구 허가민원2과', rank: '팀장', name: '이재열', region: '남양/마도/송산/서신/세솔동', phone: '031-5189-1299', email: '', work: '공장설립2팀 업무총괄 / 민원종합실무심의 및 세움터협의(남양,마도,송산,서신,세솔동)', team: '공장설립' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '윤승하', region: '서신/남양', phone: '031-5189-1313', email: '', work: '공장설립등의 승인 및 완료신고,공장등록(서신,남양) / 창업 공장설립계획승인 및 전력기금 면제 확인', team: '공장설립' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '김경현', region: '마도/송산/세솔동', phone: '031-5189-1314', email: '', work: '공장설립등의 승인 및 완료신고,공장등록(마도,송산,세솔동) / 공장등록 실태조사', team: '공장설립' },
+  { dept: '만세구 허가민원2과', rank: '팀장', name: '조우현', region: '남양/마도/송산/서신/세솔동', phone: '031-5189-1300', email: '', work: '도로하천 점용 업무 총괄(남양,마도,송산,서신,세솔동)', team: '도로하천' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '박인수', region: '남양/서신/세솔동', phone: '031-5189-1315', email: '', work: '도로점용 허가 및 협의(골착심의위원회 제외) / 도로무단점유 해소', team: '' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '김주현', region: '마도/송산', phone: '031-5189-1316', email: '', work: '도로점용 허가 및 협의(골착심의위원회 제외) / 도로무단점유 해소', team: '' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '장필상', region: '', phone: '031-5189-1317', email: '', work: '지방하천·소하천 점사용허가 / 공유수면점용 허가', team: '' }
+,
+  { dept: '도시정책실 도시개발과', rank: '과장', name: '최OO', region: '', phone: '031-5189-2920', email: '', work: '도시개발과 업무 총괄', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '팀장', name: '한OO', region: '', phone: '031-5189-3248', email: '', work: '도시개발1팀 업무 총괄', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '이OO', region: '', phone: '031-5189-3232', email: '', work: '서무,회계,보안,정보,기록물관리', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '강OO', region: '', phone: '031-5189-3188', email: '', work: '도시개발사업(금곡,효행,반월), 현안관리 및 정책업무 발굴', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '남OO', region: '', phone: '031-5189-3246', email: '', work: '도시개발사업(동화,도이,내리,병점복합타운,남양,남양뉴타운,조암,기산) 도시관리계획(지구단위) 정비', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '팀장', name: '권OO', region: '', phone: '031-5189-3236', email: '', work: '도시개발2팀 업무 총괄', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '이OO', region: '', phone: '031-5189-6220', email: '', work: '송산그린시티 개발사업(개발계획 및 실시계획 변경, 현안사항 검토, 지구단위계획 협의 등)', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '박OO', region: '', phone: '031-5189-3238', email: '', work: '시화지구(대송지구), 화옹지구 관련 업무, 반환공여구역 주변지역 개발, 송산그린시티 개발사업[지구단위계획 및 실시계획 작성(새솔동)]', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '팀장', name: '유OO', region: '', phone: '031-5189-6366', email: '', work: '도시재생팀 업무 총괄', team: '도시재생' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '박OO', region: '', phone: '031-5189-6096', email: '', work: '도시재생 전략계획 수립, 소규모 주택 및 빈집 정비사업 추진, 도시재생 특별회계 운영 및 관리', team: '도시재생' }
+,
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '김OO', region: '', phone: '031-5189-6364', email: '', work: '거점시설 사후관리계획 수립, (황계)도시재생 활성화계획(변경)수립, (황계)도시재생 뉴딜사업 추진, (병점)스마트도시재생사업 추진, 성장관리지역 내 도시계획도로 사업 추진', team: '도시재생' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '이OO', region: '', phone: '031-5189-6369', email: '', work: '(송산)도시재생 활성화계획(변경) 수립, (송산)도시재생 뉴딜사업 추진-마을 어울림센터 조성, 리본센터 조성 등, 도시재생(연계)사업 발굴·추진', team: '도시재생' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '김OO', region: '', phone: '031-5189-6375', email: '', work: '(병점)도시재생 활성화계획(변경) 수립, (병점)도시재생뉴딜사업 추진-창업문화복합센터 조성(부지 토지보상 추진 등), 지역상권 살리기 등', team: '도시재생' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '김OO', region: '', phone: '031-267-4565', email: '', work: '병점 도시재생 현장지원센터 운영 지원, 도시재생 S/W 사업 운영(역량강화 사업 등), 기타 도시재생사업 운영 지원', team: '도시재생' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '황OO', region: '', phone: '031-267-4502', email: '', work: '병점 도시재생 현장지원센터 운영 지원, 도시재생활S/W 사업 운영(지역상권 살리기 등), 기타 도시재생사업 운영 지원', team: '도시재생' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '정OO', region: '', phone: '031-355-3790', email: '', work: '송산 도시재생 현장지원센터 운영, 도시재생 S/W 사업 운영(거버넌스 운영지원, 역량강화사업 등), 기타 도시재생사업 운영 지원', team: '도시재생' },
+  { dept: '도시정책실 도시개발과', rank: '팀장', name: '이OO', region: '', phone: '031-5189-6047', email: '', work: '허가민원팀 업무 총괄, 도시계획위원회 심의-5,000㎡이상, 민원종합실무심의 및 세움터 협의(개발행위, 산지전용)-5,000㎡이상', team: '산지전용' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '박OO', region: '병점구/동탄구/효행구', phone: '031-5189-6048', email: '', work: '개발행위허가-5,000㎡이상(병점구, 동탄구, 효행구)', team: '개발행위' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '최OO', region: '만세구/새솔/마도/송산/서신/팔탄', phone: '031-5189-6054', email: '', work: '개발행위허가-5,000㎡이상(만세구-남양,새솔,마도,송산,서신,팔탄), 개발행위허가 기준 및 조례·분석, 제도개선 및 팀스터디 실시', team: '개발행위' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '김OO', region: '', phone: '031-5189-6038', email: '', work: '산지전용협의-5,000㎡이상, 산지태양광 발전설비 관리계획 수립, 공공협의-5,000㎡이상', team: '산지전용' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '강OO', region: '만세구-우경/장안/양감/향남', phone: '031-5189-6362', email: '', work: '개발행위허가-5,000㎡이상(만세구-우경,장안,양감,향남), 대규모허가지 관리, 개발행위 취소청문', team: '개발행위' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '이OO', region: '', phone: '031-5189-2627', email: '', work: '대규모 허가지 총괄관리(현장점검 포함), 급경사지 정보시스템(NDMS)입력 및 대규모허가지 관리카드 작성 관리', team: '' },
+  { dept: '도시정책실 도시개발과', rank: '팀장', name: '이OO', region: '', phone: '031-5189-2626', email: '', work: '농지전용 업무총괄, 민원종합실무심의', team: '농지전용' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '이OO', region: '동부/동탄', phone: '031-5189-4287', email: '', work: '농지전용허가·협의(동부,동탄), 공공협의, 사후관리, 농지전용부담금 부과·변경·환급, 농지전용 일반(서무), 농지보전부담금 일반(미수채납,공시,세외수입)', team: '농지전용' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '권OO', region: '남양/마도/서신/새솔', phone: '031-5189-2628', email: '', work: '농지전용허가·협의(남양,마도,서신,새솔), 공공협의, 사후관리, 농지전용부담금 부과·변경·환급', team: '농지전용' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '배OO', region: '향남/봉담', phone: '031-5189-6039', email: '', work: '농지전용허가·협의(향남,봉담), 공공협의, 사후관리, 농지전용부담금 부과·변경·환급', team: '농지전용' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '김OO', region: '정남/팔탄', phone: '031-5189-6040', email: '', work: '농지전용허가·협의(정남,팔탄), 공공협의, 사후관리, 농지전용부담금 부과·변경·환급', team: '농지전용' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '이OO', region: '양감/송산/매송/비봉', phone: '031-5189-6041', email: '', work: '농지전용허가·협의(양감,송산,매송,비봉), 공공협의, 사후관리, 농지전용부담금 부과·변경·환급', team: '농지전용' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '서OO', region: '우경/장안', phone: '031-5189-2629', email: '', work: '농지전용허가·협의(우경,장안), 공공협의, 사후관리, 농지전용부담금 부과·변경·환급', team: '농지전용' },
+  { dept: '도시정책실 도시개발과', rank: '주무관', name: '임OO', region: '', phone: '-', email: '', work: '육아휴직(2025. 11. 01.~)', team: '' }
+,
+  { dept: '만세구 허가민원1과', rank: '과장', name: '박O범', realname: '박회범', region: '', phone: '031-5189-1264', email: '', work: '허가민원1과 업무 총괄', team: '' },
+  { dept: '만세구 허가민원1과', rank: '팀장', name: '엄O하', realname: '엄근하', region: '', phone: '031-5189-1265', email: '', work: '허가지원1팀 업무 총괄, 세움터 협의, 온라인 실무심의 협의, 도시계획심의', team: '' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '김O미', realname: '김찬미', region: '', phone: '031-5189-1266', email: '', work: '서무, 회계, 기록물 관리, 대규모 허가지 중간점검 관리, 정보보안(개인정보)', team: '' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '우O제', realname: '우인제', region: '양감면/사창/정문/송산', phone: '031-5189-1271', email: '', work: '개발행위허가 [양감면-사창, 정문, 송산] 개발행위 취소청문', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '팀장', name: '이O흥', realname: '이상흥', region: '', phone: '031-5189-1267', email: '', work: '개발행위1팀 업무 총괄, 세움터협의, 온라인실무심의 협의, 도시계획심의', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '김O순', realname: '김기순', region: '향남읍', phone: '031-5189-1273', email: '', work: '개발행위허가 [향남읍-행정, 방축, 제암, 하길, 평리, 요리, 갈천, 송곡, 관리, 화리현] / [우경읍-운평]', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '김O국', realname: '김병국', region: '향남읍/양감면', phone: '031-5189-1275', email: '', work: '개발행위허가 [향남읍-상신리, 동오리, 상두리, 도이리, 장짐리, 발안리, 증거리, 수직리] /[양감면-대양리, 용소리]', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '안O성', realname: '안병성', region: '향남읍/우정읍', phone: '031-5189-1276', email: '', work: '개발행위허가 [향남읍-백토리, 구문천리, 길성리] / [우정읍-주곡리, 화산리, 국화리, 멱우리]', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '김O식', realname: '김준식', region: '우정읍', phone: '031-5189-1288', email: '', work: '개발행위허가 [우정읍-조암리, 이화리, 석천리, 호곡리, 원안리, 매향리, 화수리, 한각리]', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '팀장', name: '강O범', realname: '강용범', region: '', phone: '031-5189-1268', email: '', work: '개발행위2팀 업무 총괄, 세움터협의, 온라인실무심의 협의, 도시계획심의', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '김O환', realname: '김재환', region: '팔탄면', phone: '031-5189-1277', email: '', work: '개발행위허가[팔탄면-덕우리,고주리,가재리,화당리,월문리,매곡리,해창리] / [양감면-요당리,신왕리]', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '이O호', realname: '이원호', region: '팔탄면', phone: '031-5189-1278', email: '', work: '개발행위허가 [팔탄면-하저리,창곡리,기천리,울알리,구장리,노하리,덕천리,지월리,서근리]', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '박O욱', realname: '박채욱', region: '장안면', phone: '031-5189-1279', email: '', work: '개발행위허가 [장안면-석포리,금의리,어온리,사랑리,덕다리]', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '진O주', realname: '진홍주', region: '장안면', phone: '031-5189-1280', email: '', work: '개발행위허가 [장안면-수촌리,독정리,사곡리,노진리,장안리]', team: '개발행위' },
+  { dept: '만세구 허가민원1과', rank: '팀장', name: '계O진', realname: '계명진', region: '', phone: '031-5189-1269', email: '', work: '공장설립 업무 총괄, 세움터 협의, 온라인실무심의 협의', team: '공장설립' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '송O석', realname: '송주석', region: '장안면/우정읍', phone: '031-5189-1281', email: '', work: '공장설립승인 [장안면] / [우정읍-주곡리,석천리,조암리,한각리,멱우리], 공장등록 및 완료신고, 전력부담금 신청, 제조시설설치 승인, 지식산업센터 관리', team: '공장설립' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '유O민', realname: '유승민', region: '팔탄면/우정읍', phone: '031-5189-1282', email: '', work: '공장설립승인 [팔탄면] / [우정읍-화산리,이화리,국화리], 공장등록 및 완료신고, 전력부담금 신청, 제조시설설치 승인, 지식산업센터 관리', team: '공장설립' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '한O희', realname: '한송희', region: '향남읍/양감면/우정읍', phone: '031-5189-1283', email: '', work: '공장설립승인 [향남읍] / [양감면] / [우정읍-호곡리,매향리,운평리,원안리,화수리], 공장등록 및 완료신고, 전력부담금 신청, 제조시설설치 승인, 지식산업센터 관리', team: '공장설립' },
+  { dept: '만세구 허가민원1과', rank: '팀장', name: '권O란', realname: '권애란', region: '', phone: '031-5189-1270', email: '', work: '산지전용 업무 총괄, 세움터 협의, 온라인실무심의 협의', team: '산지전용' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '이O학', realname: '이재학', region: '장안면/향남읍', phone: '031-5189-1284', email: '', work: '산지전용허가/협의 [장안면] / [향남읍-구문천리,상신리], 대체산림자원조성비, 복구비 환급', team: '산지전용' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '홍O연', realname: '홍세연', region: '우정읍/양감면/향남읍', phone: '031-5189-1285', email: '', work: '산지전용허가/협의 [우정읍] / [양감면] / [향남읍-길성리,상두리,수직리,요리], 대체산림자원조성비, 복구비 환급', team: '산지전용' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '권O찬', realname: '권용찬', region: '팔탄면/향남읍', phone: '031-5189-1286', email: '', work: '산지전용허가/협의 [팔탄면] / [향남읍-행정리,방축리,제암리,하길리,평리,송곡리,관리,동오리,도이리,장짐리,발안리,증거리,갈천리,화리현리,백토리], 대체산림자원조성비, 복구비 환급', team: '산지전용' },
+  { dept: '만세구 허가민원1과', rank: '주무관', name: '정O상', realname: '정준상', region: '', phone: '031-5189-1287', email: '', work: '산지 허가대장 관리, 비전자문서 접수, 산지관련 확인서 발급, 대체산림자원조성비, 과태료 고지서 발급', team: '' },
+  { dept: '만세구 허가민원2과', rank: '과장', name: '박OO', realname: '박OO', region: '', phone: '031-5189-1294', email: '', work: '만세구 허가민원2과 업무총괄', team: '' },
+  { dept: '만세구 허가민원2과', rank: '팀장', name: '최O준', realname: '최영준', region: '', phone: '031-5189-1295', email: '', work: '허가지원2팀 업무 총괄, 민원종합실무심의 및 세움터 협의(남양,새솔동), 도시계획위원회 심의(남양,새솔동)', team: '' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '김O휘', realname: '김동휘', region: '남양', phone: '031-5189-1303', email: '', work: '개발행위허가·협의[5,000㎡ 미만](남양-남양,북양,안석,온석,문호,장전,수화,새솔동)', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '박O웅', realname: '박현웅', region: '', phone: '031-5189-1296', email: '', work: '서무, 회계, 기록물 관리, 정보보안(개인정보), 개발행위허가 취소청문', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '박O선', realname: '박지선', region: '남양', phone: '031-5189-1304', email: '', work: '개발행위허가·협의[5,000㎡ 미만](남양-신남,무송,활초,장덕,송림,원천,신외,시리)', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '박O호', realname: '박기호', region: '', phone: '031-5189-1301', email: '', work: '개발제한구역 내 허가·신고[건축허가,공작물축조,토지분할,형질변경 등], 관련법 협의[행위허가·신고], 개발제한구역 주민지원사업', team: '' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '김OO', region: '', phone: '031-5189-1302', email: '', work: '개발제한구역 지도단속, GB항측, GB내 불법행위 지도단속 및 사후관리, GB내 불법행위자 고발 및 이행강제금, 과태료 부과·징수, 행정대집행 업무', team: '' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '김OO', region: '', phone: '031-5189-1302', email: '', work: '개발제한구역 지도단속, GB항측, GB내 불법행위 지도단속 및 사후관리, GB내 불법행위자 고발 및 이행강제금, 과태료 부과·징수, 행정대집행 업무', team: '' },
+  { dept: '만세구 허가민원2과', rank: '팀장', name: '오O용', realname: '오수용', region: '', phone: '031-5189-1297', email: '', work: '개발행위3팀 업무 총괄, 민원종합실무심의 및 세움터 협의(마도,송산,서신), 도시계획위원회 심의(마도,송산,서신)', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '장O영', realname: '장지영', region: '마도/송산', phone: '031-5189-1306', email: '', work: '개발행위 허가·협의[5,000㎡ 미만](마도-송정,두곡,고모,청원,슬항,쌍송,해문,석교)', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '홍O균', realname: '홍석균', region: '서신/송산', phone: '031-5189-1307', email: '', work: '개발행위 허가·협의[5,000㎡ 미만](서신-궁평,제부,백미,광평,송교,장외,매화리)(송산-삼존,고정)', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '양O아', realname: '양선아', region: '마도/서신/송산', phone: '031-5189-1308', email: '', work: '개발행위 허가·협의[5,000㎡ 미만](마도-백곡,금당리)(서신-용두,홍법,사곳,상안,전곡)(송산-독지,천등,신천,쌍정)', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '박O요', realname: '박상요', region: '송산', phone: '031-5189-1318', email: '', work: '개발행위 허가·협의[5,000㎡ 미만](송산-지화,중송,칠곡,마산,육일,봉가,고포,사강,용포)', team: '개발행위' },
+  { dept: '만세구 허가민원2과', rank: '팀장', name: '최O경', realname: '최민경', region: '', phone: '031-5189-1298', email: '', work: '산지전용2팀 업무총괄, 민원종합실무심의 및 세움터 협의(남양,마도,송산,서신)', team: '산지전용' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '안O선', realname: '안지선', region: '송산/마도', phone: '031-5189-1309', email: '', work: '산지전용 허가·협의[5,000㎡ 미만](송산, 마도-석교,두곡,송정,슬항,해문), 대체산림자원조성비, 복구비 산정, 사후관리 및 사고지관리, 대체산림자원조성비 및 산지관리법위반 과태료 부과', team: '산지전용' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '남O호', realname: '남신호', region: '서신/마도', phone: '031-5189-1310', email: '', work: '산지전용 허가·협의[5,000㎡ 미만](서신, 마도-쌍송,청원,백곡,금당,고모), 대체산림자원조성비, 복구비 산정, 사후관리 및 사고지관리, 대체산림자원조성비 및 산지관리법위반 과태료 부과', team: '산지전용' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '이O정', realname: '이희정', region: '남양', phone: '031-5189-1311', email: '', work: '산지전용 허가·협의[5,000㎡ 미만](남양), 대체산림자원조성비, 복구비 산정, 사후관리 및 사고지관리, 대체산림자원조성비 체납자 관리, 대체산림자원조성비 및 산지관리법위반 과태료 부과', team: '산지전용' },
+  { dept: '만세구 허가민원2과', rank: '팀장', name: '이O열', realname: '이재열', region: '', phone: '031-5189-1299', email: '', work: '공장설립2팀 업무총괄, 민원종합실무심의 및 세움터협의(남양,마도,송산,서신,새솔동)', team: '공장설립' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '어O하', realname: '어승하', region: '서신/남양', phone: '031-5189-1313', email: '', work: '공장설립등의 승인 및 완료신고, 공장등록(서신,남양), 창업 공장설립계획승인 및 전력기금 면제 확인, 제조시설설치 승인', team: '공장설립' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '김O현', realname: '김경현', region: '마도/송산/새솔동', phone: '031-5189-1314', email: '', work: '공장설립등의 승인 및 완료신고, 공장등록(마도,송산,새솔동), 창업 공장설립계획승인 및 전력기금 면제 확인, 공장설립인 취소 청문, 공장등록 실태조사, 제조시설설치 승인', team: '공장설립' },
+  { dept: '만세구 허가민원2과', rank: '팀장', name: '조O현', realname: '조우현', region: '', phone: '031-5189-1300', email: '', work: '도로하천 점용 업무 총괄(남양,마도,송산,서신,새솔동)', team: '도로하천' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '박O수', realname: '박인수', region: '남양/새솔동', phone: '031-5189-1315', email: '', work: '[남양,새솔동]도로점용 허가 및 협의(굴착심의위원회 제외), 도로무단점유 해소', team: '' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '김O현', realname: '김주현', region: '마도/서신/송산', phone: '031-5189-1316', email: '', work: '[마도,서신,송산]도로점용 허가 및 협의(굴착심의위원회 제외). 도로무단점유 해소', team: '' },
+  { dept: '만세구 허가민원2과', rank: '주무관', name: '장O상', realname: '장필상', region: '', phone: '031-5189-1317', email: '', work: '지방하천·소하천 점·사용허가, 공유수면점용 허가', team: '' }
+,
+  { dept: '효행구 도시건축과', rank: '팀장', name: '홍OO', region: '', phone: '031-5189-7692', email: '', work: '허가민원1팀 업무총괄', team: '' },
+  { dept: '효행구 도시건축과', rank: '주무관', name: '유OO', region: '기배/정남', phone: '031-5189-7702', email: '', work: '개발행위허가(5,000㎡ 미만)[기배,정남(보통,관항,괘량,문학)]', team: '개발행위' },
+  { dept: '효행구 도시건축과', rank: '주무관', name: '박OO', region: '봉담/매송/비봉', phone: '031-5189-7703', email: '', work: '개발행위허가(5,000㎡ 미만)[봉담,매송,비봉]', team: '개발행위' },
+  { dept: '효행구 도시건축과', rank: '주무관', name: '김OO', region: '정남', phone: '031-5189-7704', email: '', work: '개발행위허가(5,000㎡ 미만)[정남-보통, 관항, 괘량, 문학 제외]', team: '개발행위' },
+  { dept: '효행구 도시건축과', rank: '팀장', name: '신OO', region: '', phone: '031-5189-7693', email: '', work: '허가민원2팀 총괄', team: '' },
+  { dept: '효행구 도시건축과', rank: '주무관', name: '정OO', region: '', phone: '031-5189-7705', email: '', work: '산지전용허가(5,000㎡ 미만)', team: '산지전용' },
+  { dept: '효행구 도시건축과', rank: '주무관', name: '경OO', region: '', phone: '031-5189-7706', email: '', work: '공장설립승인, 제조시설설치승인, 완료신고, 공장등록, 창업 공장설립계획승인, 전력산업기반기금부담금 면제확인, 공장등록실태조사, 공장 취소청문', team: '공장설립' },
+  { dept: '효행구 도시건축과', rank: '팀장', name: '김OO', region: '', phone: '031-5189-7694', email: '', work: '그린벨트팀 총괄', team: '그린벨트' },
+  { dept: '효행구 도시건축과', rank: '주무관', name: '이OO', region: '', phone: '031-5189-7708', email: '', work: '개발제한구역 주민지원사업, 개발제한구역 내 행위허가 및 신고[형질변경,공작물축조(건축부지 외),죽목의 벌채,물건의 적치], 관련법 협의(행위허가-건축외), 개발제한구역 불법행위 지도단속[매송(숙곡리,원평리)]', team: '' },
+  { dept: '효행구 도시건축과', rank: '주무관', name: '이OO', region: '', phone: '031-5189-7707', email: '', work: '개발제한구역 내 행위허가 및 신고[건축허가,공작물축조(건축부지 내),토지분할], 관련법 협의(행위허가-건축), 개발제한구역 관리 예산 및 보고서 작성', team: '' },
+  { dept: '효행구 도시건축과', rank: '주무관', name: '양OO', region: '봉담/비봉', phone: '031-5189-7717', email: '', work: '개발제한구역 내 불법행위 지도단속[봉담,비봉(자안리,청요리,쌍학리,양노리)] 항측관련 업무, 불법행위 고발 및 이행강제금 부과, 행정대집행 업무', team: '' },
+  { dept: '효행구 도시건축과', rank: '주무관', name: '안OO', region: '비봉', phone: '031-5189-7718', email: '', work: '개발제한구역 내 불법행위 지도단속[비봉(구포리,남전리,삼화리,유포리)], 항측관련 업무, 불법행위 고발 및 이행강제금 부과, 행정대집행 업무', team: '' },
+  { dept: '효행구 도시건축과', rank: '주무관', name: '허OO', region: '매송', phone: '031-5189-7719', email: '', work: '개발제한구역 내 불법행위 지도단속[매송(숙곡리,원평리 제외)], 항측관련 업무, 불법행위 고발 및 이행강제금 부과, 행정대집행 업무', team: '' },
+  { dept: '동탄구 도시건축과', rank: '팀장', name: '강OO', region: '', phone: '031-5189-5168', email: '', work: '허가민원팀 업무 총괄', team: '' },
+  { dept: '동탄구 도시건축과', rank: '주무관', name: '홍OO', region: '동탄7~9동', phone: '031-5189-5169', email: '', work: '공장설립승인,등록,완료신고 / 창업 공장설립계획승인 및 전력기금 면제 / 공장등록 실태조사 / 공장설립승인 취소청문 / 공장등록 통계,공장등록증 발급 / 개발행위 및 산지전용 허가 및 협의[5,000㎡미만](동탄7~9동, 지식산업센터 1~30블록)', team: '산지전용' },
+  { dept: '동탄구 도시건축과', rank: '주무관', name: '임OO', region: '동탄1~6동', phone: '031-5189-5170', email: '', work: '공장설립승인,등록,완료신고 / 창업 공장설립계획승인 및 전력기금 면제 / 공장등록증 발급 / 개발행위 및 산지전용 허가 및 협의[5,000㎡미만] / 대규모 허가지 점검 및 개발행위청문(동탄1~6동, 지식산업센터 31블록 이상)', team: '산지전용' }
+];
+function renderCon(q){var f=q?sampleContacts.filter(function(c){return [c.dept,c.name,c.region,c.work,c.team].join(' ').toLowerCase().includes(q.toLowerCase());}):sampleContacts;setText('conCount',f.length+'/'+sampleContacts.length);var b=document.getElementById('conBody');if(!b)return;b.innerHTML=f.map(function(c){return '<tr><td style="font-weight:700;color:var(--txt)">'+c.dept+'</td><td><span style="color:var(--blue2);font-size:10px;margin-right:4px">'+c.rank+'</span><b>'+c.name+'</b></td><td>'+c.region+'</td><td><a href="tel:'+c.phone+'">'+c.phone+'</a></td><td style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+c.work+'">'+c.work+'</td></tr>';}).join('');}
+function filterCon(q){renderCon(q);}
+
+function filterCon(q){renderCon(q);}
+function addHistItem(txt){var d=new Date();var hh=(d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();histItems.unshift({txt:txt,time:hh,date:d.toLocaleDateString()});if(histItems.length>50)histItems.pop();localStorage.setItem('gdsp_hist',JSON.stringify(histItems));}
+function addHistItem(txt){var d=new Date(),hh=(d.getHours()<10?'0':'')+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();histItems.unshift({txt:txt,time:hh,date:d.toLocaleDateString()});if(histItems.length>50)histItems.pop();localStorage.setItem('gdsp_hist',JSON.stringify(histItems));}
+function renderHist(){
+  var list=document.getElementById('histList'),empty=document.getElementById('histEmpty');
+  if(!list)return;
+  var visible=histItems.filter(function(h){return !h.hidden;});
+  var hidden=histItems.filter(function(h){return h.hidden;});
+  if(!histItems.length){list.innerHTML='';if(empty)empty.style.display='block';return;}
+  if(empty)empty.style.display='none';
+  var html=histItems.map(function(h,i){
+    if(h.hidden)return '';
+    return '<div class="r-row" style="flex-wrap:wrap">'
+      +'<div class="act-d" style="background:var(--blue);width:6px;height:6px;border-radius:50%;flex-shrink:0"></div>'
+      +'<div style="flex:1;font-size:12px;color:var(--txt2)">'+h.txt+'</div>'
+      +'<div style="font-size:10px;color:var(--txt3);margin-right:6px">'+h.date+' '+h.time+'</div>'
+      +'<div style="display:flex;gap:3px">'
+      +'<button onclick="hideHist('+i+')" style="height:22px;padding:0 7px;border-radius:4px;background:transparent;border:1px solid var(--line);color:var(--txt3);font-size:10px;cursor:pointer" title="숨기기">숨김</button>'
+      +'<button onclick="delHist('+i+')" style="height:22px;padding:0 7px;border-radius:4px;background:transparent;border:1px solid rgba(255,107,120,.2);color:var(--red);font-size:10px;cursor:pointer">삭제</button>'
+      +'<button onclick="printHist('+i+')" style="height:22px;padding:0 7px;border-radius:4px;background:rgba(62,124,255,.08);border:1px solid rgba(62,124,255,.2);color:var(--blue2);font-size:10px;cursor:pointer">출력</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+  if(hidden.length){
+    html+='<div style="text-align:center;margin-top:8px"><button onclick="showAllHist()" style="height:26px;padding:0 12px;border-radius:6px;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--txt3);font-size:11px;cursor:pointer">숨긴 항목 '+hidden.length+'개 보기</button></div>';
+  }
+  list.innerHTML=html;
+}
+function hideHist(i){histItems[i].hidden=true;localStorage.setItem('gdsp_hist',JSON.stringify(histItems));renderHist();toast('숨겼습니다 (언제든 다시 표시 가능)');}
+function showAllHist(){histItems.forEach(function(h){h.hidden=false;});localStorage.setItem('gdsp_hist',JSON.stringify(histItems));renderHist();}
+function delHist(i){if(!confirm('이 항목을 삭제하시겠습니까?'))return;histItems.splice(i,1);localStorage.setItem('gdsp_hist',JSON.stringify(histItems));renderHist();}
+function printHist(i){var h=histItems[i];var w=window.open('','_blank');w.document.write('<html><body style="font-family:sans-serif;padding:20px"><h3>작업 이력</h3><p>'+h.date+' '+h.time+'</p><p>'+h.txt+'</p></body></html>');w.document.close();w.print();}
+function clearHist(){
+  if(!confirm('작업 이력 전체를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')){return;}
+  if(!confirm('정말로 삭제하시겠습니까? 한 번 더 확인합니다.')){return;}
+  histItems=[];localStorage.removeItem('gdsp_hist');renderHist();toast('작업 이력이 삭제되었습니다');
+}
+function setRad(btn,r){document.querySelectorAll('.grbtn[onclick^="setRad"]').forEach(function(b){b.classList.remove('on')});btn.classList.add('on');}function setRadCustom(v){if(v)toast(v+"m 반경 설정됨");}
+
+function toggleTheme(){var isDark=document.body.classList.toggle('dark');document.getElementById('themeBtn').textContent=isDark?'☀️ 라이트':'🌙 다크';localStorage.setItem('gdsp_theme',isDark?'dark':'light');}
+document.getElementById('rcpRegion').addEventListener('change',function(){var r=document.getElementById('customUrlRow');if(r)r.style.display=this.value==='custom'?'block':'none';});
+(function(){
+  if(localStorage.getItem('gdsp_theme')==='dark'){document.body.classList.add('dark');var b=document.getElementById('themeBtn');if(b)b.textContent='☀️ 라이트';}
+  renderRcp();renderCon('');
+  checkCrawlServer(function(ok){
+    var banner=document.getElementById('serverBanner');
+    if(ok){banner.textContent='✓ 서버 연결됨 — 자동 갱신 사용 가능 ('+CRAWL_SERVER+')';banner.className='server-banner ok';}
+    else{banner.innerHTML='⚠ 서버 미연결 — <b>server.py</b> 실행 필요 · <button onclick="showCrawlServerGuide()" style="border:none;background:none;color:var(--red);font-weight:700;cursor:pointer;text-decoration:underline">설정 방법 보기</button>';}
+  });
+})();
+</script>
+</body>
+</html>

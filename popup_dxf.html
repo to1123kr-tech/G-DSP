@@ -1,0 +1,1721 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>G-DSP — 도면 수량산출 · 공간정보 변환</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* ── 라이트(기본) ── */
+  --bg:#f5f7fa;--bg2:#eef1f6;--bg3:#e6eaf2;
+  --card:#ffffff;--line:#dde3ed;--line2:#c8d0e0;
+  --txt:#1a2540;--txt2:#3d5070;--txt3:#7a90b0;
+  --blue:#2563eb;--blue2:#3b82f6;--blue3:#1d4ed8;
+  --green:#059669;--red:#ef4444;--gold:#d97706;
+  --cyan:#0891b2;--purple:#7c3aed;--orange:#ea580c;
+  --neon:#2563eb;--neon2:#3b82f6;
+  --sidebar-w:240px;
+  --shadow:0 1px 4px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06);
+  --shadow2:0 2px 8px rgba(0,0,0,.1),0 8px 24px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+button,input,select,textarea{font:inherit;cursor:pointer}
+button{border:none;background:none;color:inherit}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--txt3)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes neonPulse{0%,100%{filter:drop-shadow(0 0 6px #00f0ff) drop-shadow(0 0 14px #0af)}50%{filter:drop-shadow(0 0 14px #00f0ff) drop-shadow(0 0 28px #0af)}}
+@keyframes dotPulse{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes scanLine{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
+@keyframes cardIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideDown{from{opacity:0;max-height:0}to{opacity:1;max-height:600px}}
+@keyframes orbit{0%{transform:rotate(0deg) translateX(36px) rotate(0deg)}100%{transform:rotate(360deg) translateX(36px) rotate(-360deg)}}
+@keyframes logoSway{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-4px) rotate(1deg)}}
+@keyframes pinFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+
+/* ══ LOGIN ══ */
+#loginScreen{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#e8f0fe 0%,#f0f4ff 50%,#e8effe 100%);display:flex;align-items:center;justify-content:center}
+.login-wrap{display:flex;flex-direction:column;align-items:center;animation:fadeUp .6s cubic-bezier(.22,1,.36,1) both}
+.login-logo-img{width:280px;margin-bottom:6px}
+.login-tagline{font-size:11px;color:var(--txt3);letter-spacing:1.5px;text-align:center;margin-bottom:24px}
+.login-card{width:360px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px 26px 22px;box-shadow:var(--shadow2)}
+.lf-label{display:block;font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.7px;margin-bottom:5px}
+.lf-input{width:100%;height:42px;padding:0 14px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--txt);font-size:13px;outline:none;transition:.15s;margin-bottom:10px}
+.lf-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.lf-btn{width:100%;height:44px;border-radius:9px;margin-top:4px;background:linear-gradient(135deg,var(--blue3),var(--blue));border:none;color:#fff;font-weight:700;font-size:14px;letter-spacing:.5px;cursor:pointer;transition:.15s;box-shadow:0 4px 16px rgba(37,99,235,.3)}
+.lf-btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.lf-hint{font-size:11px;color:var(--txt3);text-align:center;margin-top:12px}
+
+/* ══ APP ══ */
+#app{display:none;height:100vh;display:grid;grid-template-rows:52px 1fr;grid-template-columns:var(--sidebar-w) 1fr}
+#app.show{display:grid}
+
+/* ══ HEADER ══ */
+.hdr{grid-column:1/3;display:flex;align-items:center;padding:0 14px;gap:11px;background:#fff;border-bottom:1px solid var(--line);position:relative;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.hdr-logo{height:34px;flex-shrink:0}
+.hdr-sep{width:1px;height:18px;background:var(--line);flex-shrink:0}
+.hdr-search{flex:1;max-width:520px;height:36px;display:flex;align-items:center;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;overflow:hidden;transition:.15s}
+.hdr-search:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.hs-lbl{padding:0 10px;height:100%;display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--blue2);border-right:1px solid var(--line2);white-space:nowrap;flex-shrink:0;background:rgba(37,99,235,.04)}
+.hs-inp{flex:1;height:100%;padding:0 11px;border:none;outline:none;background:transparent;font-size:12px;color:var(--txt)}
+.hs-inp::placeholder{color:var(--txt3);font-size:11px}
+.hs-btn{height:100%;padding:0 16px;background:linear-gradient(135deg,var(--blue3),var(--blue));color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;flex-shrink:0;transition:.15s}
+.hs-btn:hover{filter:brightness(1.1)}
+.hdr-status{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.s-dot{width:7px;height:7px;border-radius:50%}
+.s-on{background:var(--green);animation:dotPulse 2s infinite;box-shadow:0 0 6px var(--green)}
+.s-off{background:var(--txt3)}
+.s-txt{font-size:10px;font-weight:700;color:var(--txt3);letter-spacing:.3px}
+.hdr-right{display:flex;align-items:center;gap:5px;margin-left:auto}
+.hbtn{height:30px;padding:0 12px;border-radius:7px;border:1px solid var(--line2);background:#fff;color:var(--txt2);font-size:11px;font-weight:700;transition:.15s}
+.hbtn:hover{color:var(--txt);background:var(--bg2);border-color:var(--blue2)}
+.hbtn-user{height:30px;padding:0 12px;border-radius:7px;border:1px solid rgba(37,99,235,.3);background:rgba(37,99,235,.06);color:var(--blue2);font-size:11px;font-weight:700}
+
+/* ══ SIDEBAR ══ */
+.sidebar{background:#fff;border-right:1px solid var(--line);overflow-y:auto;scrollbar-width:thin;display:flex;flex-direction:column;box-shadow:2px 0 8px rgba(0,0,0,.04)}
+/* 대분류 */
+.nav-group{flex-shrink:0}
+.nav-cat{display:flex;align-items:center;gap:10px;padding:12px 15px;cursor:pointer;transition:.15s;user-select:none;border-bottom:1px solid var(--line)}
+.nav-cat:hover{background:rgba(37,99,235,.04)}
+.nav-cat.on{background:rgba(37,99,235,.06)}
+.nav-cat-ico{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex-shrink:0}
+.nav-cat-ico svg{width:15px;height:15px}
+.nc-blue{background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.2)}
+.nc-green{background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.2)}
+.nc-purple{background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2)}
+.nc-gold{background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.2)}
+.nc-cyan{background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.2)}
+.nc-red{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2)}
+.nc-orange{background:rgba(234,88,12,.1);border:1px solid rgba(234,88,12,.2)}
+.nav-cat-txt{flex:1;min-width:0}
+.nav-cat-name{font-size:13px;font-weight:700;color:var(--txt);line-height:1.2}
+.nav-cat-sub{font-size:11px;color:var(--txt3);margin-top:2px}
+.nav-cat-arr{font-size:11px;color:var(--txt3);transition:.2s;flex-shrink:0}
+.nav-cat.on .nav-cat-arr{transform:rotate(90deg);color:var(--blue)}
+/* 소분류 */
+.nav-sub{display:none;overflow:hidden;background:var(--bg2)}
+.nav-sub.on{display:block;animation:slideDown .2s ease}
+.nav-item{display:flex;align-items:center;gap:9px;padding:10px 15px 10px 22px;cursor:pointer;transition:.15s;font-size:13px;font-weight:500;color:var(--txt2);border-bottom:1px solid var(--line)}
+.nav-item:hover{color:var(--blue);background:rgba(37,99,235,.05)}
+.nav-item.on{color:var(--blue);background:rgba(37,99,235,.08);border-left:2px solid var(--blue);font-weight:700}
+.nav-item svg{width:15px;height:15px;flex-shrink:0;opacity:.85}
+
+/* ══ CONTENT ══ */
+.content{position:relative;overflow:hidden;background:var(--bg)}
+.view{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
+.view.on{display:flex;animation:fadeIn .2s ease}
+
+/* 공통 패널 헤더 */
+.panel-hdr{padding:12px 18px;background:#fff;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.panel-hdr-title{font-size:14px;font-weight:700;color:var(--txt)}
+.panel-hdr-sub{font-size:11px;color:var(--txt3);margin-left:auto}
+
+/* ══ 대시보드 ══ */
+.dash{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+
+/* 검색결과 카드 */
+.rc{background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:14px 16px;display:none;animation:cardIn .3s ease}
+.rc.on{display:block}
+.rc-top{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.rc-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:dotPulse 2s infinite}
+.rc-title{font-size:13px;font-weight:700;color:var(--txt)}
+.rc-jibun{margin-left:auto;font-size:11px;font-weight:700;color:var(--neon);background:rgba(0,240,255,.07);border:1px solid rgba(0,240,255,.18);padding:2px 9px;border-radius:5px}
+.rc-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:11px}
+.rci{background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.rci-k{font-size:9px;color:var(--txt3);letter-spacing:.3px;margin-bottom:3px}
+.rci-v{font-size:12px;font-weight:700;color:var(--txt)}
+.rci-v.b{color:var(--blue2)}.rci-v.g{color:var(--green)}.rci-v.m{color:var(--gold)}
+.rc-acts{display:flex;gap:5px;flex-wrap:wrap}
+.ra{height:27px;padding:0 10px;border-radius:6px;border:1px solid rgba(62,124,255,.28);background:rgba(62,124,255,.08);color:var(--blue2);font-size:11px;font-weight:700;cursor:pointer;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.ra:hover{background:rgba(62,124,255,.2);color:#fff;border-color:var(--blue)}
+.ra svg{width:12px;height:12px;flex-shrink:0}
+.ra-neon{border-color:rgba(0,240,255,.3);background:rgba(0,240,255,.07);color:var(--neon)}
+.ra-neon:hover{background:rgba(0,240,255,.18)}
+
+/* 대시보드 컨텐츠 그리드 */
+.dash-main{display:grid;grid-template-columns:1fr 260px;gap:14px}
+.fc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:9px}
+.fc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px;cursor:pointer;transition:.18s;position:relative;overflow:hidden}
+.fc:hover{border-color:rgba(0,240,255,.2);transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.35)}
+.fc-ico{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;margin-bottom:9px}
+.fc-ico svg{width:17px;height:17px}
+.ic-blue{background:rgba(62,124,255,.12);border:1px solid rgba(62,124,255,.2)}
+.ic-green{background:rgba(34,211,165,.1);border:1px solid rgba(34,211,165,.2)}
+.ic-purple{background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2)}
+.ic-gold{background:rgba(241,198,91,.1);border:1px solid rgba(241,198,91,.2)}
+.ic-cyan{background:rgba(0,240,255,.08);border:1px solid rgba(0,240,255,.18)}
+.ic-red{background:rgba(255,107,120,.1);border:1px solid rgba(255,107,120,.2)}
+.ic-orange{background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2)}
+.fc-name{font-size:12px;font-weight:700;color:var(--txt);margin-bottom:2px}
+.fc-desc{font-size:10px;color:var(--txt3);line-height:1.5}
+.fc-arr{position:absolute;right:12px;bottom:14px;color:var(--txt3);font-size:13px;transition:.15s}
+.fc:hover .fc-arr{color:var(--neon)}
+
+/* 우측 사이드 — 최근활동 + 빠른사이트 */
+.dash-right{display:flex;flex-direction:column;gap:10px}
+.ds-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+.ds-t{font-size:10px;font-weight:700;color:var(--txt3);letter-spacing:.7px;text-transform:uppercase;margin-bottom:9px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+.act{display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid var(--line)}
+.act:last-child{border-bottom:none}
+.act-d{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.act-t{flex:1;font-size:11px;color:var(--txt2)}
+.act-tm{font-size:10px;color:var(--txt3)}
+.qs{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--txt2);font-size:12px;font-weight:700;transition:.15s;margin-bottom:5px}
+.qs:last-child{margin-bottom:0}
+.qs svg{width:14px;height:14px;flex-shrink:0;color:var(--txt3)}
+.qs:hover{border-color:rgba(0,240,255,.2);color:var(--neon);background:rgba(0,240,255,.04)}
+.qs:hover svg{color:var(--neon)}
+.qs-arr{margin-left:auto;font-size:11px;color:var(--txt3)}
+
+/* ══ GEO 뷰 ══ */
+.geo-body{flex:1;display:grid;grid-template-columns:250px 1fr 270px;min-height:0;gap:1px;background:var(--line)}
+.gp{background:var(--bg2);display:flex;flex-direction:column;min-height:0}
+.gp-hdr{padding:8px 12px;border-bottom:1px solid var(--line);flex-shrink:0;font-size:10px;font-weight:700;color:var(--txt3);letter-spacing:.6px;text-transform:uppercase}
+.gp-body{flex:1;overflow-y:auto;padding:9px 10px;scrollbar-width:thin}
+.gsec{background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:10px;padding:10px 11px;margin-bottom:7px}
+.gsec:last-child{margin-bottom:0}
+.gsec-t{font-size:9px;font-weight:900;color:var(--txt3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+/* 지도 선택 버튼 그리드 */
+.map-picker{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}
+.mp-btn{padding:7px 6px;border-radius:7px;border:1px solid var(--line);background:var(--bg3);color:var(--txt2);font-size:10px;font-weight:700;text-align:center;cursor:pointer;transition:.15s;line-height:1.3}
+.mp-btn:hover{border-color:rgba(0,240,255,.25);color:var(--neon);background:rgba(0,240,255,.05)}
+.mp-btn.on{border-color:rgba(0,240,255,.4);color:var(--neon);background:rgba(0,240,255,.1);box-shadow:0 0 8px rgba(0,240,255,.1)}
+/* 지도 영역 */
+.map-area{position:relative;overflow:hidden;background:#030810}
+.map-area iframe{position:absolute;inset:0;width:100%;height:100%;border:none;z-index:2}
+.map-cover{position:absolute;top:0;left:0;right:0;height:56px;z-index:4;background:#030810;pointer-events:none;display:none}
+.map-tools{position:absolute;right:9px;top:9px;z-index:6;display:flex;flex-direction:column;gap:4px}
+.mt{width:32px;height:32px;border-radius:8px;background:rgba(4,8,15,.9);border:1px solid var(--line2);color:var(--txt2);display:grid;place-items:center;transition:.15s;cursor:pointer}
+.mt:hover,.mt.on{border-color:var(--neon);color:var(--neon);background:rgba(0,240,255,.08)}
+.mt svg{width:13px;height:13px}
+.map-cap{position:absolute;left:9px;bottom:9px;z-index:6;background:rgba(4,8,15,.94);border:1px solid var(--line2);border-radius:9px;padding:8px 12px;max-width:210px}
+.mc-t{font-size:11px;font-weight:700;color:var(--neon)}
+.mc-d{font-size:10px;color:var(--txt2);margin-top:3px;line-height:1.5}
+/* 정보 행 */
+.irow{display:grid;grid-template-columns:64px 1fr;padding:5px 0;border-bottom:1px solid var(--line)}
+.irow:last-child{border-bottom:none}
+.ik{font-size:10px;color:var(--txt3)}
+.iv{font-size:12px;font-weight:700;text-align:right}
+.iv-b{color:var(--blue2)}.iv-g{color:var(--green)}.iv-m{color:var(--gold)}.iv-n{color:var(--neon)}
+/* 버튼 */
+.gbtn{height:30px;width:100%;border-radius:7px;background:linear-gradient(135deg,var(--blue3),var(--blue));border:none;color:#fff;font-weight:700;font-size:11px;cursor:pointer;transition:.15s;margin-top:5px}
+.gbtn:hover{filter:brightness(1.08)}
+.gbtn-out{height:30px;width:100%;border-radius:7px;background:transparent;border:1px solid rgba(62,124,255,.28);color:var(--blue2);font-weight:700;font-size:11px;cursor:pointer;transition:.15s;margin-top:4px}
+.gbtn-out:hover{background:rgba(62,124,255,.1)}
+.gbtn-neon{height:30px;width:100%;border-radius:7px;background:rgba(0,240,255,.07);border:1px solid rgba(0,240,255,.25);color:var(--neon);font-weight:700;font-size:11px;cursor:pointer;transition:.15s;margin-top:4px}
+.gbtn-neon:hover{background:rgba(0,240,255,.15)}
+.glink{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:7px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;transition:.15s;text-decoration:none;margin-bottom:3px}
+.glink:last-child{margin-bottom:0}
+.glink:hover{border-color:rgba(0,240,255,.2);color:var(--neon);background:rgba(0,240,255,.05)}
+.glink-ico{width:12px;height:12px;flex-shrink:0}
+.glink-arr{margin-left:auto;font-size:12px;color:var(--txt3)}
+.ls-tag{font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px}
+.ls-r{background:rgba(34,211,165,.08);color:var(--green);border:1px solid rgba(34,211,165,.2)}
+.ls-w{background:rgba(255,255,255,.04);color:var(--txt3);border:1px solid var(--line)}
+.grbtn{height:22px;padding:0 7px;border-radius:5px;border:1px solid var(--line);background:transparent;color:var(--txt3);font-size:10px;font-weight:700;transition:.15s}
+.grbtn.on,.grbtn:hover{border-color:rgba(0,240,255,.28);background:rgba(0,240,255,.07);color:var(--neon)}
+.tile-row{display:flex;align-items:center;gap:6px;padding:4px 7px;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:6px;margin-bottom:3px}
+.tile-row span{flex:1;font-family:monospace;font-size:11px;color:var(--txt2)}
+/* 토지이용 연동 배너 */
+.land-banner{background:rgba(0,240,255,.05);border:1px solid rgba(0,240,255,.18);border-radius:9px;padding:9px 10px;margin-top:7px;display:none}
+.land-banner.on{display:block}
+.land-banner-t{font-size:9px;font-weight:700;color:var(--neon);letter-spacing:.5px;text-transform:uppercase;margin-bottom:7px}
+.land-btn{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px;border:1px solid rgba(0,240,255,.22);background:rgba(0,240,255,.07);color:var(--neon);font-size:11px;font-weight:700;cursor:pointer;transition:.15s;margin-bottom:3px;text-decoration:none}
+.land-btn:last-child{margin-bottom:0}
+.land-btn:hover{background:rgba(0,240,255,.16)}
+.land-btn svg{width:12px;height:12px;flex-shrink:0}
+
+/* ══ DXF ══ */
+.dxf-bar{padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.dxf-warn{padding:5px 12px;font-size:10px;color:var(--gold);background:rgba(241,198,91,.06);border-bottom:1px solid rgba(241,198,91,.15);flex-shrink:0}
+.dxf-shell{flex:1;display:flex;min-height:0}
+.dxf-side{width:178px;background:var(--bg2);border-right:1px solid var(--line);padding:9px;overflow-y:auto;flex-shrink:0;scrollbar-width:thin}
+.dxf-cw{flex:1;position:relative;overflow:hidden;cursor:crosshair;background:#020508}
+.dxf-sbt{font-size:9px;font-weight:700;color:var(--txt3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px}
+.dxf-upz{border:1px dashed var(--line2);border-radius:9px;padding:13px 8px;text-align:center;cursor:pointer;position:relative;margin-bottom:9px;transition:.15s;background:rgba(255,255,255,.02)}
+.dxf-upz:hover{border-color:var(--neon);background:rgba(0,240,255,.04)}
+.dxf-upz input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+/* ══ 건축물대장 ══ */
+.bld-view{flex:1;overflow-y:auto;padding:16px 18px}
+.bld-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bld-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.bld-card-t{font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.bld-preview{background:var(--bg3);border:1px solid var(--line);border-radius:8px;height:180px;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px;margin-bottom:8px;cursor:pointer;transition:.15s}
+.bld-preview:hover{border-color:rgba(0,240,255,.2);color:var(--neon)}
+.bld-irow{display:grid;grid-template-columns:70px 1fr;padding:5px 0;border-bottom:1px solid var(--line);font-size:12px}
+.bld-irow:last-child{border-bottom:none}
+.bld-ik{color:var(--txt3)}
+.bld-iv{font-weight:700;text-align:right}
+.issue-btn{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--txt2);font-size:11px;font-weight:700;transition:.15s;margin-bottom:4px;cursor:pointer;background:transparent}
+.issue-btn:hover{border-color:rgba(62,124,255,.3);color:var(--blue2);background:rgba(62,124,255,.06)}
+.issue-btn svg{width:13px;height:13px;flex-shrink:0}
+.issue-btn-arr{margin-left:auto;font-size:12px;color:var(--txt3)}
+
+/* ══ 분할모드 ══ */
+.split-view{flex:1;display:flex;flex-direction:column}
+.split-warn{padding:6px 14px;background:rgba(255,107,120,.07);border-bottom:1px solid rgba(255,107,120,.2);font-size:11px;color:var(--red);flex-shrink:0;display:none}
+.split-warn.on{display:block}
+.split-body{flex:1;display:grid;grid-template-columns:200px 1fr 220px;min-height:0;gap:1px;background:var(--line)}
+.sp{background:var(--bg2);display:flex;flex-direction:column;min-height:0;overflow-y:auto;padding:10px;scrollbar-width:thin}
+.sp-canvas{background:#020810;position:relative;overflow:hidden;cursor:crosshair}
+.sp-canvas canvas{position:absolute;inset:0;width:100%;height:100%}
+
+/* ══ 등기부등본 ══ */
+.reg-view{flex:1;overflow-y:auto;padding:16px 18px}
+.reg-search{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.reg-search-t{font-size:11px;font-weight:700;color:var(--txt3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px}
+.reg-list{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.reg-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--line);border-radius:8px;margin-bottom:4px;font-size:11px}
+
+/* ══ 공간정보 변환 ══ */
+.conv-view{flex:1;overflow-y:auto;padding:16px 18px}
+.conv-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+.conv-t{font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+.conv-select{width:100%;height:34px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--txt);padding:0 10px;outline:none;font-size:12px;margin-bottom:6px}
+.conv-upz{border:1px dashed var(--line2);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:.15s;background:rgba(255,255,255,.02);position:relative}
+.conv-upz:hover{border-color:var(--blue);background:rgba(62,124,255,.05)}
+.conv-upz input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.conv-preview{background:var(--bg3);border:1px solid var(--line);border-radius:8px;height:150px;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:11px;margin-top:6px}
+
+/* ══ 연락처 ══ */
+.ctab-bar{padding:7px 13px;background:var(--bg2);border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-shrink:0}
+.csf{height:30px;padding:0 11px;background:var(--bg3);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;transition:.15s}
+.csf:focus{border-color:var(--blue)}
+.ctbl{width:100%;border-collapse:collapse}
+.ctbl th{padding:7px 11px;font-size:10px;color:var(--txt3);text-align:left;border-bottom:1px solid var(--line2);background:var(--bg2);font-weight:700;letter-spacing:.5px;position:sticky;top:0;z-index:1}
+.ctbl td{padding:6px 11px;font-size:11px;color:var(--txt2);border-bottom:1px solid var(--line)}
+.ctbl tr:hover td{background:rgba(0,240,255,.04);color:var(--txt)}
+.ctbl td a{color:var(--blue2);text-decoration:none}
+
+/* ══ 진행조회 ══ */
+.rcp-wrap{width:100%;padding:20px 24px;box-sizing:border-box}
+.rcp-search-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:20px;position:relative;box-shadow:var(--shadow)}
+.rcp-search-card::before{content:attr(data-l);position:absolute;top:-1px;left:16px;font-size:11px;font-weight:700;color:var(--blue);background:#fff;padding:0 7px;letter-spacing:.3px}
+.ri{width:100%;height:42px;padding:0 14px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--txt);font-size:14px;outline:none;transition:.15s}
+.ri:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1);background:#fff}
+.rcp-region-row{display:flex;gap:8px;margin-bottom:12px}
+.rcp-region-sel{height:42px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--txt);padding:0 12px;outline:none;font-size:14px;flex:1;transition:.15s}
+.rcp-region-sel:focus{border-color:var(--blue);background:#fff}
+.r-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg3);border:1px solid var(--line);border-radius:9px;margin-bottom:5px;font-size:13px}
+.r-status{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px}
+.rs-ing{background:rgba(37,99,235,.1);color:#1d4ed8;border:1px solid rgba(37,99,235,.2)}
+.rs-sup{background:rgba(217,119,6,.1);color:#92400e;border:1px solid rgba(217,119,6,.25)}
+.rs-done{background:rgba(5,150,105,.1);color:#065f46;border:1px solid rgba(5,150,105,.2)}
+
+/* 진행조회 3열 가로 레이아웃 */
+.rcp-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
+.rcp-col-hdr{display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:10px;margin-bottom:12px;font-size:14px;font-weight:700}
+.rcp-col-ing .rcp-col-hdr{background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.18);color:#1d4ed8}
+.rcp-col-sup .rcp-col-hdr{background:rgba(217,119,6,.07);border:1px solid rgba(217,119,6,.2);color:#92400e}
+.rcp-col-done .rcp-col-hdr{background:rgba(5,150,105,.07);border:1px solid rgba(5,150,105,.18);color:#065f46}
+
+/* 아이템 카드 — 스크린샷 스타일 */
+.rcp-item-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;transition:.2s;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.rcp-item-card:hover{border-color:var(--blue2);box-shadow:0 2px 8px rgba(37,99,235,.1)}
+.rcp-item-card.has-new{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+.rcp-item-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+.rcp-item-num{font-size:15px;font-weight:700;color:var(--txt);letter-spacing:.3px}
+.rcp-item-meta{font-size:12px;color:var(--txt3);margin-top:3px}
+.rcp-item-dday{font-size:12px;font-weight:700}
+.rcp-item-btns{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center}
+
+/* 버튼 스타일 — 스크린샷의 오렌지/붉은 조회/삭제 버튼 */
+.rcp-ibtn{height:30px;padding:0 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;border:none;display:inline-flex;align-items:center;gap:4px}
+.rcp-ibtn-query{background:#f97316;color:#fff;box-shadow:0 1px 4px rgba(249,115,22,.3)}
+.rcp-ibtn-query:hover{background:#ea580c}
+.rcp-ibtn-print{background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);color:var(--blue2)}
+.rcp-ibtn-print:hover{background:rgba(37,99,235,.15)}
+.rcp-ibtn-del{background:#ef4444;color:#fff;box-shadow:0 1px 4px rgba(239,68,68,.3)}
+.rcp-ibtn-del:hover{background:#dc2626}
+.rcp-ibtn-sup{background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);color:#92400e}
+.rcp-ibtn-sup:hover{background:rgba(217,119,6,.15)}
+
+/* 상태 셀렉트 */
+.rcp-status-sel{height:30px;padding:0 8px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;font-weight:600;outline:none;cursor:pointer}
+
+/* 보완 패널 */
+.rcp-sup-panel{overflow:hidden;max-height:0;transition:max-height .35s ease,opacity .35s ease;opacity:0}
+.rcp-sup-panel.open{max-height:500px;opacity:1}
+.rcp-sup-inner{background:rgba(217,119,6,.04);border:1px solid rgba(217,119,6,.2);border-radius:10px;padding:14px;margin-top:10px}
+.rcp-sup-label{font-size:12px;font-weight:700;color:#92400e;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.rcp-sup-ta{width:100%;min-height:80px;background:#fff;border:1px solid var(--line2);border-radius:8px;color:var(--txt);font-size:13px;padding:10px 12px;outline:none;resize:vertical;line-height:1.6;box-sizing:border-box;transition:.15s}
+.rcp-sup-ta:focus{border-color:var(--gold)}
+.rcp-sup-row{display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.rcp-sup-field{display:flex;flex-direction:column;gap:3px}
+.rcp-sup-field label{font-size:11px;color:var(--txt3);font-weight:600}
+.rcp-sup-field input[type=date]{height:32px;padding:0 10px;background:#fff;border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;transition:.15s}
+.rcp-sup-field input[type=date]:focus{border-color:var(--gold)}
+
+/* 처리기한 D-day 칩 */
+.dday-chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:20px;font-size:11px;font-weight:700;margin-left:6px}
+.dday-ok{background:rgba(5,150,105,.1);color:#065f46;border:1px solid rgba(5,150,105,.2)}
+.dday-warn{background:rgba(217,119,6,.12);color:#92400e;border:1px solid rgba(217,119,6,.25)}
+.dday-over{background:rgba(239,68,68,.1);color:#b91c1c;border:1px solid rgba(239,68,68,.2)}
+
+/* 새로운 상태 배지 애니메이션 */
+@keyframes newBadge{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.8;transform:scale(1.1)}}
+@keyframes shimmer{0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.4)}50%{box-shadow:0 0 0 4px rgba(37,99,235,.1)}}
+.new-badge{display:inline-flex;align-items:center;background:#ef4444;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:5px;animation:newBadge 1s ease-in-out infinite;vertical-align:middle}
+.rcp-item-card.has-new{animation:shimmer 2s ease-in-out infinite}
+
+/* 체크박스 */
+.rcp-chk{width:16px;height:16px;accent-color:var(--blue);cursor:pointer;flex-shrink:0;margin-top:1px}
+
+/* 다크/라이트 토글 */
+.menu-card{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:18px 14px 16px;cursor:pointer;transition:.18s;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;user-select:none}
+.menu-card:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 6px 24px rgba(62,124,255,.13)}
+.menu-card-ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex-shrink:0}
+.menu-card-ico svg{width:22px;height:22px}
+.menu-card-name{font-size:13px;font-weight:700;color:var(--txt);line-height:1.3}
+.menu-card-cat{font-size:10px;color:var(--txt3);margin-top:2px}
+#cardBtn.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.theme-toggle:hover{color:var(--txt);background:var(--bg2)}
+
+/* ── 다크 모드 오버라이드 ── */
+body.dark{--bg:#04080f;--bg2:#060d18;--bg3:#08111f;--card:#0a1220;--line:#112038;--line2:#1e3555;--txt:#d8eaff;--txt2:#607a9e;--txt3:#4a6080;--blue:#3e7cff;--blue2:#60a5fa;--blue3:#1a50f0;--green:#22d3a5;--red:#ff6b78;--gold:#f1c65b;--cyan:#06b6d4;--purple:#a78bfa;--orange:#f97316;--neon:#00f0ff;--shadow:0 2px 8px rgba(0,0,0,.4);--shadow2:0 8px 32px rgba(0,0,0,.6)}
+body.dark .hdr{background:linear-gradient(180deg,#06101e,#04080f);box-shadow:none}
+body.dark .sidebar{background:var(--bg2);box-shadow:none}
+body.dark .panel-hdr{background:var(--bg2);box-shadow:none}
+body.dark .rcp-search-card{background:var(--card)}
+body.dark .rcp-search-card::before{background:var(--card)}
+body.dark .rcp-item-card{background:var(--bg3);border-color:var(--line)}
+body.dark .hbtn{background:rgba(255,255,255,.04)}
+body.dark .theme-toggle{background:rgba(255,255,255,.04)}
+body.dark .ri{background:var(--bg2);color:var(--txt)}
+body.dark .rcp-region-sel{background:var(--bg2);color:var(--txt)}
+body.dark .rcp-status-sel{background:var(--bg2);color:var(--txt)}
+body.dark .rcp-sup-ta{background:var(--bg2);color:var(--txt)}
+body.dark .rcp-sup-field input[type=date]{background:var(--bg2);color:var(--txt)}
+body.dark .login-card{background:var(--card)}
+body.dark #loginScreen{background:radial-gradient(ellipse at 50% 40%,#060e22,#020508)}
+body.dark .modal{background:#08111f}
+body.dark .toast{background:#08111f}
+
+/* ══ API 설정 ══ */
+.api-view{flex:1;overflow-y:auto;padding:16px 18px}
+.api-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+.api-t{font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.api-t svg{width:13px;height:13px;color:var(--neon);flex-shrink:0}
+.api-row{display:grid;grid-template-columns:1fr 56px 56px 56px;gap:4px;margin-bottom:6px}
+.api-row2{display:grid;grid-template-columns:1fr 56px 56px;gap:4px;margin-bottom:6px}
+.mf{width:100%;height:34px;padding:0 10px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;transition:.15s}
+.mf:focus{border-color:var(--neon)}
+.mf::placeholder{color:var(--txt3);font-size:11px}
+.mbtn{height:34px;padding:0 8px;border-radius:7px;border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--txt2);font-size:10px;font-weight:700;cursor:pointer;transition:.15s}
+.mbtn-s{background:rgba(62,124,255,.1);border-color:rgba(62,124,255,.3);color:var(--blue2)}
+.mbtn-t{background:rgba(34,211,165,.08);border-color:rgba(34,211,165,.2);color:var(--green)}
+.mbtn-d{background:rgba(255,107,120,.08);border-color:rgba(255,107,120,.2);color:var(--red)}
+.cbadge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px}
+.cb-ok{background:rgba(34,211,165,.1);color:var(--green);border:1px solid rgba(34,211,165,.25)}
+.cb-err{background:rgba(255,107,120,.1);color:var(--red);border:1px solid rgba(255,107,120,.25)}
+.cb-none{background:rgba(255,255,255,.04);color:var(--txt3);border:1px solid var(--line)}
+.mst-row{display:flex;align-items:center;gap:8px;margin-top:5px}
+.api-info{font-size:11px;color:var(--txt3);padding:8px 10px;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:8px;line-height:1.6}
+.api-res{margin-top:10px;padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg3);color:var(--txt2);font-size:11px;min-height:34px;line-height:1.6}
+
+/* ══ 토스트 ══ */
+.toast{position:fixed;bottom:20px;right:20px;z-index:2000;background:#fff;border:1px solid var(--line2);color:var(--txt);border-radius:10px;padding:11px 16px;font-size:13px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,.12);transform:translateX(130%);transition:transform .3s cubic-bezier(.22,1,.36,1)}
+.toast.show{transform:translateX(0)}
+.toast.ok{border-color:rgba(5,150,105,.3);color:#065f46;background:#f0fdf4}
+.toast.err{border-color:rgba(239,68,68,.3);color:#b91c1c;background:#fef2f2}
+
+/* 법적고지 모달 */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal-bg.open{display:flex}
+.modal{width:min(500px,94vw);background:#08111f;border:1px solid var(--line2);border-radius:15px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:fadeUp .2s ease}
+.modal-hdr{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line);background:var(--bg2)}
+.modal-t{font-size:13px;font-weight:700;color:var(--red)}
+.modal-body{padding:16px}
+.legal-box{background:rgba(255,107,120,.06);border:1px solid rgba(255,107,120,.2);border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--txt2);line-height:1.7}
+.chk-row{display:flex;align-items:flex-start;gap:9px;margin-bottom:9px;cursor:pointer}
+.chk-row input{width:15px;height:15px;flex-shrink:0;margin-top:1px;accent-color:var(--blue)}
+.chk-lbl{font-size:12px;color:var(--txt2);line-height:1.6}
+.chk-lbl strong{color:var(--txt)}
+.agree-btn{width:100%;height:42px;border-radius:9px;background:linear-gradient(135deg,var(--blue3),var(--blue));border:none;color:#fff;font-weight:700;font-size:13px;cursor:pointer;transition:.15s;opacity:.4;pointer-events:none}
+.agree-btn.active{opacity:1;pointer-events:auto}
+.agree-btn.active:hover{filter:brightness(1.08)}
+.mbtn-x{width:26px;height:26px;border-radius:7px;border:1px solid var(--line2);background:transparent;color:var(--txt2);font-size:12px;display:grid;place-items:center;cursor:pointer;transition:.15s}
+.mbtn-x:hover{border-color:var(--red);color:var(--red)}
+
+/* ══ 시작 팝업 오버레이 ══ */
+#startPopupOverlay{
+  position:fixed;inset:0;z-index:99999;
+  background:rgba(0,0,0,.82);
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(5px);
+  animation:fadeIn .3s ease;
+}
+@keyframes popSlideIn{from{opacity:0;transform:translateY(-24px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.sp-wrap{
+  display:flex;gap:14px;
+  width:min(1140px,96vw);
+  height:min(88vh,820px);
+  animation:popSlideIn .4s cubic-bezier(.22,1,.36,1);
+}
+.sp-card{
+  flex:1;min-width:0;
+  background:#08111f;
+  border:1px solid var(--line2);
+  border-radius:16px;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  box-shadow:0 24px 60px rgba(0,0,0,.7);
+}
+.sp-card-hdr{
+  height:46px;padding:0 16px;
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--line);
+  background:var(--bg2);flex-shrink:0;
+}
+.sp-card-hdr-title{font-size:13px;font-weight:700;color:var(--txt);flex:1}
+.sp-iframe{flex:1;border:none;width:100%;display:block;background:var(--bg)}
+.sp-footer{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  display:flex;gap:10px;z-index:100000;
+}
+.sp-start-btn{
+  height:46px;padding:0 36px;border-radius:12px;
+  background:linear-gradient(135deg,#0a2a60,#1a50f0,#3e7cff);
+  border:none;color:#fff;font-size:15px;font-weight:700;
+  cursor:pointer;letter-spacing:.5px;transition:.15s;
+  box-shadow:0 6px 22px rgba(62,124,255,.4);
+  font-family:'Noto Sans KR',sans-serif;
+}
+.sp-start-btn:hover{filter:brightness(1.1);transform:translateY(-2px)}
+.sp-close-btn{
+  height:46px;padding:0 22px;border-radius:12px;
+  border:1px solid rgba(255,107,120,.35);
+  background:rgba(255,107,120,.1);
+  color:var(--red);font-size:14px;font-weight:700;
+  cursor:pointer;transition:.15s;
+  font-family:'Noto Sans KR',sans-serif;
+}
+.sp-close-btn:hover{background:rgba(255,107,120,.22)}
+
+/* 팝업 전용 */
+html,body{height:100%;overflow:hidden}
+.wrap{display:flex;flex-direction:column;height:100vh}
+.hdr{height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0}
+.hdr-logo{font-size:15px;font-weight:900;color:var(--blue);letter-spacing:1px}
+.hdr-sep{width:1px;height:18px;background:var(--line)}
+.hdr-title{font-size:14px;font-weight:700;color:var(--txt)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+.hbtn{height:30px;padding:0 11px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;transition:.15s}
+.hbtn:hover{border-color:var(--blue2);color:var(--blue2)}
+.hbtn.close{border-color:rgba(239,68,68,.3);color:var(--red)}
+.hbtn.close:hover{background:rgba(239,68,68,.08)}
+.hbtn.active{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.3);color:var(--blue2)}
+.tabs{display:flex;gap:2px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0}
+.tab{height:40px;padding:0 16px;font-size:13px;font-weight:700;color:var(--txt3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:.15s;display:flex;align-items:center;gap:7px}
+.tab:hover{color:var(--txt2)}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+.tab-view{display:none;flex:1;overflow:hidden;flex-direction:column}
+.tab-view.on{display:flex}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <span class="hdr-logo">G-DSP</span>
+    <div class="hdr-sep"></div>
+    <span class="hdr-title">📐 도면 · 변환</span>
+    <div class="hdr-right">
+      <button class="hbtn" id="themeBtn" onclick="toggleTheme()">🌙 다크</button>
+      <button class="hbtn close" onclick="window.close()">✕ 닫기</button>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab on" id="tab-dxf" onclick="switchTab('dxf')">
+      <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      DXF 수량산출
+    </button>
+    <button class="tab" id="tab-conv" onclick="switchTab('conv')">
+      <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+      공간정보 변환
+    </button>
+  </div>
+
+  <div class="tab-view on" id="view-dxf-tab">
+    <!-- ③ DXF -->
+    <div id="dxf-wrap" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <div style="padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;gap:6px">
+        <svg style="width:13px;height:13px;color:var(--txt2)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span style="font-size:12px;font-weight:700;color:var(--txt2)">도면 수량산출</span>
+        <div style="margin-left:auto;display:flex;gap:4px">
+          <button id="dxf_fitBtn" onclick="dxfResetView()" class="grbtn" style="display:none;height:22px">화면맞춤</button>
+          <button id="dxf_calibToggle" onclick="dxfToggleCalib()" class="grbtn" style="display:none;height:22px">보정</button>
+          <button id="dxf_csvBtn" onclick="dxfExportCSV()" class="grbtn" style="display:none;height:22px;color:var(--green);border-color:rgba(34,211,165,.3)">CSV</button>
+          <button onclick="dxfExportPDF()" class="grbtn" style="height:22px;color:var(--blue2);border-color:rgba(62,124,255,.3)">PDF</button>
+          <button onclick="dxfExportDXFResult()" class="grbtn" style="height:22px;color:var(--purple);border-color:rgba(167,139,250,.3)">DXF저장</button>
+        </div>
+      </div>
+      <div class="dxf-warn">⚠ 꺾인선·복합구간 셀프측정 실측 필수 — 결과는 참고용 · 면적 산정 불가</div>
+      <div class="dxf-shell">
+        <div class="dxf-side">
+          <!-- 단위 + 분류 -->
+          <div style="margin-bottom:8px">
+            <div class="dxf-sbt">단위</div>
+            <div style="display:flex;gap:3px">
+              <button id="dxf_unitMM" onclick="dxfSetUnit('mm')" class="grbtn on" style="flex:1;height:24px">mm</button>
+              <button id="dxf_unitM"  onclick="dxfSetUnit('m')"  class="grbtn"    style="flex:1;height:24px">m</button>
+            </div>
+          </div>
+          <div style="margin-bottom:8px">
+            <div class="dxf-sbt">분류 기준</div>
+            <div style="display:flex;gap:3px">
+              <button id="dxf_modeColor" onclick="dxfSetMode('color')" class="grbtn on" style="flex:1;height:24px;font-size:10px">색상</button>
+              <button id="dxf_modeLayer" onclick="dxfSetMode('layer')" class="grbtn"    style="flex:1;height:24px;font-size:10px">레이어</button>
+            </div>
+          </div>
+          <div style="margin-bottom:8px">
+            <div class="dxf-sbt">옵션</div>
+            <div style="display:flex;flex-wrap:wrap;gap:3px">
+              <button id="dxf_optLtype"    onclick="dxfToggleOpt('ltype',this)"    class="grbtn on" style="font-size:9px;height:21px;padding:0 5px">선종류</button>
+              <button id="dxf_optText"     onclick="dxfToggleOpt('text',this)"     class="grbtn on" style="font-size:9px;height:21px;padding:0 5px">문자</button>
+              <button id="dxf_optDashLine" onclick="dxfToggleOpt('dashLine',this)" class="grbtn on" style="font-size:9px;height:21px;padding:0 5px">점선</button>
+              <button id="dxf_optLegend"   onclick="dxfToggleOpt('legend',this)"   class="grbtn" style="font-size:9px;height:21px;padding:0 5px">범례</button>
+            </div>
+          </div>
+          <div style="margin-bottom:9px"><div class="dxf-sbt">파일 업로드</div>
+            <div class="dxf-upz" ondrop="dxfHandleDrop(event)" ondragover="event.preventDefault()">
+              <input type="file" accept=".dxf" onchange="dxfLoadFile(event)">
+              <svg style="width:24px;height:24px;color:var(--txt3);margin:0 auto 5px;display:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <div style="font-size:11px;color:var(--txt2);font-weight:700">클릭 또는 드래그</div>
+              <div style="font-size:10px;color:var(--txt3);margin-top:2px">.dxf 파일</div>
+            </div>
+          </div>
+
+          <div><div class="dxf-sbt">수량 목록</div>
+            <div id="dxf_sumList" style="display:flex;flex-direction:column;gap:2px;max-height:200px;overflow-y:auto;scrollbar-width:thin"></div>
+          </div>
+          <div id="dxf_calibPanel" style="display:none;margin-top:8px;background:rgba(241,198,91,.05);border:1px solid rgba(241,198,91,.2);border-radius:9px;padding:9px">
+            <div class="dxf-sbt" style="color:var(--gold)">길이 보정</div>
+            <button onclick="dxfApplyMmToM()" class="grbtn" style="width:100%;height:24px;font-size:10px;margin-bottom:5px;color:var(--gold);border-color:rgba(241,198,91,.3)">mm→m 자동보정</button>
+            <div style="display:flex;gap:3px;align-items:center;margin-bottom:3px">
+              <span style="font-size:10px;color:var(--txt3)">실제</span>
+              <input type="number" id="dxf_calibInput" placeholder="42.0" style="flex:1;height:24px;padding:0 6px;background:var(--bg2);border:1px solid var(--line2);border-radius:5px;color:var(--txt);font-size:11px;outline:none">
+              <span style="font-size:10px;color:var(--txt3)">m</span>
+            </div>
+            <div style="font-size:10px;color:var(--txt2);margin-bottom:4px" id="dxf_calibRes">기준선 클릭</div>
+            <div style="display:flex;gap:3px">
+              <button onclick="dxfApplyCalib()"  class="grbtn" style="flex:1;height:24px;font-size:10px;color:var(--green);border-color:rgba(34,211,165,.3)">적용</button>
+              <button onclick="dxfCancelCalib()" class="grbtn" style="flex:1;height:24px;font-size:10px">취소</button>
+            </div>
+          </div>
+          <div id="dxf_smPanel" style="display:none;margin-top:8px;background:rgba(0,240,255,.05);border:1px solid rgba(0,240,255,.18);border-radius:9px;padding:9px">
+            <div class="dxf-sbt">셀프측정</div>
+            <div id="dxf_smSegList" style="max-height:90px;overflow-y:auto;margin-bottom:4px;scrollbar-width:thin"></div>
+            <button onclick="dxfStopSelfMeasure()" class="grbtn" style="width:100%;height:24px;font-size:10px;color:var(--red);border-color:rgba(255,107,120,.3)">측정 종료</button>
+          </div>
+          <div id="dxf_selPanel" style="display:none;margin-top:8px;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:9px;padding:9px">
+            <div class="dxf-sbt" id="dxf_selTit">선택</div>
+            <div style="font-size:20px;font-weight:900;color:var(--green);margin-bottom:2px" id="dxf_selTotal">0.000 m</div>
+            <div style="font-size:10px;color:var(--txt3)" id="dxf_selCount">0개</div>
+            <button id="dxf_smBtn" onclick="dxfStartSelfMeasure()" class="grbtn" style="width:100%;height:24px;font-size:10px;margin-top:5px">셀프측정</button>
+          </div>
+        </div>
+        <div class="dxf-cw" id="dxf_canvasWrap">
+          <canvas id="dxf_canvas" style="position:absolute;top:0;left:0"></canvas>
+          <div id="dxf_empty" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--txt3)">
+            <svg style="width:48px;height:48px;opacity:.12;margin-bottom:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div style="font-size:13px;font-weight:700;color:var(--txt2)">DXF 파일을 업로드하세요</div>
+            <div style="font-size:11px;margin-top:4px;opacity:.6">좌측 업로드 또는 드래그 앤 드롭</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="tab-view" id="view-conv-tab">
+    <div id="conv-wrap" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <div class="panel-hdr">
+        <svg style="width:14px;height:14px;color:var(--orange)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+        <span class="panel-hdr-title">공간정보 파일 변환</span>
+      </div>
+      <div class="conv-view">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="conv-card">
+            <div class="conv-t">좌표계 선택</div>
+            <select class="conv-select" id="convFrom"><option>GRS80 (TM 중부)</option><option>WGS84 (GPS)</option><option>EPSG:5186</option><option>EPSG:5174</option><option>EPSG:4326</option></select>
+            <div style="font-size:10px;color:var(--txt3);text-align:center;margin:5px 0">→ 변환</div>
+            <select class="conv-select" id="convTo"><option>WGS84 (GPS)</option><option>GRS80 (TM 중부)</option><option>EPSG:5186</option><option>EPSG:4326</option></select>
+          </div>
+          <div class="conv-card">
+            <div class="conv-t">DXF 파일 업로드</div>
+            <div class="conv-upz" ondragover="event.preventDefault()">
+              <input type="file" accept=".dxf,.shp,.geojson">
+              <svg style="width:28px;height:28px;color:var(--txt3);margin:0 auto 6px;display:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <div style="font-size:11px;color:var(--txt2);font-weight:700">DXF / SHP / GeoJSON</div>
+              <div style="font-size:10px;color:var(--txt3);margin-top:2px">드래그 또는 클릭</div>
+            </div>
+            <button onclick="toast('좌표계 변환: 서버 연동 개발 예정입니다')" class="gbtn" style="margin-top:8px">변환 실행</button>
+          </div>
+          <div class="conv-card" style="grid-column:1/3">
+            <div class="conv-t">결과 미리보기</div>
+            <div class="conv-preview">변환 후 결과 지도 미리보기</div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <button onclick="toast('DXF 결과 저장 — 변환 후 활성화됩니다')" class="gbtn-out" style="flex:1;height:30px">결과물 저장</button>
+              <button onclick="toast('저장 위치 열기 — 데스크탑 앱 연동 필요')" class="gbtn-out" style="flex:1;height:30px;opacity:.5;cursor:not-allowed">저장위치 열기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑦ 연락처 -->
+    <div class="view" id="view-con">
+
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('on');});
+  document.querySelectorAll('.tab-view').forEach(function(v){v.classList.remove('on');});
+  document.getElementById('tab-'+t).classList.add('on');
+  document.getElementById('view-'+t+'-tab').classList.add('on');
+  if(t==='dxf') setTimeout(function(){initDxfCanvas();},100);
+}
+function toggleTheme(){
+  var isDark=document.body.classList.toggle('dark');
+  document.getElementById('themeBtn').textContent=isDark?'☀️ 라이트':'🌙 다크';
+  localStorage.setItem('gdsp_theme',isDark?'dark':'light');
+}
+(function(){if(localStorage.getItem('gdsp_theme')==='dark'){document.body.classList.add('dark');var b=document.getElementById('themeBtn');if(b)b.textContent='☀️ 라이트';}})();
+var _tt;
+var _tt;
+
+function initDxfCanvas(){
+  var wrap=document.getElementById('dxf_canvasWrap');
+  var cv=document.getElementById('dxf_canvas');
+  if(wrap&&cv){cv.width=wrap.clientWidth;cv.height=wrap.clientHeight;}
+}
+try{
+function dxfSetUnit(u){
+  unitMode=u;
+  var _cl_dxf_unitMM=document.getElementById('dxf_unitMM');if(_cl_dxf_unitMM)_cl_dxf_unitMM.classList.toggle('on',u==='mm');
+  var _cl_dxf_unitM=document.getElementById('dxf_unitM');if(_cl_dxf_unitM)_cl_dxf_unitM.classList.toggle('on',u==='m');
+  document.getElementById('stUnit').textContent=u;
+  renderSidebar();updateSelInfo();updateSmPanel();
+}
+
+// rawLen = DXF 내부값 (mm 기준 가정)
+function dispLen(raw){
+  const v=useCalib?raw*calibFactor:raw;
+  if(unitMode==='m') return (v*0.001).toFixed(3)+' m';
+  return Math.round(v).toLocaleString()+' mm';
+}
+function dispLenM(raw){
+  const v=useCalib?raw*calibFactor:raw;
+  return (v*0.001).toFixed(3)+' m';
+}
+
+// ── 분류 모드 ─────────────────────────────────────
+function dxfSetMode(m){
+  groupMode=m;
+  var _cl_dxf_modeColor=document.getElementById('dxf_modeColor');if(_cl_dxf_modeColor)_cl_dxf_modeColor.classList.toggle('on',m==='color');
+  var _cl_dxf_modeLayer=document.getElementById('dxf_modeLayer');if(_cl_dxf_modeLayer)_cl_dxf_modeLayer.classList.toggle('on',m==='layer');
+  selKey=null;xEnts=new Set();
+  buildGroups();renderSidebar();drawAll();
+  var _cl_selinfo=document.getElementById('selinfo');if(_cl_selinfo)_cl_selinfo.classList.remove('show');
+}
+
+function gKey(e){
+  if(groupMode==='layer') return 'L::'+e.lay;
+  if(!opts.ltype) return 'C::'+e.color;
+  return 'C::'+e.color+'::'+e.ltype;
+}
+  return Math.round(v).toLocaleString()+' mm';
+}
+function dispLenM(raw){
+  const v=useCalib?raw*calibFactor:raw;
+  return (v*0.001).toFixed(3)+' m';
+}
+
+// ── 분류 모드 ─────────────────────────────────────
+function dxfSetMode(m){
+  groupMode=m;
+  var _cl_dxf_modeColor=document.getElementById('dxf_modeColor');if(_cl_dxf_modeColor)_cl_dxf_modeColor.classList.toggle('on',m==='color');
+  var _cl_dxf_modeLayer=document.getElementById('dxf_modeLayer');if(_cl_dxf_modeLayer)_cl_dxf_modeLayer.classList.toggle('on',m==='layer');
+  selKey=null;xEnts=new Set();
+  buildGroups();renderSidebar();drawAll();
+  var _cl_selinfo=document.getElementById('selinfo');if(_cl_selinfo)_cl_selinfo.classList.remove('show');
+}
+
+function gKey(e){
+  if(groupMode==='layer') return 'L::'+e.lay;
+  if(!opts.ltype) return 'C::'+e.color;
+  return 'C::'+e.color+'::'+e.ltype;
+}
+
+// ── DXF 파서 ─────────────────────────────────────
+function parseDXF(txt){
+  const lines=txt.split(/\r?\n/),res=[],layC={},layLT={};
+  let i=0;
+  while(i<lines.length){
+    if(lines[i].trim()==="AcDbLayerTableRecord"){
+      let nm=null,cl=null,lt=null;i++;
+      while(i<lines.length){
+        const c=lines[i].trim(),v=lines[i+1]?.trim();
+        if(c==="0")break;
+        if(c==="2")nm=v;if(c==="62")cl=parseInt(v);if(c==="6")lt=v;i+=2;
+      }
+      if(nm){layC[nm]=cl;layLT[nm]=lt||"CONTINUOUS";}
+    }else i+=2;
+  }
+  i=0;
+  function rdEnt(et){
+    let lay="0",cl=null,lt=null;
+    const data={};
+    while(i<lines.length){
+      const c=lines[i]?.trim(),v=lines[i+1]?.trim();
+      if(c==="0")break;
+      if(c==="8")lay=v;else if(c==="62")cl=parseInt(v);else if(c==="6")lt=v;
+      else data[c]=(data[c]||[]); data[c].push(v);
+      i+=2;
+    }
+    const fc=(cl&&cl!==256)?cl:(layC[lay]||7);
+    const flt=(lt&&lt!=="BYLAYER")?lt:(layLT[lay]||"CONTINUOUS");
+    return{lay,fc,flt,data};
+  }
+  while(i<lines.length){
+    const code=lines[i]?.trim();
+    if(code!=="0"){i+=2;continue;}
+    const et=lines[i+1]?.trim();i+=2;
+    if(et==="LINE"){
+      let lay="0",cl=null,lt=null,x1,y1,x2,y2;
+      while(i<lines.length){
+        const c=lines[i]?.trim(),v=lines[i+1]?.trim();if(c==="0")break;
+        if(c==="8")lay=v;else if(c==="62")cl=parseInt(v);else if(c==="6")lt=v;
+        else if(c==="10")x1=parseFloat(v);else if(c==="20")y1=parseFloat(v);
+        else if(c==="11")x2=parseFloat(v);else if(c==="21")y2=parseFloat(v);
+        i+=2;
+      }
+      if(x1!=null&&x2!=null){
+        const fc=(cl&&cl!==256)?cl:(layC[lay]||7);
+        const flt=(lt&&lt!=="BYLAYER")?lt:(layLT[lay]||"CONTINUOUS");
+        res.push({id:res.length,et:"LINE",lay,color:fc,ltype:flt,x1,y1,x2,y2,length:Math.sqrt((x2-x1)**2+(y2-y1)**2)});
+      }
+    }else if(et==="LWPOLYLINE"){
+      let lay="0",cl=null,lt=null,pts=[],closed=false;
+      while(i<lines.length){
+        const c=lines[i]?.trim(),v=lines[i+1]?.trim();if(c==="0")break;
+        if(c==="8")lay=v;else if(c==="62")cl=parseInt(v);else if(c==="6")lt=v;
+        else if(c==="70"){try{if(parseInt(v)&1)closed=true;}catch(e){}}
+        else if(c==="10")pts.push([parseFloat(v),0]);
+        else if(c==="20"){if(pts.length)pts[pts.length-1][1]=parseFloat(v);}
+        i+=2;
+      }
+      if(pts.length>=2){
+        const fc=(cl&&cl!==256)?cl:(layC[lay]||7);
+        const flt=(lt&&lt!=="BYLAYER")?lt:(layLT[lay]||"CONTINUOUS");
+        let len=0;
+        for(let j=0;j<pts.length-1;j++)len+=Math.sqrt((pts[j+1][0]-pts[j][0])**2+(pts[j+1][1]-pts[j][1])**2);
+        if(closed)len+=Math.sqrt((pts[0][0]-pts[pts.length-1][0])**2+(pts[0][1]-pts[pts.length-1][1])**2);
+        res.push({id:res.length,et:"LWPOLYLINE",lay,color:fc,ltype:flt,pts,closed,length:len});
+      }
+    }else if(et==="ARC"){
+      let lay="0",cl=null,lt=null,cx=0,cy=0,r=0,sa=0,ea=0;
+      while(i<lines.length){
+        const c=lines[i]?.trim(),v=lines[i+1]?.trim();if(c==="0")break;
+        if(c==="8")lay=v;else if(c==="62")cl=parseInt(v);else if(c==="6")lt=v;
+        else if(c==="10")cx=parseFloat(v);else if(c==="20")cy=parseFloat(v);
+        else if(c==="40")r=parseFloat(v);else if(c==="50")sa=parseFloat(v);else if(c==="51")ea=parseFloat(v);
+        i+=2;
+      }
+      const fc=(cl&&cl!==256)?cl:(layC[lay]||7);
+      const flt=(lt&&lt!=="BYLAYER")?lt:(layLT[lay]||"CONTINUOUS");
+      let ang=ea-sa;if(ang<=0)ang+=360;
+      res.push({id:res.length,et:"ARC",lay,color:fc,ltype:flt,cx,cy,r,sa,ea,length:r*(ang*Math.PI/180)});
+    }else if(et==="INSERT"){
+      let lay="0",cl=null,x=0,y=0,blockName="";
+      while(i<lines.length){
+        const c=lines[i]?.trim(),v=lines[i+1]?.trim();if(c==="0")break;
+        if(c==="8")lay=v;else if(c==="62")cl=parseInt(v);
+        else if(c==="2")blockName=v;
+        else if(c==="10")x=parseFloat(v);else if(c==="20")y=parseFloat(v);
+        i+=2;
+      }
+      const fc=(cl&&cl!==256)?cl:(layC[lay]||7);
+      res.push({id:res.length,et:"INSERT",lay,color:fc,ltype:"CONTINUOUS",x,y,length:0,blockName});
+    }else if(et==="CIRCLE"){
+      let lay="0",cl=null,cx=0,cy=0,r=0;
+      while(i<lines.length){
+        const c=lines[i]?.trim(),v=lines[i+1]?.trim();if(c==="0")break;
+        if(c==="8")lay=v;else if(c==="62")cl=parseInt(v);
+        else if(c==="10")cx=parseFloat(v);else if(c==="20")cy=parseFloat(v);else if(c==="40")r=parseFloat(v);
+        i+=2;
+      }
+      const fc=(cl&&cl!==256)?cl:(layC[lay]||7);
+      res.push({id:res.length,et:"CIRCLE",lay,color:fc,ltype:"CONTINUOUS",cx,cy,r,length:0});
+    }else if(et==="TEXT"||et==="MTEXT"){
+      let lay="0",cl=null,x=0,y=0,txt="",h=2.5;
+      while(i<lines.length){
+        const c=lines[i]?.trim(),v=lines[i+1]?.trim();if(c==="0")break;
+        if(c==="8")lay=v;else if(c==="62")cl=parseInt(v);
+        else if(c==="10")x=parseFloat(v);else if(c==="20")y=parseFloat(v);
+        else if(c==="1")txt=v;else if(c==="40")h=parseFloat(v);
+        i+=2;
+      }
+      const fc=(cl&&cl!==256)?cl:(layC[lay]||7);
+      res.push({id:res.length,et:"TEXT",lay,color:fc,ltype:"CONTINUOUS",x,y,text:txt,height:h,length:0});
+    }else i+=2;
+  }
+  return res;
+}
+
+// ── 그룹 빌드 ─────────────────────────────────────
+function buildGroups(){
+  groups={};
+  for(const e of ents){
+    if(isSkipLayer(e.lay))continue;
+    const k=gKey(e);
+    if(!groups[k])groups[k]={key:k,color:e.color,ltype:e.ltype,lay:e.lay,hex:aciHex(e.color),ents:[],totalLen:0,symCnt:0,blockMap:{}};
+    groups[k].ents.push(e);
+    if(!xEnts.has(e.id)){
+      groups[k].totalLen+=e.length||0;
+      const bn=(e.blockName||"").toUpperCase();
+      const isArr=bn.includes("ARROW")||bn.includes("LEADER")||bn.includes("SYM_ARROW");
+      if(e.et==="INSERT"&&!isArr){
+        groups[k].symCnt++;
+        const bname=e.blockName||"(unnamed)";
+        groups[k].blockMap[bname]=(groups[k].blockMap[bname]||0)+1;
+      }
+      if(e.et==="CIRCLE"){
+        groups[k].symCnt++;
+        groups[k].blockMap["⊙ CIRCLE"]=(groups[k].blockMap["⊙ CIRCLE"]||0)+1;
+      }
+    }
+  }
+}
+
+// ── 파일 로드 ─────────────────────────────────────
+function dxfLoadFile(ev){
+  const file=ev.target?.files?.[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    let text;
+    try{text=new TextDecoder("euc-kr").decode(new Uint8Array(e.target.result));}
+    catch(err){text=new TextDecoder("utf-8").decode(new Uint8Array(e.target.result));}
+    processFile(file.name,text);
+  };
+  r.readAsArrayBuffer(file);
+}
+function dxfHandleDrop(e){e.preventDefault();const f=e.dataTransfer.files[0];if(f)dxfLoadFile({target:{files:[f]}});}
+function processFile(name,text){
+  ents=parseDXF(text);xEnts=new Set();hiddenKeys=new Set();selKey=null;
+  calibFactor=1.0;useCalib=false;
+  buildGroups();calcBounds();dxfResetView();renderSidebar();drawAll();
+  document.getElementById("stF").textContent=name;
+  document.getElementById("stC").textContent=ents.length;
+  ["calibToggle","fitBtn","csvBtn","smBtn"].forEach(id=>document.getElementById(id).style.display="inline-flex");
+}
+function dxfToggleOpt(key,btn){opts[key]=!opts[key];btn.classList.toggle("on",opts[key]);buildGroups();renderSidebar();drawAll();}
+
+// ── 보정 ─────────────────────────────────────────
+function dxfToggleCalib(){
+  calibMode=!calibMode;
+  var _cl_calibPanel=document.getElementById("calibPanel");if(_cl_calibPanel)_cl_calibPanel.classList.toggle("show",calibMode);
+  var _cl_calibToggle=document.getElementById("calibToggle");if(_cl_calibToggle)_cl_calibToggle.classList.toggle("on",calibMode);
+  if(!calibMode){calibPending=null;document.getElementById("calibRes").textContent="기준선을 클릭하세요";}
+}
+function dxfApplyMmToM(){
+  useCalib=true;calibFactor=1.0;
+  var _ds_stCalibWrap=document.getElementById("stCalibWrap");if(_ds_stCalibWrap)_ds_stCalibWrap.style.display="inline";
+  document.getElementById("stCalib").textContent="mm→m(÷1000)";
+  var _cl_calibPanel=document.getElementById("calibPanel");if(_cl_calibPanel)_cl_calibPanel.classList.remove("show");
+  var _cl_calibToggle=document.getElementById("calibToggle");if(_cl_calibToggle)_cl_calibToggle.classList.remove("on");
+  calibMode=false;calibPending=null;
+  renderSidebar();updateSelInfo();updateSmPanel();
+}
+function dxfApplyCalib(){
+  if(!calibPending){alert("기준선을 먼저 클릭하세요.");return;}
+  const real=parseFloat(document.getElementById("calibInput").value);
+  if(!real||real<=0){alert("실제 길이를 입력하세요.");return;}
+  calibFactor=real/(calibPending.length*0.001);
+  useCalib=true;
+  var _ds_stCalibWrap=document.getElementById("stCalibWrap");if(_ds_stCalibWrap)_ds_stCalibWrap.style.display="inline";
+  document.getElementById("stCalib").textContent=calibFactor.toFixed(4);
+  calibMode=false;
+  document.getElementById("calibPanel").classList.remove("show");
+  document.getElementById("calibToggle").classList.remove("on");
+  calibPending=null;
+  renderSidebar();updateSelInfo();
+}
+function dxfCancelCalib(){
+  calibMode=false;
+  document.getElementById("calibPanel").classList.remove("show");
+  document.getElementById("calibToggle").classList.remove("on");
+  calibPending=null;
+}
+
+// ── 셀프 측정 ─────────────────────────────────────
+let smMode=false,smSegs=[],smPts=[],smMouseXY=null,smBadgeHits=[];
+
+function dxfStartSelfMeasure(){
+  smMode=true;smSegs=[];smPts=[];smMouseXY=null;smBadgeHits=[];
+  var _cl_dxf_smPanel=document.getElementById('dxf_smPanel');if(_cl_dxf_smPanel)_cl_dxf_smPanel.classList.add('show');
+  var _cl_dxf_smBtn=document.getElementById('dxf_smBtn');if(_cl_dxf_smBtn)_cl_dxf_smBtn.classList.add('on');
+  var _fc=document.getElementById('fg');if(_fc)_fc.style.cursor='cell';
+  updateSmPanel();drawAll();
+}
+function dxfStopSelfMeasure(){
+  if(smPts.length>=2)smConfirmSeg();
+  smMode=false;smPts=[];smMouseXY=null;smBadgeHits=[];
+  var _cl_dxf_smPanel=document.getElementById('dxf_smPanel');if(_cl_dxf_smPanel)_cl_dxf_smPanel.classList.remove('show');
+  document.getElementById('dxf_smBtn')?.classList.remove('on');
+  var _fc=document.getElementById('fg');if(_fc)_fc.style.cursor='crosshair';
+  drawAll();
+}
+function smClear(){smSegs=[];smPts=[];smMouseXY=null;updateSmPanel();drawAll();}
+function smDelSeg(i){smSegs.splice(i,1);updateSmPanel();drawAll();}
+
+function snapToEnt(e,wx,wy){
+  const thr=15/tf.sc;
+  if(e.et==='LINE'){
+    if(dist(wx,wy,e.x1,e.y1)<thr)return{x:e.x1,y:e.y1};
+    if(dist(wx,wy,e.x2,e.y2)<thr)return{x:e.x2,y:e.y2};
+    const dx=e.x2-e.x1,dy=e.y2-e.y1,l2=dx*dx+dy*dy;
+    if(l2===0)return{x:e.x1,y:e.y1};
+    let t=((wx-e.x1)*dx+(wy-e.y1)*dy)/l2;t=Math.max(0,Math.min(1,t));
+    return{x:e.x1+t*dx,y:e.y1+t*dy};
+  }else if(e.et==='LWPOLYLINE'){
+    for(const p of e.pts)if(dist(wx,wy,p[0],p[1])<thr)return{x:p[0],y:p[1]};
+    let best={x:wx,y:wy},minD=Infinity;
+    for(let j=0;j<e.pts.length-1;j++){
+      const ax=e.pts[j][0],ay=e.pts[j][1],bx=e.pts[j+1][0],by=e.pts[j+1][1];
+      const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;
+      let t=l2>0?((wx-ax)*dx+(wy-ay)*dy)/l2:0;t=Math.max(0,Math.min(1,t));
+      const px=ax+t*dx,py=ay+t*dy,d=dist(wx,wy,px,py);
+      if(d<minD){minD=d;best={x:px,y:py};}
+    }
+    return best;
+  }
+  return{x:wx,y:wy};
+}
+function dist(ax,ay,bx,by){return Math.sqrt((ax-bx)**2+(ay-by)**2);}
+
+function followPolyline(ent,sp,ep){
+  if(ent.et==='LINE')return[sp,ep];
+  if(ent.et!=='LWPOLYLINE')return[sp,ep];
+  const pts=ent.pts;
+  function si(pt){let b=0,m=Infinity;for(let j=0;j<pts.length-1;j++){const d=d2seg(pt.x,pt.y,pts[j][0],pts[j][1],pts[j+1][0],pts[j+1][1]);if(d<m){m=d;b=j;}}return b;}
+  const s=si(sp),e=si(ep);
+  const r=[sp];
+  if(s<e)for(let j=s+1;j<=e;j++)r.push({x:pts[j][0],y:pts[j][1]});
+  else if(s>e)for(let j=s;j>e;j--)r.push({x:pts[j][0],y:pts[j][1]});
+  r.push(ep);return r;
+}
+
+function smConfirmSeg(){
+  if(smPts.length<2){smPts=[];drawAll();return;}
+  let fp=[];
+  for(let i=0;i<smPts.length-1;i++){
+    const A=smPts[i],B=smPts[i+1];
+    if(A.ent&&B.ent&&A.ent.id===B.ent.id){
+      const seg=followPolyline(A.ent,A.pt,B.pt);
+      if(i===0)fp.push(...seg);else fp.push(...seg.slice(1));
+    }else{if(i===0)fp.push(A.pt);fp.push(B.pt);}
+  }
+  let len=0;
+  for(let i=0;i<fp.length-1;i++){const dx=fp[i+1].x-fp[i].x,dy=fp[i+1].y-fp[i].y;len+=Math.sqrt(dx*dx+dy*dy);}
+  smSegs.push({pts:fp,len});smPts=[];updateSmPanel();
+}
+
+function handleSmClick(wx,wy){
+  const thr=Math.max(14/tf.sc,6);
+  for(const bh of smBadgeHits){if(dist(wx,wy,bh.wx,bh.wy)<thr){smDelSeg(bh.segIdx);return;}}
+  const hit=findNearest(wx,wy,thr);
+  const pt=hit?snapToEnt(hit,wx,wy):{x:wx,y:wy};
+  smPts.push({pt,ent:hit||null});
+  document.getElementById('smHint').textContent=smPts.length===1?'끝점 클릭 (경유점 여러개 가능) → 우클릭 구간확정':`${smPts.length}점 입력됨 → 우클릭으로 구간확정`;
+  updateSmPanel();drawAll();
+}
+function handleSmMove(wx,wy){
+  smMouseXY={x:wx,y:wy};
+  const hit=findNearest(wx,wy,12/tf.sc);
+  if(hit)smMouseXY=snapToEnt(hit,wx,wy);
+  drawAll();
+}
+
+// X뱃지 — 확대 반응형, 주황색
+function drawXBadge(ctx,pt,color,segIdx){
+  const[sx,sy]=toScreen(pt.x,pt.y);
+  const r=Math.max(10,Math.min(18,tf.sc*0.015+10));
+  ctx.save();
+  ctx.shadowColor=color;ctx.shadowBlur=8;
+  ctx.strokeStyle='rgba(255,255,255,0.95)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(sx,sy,r+1.5,0,Math.PI*2);ctx.stroke();
+  ctx.shadowBlur=0;
+  ctx.fillStyle=color;
+  ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.fill();
+  const arm=r*0.52;
+  ctx.strokeStyle='#fff';ctx.lineWidth=2.5;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(sx-arm,sy-arm);ctx.lineTo(sx+arm,sy+arm);
+  ctx.moveTo(sx+arm,sy-arm);ctx.lineTo(sx-arm,sy+arm);ctx.stroke();
+  if(segIdx!==undefined){
+    const nb=r*0.65;
+    ctx.fillStyle='rgba(0,0,0,0.9)';
+    ctx.beginPath();ctx.arc(sx+r+1,sy-r-1,nb,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font=`bold ${Math.max(9,Math.round(nb*1.1))}px sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(segIdx+1,sx+r+1,sy-r-1);
+  }
+  ctx.restore();
+}
+
+function drawSmAll(){
+  smBadgeHits=[];
+  const ctx=document.getElementById('bg').getContext('2d');
+  for(let i=0;i<smSegs.length;i++){
+    const seg=smSegs[i];if(seg.pts.length<2)continue;
+    ctx.save();
+    ctx.strokeStyle='#4a9eff';ctx.lineWidth=3;ctx.setLineDash([]);
+    ctx.shadowColor='rgba(74,158,255,0.5)';ctx.shadowBlur=8;
+    ctx.beginPath();ctx.moveTo(...toScreen(seg.pts[0].x,seg.pts[0].y));
+    for(let j=1;j<seg.pts.length;j++)ctx.lineTo(...toScreen(seg.pts[j].x,seg.pts[j].y));
+    ctx.stroke();ctx.shadowBlur=0;ctx.restore();
+    // 끝점에만 X뱃지 (주황)
+    const ep=seg.pts[seg.pts.length-1];
+    drawXBadge(ctx,ep,'#ff8800',i);
+    smBadgeHits.push({wx:ep.x,wy:ep.y,segIdx:i});
+    // 중간 라벨 (크게)
+    const mid=seg.pts[Math.floor(seg.pts.length/2)];
+    const[mx,my]=toScreen(mid.x,mid.y);
+    const lbl=dispLen(seg.len);
+    ctx.save();
+    const fs=Math.max(14,Math.min(20,tf.sc*0.02+14));
+    ctx.font=`bold ${fs}px "Malgun Gothic"`;
+    const tw=ctx.measureText(lbl).width;
+    ctx.fillStyle='rgba(0,0,0,0.88)';
+    ctx.strokeStyle='#4a9eff';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.roundRect(mx+8,my-fs-5,tw+14,fs+10,5);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#4a9eff';ctx.textBaseline='top';
+    ctx.fillText(lbl,mx+15,my-fs);
+    ctx.restore();
+  }
+  if(smPts.length>0){
+    const prev=[...smPts.map(p=>p.pt)];
+    if(smMouseXY)prev.push(smMouseXY);
+    if(prev.length>=2){
+      ctx.save();
+      ctx.strokeStyle='#00ff88';ctx.lineWidth=2;ctx.setLineDash([8,5]);
+      ctx.shadowColor='rgba(0,255,136,0.4)';ctx.shadowBlur=4;
+      ctx.beginPath();ctx.moveTo(...toScreen(prev[0].x,prev[0].y));
+      for(let j=1;j<prev.length;j++)ctx.lineTo(...toScreen(prev[j].x,prev[j].y));
+      ctx.stroke();ctx.shadowBlur=0;ctx.setLineDash([]);ctx.restore();
+    }
+    smPts.forEach((p,idx)=>drawXBadge(ctx,p.pt,idx===0?'#00cc66':'#88ddff'));
+    if(smMouseXY&&smPts.length>=1){
+      const tmp=[...smPts.map(p=>p.pt),smMouseXY];
+      let cur=0;
+      for(let i=0;i<tmp.length-1;i++){const dx=tmp[i+1].x-tmp[i].x,dy=tmp[i+1].y-tmp[i].y;cur+=Math.sqrt(dx*dx+dy*dy);}
+      const[mx,my]=toScreen(smMouseXY.x,smMouseXY.y);
+      const lbl=dispLen(cur);
+      ctx.save();
+      const fs=Math.max(15,Math.min(22,tf.sc*0.022+15));
+      ctx.font=`bold ${fs}px "Malgun Gothic"`;
+      const tw=ctx.measureText(lbl).width;
+      ctx.fillStyle='rgba(0,0,0,0.9)';
+      ctx.strokeStyle='#00ff88';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.roundRect(mx+12,my-fs-6,tw+16,fs+12,5);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#00ff88';ctx.textBaseline='top';
+      ctx.fillText(lbl,mx+20,my-fs);
+      ctx.restore();
+    }
+  }
+}
+
+function updateSmPanel(){
+  const total=smSegs.reduce((s,seg)=>s+seg.len,0);
+  document.getElementById('smTotal').textContent=dispLen(total);
+  document.getElementById('smSub').textContent='= '+dispLenM(total);
+  document.getElementById('smSegs').innerHTML=smSegs.map((seg,i)=>`
+    <div class="sm-seg">
+      <span class="sm-seg-num">${i+1}</span>
+      <span class="sm-seg-len">${dispLen(seg.len)}</span>
+      <button class="sm-seg-del" onclick="smDelSeg(${i})">✕</button>
+    </div>`).join('');
+  if(smPts.length===0&&smSegs.length===0)document.getElementById('smHint').textContent='클릭으로 점 추가 → 우클릭 구간확정';
+}
+
+// ── 숨기기 ────────────────────────────────────────
+function ctxHideGroup(){
+  hideCtxMenu();
+  const key=ctxTargetKey||selKey;
+  if(key){hiddenKeys.add(key);if(selKey===key){selKey=null;xEnts=new Set();}buildGroups();renderSidebar();drawAll();updateHiddenBadge();}
+}
+function ctxShowAll(){hideCtxMenu();hiddenKeys=new Set();buildGroups();renderSidebar();drawAll();updateHiddenBadge();}
+function toggleHideKey(key){
+  if(hiddenKeys.has(key))hiddenKeys.delete(key);else hiddenKeys.add(key);
+  if(hiddenKeys.has(key)&&selKey===key){selKey=null;xEnts=new Set();}
+  buildGroups();renderSidebar();drawAll();updateHiddenBadge();
+}
+function updateHiddenBadge(){
+  const b=document.getElementById('hiddenBadge');
+  if(hiddenKeys.size>0){b.style.display='inline';b.textContent=`(숨김 ${hiddenKeys.size}개)`;}
+  else b.style.display='none';
+}
+
+// ── 클릭 ─────────────────────────────────────────
+function handleClick(ev){
+  if(!ents.length)return;
+  const rect=ev.target.getBoundingClientRect();
+  const sx=ev.clientX-rect.left,sy=ev.clientY-rect.top;
+  const[wx,wy]=toWorld(sx,sy);
+  if(smMode){handleSmClick(wx,wy);return;}
+  const hit=findNearest(wx,wy,10/tf.sc);if(!hit)return;
+  if(calibMode){calibPending=hit;document.getElementById("calibRes").textContent="선택: "+dispLen(hit.length)+" (DXF기준)";return;}
+  const k=gKey(hit);
+  if(hiddenKeys.has(k)){hiddenKeys.delete(k);buildGroups();renderSidebar();drawAll();updateHiddenBadge();return;}
+  if(selKey===k){
+    if(xEnts.has(hit.id))xEnts.delete(hit.id);else xEnts.add(hit.id);
+    buildGroups();renderSidebar();drawAll();updateSelInfo();
+  }else{
+    selKey=k;xEnts=new Set();buildGroups();renderSidebar();drawAll();updateSelInfo();
+  }
+}
+
+let ctxTargetKey=null;
+function handleRightClick(ev){
+  ev.preventDefault();
+  const rect=ev.target.getBoundingClientRect();
+  const wx=(ev.clientX-rect.left-tf.x)/tf.sc,wy=-(ev.clientY-rect.top-tf.y)/tf.sc;
+  const hit=findNearest(wx,wy,10/tf.sc);
+  ctxTargetKey=hit?gKey(hit):(selKey||null);
+  showCtxMenu(ev.clientX,ev.clientY);
+}
+function showCtxMenu(x,y){
+  const menu=document.getElementById('ctxMenu');
+  const inSM=smMode,hasPts=smPts.length>=2,hasPt1=smPts.length>=1;
+  const hasSel=!!(selKey||ctxTargetKey);
+  const items={
+    'ctx-sm-start':!inSM,'ctx-sm-stop':inSM,
+    'ctx-confirm':inSM&&hasPts,'ctx-undo':inSM&&hasPt1,
+    'ctx-sep1':true,'ctx-sep2':!inSM,
+    'ctx-hide':!inSM&&hasSel,
+    'ctx-showAll':!inSM&&hiddenKeys.size>0,
+    'ctx-clearsel':!inSM,
+  };
+  for(const[id,show]of Object.entries(items)){const el=document.getElementById(id);if(el)el.style.display=show?'flex':'none';}
+  const W=window.innerWidth,H=window.innerHeight,mw=155,mh=200;
+  menu.style.left=(x+mw>W?x-mw:x)+'px';
+  menu.style.top=(y+mh>H?y-mh:y)+'px';
+  menu.classList.add('show');
+}
+function hideCtxMenu(){var _cl_ctxMenu=document.getElementById('ctxMenu');if(_cl_ctxMenu)_cl_ctxMenu.classList.remove('show');}
+function ctxStartSM(){hideCtxMenu();dxfStartSelfMeasure();}
+function ctxStop(){hideCtxMenu();dxfStopSelfMeasure();}
+function ctxConfirm(){hideCtxMenu();smConfirmSeg();drawAll();}
+function ctxUndo(){hideCtxMenu();smPts.pop();updateSmPanel();drawAll();}
+function ctxClearSel(){hideCtxMenu();selKey=null;xEnts=new Set();buildGroups();renderSidebar();drawAll();document.getElementById('selinfo').classList.remove('show');}
+document.addEventListener('click',()=>hideCtxMenu());
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){hideCtxMenu();if(smMode)dxfStopSelfMeasure();}});
+
+// ── 선택정보 ─────────────────────────────────────
+function updateSelInfo(){
+  const info=document.getElementById("selinfo");
+  if(!selKey){info.classList.remove("show");return;}
+  const grp=groups[selKey];
+  if(!grp){info.classList.remove("show");return;}
+  info.classList.add("show");
+  document.getElementById("selTit").textContent=groupMode==='layer'?`레이어: ${grp.lay}`:`ACI-${grp.color} / ${grp.ltype}`;
+  document.getElementById("selLen").textContent=grp.totalLen>0.01?dispLen(grp.totalLen):'(길이없음)';
+  // 블록별 개수 표시
+  let mmTxt='';
+  if(grp.totalLen>0.01) mmTxt='= '+dispLenM(grp.totalLen);
+  const bd=Object.entries(grp.blockMap||{});
+  if(bd.length>0){
+    mmTxt+=(mmTxt?'<br>':'')+'<span style="color:var(--ac2);font-weight:700">⊕ 심볼 '+grp.symCnt+'개</span>';
+    if(bd.length>1) bd.forEach(([bn,cnt])=>{ mmTxt+=`<br><span style="font-size:10px;color:#aaa">· ${bn}: ${cnt}개</span>`; });
+  }
+  document.getElementById("selMm").innerHTML=mmTxt;
+}
+
+// ── 마우스 이동 ──────────────────────────────────
+function handleMove(ev){
+  if(!ents.length)return;
+  const rect=ev.target.getBoundingClientRect();
+  const sx=ev.clientX-rect.left,sy=ev.clientY-rect.top;
+  const[wx,wy]=toWorld(sx,sy);
+  if(smMode){handleSmMove(wx,wy);return;}
+  const hit=findNearest(wx,wy,10/tf.sc);
+  const tip=document.getElementById("tip");
+  if(hit){
+    const k=gKey(hit),grp=groups[k];
+    tip.style.display="block";tip.style.left=(sx+14)+"px";tip.style.top=(sy-8)+"px";
+    const isX=xEnts.has(hit.id),isHid=hiddenKeys.has(k);
+    let html=`<div class="tip-nm">${groupMode==='layer'?('레이어: '+hit.lay):('ACI-'+hit.color+' / '+hit.ltype)}</div>`;
+    if(grp){
+      // 개수는 항상 표시
+      html+=`<div class="tip-lt" style="color:var(--ac2);font-size:12px;font-weight:700">📦 총 ${grp.ents.length}개 객체</div>`;
+      if(grp.symCnt>0){
+        html+=`<div class="tip-ln" style="color:var(--ac2);font-size:13px;font-weight:800">⊕ 심볼 ${grp.symCnt}개</div>`;
+        const bd=Object.entries(grp.blockMap||{});
+        if(bd.length>1) bd.forEach(([bn,cnt])=>{ html+=`<div style="font-size:10px;color:#aaa">· ${bn}: ${cnt}개</div>`; });
+      }
+      if(grp.totalLen>0.01)html+=`<div class="tip-ln">${dispLen(grp.totalLen)}</div>`;
+      if(isHid)html+=`<div class="tip-lt">[숨김]</div>`;
+    }
+    html+=`<div class="tip-hint">${isHid?'클릭: 숨김해제':selKey===k?isX?'클릭: 복원':'클릭: 이 선 빼기':'클릭: 선택'}<br>우클릭 → 메뉴</div>`;
+    tip.innerHTML=html;
+  }else tip.style.display="none";
+}
+function hideTip(){var _t=document.getElementById("tip");if(_t)_t.style.display="none";}
+
+// ── 최근접 탐색 ──────────────────────────────────
+function findNearest(wx,wy,thr){
+  let best=null,minD=Infinity;
+  for(const e of ents){
+    if(e.et==="TEXT")continue;
+    let d=Infinity;
+    if(e.et==="LINE")d=d2seg(wx,wy,e.x1,e.y1,e.x2,e.y2);
+    else if(e.et==="LWPOLYLINE"){for(let j=0;j<e.pts.length-1;j++)d=Math.min(d,d2seg(wx,wy,e.pts[j][0],e.pts[j][1],e.pts[j+1][0],e.pts[j+1][1]));}
+    else if(e.et==="CIRCLE")d=Math.abs(Math.sqrt((wx-e.cx)**2+(wy-e.cy)**2)-e.r);
+    else if(e.et==="INSERT")d=Math.sqrt((wx-e.x)**2+(wy-e.y)**2);
+    else if(e.et==="ARC"){
+      const ang=((Math.atan2(wy-e.cy,wx-e.cx)*180/Math.PI)%360+360)%360;
+      let sa=e.sa,ea=e.ea;if(ea<sa)ea+=360;
+      const inArc=(ang>=sa&&ang<=ea)||(ang+360>=sa&&ang+360<=ea);
+      if(inArc)d=Math.abs(Math.sqrt((wx-e.cx)**2+(wy-e.cy)**2)-e.r);
+    }
+    if(d<thr&&d<minD){minD=d;best=e;}
+  }
+  return best;
+}
+
+// ── 사이드바 렌더 ─────────────────────────────────
+function renderSidebar(){
+  const list=document.getElementById("rlist");
+  const sorted=Object.values(groups).sort((a,b)=>b.totalLen-a.totalLen);
+  if(!sorted.length)return;
+  list.innerHTML=sorted.map(g=>{
+    const isAct=selKey===g.key,isHid=hiddenKeys.has(g.key);
+    const xCnt=g.ents.filter(e=>xEnts.has(e.id)).length;
+    const label=groupMode==='layer'?g.lay:`ACI-${g.color}`;
+    const sub=groupMode==='layer'?`${g.ents.length}개`:g.ltype;
+    const blockDetail=Object.entries(g.blockMap||{}).map(([bn,cnt])=>`<span style="color:var(--ac2)">${bn}</span> <b>${cnt}개</b>`).join(' / ');
+    return `<div class="ri${isAct?" active":""}${isHid?" hidden-row":""}" onclick="clickGroup('${esc(g.key)}')">
+      <div class="ri-h">
+        <div class="dot" style="background:${g.hex}"></div>
+        <span class="ri-nm">${label}</span>
+        <button class="ri-eye" onclick="event.stopPropagation();toggleHideKey('${esc(g.key)}');" title="${isHid?'숨김해제':'숨기기'}">${isHid?'🙈':'👁'}</button>
+      </div>
+      <div class="ri-lt">${sub}${xCnt?` <span style="color:var(--ac)">(빠짐 -${xCnt})</span>`:''}</div>
+      <div class="ri-cnt">📦 선/객체 ${g.ents.length}개${g.symCnt>0?` &nbsp;|&nbsp; ⊕ 심볼 ${g.symCnt}개`:''}</div>
+      ${blockDetail?`<div style="font-size:10px;color:var(--tx3);margin-top:2px;line-height:1.6">${blockDetail}</div>`:''}
+      ${g.totalLen>0.01?`<div class="ri-ln">${dispLen(g.totalLen)}</div>`:''}
+    </div>`;
+  }).join("");
+  document.getElementById("stG").textContent=sorted.length;
+}
+function esc(s){return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+
+function clickGroup(key){
+  if(selKey===key){selKey=null;xEnts=new Set();buildGroups();renderSidebar();drawAll();var _cl_selinfo=document.getElementById("selinfo");if(_cl_selinfo)_cl_selinfo.classList.remove("show");}
+  else{selKey=key;xEnts=new Set();buildGroups();renderSidebar();drawAll();updateSelInfo();}
+}
+
+// ── CSV ───────────────────────────────────────────
+function dxfExportCSV(){
+  const rows=["분류,색상ACI,선종류,레이어,길이_m,길이_mm,심볼,객체수"];
+  Object.values(groups).sort((a,b)=>b.totalLen-a.totalLen).forEach(g=>{
+    const lays=[...new Set(g.ents.map(e=>e.lay))].join("|");
+    rows.push(`${groupMode==='layer'?g.lay:'색상'},ACI-${g.color},${g.ltype},${lays},${dispLenM(g.totalLen).replace(' m','')},${Math.round(g.totalLen)},${g.symCnt},${g.ents.length}`);
+  });
+  const blob=new Blob(["\uFEFF"+rows.join("\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="수량산출.csv";a.click();
+}
+
+// ── 그리기 ───────────────────────────────────────
+function drawAll(){
+  const cv=document.getElementById("bg"),ctx=cv.getContext("2d");
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle="#050510";ctx.fillRect(0,0,cv.width,cv.height);
+  for(const e of ents){
+    const isLeg=isSkipLayer(e.lay);
+    if(isLeg&&!opts.legend)continue;
+    if(e.et==="HATCH")continue;
+    if(e.et==="TEXT"){
+      if(!opts.text)continue;
+      const[sx,sy]=toScreen(e.x,e.y);
+      const fs=Math.max(e.height*tf.sc,6);if(fs<6)continue;
+      ctx.font=Math.min(fs,13)+"px Malgun Gothic";
+      ctx.globalAlpha=0.6;ctx.fillStyle="#CCCCAA";
+      ctx.fillText(e.text,sx,sy);ctx.globalAlpha=1;continue;
+    }
+    const k=gKey(e);
+    if(hiddenKeys.has(k))continue;
+    const isSel=selKey===k,isX=xEnts.has(e.id);
+    let alpha;
+    if(isLeg)alpha=0.30;
+    else alpha=selKey===null?1.0:(isSel?(isX?0.12:1):0.12);
+    ctx.globalAlpha=alpha;
+    const hex=aciHex(e.color);
+    // 어두운 배경에서 잘 보이도록 밝기 강화
+    let drawColor=hex;
+    if(hex==="#CCCCCC"||hex==="#AAAAAA")drawColor="#EEEECC";
+    else if(hex==="#414141")drawColor="#AAAAAA";
+    else if(hex==="#000000"||hex==="#080808")drawColor="#888888";
+    else if(hex==="#0000FF"||hex==="#2288FF")drawColor="#5599FF"; // 파란색 더 밝게
+    else if(hex==="#FF0000")drawColor="#FF4444";  // 빨간색 더 밝게
+    // 일반적으로 어두운 색(밝기 < 80) 은 밝게 보정
+    else{
+      const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+      const bright=(r*299+g*587+b*114)/1000;
+      if(bright<80){
+        const f=Math.min(2.2,160/Math.max(bright,1));
+        const nr=Math.min(255,Math.round(r*f)),ng=Math.min(255,Math.round(g*f)),nb=Math.min(255,Math.round(b*f));
+        drawColor=`#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
+      }
+    }
+    ctx.strokeStyle=drawColor;
+    ctx.fillStyle=drawColor;
+    ctx.lineWidth=isSel&&!isX?3.5:1.8;
+    const showDash=DASH_LT.has(e.ltype)&&!opts.dashLine;
+    // 점선: 픽셀 단위로 고정 (화면 크기 무관하게 항상 보임)
+    ctx.setLineDash(showDash?[6,4]:[]);
+    if(e.et==="LINE"){
+      const[sx1,sy1]=toScreen(e.x1,e.y1),[sx2,sy2]=toScreen(e.x2,e.y2);
+      ctx.beginPath();ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
+    }else if(e.et==="LWPOLYLINE"){
+      ctx.beginPath();
+      const[sx,sy]=toScreen(e.pts[0][0],e.pts[0][1]);ctx.moveTo(sx,sy);
+      for(let j=1;j<e.pts.length;j++){const[px,py]=toScreen(e.pts[j][0],e.pts[j][1]);ctx.lineTo(px,py);}
+      if(e.closed)ctx.closePath();ctx.stroke();
+    }else if(e.et==="ARC"){
+      const[sx,sy]=toScreen(e.cx,e.cy),sr=e.r*tf.sc;
+      ctx.setLineDash([]);ctx.beginPath();ctx.arc(sx,sy,Math.max(sr,2),e.sa*Math.PI/180,e.ea*Math.PI/180);ctx.stroke();
+    }else if(e.et==="CIRCLE"){
+      const[sx,sy]=toScreen(e.cx,e.cy),sr=e.r*tf.sc;
+      ctx.setLineDash([]);ctx.beginPath();ctx.arc(sx,sy,Math.max(sr,3),0,Math.PI*2);ctx.stroke();
+    }else if(e.et==="INSERT"){
+      const[sx,sy]=toScreen(e.x,e.y);
+      const R=8; // 고정 8px — 확대축소 무관
+      const bn=(e.blockName||"").toUpperCase();
+      ctx.setLineDash([]);
+      ctx.strokeStyle=drawColor;
+      ctx.lineWidth=isSel&&!isX?2.5:1.5;
+      ctx.globalAlpha=alpha;
+      // 블록명별 모양
+      if(bn.startsWith("EF$")||bn.startsWith("EF_")){
+        // 집수정 → 사각형
+        ctx.strokeRect(sx-R,sy-R,R*2,R*2);
+        ctx.globalAlpha=alpha*0.18;ctx.fillStyle=drawColor;
+        ctx.fillRect(sx-R,sy-R,R*2,R*2);ctx.globalAlpha=alpha;
+        ctx.beginPath();ctx.moveTo(sx-R*0.5,sy);ctx.lineTo(sx+R*0.5,sy);
+        ctx.moveTo(sx,sy-R*0.5);ctx.lineTo(sx,sy+R*0.5);ctx.stroke();
+      }else if(bn.includes("GEO_")||bn.includes("GEO")){
+        // 측점 → 삼각형
+        ctx.beginPath();ctx.moveTo(sx,sy-R*1.1);ctx.lineTo(sx+R,sy+R*0.7);ctx.lineTo(sx-R,sy+R*0.7);ctx.closePath();ctx.stroke();
+        ctx.globalAlpha=alpha*0.18;ctx.fillStyle=drawColor;ctx.fill();ctx.globalAlpha=alpha;
+      }else if(bn.startsWith("4444")||bn.includes("FORM.SYM_3")){
+        // 다이아몬드 → 마름모
+        ctx.beginPath();ctx.moveTo(sx,sy-R*1.2);ctx.lineTo(sx+R,sy);ctx.lineTo(sx,sy+R*1.2);ctx.lineTo(sx-R,sy);ctx.closePath();ctx.stroke();
+        ctx.globalAlpha=alpha*0.18;ctx.fillStyle=drawColor;ctx.fill();ctx.globalAlpha=alpha;
+      }else if(bn.startsWith("AB002")){
+        // AB002 → X 표시
+        ctx.beginPath();ctx.moveTo(sx-R*0.8,sy-R*0.8);ctx.lineTo(sx+R*0.8,sy+R*0.8);
+        ctx.moveTo(sx+R*0.8,sy-R*0.8);ctx.lineTo(sx-R*0.8,sy+R*0.8);ctx.stroke();
+        ctx.beginPath();ctx.arc(sx,sy,R,0,Math.PI*2);ctx.stroke();
+      }else{
+        // 기본(맨홀 등) → 원+십자
+        ctx.beginPath();ctx.arc(sx,sy,R,0,Math.PI*2);ctx.stroke();
+        ctx.globalAlpha=alpha*0.18;ctx.fillStyle=drawColor;
+        ctx.beginPath();ctx.arc(sx,sy,R,0,Math.PI*2);ctx.fill();ctx.globalAlpha=alpha;
+        ctx.beginPath();ctx.moveTo(sx-R*0.6,sy);ctx.lineTo(sx+R*0.6,sy);
+        ctx.moveTo(sx,sy-R*0.6);ctx.lineTo(sx,sy+R*0.6);ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+  }
+  ctx.globalAlpha=1;
+  if(smMode)drawSmAll();
+}
+
+function toScreen(wx,wy){return[tf.x+wx*tf.sc,tf.y-wy*tf.sc];}
+function toWorld(sx,sy){return[(sx-tf.x)/tf.sc,-(sy-tf.y)/tf.sc];}
+
+function calcBounds(){
+  let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;
+  for(const e of ents){
+    if(e.et==="LINE"){mnX=Math.min(mnX,e.x1,e.x2);mxX=Math.max(mxX,e.x1,e.x2);mnY=Math.min(mnY,e.y1,e.y2);mxY=Math.max(mxY,e.y1,e.y2);}
+    else if(e.et==="LWPOLYLINE")for(const p of e.pts){mnX=Math.min(mnX,p[0]);mxX=Math.max(mxX,p[0]);mnY=Math.min(mnY,p[1]);mxY=Math.max(mxY,p[1]);}
+    else if(e.et==="CIRCLE"||e.et==="ARC"){mnX=Math.min(mnX,e.cx-e.r);mxX=Math.max(mxX,e.cx+e.r);mnY=Math.min(mnY,e.cy-e.r);mxY=Math.max(mxY,e.cy+e.r);}
+    else if(e.et==="INSERT"||e.et==="TEXT"){if(isFinite(e.x)){mnX=Math.min(mnX,e.x);mxX=Math.max(mxX,e.x);mnY=Math.min(mnY,e.y);mxY=Math.max(mxY,e.y);}}
+  }
+  if(!isFinite(mnX)){mnX=0;mnY=0;mxX=100;mxY=100;}
+  bounds={minX:mnX,minY:mnY,maxX:mxX,maxY:mxY};
+}
+function dxfResetView(){
+  const wrap=document.getElementById("cwrap"),W=wrap.clientWidth,H=wrap.clientHeight;
+  const bw=bounds.maxX-bounds.minX||1,bh=bounds.maxY-bounds.minY||1;
+  const sc=Math.min(W/bw,H/bh)*0.88;
+  const cx=(bounds.minX+bounds.maxX)/2,cy=(bounds.minY+bounds.maxY)/2;
+  tf={x:W/2-cx*sc,y:H/2+cy*sc,sc};
+  resizeCvs();drawAll();
+}
+function resizeCvs(){
+  const wrap=document.getElementById("cwrap"),W=wrap.clientWidth,H=wrap.clientHeight;
+  ["bg","fg"].forEach(id=>{const c=document.getElementById(id);if(c){c.width=W;c.height=H;}});
+}
+function d2seg(px,py,ax,ay,bx,by){
+  const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;
+  if(l2===0)return Math.sqrt((px-ax)**2+(py-ay)**2);
+  let t=((px-ax)*dx+(py-ay)*dy)/l2;t=Math.max(0,Math.min(1,t));
+  return Math.sqrt((px-(ax+t*dx))**2+(py-(ay+t*dy))**2);
+}
+
+function showAbout(){
+  (function(){var _e=document.getElementById('aboutOverlay');if(_e)_e.style.display='flex';})();
+  (function(){var _e=document.getElementById('aboutPopup');if(_e)_e.style.display='block';})();
+  document.getElementById('copyMsg').textContent='';
+}
+function hideAbout(){
+  (function(){var _e=document.getElementById('aboutOverlay');if(_e)_e.style.display='none';})();
+  (function(){var _e=document.getElementById('aboutPopup');if(_e)_e.style.display='none';})();
+}
+
+// ── 지형 고도 조회 ──
+function showElevPopup(){
+  var el=document.getElementById('elevPopup');
+  if(el){el.style.display='flex';}
+  if(armed&&currentJibun){
+    var inp=document.getElementById('elevAddr');
+    if(inp)inp.value=currentJibun;
+    queryElevation();
+  }
+}
+function hideElevPopup(){
+  var el=document.getElementById('elevPopup');
+  if(el)el.style.display='none';
+}
+function queryElevation(){
+  var addr=(document.getElementById('elevAddr').value||'').trim();
+  if(!addr){toast('주소를 입력하세요','err');return;}
+  var resEl=document.getElementById('elevResult');
+  if(resEl)resEl.innerHTML='<div style="color:var(--txt3);font-size:12px;text-align:center;padding:8px">🔄 좌표 조회 중...</div>';
+  if(!kakaoGeocoder){
+    if(resEl)resEl.innerHTML='<div style="color:var(--red);font-size:12px">지도 메뉴를 먼저 열어주세요</div>';
+    return;
+  }
+  kakaoGeocoder.addressSearch(addr,function(result,status){
+    if(status!==kakao.maps.services.Status.OK){
+      if(resEl)resEl.innerHTML='<div style="color:var(--red);font-size:12px">주소를 찾을 수 없습니다.</div>';
+      return;
+    }
+    var lat=parseFloat(result[0].y),lng=parseFloat(result[0].x);
+    if(resEl)resEl.innerHTML='<div style="color:var(--txt3);font-size:12px;text-align:center;padding:8px">✓ 좌표 확인 → 고도 조회 중...</div>';
+    fetch('https://api.open-elevation.com/api/v1/lookup',{
+      method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({locations:[{latitude:lat,longitude:lng}]})
+    })
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var elev=d&&d.results&&d.results[0]&&d.results[0].elevation;
+      if(elev===undefined||elev===null)throw new Error('no data');
+      renderElevResult(addr,lat,lng,elev);
+    })
+    .catch(function(){
+      fetch('https://api.opentopodata.org/v1/srtm30m?locations='+lat+','+lng)
+        .then(function(r){return r.json();})
+        .then(function(d){
+          var elev=d&&d.results&&d.results[0]&&d.results[0].elevation;
+          if(elev===undefined||elev===null)throw new Error('no data');
+          renderElevResult(addr,lat,lng,elev);
+        })
+        .catch(function(){
+          if(resEl)resEl.innerHTML='<div style="color:var(--red);font-size:12px">고도 조회 실패 — 잠시 후 다시 시도해주세요.</div>';
+        });
+    });
+  });
+}
+function renderElevResult(addr,lat,lng,elev){
+  var resEl=document.getElementById('elevResult');
+  if(!resEl)return;
+  resEl.innerHTML='<div style="background:rgba(0,240,255,.06);border:1px solid rgba(0,240,255,.2);border-radius:10px;padding:14px">'
+    +'<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">📍 '+addr+'</div>'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+    +'<div style="font-size:32px;font-weight:900;color:var(--neon)">'+elev.toFixed(1)+'<span style="font-size:14px;font-weight:500;margin-left:4px">m</span></div>'
+    +'<div style="font-size:11px;color:var(--txt3)">지형 절대고도<br><span style="font-size:9px">DEM 기반 참고값</span></div>'
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--txt3);line-height:1.8">위도: '+lat.toFixed(6)+'&nbsp;&nbsp;경도: '+lng.toFixed(6)+'<br>'
+    +'<span style="color:var(--gold);font-size:9px">※ 정밀 측량값과 차이가 있을 수 있습니다</span></div></div>';
+}
+
+function copyEmail(){
+  navigator.clipboard.writeText('fbi1431@hanmail.net').then(()=>{
+    document.getElementById('copyMsg').textContent='✓ 클립보드에 복사됐습니다';
+    setTimeout(()=>{document.getElementById('copyMsg').textContent='';},2000);
+  }).catch(()=>{
+    document.getElementById('copyMsg').textContent='fbi1431@hanmail.net';
+  });
+}
+var _ao=document.getElementById('aboutOverlay');if(_ao)_ao.addEventListener('click',hideAbout);
+
+// 휠 줌
+var _fg=document.getElementById("fg");if(_fg)_fg.addEventListener("wheel",ev=>{
+  ev.preventDefault();
+  const rect=ev.target.getBoundingClientRect();
+  const mx=ev.clientX-rect.left,my=ev.clientY-rect.top;
+  const f=ev.deltaY<0?1.15:1/1.15;
+  tf.x=mx+(tf.x-mx)*f;tf.y=my+(tf.y-my)*f;tf.sc*=f;drawAll();
+},{passive:false});
+
+// ── 패닝 + 드래그 영역 빼기 ──────────────────────
+let pan=false, ps={x:0,y:0};
+let dragMode=false, dragStart=null, dragCur=null, dragActive=false;
+
+if(_fg)_fg.addEventListener("mousedown",ev=>{
+  if(ev.button===1||ev.altKey){ev.preventDefault();pan=true;ps={x:ev.clientX,y:ev.clientY};return;}
+  // Shift+드래그 = 영역 빼기
+  if(ev.button===0&&ev.shiftKey&&selKey&&ents.length){
+    ev.preventDefault();
+    const rect=ev.target.getBoundingClientRect();
+    dragMode=true; dragActive=false;
+    dragStart={sx:ev.clientX-rect.left,sy:ev.clientY-rect.top};
+    dragCur={...dragStart};
+    var _fc=document.getElementById('fg');if(_fc)_fc.style.cursor='crosshair';
+  }
+});
+
+document.addEventListener("mousemove",ev=>{
+  if(pan){tf.x+=ev.clientX-ps.x;tf.y+=ev.clientY-ps.y;ps={x:ev.clientX,y:ev.clientY};drawAll();return;}
+  if(!dragMode||!dragStart)return;
+  const rect=(document.getElementById('fg')||document.createElement('canvas')).getBoundingClientRect();
+  dragCur={sx:ev.clientX-rect.left,sy:ev.clientY-rect.top};
+  const dx=dragCur.sx-dragStart.sx,dy=dragCur.sy-dragStart.sy;
+  if(Math.abs(dx)>5||Math.abs(dy)>5) dragActive=true;
+  if(dragActive){
+    const dr=document.getElementById('dragRect');
+    const l=Math.min(dragStart.sx,dragCur.sx),t=Math.min(dragStart.sy,dragCur.sy);
+    const w=Math.abs(dx),h=Math.abs(dy);
+    const cwr=document.getElementById('cwrap').getBoundingClientRect();
+    dr.style.display='block';
+    dr.style.left=(l)+'px';dr.style.top=(t)+'px';
+    dr.style.width=w+'px';dr.style.height=h+'px';
+    const hint=document.getElementById('dragHint');
+    hint.style.display='block';
+    hint.textContent=`드래그 영역 내 선 빼기 — 놓으면 적용`;
+  }
+});
+
+document.addEventListener("mouseup",ev=>{
+  pan=false;
+  if(!dragMode)return;
+  const dr=document.getElementById('dragRect');
+  dr.style.display='none';
+  var _ds_dragHint=document.getElementById('dragHint');if(_ds_dragHint)_ds_dragHint.style.display='none';
+  if(dragActive&&dragStart&&dragCur&&selKey){
+    // 영역 내 선들을 xEnts에 추가
+    const l=Math.min(dragStart.sx,dragCur.sx),r=Math.max(dragStart.sx,dragCur.sx);
+    const t=Math.min(dragStart.sy,dragCur.sy),b=Math.max(dragStart.sy,dragCur.sy);
+    let added=0;
+    for(const e of ents){
+      if(gKey(e)!==selKey)continue;
+      if(xEnts.has(e.id))continue;
+      // 엔티티의 대표점이 영역 안에 있으면 빼기
+      const pts=getEntScreenPts(e);
+      const inside=pts.some(([px,py])=>px>=l&&px<=r&&py>=t&&py<=b);
+      if(inside){xEnts.add(e.id);added++;}
+    }
+    if(added>0){buildGroups();renderSidebar();drawAll();updateSelInfo();}
+  }
+  dragMode=false;dragActive=false;dragStart=null;dragCur=null;
+});
+
+// 엔티티의 스크린 대표 좌표 반환
+function getEntScreenPts(e){
+  if(e.et==="LINE")return[toScreen(e.x1,e.y1),toScreen(e.x2,e.y2),toScreen((e.x1+e.x2)/2,(e.y1+e.y2)/2)];
+  if(e.et==="LWPOLYLINE")return e.pts.map(p=>toScreen(p[0],p[1]));
+  if(e.et==="INSERT")return[toScreen(e.x,e.y)];
+  if(e.et==="CIRCLE"||e.et==="ARC")return[toScreen(e.cx,e.cy)];
+  return[];
+}
+window.addEve
+var _ao=document.getElementById('aboutOverlay');if(_ao)_ao.addEventListener('click',function(){var _ap=document.getElementById('aboutPopup');if(_ap)_ap.style.display='none';var _ao2=document.getElementById('aboutOverlay');if(_ao2)_ao2.style.display='none';});
+}catch(e){console.warn('DXF:',e);}
+
+
+
+</script>
+</body>
+</html>function dxfExportPDF(){
+  if(!window.dxf_entities||!window.dxf_entities.length){toast('먼저 DXF 파일을 업로드하세요','err');return;}
+  window.print();toast('PDF 저장 — 브라우저 인쇄 창에서 PDF로 저장하세요');
+}
+function dxfExportDXFResult(){
+  if(!window.dxf_entities||!window.dxf_entities.length){toast('먼저 DXF 파일을 업로드하세요','err');return;}
+  toast('DXF 저장 — 수량산출 결과 DXF 저장 기능 연동 예정');
+}
+/* 지적도 다운로드 */
+var jdMode='rect', jdDrawing=false, jdStartX=0, jdStartY=0;
+}
+function doJdDownload(){
+  toast('다운로드: 국토정보플랫폼에서 로그인 후 다운로드 가능합니다');
+  setTimeout(function(){window.open('https://map.ngii.go.kr/ms/map/NlipMap.do','_blank');},600);
+}
+function openJideokMap(){
+  showView('jideok');
+}
+function doDl(t){
+  if(!armed){toast('먼저 지번을 검색하세요','err');return;}
+  if(t==='수치지형도'){
+    var ngiiId=localStorage.getItem('gdsp_ngiiId');
+    var url='https://map.ngii.go.kr/ms/map/NlipMap.do';
+    toast('수치지형도 — 국토정보플랫폼으로 이동합니다 (로그인 후 다운로드)');
+    setTimeout(function(){window.open(url,'_blank');},400);
+  } else if(t==='지적도'){
+    toast('지적도 다운로드 — 국토정보플랫폼으로 이동합니다');
+    setTimeout(function(){window.open('https://map.vworld.kr/map/maps.do?basemap=GRAPHIC&service=dmap','_blank');},400);
+  }
+}
+function saveApi(key){
+  var ids={kakao:'kakaoKey',vworld:'vworldKey',building:'buildingKey',land:'landKey'};
+  var el=document.getElementById(ids[key]);
+  if(el&&el.value.trim()){localStorage.setItem('gdsp_'+key,el.value.trim());toast(key+' API 키 저장됨','ok');setText('apiRes','✓ 저장됨. 테스트 버튼으로 연결 확인하세요.');}
+  else toast('API KEY를 입력하세요','err');
+}
+function delApi(key){
+  var ids={kakao:'kakaoKey',vworld:'vworldKey',building:'buildingKey',land:'landKey'};
+  var sts={kakao:'kakaoSt',vworld:'vworldSt',building:'buildingSt',land:'landSt'};
+  var el=document.getElementById(ids[key]);if(el)el.value='';
+  localStorage.removeItem('gdsp_'+key);
+  var st=document.getElementById(sts[key]);
+  if(st){st.className='cbadge cb-none';st.textContent='미확인';}
+  toast(key+' 삭제됨');
+}
+function testApi(key){
+  var ids={kakao:'kakaoKey',vworld:'vworldKey',building:'buildingKey',land:'landKey'};
+  var sts={kakao:'kakaoSt',vworld:'vworldSt',building:'buildingSt',land:'landSt'};
+  var el=document.getElementById(ids[key]);
+  if(!el||!el.value.trim()){toast('API KEY를 먼저 입력하세요','err');return;}
+  var apiKey=el.value.trim();
+  var st=document.getElementById(sts[key]);
+  setText('apiRes','🔄 연결 테스트 중...');
+  if(st){st.className='cbadge cb-none';st.textContent='확인 중...';}
+  if(key==='kakao'){
+    fetch('https://dapi.kakao.com/v2/local/search/address.json?query=화성시+남양읍+한가울길+70',{
+      headers:{'Authorization':'KakaoAK '+apiKey}
+    })
+      .then(function(r){return r.json();})
+      .then(function(d){
+
+}catch(e){console.warn('DXF init:',e);}
+window.addEventListener('resize',initDxfCanvas);
+window.addEventListener('load',function(){
+  initDxfCanvas();
+  setTimeout(initDxfCanvas,300);
+});
+</script>
+</body>
+</html>

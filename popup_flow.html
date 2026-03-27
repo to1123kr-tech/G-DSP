@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>G-DSP — 물흐름 분석</title>
+<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+/* ── G-DSP 헤더 변수 ── */
+:root{
+  --gdsp-bg:#0a0e1a;
+  --gdsp-hdr:#0d1628;
+  --gdsp-blue:#2563eb;
+  --gdsp-green:#00ff9f;
+  --gdsp-cyan:#00d4ff;
+  /* FlowFree 변수 */
+  --bg:#0a0e1a;--panel:#111827;--panel2:#1a2235;--border:#1e3a5f;
+  --accent:#00d4ff;--accent2:#00ff9f;--accent3:#ff6b35;
+  --text:#e2e8f0;--dim:#64748b;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+button,input,select{font:inherit;cursor:pointer;}
+
+/* ── G-DSP 헤더 ── */
+.gdsp-hdr{
+  height:52px;display:flex;align-items:center;gap:12px;padding:0 16px;
+  background:linear-gradient(90deg,#050c18,#0a1628,#050c18);
+  border-bottom:2px solid transparent;
+  border-image:linear-gradient(90deg,#0a0e1a,#00d4ff,#00ff9f,#0a0e1a) 1;
+  flex-shrink:0;position:relative;overflow:hidden;
+}
+.gdsp-hdr::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(0,212,255,.04),transparent);animation:hshine 4s ease-in-out infinite;}
+@keyframes hshine{0%,100%{transform:translateX(-100%)}50%{transform:translateX(100%)}}
+.gdsp-logo{font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:900;letter-spacing:2px;background:linear-gradient(90deg,#00d4ff,#00ff9f);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.gdsp-sep{width:1px;height:18px;background:#1e3a5f;flex-shrink:0;}
+.gdsp-title{font-size:13px;font-weight:700;color:var(--text);}
+.gdsp-sub{font-size:10px;color:var(--dim);}
+
+/* 검색창 */
+.gdsp-search{
+  flex:1;max-width:440px;height:34px;display:flex;
+  background:rgba(255,255,255,.05);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;transition:.15s;
+}
+.gdsp-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,212,255,.15);}
+.gs-lbl{padding:0 10px;display:flex;align-items:center;font-size:10px;font-weight:700;color:var(--accent);border-right:1px solid var(--border);white-space:nowrap;background:rgba(0,212,255,.05);}
+.gs-inp{flex:1;height:100%;padding:0 10px;border:none;outline:none;background:transparent;font-size:12px;color:var(--text);}
+.gs-inp::placeholder{color:var(--dim);font-size:11px;}
+.gs-btn{height:100%;padding:0 14px;background:linear-gradient(135deg,#1a57f0,#00d4ff);color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;}
+
+/* 상태 */
+.gdsp-stat{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);display:flex;gap:14px;}
+.gdsp-stat b{color:var(--accent2);}
+.gdsp-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.gdsp-btn{height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--dim);font-size:10px;font-weight:700;cursor:pointer;transition:.15s;}
+.gdsp-btn:hover{border-color:var(--accent);color:var(--accent);}
+.gdsp-btn.close{border-color:rgba(239,68,68,.3);color:#ef4444;}
+.gdsp-btn.close:hover{background:rgba(239,68,68,.1);}
+
+/* ── 레이아웃 — 3분할 ── */
+.app{display:flex;flex:1;overflow:hidden;}
+
+/* 좌: DXF 컨트롤 */
+.lp{width:240px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+.lscroll{overflow-y:auto;flex:1;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.sec{border-bottom:1px solid var(--border);padding:11px 13px;}
+.sec-title{font-size:10px;font-weight:700;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px;}
+.upz{border:2px dashed var(--border);border-radius:7px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(0,212,255,.03);}
+.upz:hover,.upz.over{border-color:var(--accent);background:rgba(0,212,255,.08);}
+.upz .ico{font-size:20px;margin-bottom:4px;}
+.upz p{font-size:11px;color:var(--dim);line-height:1.5;}
+.upz strong{color:var(--accent);font-size:12px;}
+#fi{display:none;}
+.btn{display:flex;align-items:center;gap:6px;width:100%;padding:7px 11px;border:1px solid var(--border);border-radius:5px;background:var(--panel2);color:var(--text);font-size:12px;cursor:pointer;transition:all .15s;margin-bottom:5px;}
+.btn:last-child{margin-bottom:0;}
+.btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.07);}
+.btn.pri{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.1);}
+.togrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
+.togrow:last-child{margin-bottom:0;}
+.toglabel{font-size:12px;}
+.tog{width:34px;height:18px;background:#374151;border-radius:9px;cursor:pointer;transition:background .2s;position:relative;flex-shrink:0;}
+.tog.on{background:var(--accent);}
+.tog::after{content:'';position:absolute;top:3px;left:3px;width:12px;height:12px;background:#fff;border-radius:50%;transition:left .2s;}
+.tog.on::after{left:19px;}
+.slrow{margin-bottom:7px;}
+.slrow label{font-size:11px;color:var(--dim);display:flex;justify-content:space-between;margin-bottom:3px;}
+.slrow label span{color:var(--accent);font-family:'JetBrains Mono',monospace;}
+input[type=range]{width:100%;-webkit-appearance:none;height:4px;background:var(--border);border-radius:2px;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;background:var(--accent);border-radius:50%;cursor:pointer;}
+.litem{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:4px;font-size:11px;margin-bottom:3px;background:var(--panel2);}
+.ldot{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+.lname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lcnt{color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:10px;}
+.pbar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:7px;display:none;}
+.pfill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width .3s;width:0%;}
+.legbox{margin-top:6px;}
+.legstrip{display:flex;height:11px;border-radius:3px;overflow:hidden;margin:3px 0;}
+.leglabel{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);font-family:'JetBrains Mono',monospace;}
+
+/* 가운데: 카카오지도 */
+.map-panel{width:340px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);background:#050810;}
+.map-hdr{height:34px;display:flex;align-items:center;padding:0 10px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:var(--dim);letter-spacing:1px;flex-shrink:0;}
+.map-hdr-btns{margin-left:auto;display:flex;gap:4px;}
+.map-hdr-btn{height:22px;padding:0 8px;border-radius:4px;border:1px solid var(--border);background:var(--panel2);color:var(--dim);font-size:10px;cursor:pointer;transition:.15s;}
+.map-hdr-btn:hover{border-color:var(--accent);color:var(--accent);}
+.map-hdr-btn.on{background:rgba(0,212,255,.12);border-color:var(--accent);color:var(--accent);}
+#kakaoMapDiv{flex:1;width:100%;}
+.map-info{height:54px;border-top:1px solid var(--border);padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);line-height:1.9;flex-shrink:0;}
+.map-info span{color:var(--accent2);}
+
+/* 우: 분석 캔버스 */
+.ca{flex:1;position:relative;overflow:hidden;background:#050810;}
+#mc{position:absolute;top:0;left:0;}
+.ca-drop{position:absolute;inset:0;background:rgba(0,212,255,0.08);border:3px dashed var(--accent);display:none;align-items:center;justify-content:center;z-index:20;pointer-events:none;}
+.ca-drop.active{display:flex;}
+.ca-drop-inner{text-align:center;color:var(--accent);}
+.ca-drop-inner .drop-ico{font-size:48px;animation:dropbounce .7s ease-in-out infinite alternate;}
+@keyframes dropbounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
+.empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--dim);pointer-events:none;}
+.empty .eico{font-size:44px;margin-bottom:12px;opacity:.25;}
+.empty h2{font-size:15px;font-weight:500;margin-bottom:6px;color:#475569;}
+.empty p{font-size:11px;line-height:1.7;color:#334155;}
+.tbar{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(10,14,26,.92);border:1px solid var(--border);border-radius:9px;padding:6px 10px;backdrop-filter:blur(8px);z-index:10;}
+.tb{padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--dim);transition:all .15s;display:flex;align-items:center;gap:4px;}
+.tb:hover{color:var(--text);border-color:var(--border);}
+.tb.act{background:rgba(0,212,255,.15);border-color:var(--accent);color:var(--accent);}
+.minfo{position:absolute;top:10px;right:10px;background:rgba(10,14,26,.88);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);z-index:10;line-height:1.9;backdrop-filter:blur(6px);}
+.minfo span{color:var(--accent);}
+
+/* 우하단: 단면 분석 패널 */
+.rp{width:260px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
+.rphead{padding:8px 12px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--dim);text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;}
+.badge{font-size:9px;padding:1px 5px;background:var(--panel2);border:1px solid var(--border);border-radius:3px;font-family:'JetBrains Mono',monospace;color:var(--dim);}
+#sc{background:#050810;display:block;}
+.sinfo{padding:8px 12px;font-size:11px;color:var(--dim);border-top:1px solid var(--border);font-family:'JetBrains Mono',monospace;line-height:1.8;}
+.sinfo span{color:var(--accent2);}
+.usage-box{margin:8px 12px 0;border:1px solid var(--border);border-radius:8px;background:rgba(26,34,53,.6);padding:9px 12px;}
+.usage-box-title{font-size:10px;font-weight:700;color:var(--dim);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:7px;}
+.usage-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;font-size:11px;color:var(--text);}
+.step-num{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,#ff6b35,#f59e0b);color:#050810;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.usage-step em{display:block;font-style:normal;color:var(--dim);font-size:10px;margin-top:1px;}
+
+/* 알림 */
+.notif{position:fixed;top:60px;right:16px;background:var(--panel);border:1px solid var(--accent);border-radius:7px;padding:10px 16px;font-size:13px;z-index:100;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+</style>
+</head>
+<body>
+
+<!-- G-DSP 헤더 -->
+<div class="gdsp-hdr">
+  <span class="gdsp-logo">G-DSP</span>
+  <div class="gdsp-sep"></div>
+  <span class="gdsp-title">🌧️ 물흐름 분석</span>
+  <span class="gdsp-sub" style="margin-left:6px">DXF 등고선 → TIN → 물흐름 · 우수계산</span>
+
+  <div class="gdsp-search" style="margin-left:16px">
+    <div class="gs-lbl">🔍 지번검색</div>
+    <input class="gs-inp" id="mapSearch" placeholder="화성시 지번 입력 (예: 남양읍 남양리 123)" onkeydown="if(event.key==='Enter')doMapSearch()">
+    <button class="gs-btn" onclick="doMapSearch()">이동</button>
+  </div>
+
+  <div class="gdsp-stat" style="margin-left:12px">
+    <div id="statZ">Z: <b>-</b></div>
+    <div id="statTris">삼각형: <b>0</b></div>
+    <div id="statSlope">최대경사: <b>0%</b></div>
+  </div>
+
+  <div class="gdsp-right">
+    <button class="gdsp-btn close" onclick="window.close()">✕ 닫기</button>
+  </div>
+</div>
+
+<!-- 3분할 레이아웃 -->
+<div class="app">
+
+  <!-- 좌: DXF 컨트롤 패널 -->
+  <div class="lp">
+    <div class="lscroll">
+      <div class="sec">
+        <div class="sec-title">Data Input</div>
+        <div class="upz" id="upz">
+          <div class="ico">📁</div>
+          <strong>CAD DXF 업로드</strong>
+          <p>수치지형도 등고선 데이터<br>드래그하거나 클릭</p>
+        </div>
+        <input type="file" id="fi" multiple accept=".dxf">
+        <div class="pbar" id="pb"><div class="pfill" id="pf"></div></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">Analysis Control</div>
+        <div class="slrow">
+          <label>샘플링 밀도 <span id="valS">3,000</span></label>
+          <input type="range" id="slS" min="500" max="8000" step="100" value="3000">
+        </div>
+        <button class="btn pri" id="btnRun">⚡ 삼각망 엔진 가동</button>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">Visualization</div>
+        <div class="togrow"><div class="toglabel">삼각망 (TIN)</div><div class="tog" id="togTIN"></div></div>
+        <div class="togrow"><div class="toglabel">등고선 (Contour)</div><div class="tog on" id="togCon"></div></div>
+        <div class="togrow"><div class="toglabel">경사도 (Slope)</div><div class="tog on" id="togSlp"></div></div>
+        <div class="togrow"><div class="toglabel">물흐름 (Flow)</div><div class="tog on" id="togFlw"></div></div>
+        <div class="legbox" id="legSlp">
+          <div class="leglabel"><span>0%</span><span>Slope</span><span>50%+</span></div>
+          <div class="legstrip" style="background:linear-gradient(90deg,#00ff9f,#ffff00,#ff6b35,#ef4444)"></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">Export</div>
+        <button class="btn" id="btnExpDXF">📤 DXF로 내보내기</button>
+        <button class="btn" id="btnExpPNG">🖼️ PNG 저장</button>
+      </div>
+
+      <div class="sec">
+        <div class="sec-title">Layers</div>
+        <div id="layerList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 가운데: 카카오지도 -->
+  <div class="map-panel">
+    <div class="map-hdr">
+      🗺 카카오 지도
+      <div class="map-hdr-btns">
+        <button class="map-hdr-btn on" id="mpNormal" onclick="setMapType('normal',this)">일반</button>
+        <button class="map-hdr-btn" id="mpSkyview" onclick="setMapType('skyview',this)">위성</button>
+        <button class="map-hdr-btn" id="mpCadastral" onclick="toggleCadastral(this)">지적도</button>
+      </div>
+    </div>
+    <div id="kakaoMapDiv" style="flex:1;width:100%"></div>
+    <div class="map-info">
+      지번: <span id="mapJibun">검색 후 표시</span><br>
+      좌표: <span id="mapCoord">—</span>
+    </div>
+  </div>
+
+  <!-- 우: 분석 캔버스 -->
+  <div class="ca" id="ca">
+    <canvas id="mc"></canvas>
+    <div class="ca-drop" id="caDrop">
+      <div class="ca-drop-inner">
+        <div class="drop-ico">📥</div>
+        <p>파일을 놓아서 업로드</p>
+      </div>
+    </div>
+    <div class="empty" id="emp">
+      <div class="eico">🌧️</div>
+      <h2>물흐름 분석 대기 중</h2>
+      <p>DXF 파일(수치지형도 등고선)을 업로드하면<br>삼각망 기반 물흐름 방향 분석이 시작됩니다.</p>
+    </div>
+    <div class="tbar">
+      <button class="tb act" data-t="pan">🖐️ 이동/확대</button>
+      <button class="tb" data-t="sec">📏 단면 분석</button>
+      <button class="tb" data-t="ins">🔍 정밀 검사</button>
+    </div>
+    <div class="minfo" id="minfo" style="display:none">
+      Elevation: <span id="minE">-</span> ~ <span id="maxE">-</span><br>
+      Coordinate: <span id="curX">-</span>, <span id="curY">-</span><br>
+      Current Z: <span id="curZ">-</span>
+    </div>
+  </div>
+
+  <!-- 우측 패널: 단면 분석 -->
+  <div class="rp">
+    <div class="rphead">Profile Analysis <div class="badge">LIVE</div></div>
+    <canvas id="sc"></canvas>
+    <div class="sinfo">
+      Distance: <span id="sDist">-</span>m<br>
+      Height: <span id="sHeight">-</span>m<br>
+      Avg Slope: <span id="sSlope">-</span>%
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:0 0 8px">
+      <div class="usage-box" style="margin-top:8px">
+        <div class="usage-box-title">분석 가이드</div>
+        <div class="usage-step"><div class="step-num">1</div><div><strong>지번 검색</strong><em>위 검색창에서 지번으로 지도 이동</em></div></div>
+        <div class="usage-step"><div class="step-num">2</div><div><strong>DXF 업로드</strong><em>수치지형도 등고선 파일 선택</em></div></div>
+        <div class="usage-step"><div class="step-num">3</div><div><strong>엔진 가동</strong><em>물흐름 방향·유역 자동 분석</em></div></div>
+        <div class="usage-step"><div class="step-num">4</div><div><strong>우수계산</strong><em>하단 합리식으로 유출량 산정</em></div></div>
+      </div>
+
+      <!-- 우수 유출량 계산 (합리식) -->
+      <div style="margin:8px 12px 0;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:rgba(0,212,255,.03)">
+        <div class="usage-box-title" style="margin-bottom:8px">🌧️ 우수 유출량 (합리식)</div>
+        <div style="font-size:9px;color:var(--dim);margin-bottom:8px;font-family:'JetBrains Mono',monospace">Q = C × I × A ÷ 360</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+          <span style="font-size:10px;color:var(--dim);width:70px">유출계수 C</span>
+          <input type="number" id="rfC" placeholder="0.7" min="0" max="1" step="0.01" style="flex:1;height:24px;padding:0 6px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;outline:none" oninput="calcRainfall()">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+          <span style="font-size:10px;color:var(--dim);width:70px">강우강도 I</span>
+          <input type="number" id="rfI" placeholder="mm/h" style="flex:1;height:24px;padding:0 6px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;outline:none" oninput="calcRainfall()">
+          <span style="font-size:9px;color:var(--dim)">mm/h</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span style="font-size:10px;color:var(--dim);width:70px">유역면적 A</span>
+          <input type="number" id="rfA" placeholder="㎡" style="flex:1;height:24px;padding:0 6px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;outline:none" oninput="calcRainfall()">
+          <span style="font-size:9px;color:var(--dim)">㎡</span>
+        </div>
+        <div id="rfResult" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim);min-height:36px;background:rgba(0,0,0,.2);border-radius:5px;padding:6px 8px">입력 후 자동 계산</div>
+        <!-- 유출계수 참고값 -->
+        <div style="margin-top:8px;font-size:9px;color:var(--dim);margin-bottom:4px">유출계수 참고값 (클릭 시 입력)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+          <button onclick="document.getElementById('rfC').value='0.95';calcRainfall()" style="padding:3px 6px;background:var(--panel2);border:1px solid var(--border);border-radius:3px;color:var(--dim);font-size:9px;cursor:pointer;text-align:left">지붕·포장 0.95</button>
+          <button onclick="document.getElementById('rfC').value='0.70';calcRainfall()" style="padding:3px 6px;background:var(--panel2);border:1px solid var(--border);border-radius:3px;color:var(--dim);font-size:9px;cursor:pointer;text-align:left">도로·주차 0.70</button>
+          <button onclick="document.getElementById('rfC').value='0.30';calcRainfall()" style="padding:3px 6px;background:var(--panel2);border:1px solid var(--border);border-radius:3px;color:var(--dim);font-size:9px;cursor:pointer;text-align:left">잔디·공원 0.30</button>
+          <button onclick="document.getElementById('rfC').value='0.45';calcRainfall()" style="padding:3px 6px;background:var(--panel2);border:1px solid var(--border);border-radius:3px;color:var(--dim);font-size:9px;cursor:pointer;text-align:left">산림·경지 0.45</button>
+        </div>
+        <div style="margin-top:6px;font-size:9px;color:var(--dim);line-height:1.6">※ 화성시 10년빈도: 약 75~90mm/h<br>※ 정확한 설계는 전문가 검토 필요</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="notif" id="notif"></div>
+
+<script>
+// ── 카카오 지도 ──────────────────────────────────
+var kakaoMap = null, kakaoGeocoder = null, kakaoMarker = null;
+var cadastralLayer = null, cadastralOn = false;
+
+function initKakaoMap(){
+  if(!window.kakao||!window.kakao.maps){ setTimeout(initKakaoMap, 300); return; }
+  var container = document.getElementById('kakaoMapDiv');
+  if(!container) return;
+  var options = {center: new kakao.maps.LatLng(37.2055, 126.8317), level: 5};
+  kakaoMap = new kakao.maps.Map(container, options);
+  kakaoGeocoder = new kakao.maps.services.Geocoder();
+  kakaoMarker = new kakao.maps.Marker();
+  kakaoMarker.setMap(kakaoMap);
+  kakao.maps.event.addListener(kakaoMap, 'click', function(e){
+    var lat = e.latLng.getLat(), lng = e.latLng.getLng();
+    document.getElementById('mapCoord').textContent = lat.toFixed(5)+', '+lng.toFixed(5);
+  });
+}
+
+function doMapSearch(){
+  var q = document.getElementById('mapSearch').value.trim();
+  if(!q){ notify('지번을 입력하세요', 'warn'); return; }
+  if(!kakaoGeocoder){ notify('지도 초기화 중...', 'warn'); return; }
+  var searchQ = q.includes('화성') ? q : '화성시 ' + q;
+  kakaoGeocoder.addressSearch(searchQ, function(result, status){
+    if(status === kakao.maps.services.Status.OK){
+      var lat = parseFloat(result[0].y), lng = parseFloat(result[0].x);
+      var pos = new kakao.maps.LatLng(lat, lng);
+      kakaoMap.setCenter(pos);
+      kakaoMap.setLevel(3);
+      kakaoMarker.setPosition(pos);
+      document.getElementById('mapJibun').textContent = searchQ;
+      document.getElementById('mapCoord').textContent = lat.toFixed(5)+', '+lng.toFixed(5);
+      notify('✓ 지도 이동: '+searchQ);
+    } else {
+      notify('주소를 찾을 수 없습니다', 'warn');
+    }
+  });
+}
+
+function setMapType(type, btn){
+  if(!kakaoMap) return;
+  document.querySelectorAll('.map-hdr-btn').forEach(function(b){ if(b.id!=='mpCadastral') b.classList.remove('on'); });
+  btn.classList.add('on');
+  if(type === 'normal') kakaoMap.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
+  else if(type === 'skyview') kakaoMap.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
+}
+
+function toggleCadastral(btn){
+  if(!kakaoMap) return;
+  cadastralOn = !cadastralOn;
+  btn.classList.toggle('on', cadastralOn);
+  if(cadastralOn){
+    kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+  } else {
+    kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+  }
+}
+
+// ── 우수 유출량 계산 (합리식) ──────────────────────
+function calcRainfall(){
+  var C = parseFloat(document.getElementById('rfC').value);
+  var I = parseFloat(document.getElementById('rfI').value);
+  var A = parseFloat(document.getElementById('rfA').value);
+  var res = document.getElementById('rfResult');
+  if(!C||!I||!A){ res.textContent='입력 후 자동 계산'; return; }
+  var Q = C*I*A/3600000;
+  res.innerHTML = '<span style="font-size:14px;font-weight:700;color:#00d4ff">'+Q.toFixed(4)+' ㎥/s</span>'
+    +' <span style="color:var(--dim);font-size:10px">= '+(Q*1000).toFixed(2)+' L/s</span><br>'
+    +'<span style="font-size:10px;color:var(--dim)">유역: '+(A/10000).toFixed(4)+'ha · C='+ C+' · I='+I+'mm/h</span>';
+}
+
+// ── FlowFree 분석 엔진 ────────────────────────────
+var S = {
+  contours:[],tinPts:[],tris:[],arrows:[],sections:[],layers:{},rawLines:[],srcLines:[],textPoints:[],
+  bounds:null,scale:1,ox:0,oy:0,tool:'pan',vis:{tin:false,con:true,slp:true,flw:true},
+  isDown:false,lastM:{x:0,y:0},secS:null,secE:null,zSamples:[],density:3000
+};
+var mc=document.getElementById('mc'),ctx=mc.getContext('2d');
+var sc=document.getElementById('sc'),sctx=sc.getContext('2d');
+
+window.onload=function(){
+  resize();
+  window.onresize=resize;
+  initUI();
+  initKakaoMap();
+  requestAnimationFrame(loop);
+};
+
+function resize(){
+  var ca=document.getElementById('ca');
+  mc.width=ca.clientWidth; mc.height=ca.clientHeight;
+  sc.width=document.querySelector('.rp').clientWidth;
+  sc.height=140;
+  if(S.bounds) fitView();
+}
+
+function initUI(){
+  var upz=document.getElementById('upz'),fi=document.getElementById('fi');
+  upz.onclick=function(){fi.click();};
+  fi.onchange=function(e){handleFiles(e.target.files);};
+  document.getElementById('slS').oninput=function(e){
+    S.density=parseInt(e.target.value);
+    document.getElementById('valS').textContent=S.density.toLocaleString();
+  };
+  document.getElementById('btnRun').onclick=runAnalysis;
+  ['tin','con','slp','flw'].forEach(function(k){
+    var el=document.getElementById('tog'+k.charAt(0).toUpperCase()+k.slice(1));
+    el.onclick=function(){
+      S.vis[k]=!S.vis[k];
+      el.classList.toggle('on',S.vis[k]);
+      if(k==='slp') document.getElementById('legSlp').style.opacity=S.vis[k]?1:0.3;
+    };
+  });
+  document.querySelectorAll('.tb').forEach(function(b){
+    b.onclick=function(){
+      document.querySelectorAll('.tb').forEach(function(x){x.classList.remove('act');});
+      b.classList.add('act'); S.tool=b.dataset.t;
+      if(S.tool!=='sec'){S.secS=null;S.secE=null;clearSection();}
+    };
+  });
+  mc.onmousedown=onDown;
+  window.onmousemove=onMove;
+  window.onmouseup=onUp;
+  mc.onwheel=onWheel;
+  var cad=document.getElementById('ca');
+  cad.ondragover=function(e){e.preventDefault();document.getElementById('caDrop').classList.add('active');};
+  cad.ondragleave=function(){document.getElementById('caDrop').classList.remove('active');};
+  cad.ondrop=function(e){e.preventDefault();document.getElementById('caDrop').classList.remove('active');handleFiles(e.dataTransfer.files);};
+  document.getElementById('btnExpPNG').onclick=exportPNG;
+  document.getElementById('btnExpDXF').onclick=exportDXF;
+}
+
+function handleFiles(files){
+  if(!files.length) return;
+  notify('파일 분석 중...');
+  var pb=document.getElementById('pb'),pf=document.getElementById('pf');
+  pb.style.display='block';pf.style.width='10%';
+  var allContours=[],allLayers={},allRaw=[],allSrc=[];
+  var done=0;
+  for(var i=0;i<files.length;i++){
+    var reader=new FileReader();
+    reader.onload=(function(f){
+      return function(e){
+        var res=parseDXFBytes(e.target.result);
+        allContours=allContours.concat(res.contours);
+        allRaw=allRaw.concat(res.rawLines);
+        allSrc=allSrc.concat(res.srcLines);
+        for(var k in res.layers) allLayers[k]=(allLayers[k]||[]).concat(res.layers[k]);
+        done++;
+        pf.style.width=(done/files.length*100)+'%';
+        if(done===files.length){
+          S.contours=allContours;S.layers=allLayers;S.rawLines=allRaw;S.srcLines=allSrc;
+          setTimeout(function(){
+            pb.style.display='none';
+            if(S.contours.length||S.rawLines.length) runAnalysis();
+            else notify('유효한 등고선 데이터를 찾지 못했습니다','warn');
+          },300);
+        }
+      };
+    })(files[i]);
+    reader.readAsArrayBuffer(files[i]);
+  }
+}
+
+function parseDXFBytes(buffer){
+  var text;
+  var encodings=['euc-kr','cp949','utf-8'];
+  for(var ei=0;ei<encodings.length;ei++){
+    try{var dec=new TextDecoder(encodings[ei],{fatal:true});text=dec.decode(buffer);break;}catch(e){}
+  }
+  if(!text) text=new TextDecoder('utf-8',{fatal:false}).decode(buffer);
+  return parseDXFText(text);
+}
+
+function parseDXFText(text){
+  var lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  var contours=[],layers={},rawLines=[];
+  var i=0;
+  function sf(s){var v=parseFloat(s);return isNaN(v)?null:v;}
+  function validCoord(x,y){return x!==null&&y!==null&&(Math.abs(x)>100||Math.abs(y)>100);}
+  var LAYER_INTERVAL={'B0014112':50,'B0014116':50,'B0014111':10,'B0014113':10,'B0014117':10,'B0014118':5,'B0014114':5,'B0014119':5};
+  function addEntity(layer,elev,pts,hasElev){
+    if(!pts||pts.length<2) return;
+    if(!validCoord(pts[0].x,pts[0].y)) return;
+    if(!layers[layer]) layers[layer]=[];
+    layers[layer].push({elev:elev,pts:pts,hasElev:!!hasElev});
+    rawLines.push({layer:layer,elev:elev,pts:pts,hasElev:!!hasElev});
+    if(hasElev&&elev!==0) contours.push({elev:elev,pts:pts,layer:layer});
+  }
+  while(i<lines.length-1){
+    var code=lines[i].trim();i++;
+    var val=(i<lines.length)?lines[i].trim():'';i++;
+    if(code==='0'&&(val==='LWPOLYLINE'||val==='POLYLINE')){
+      var layer='0',elev=0,hasElev=false,pts=[],cx=null,cy=null;
+      while(i<lines.length-1){
+        var c2=lines[i].trim();if(c2==='0') break;
+        var v2=(i+1<lines.length)?lines[i+1].trim():'';i+=2;
+        if(c2==='8') layer=v2;
+        else if(c2==='38'||c2==='30'){var fe=sf(v2);if(fe!==null){elev=fe;hasElev=true;}}
+        else if(c2==='10'){if(cx!==null&&cy!==null)pts.push({x:cx,y:cy});cx=sf(v2);}
+        else if(c2==='20') cy=sf(v2);
+      }
+      if(cx!==null&&cy!==null) pts.push({x:cx,y:cy});
+      addEntity(layer,elev,pts,hasElev);
+    }
+  }
+  var textPoints=[];i=0;
+  while(i<lines.length-1){
+    var tc=lines[i].trim();i++;var tv=(i<lines.length)?lines[i].trim():'';i++;
+    if(tc==='0'&&(tv==='TEXT'||tv==='MTEXT')){
+      var tx=null,ty=null,tstr='',tlay='';
+      while(i<lines.length-1){
+        var tc2=lines[i].trim();if(tc2==='0') break;
+        var tv2=(i+1<lines.length)?lines[i+1].trim():'';i+=2;
+        if(tc2==='10') tx=sf(tv2);else if(tc2==='20') ty=sf(tv2);
+        else if(tc2==='1') tstr=tv2;else if(tc2==='8') tlay=tv2;
+      }
+      if(tx!==null&&ty!==null&&tstr&&validCoord(tx,ty)){
+        var numMatch=tstr.match(/([0-9]+(?:\.[0-9]+)?)/);
+        if(numMatch){var numVal=parseFloat(numMatch[1]);if(isFinite(numVal)&&numVal>=1)textPoints.push({x:tx,y:ty,val:numVal,layer:tlay});}
+      }
+    }
+  }
+  S.textPoints=(S.textPoints||[]).concat(textPoints);
+  if(textPoints.length>0){
+    for(var lname in layers){
+      var interval=LAYER_INTERVAL[lname];if(!interval) continue;
+      layers[lname].forEach(function(item){
+        if(item.hasElev&&item.elev!==0) return;
+        var wSum=0,vSum=0;
+        textPoints.forEach(function(tp){
+          var minD2=Infinity;
+          for(var pi=0;pi<item.pts.length;pi+=Math.max(1,Math.floor(item.pts.length/8))){
+            var d2=Math.pow(item.pts[pi].x-tp.x,2)+Math.pow(item.pts[pi].y-tp.y,2);
+            if(d2<minD2) minD2=d2;
+          }
+          if(minD2<1){wSum=1;vSum=tp.val;return;}
+          var w=1/minD2;wSum+=w;vSum+=w*tp.val;
+        });
+        if(wSum>0){
+          var snapped=Math.round((vSum/wSum)/interval)*interval;
+          item.elev=snapped;item.hasElev=true;
+          contours.push({elev:snapped,pts:item.pts,layer:lname});
+        }
+      });
+    }
+  }
+  return{contours:contours,layers:layers,rawLines:rawLines,srcLines:lines};
+}
+
+function runAnalysis(){
+  if(!S.contours.length&&!S.rawLines.length){notify('데이터가 없습니다','warn');return;}
+  var allXs=[],allYs=[];
+  S.rawLines.forEach(function(r){r.pts.forEach(function(p){allXs.push(p.x);allYs.push(p.y);});});
+  var pts=[],zSamples=[];
+  var totalLen=0;
+  S.contours.forEach(function(c){for(var i=0;i<c.pts.length-1;i++)totalLen+=dist(c.pts[i],c.pts[i+1]);});
+  var sampleDist=Math.max(totalLen/S.density,0.5);
+  S.contours.forEach(function(c){
+    var acc=0;pts.push({x:c.pts[0].x,y:c.pts[0].y,z:c.elev});zSamples.push({x:c.pts[0].x,y:c.pts[0].y,z:c.elev});
+    for(var i=1;i<c.pts.length;i++){
+      var d=dist(c.pts[i-1],c.pts[i]);acc+=d;
+      if(acc>=sampleDist){pts.push({x:c.pts[i].x,y:c.pts[i].y,z:c.elev});zSamples.push({x:c.pts[i].x,y:c.pts[i].y,z:c.elev});acc=0;}
+      else if(acc>=sampleDist*0.3) zSamples.push({x:c.pts[i].x,y:c.pts[i].y,z:c.elev});
+    }
+  });
+  if(S.contours.length>1){
+    for(var ci=0;ci<S.contours.length-1;ci++){
+      var c1=S.contours[ci],c2=S.contours[ci+1];
+      if(Math.abs(c1.elev-c2.elev)>0.1){
+        var cx1=0,cy1=0,cx2=0,cy2=0;
+        c1.pts.forEach(function(p){cx1+=p.x;cy1+=p.y;});cx1/=c1.pts.length;cy1/=c1.pts.length;
+        c2.pts.forEach(function(p){cx2+=p.x;cy2+=p.y;});cx2/=c2.pts.length;cy2/=c2.pts.length;
+        var midZ=(c1.elev+c2.elev)/2;
+        for(var k=1;k<4;k++){var t=k/4;pts.push({x:cx1+(cx2-cx1)*t,y:cy1+(cy2-cy1)*t,z:midZ});}
+      }
+    }
+  }
+  S.textPoints.forEach(function(tp){zSamples.push({x:tp.x,y:tp.y,z:tp.val});if(tp.layer==='_SURVEY_PT'||tp.layer==='F0011111')pts.push({x:tp.x,y:tp.y,z:tp.val});});
+  var seen={},clean=[];
+  pts.forEach(function(p){var k=p.x.toFixed(1)+','+p.y.toFixed(1);if(!seen[k]){seen[k]=1;clean.push(p);}});
+  S.tinPts=clean;S.zSamples=zSamples;
+  var zs=clean.map(function(p){return p.z;});
+  S.bounds={minX:Math.min.apply(null,allXs),maxX:Math.max.apply(null,allXs),minY:Math.min.apply(null,allYs),maxY:Math.max.apply(null,allYs),minZ:Math.min.apply(null,zs),maxZ:Math.max.apply(null,zs)};
+  document.getElementById('minE').textContent=S.bounds.minZ.toFixed(1)+'m';
+  document.getElementById('maxE').textContent=S.bounds.maxZ.toFixed(1)+'m';
+  document.getElementById('emp').style.display='none';
+  document.getElementById('minfo').style.display='block';
+  notify('정밀 삼각망 생성 중...');
+  setTimeout(function(){S.tris=bowyer(S.tinPts);calculateSlopes();updateLayerList();fitView();notify('분석 완료!');},50);
+}
+
+function bowyer(pts){
+  var n=pts.length,b=S.bounds,d=Math.max(b.maxX-b.minX,b.maxY-b.minY)*20;
+  var mx=(b.minX+b.maxX)/2,my=(b.minY+b.maxY)/2;
+  var all=pts.concat([{x:mx-d,y:my-d,z:0},{x:mx,y:my+d*2,z:0},{x:mx+d*2,y:my-d,z:0}]);
+  var s0=n,s1=n+1,s2=n+2;
+  var tris=[{a:s0,b:s1,c:s2,del:false}];
+  for(var i=0;i<n;i++){
+    var p=all[i],edges=[];
+    for(var j=0;j<tris.length;j++){var t=tris[j];if(t.del)continue;if(inCirc(all[t.a],all[t.b],all[t.c],p)){t.del=true;edges.push([t.a,t.b],[t.b,t.c],[t.c,t.a]);}}
+    var edgeCount={};
+    edges.forEach(function(e){var k=Math.min(e[0],e[1])+"_"+Math.max(e[0],e[1]);edgeCount[k]=(edgeCount[k]||0)+1;});
+    edges.forEach(function(e){var k=Math.min(e[0],e[1])+"_"+Math.max(e[0],e[1]);if(edgeCount[k]===1)tris.push({a:e[0],b:e[1],c:i,del:false});});
+  }
+  for(var ci=0;ci<S.contours.length;ci++){
+    var c=S.contours[ci];
+    for(var pi=0;pi<c.pts.length-1;pi++){
+      var idx1=findPt(pts,c.pts[pi]),idx2=findPt(pts,c.pts[pi+1]);
+      if(idx1>=0&&idx2>=0&&idx1!==idx2) insertConstraint(tris,all,idx1,idx2);
+    }
+  }
+  var avgNND=(b.maxX-b.minX+b.maxY-b.minY)/2/Math.sqrt(n),maxEdge=avgNND*25;
+  return tris.filter(function(t){
+    if(t.del||t.a>=n||t.b>=n||t.c>=n) return false;
+    var Pa=all[t.a],Pb=all[t.b],Pc=all[t.c];
+    return dist(Pa,Pb)<maxEdge&&dist(Pb,Pc)<maxEdge&&dist(Pc,Pa)<maxEdge;
+  });
+}
+
+function insertConstraint(tris,pts,ai,bi){
+  if(edgeExists(tris,ai,bi)) return;
+  var iter=0,A=pts[ai],B=pts[bi];
+  while(!edgeExists(tris,ai,bi)&&iter<300){
+    iter++;var flipped=false;
+    for(var ti=0;ti<tris.length;ti++){
+      if(tris[ti].del) continue;
+      var t=tris[ti],verts=[t.a,t.b,t.c];
+      for(var ei=0;ei<3;ei++){
+        var u=verts[ei],v=verts[(ei+1)%3];
+        if(u===ai||u===bi||v===ai||v===bi) continue;
+        if(!segsIntersect(A,B,pts[u],pts[v])) continue;
+        var adj=-1;
+        for(var tj=0;tj<tris.length;tj++){if(tj===ti||tris[tj].del)continue;var tv=tris[tj];if((tv.a===u||tv.b===u||tv.c===u)&&(tv.a===v||tv.b===v||tv.c===v)){adj=tj;break;}}
+        if(adj<0) continue;
+        var wa=tris[adj],w3=-1,w4=-1;
+        [wa.a,wa.b,wa.c].forEach(function(x){if(x!==u&&x!==v)w3=x;});
+        [t.a,t.b,t.c].forEach(function(x){if(x!==u&&x!==v)w4=x;});
+        if(w3<0||w4<0) continue;
+        if(orient2(pts[u],pts[w3],pts[v])*orient2(pts[u],pts[w4],pts[v])>=0) continue;
+        tris[ti].del=true;tris[adj].del=true;
+        var nt1={a:u,b:w3,c:w4,del:false},nt2={a:v,b:w4,c:w3,del:false};
+        if(orient2(pts[nt1.a],pts[nt1.b],pts[nt1.c])<0){var tmp=nt1.b;nt1.b=nt1.c;nt1.c=tmp;}
+        if(orient2(pts[nt2.a],pts[nt2.b],pts[nt2.c])<0){var tmp=nt2.b;nt2.b=nt2.c;nt2.c=tmp;}
+        tris.push(nt1,nt2);flipped=true;break;
+      }
+      if(flipped) break;
+    }
+    if(!flipped) break;
+  }
+}
+
+function calculateSlopes(){
+  var maxS=0;S.arrows=[];
+  S.tris.forEach(function(t){
+    var p1=S.tinPts[t.a],p2=S.tinPts[t.b],p3=S.tinPts[t.c];
+    var ux=p2.x-p1.x,uy=p2.y-p1.y,uz=p2.z-p1.z;
+    var vx=p3.x-p1.x,vy=p3.y-p1.y,vz=p3.z-p1.z;
+    var nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+    if(Math.abs(nz)<1e-6){t.slope=0;return;}
+    var sx=-nx/nz,sy=-ny/nz,slope=Math.sqrt(sx*sx+sy*sy);
+    t.slope=slope;if(slope>maxS)maxS=slope;
+    if(Math.random()>0.8){var mx=(p1.x+p2.x+p3.x)/3,my=(p1.y+p2.y+p3.y)/3;if(slope>0.01)S.arrows.push({x:mx,y:my,dx:sx/slope,dy:sy/slope});}
+  });
+  document.getElementById('statTris').innerHTML='삼각형: <b>'+S.tris.length.toLocaleString()+'</b>';
+  document.getElementById('statSlope').innerHTML='최대경사: <b>'+(maxS*100).toFixed(1)+'%</b>';
+}
+
+function loop(){render();requestAnimationFrame(loop);}
+function render(){
+  ctx.clearRect(0,0,mc.width,mc.height);
+  if(!S.bounds) return;
+  if(S.vis.slp){S.tris.forEach(function(t){var p1=w2s(S.tinPts[t.a]),p2=w2s(S.tinPts[t.b]),p3=w2s(S.tinPts[t.c]);var s=Math.min(t.slope*2,1);ctx.fillStyle='hsla('+(120-s*120)+',70%,50%,0.4)';ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.fill();});}
+  if(S.vis.tin){ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=0.5;S.tris.forEach(function(t){var p1=w2s(S.tinPts[t.a]),p2=w2s(S.tinPts[t.b]),p3=w2s(S.tinPts[t.c]);ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.closePath();ctx.stroke();});}
+  if(S.vis.con){ctx.lineWidth=1;S.contours.forEach(function(c){var t=(c.elev-S.bounds.minZ)/(S.bounds.maxZ-S.bounds.minZ||1);ctx.strokeStyle='hsla('+(240-t*240)+',80%,60%,0.8)';ctx.beginPath();c.pts.forEach(function(p,i){var s=w2s(p);if(i===0)ctx.moveTo(s.x,s.y);else ctx.lineTo(s.x,s.y);});ctx.stroke();});}
+  if(S.vis.flw){ctx.strokeStyle='rgba(56,189,248,0.6)';ctx.lineWidth=1;S.arrows.forEach(function(a){var s=w2s(a);ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x+a.dx*10,s.y-a.dy*10);ctx.stroke();});}
+  if(S.secS&&S.secE){var p1=w2s(S.secS),p2=w2s(S.secE);ctx.strokeStyle='#38bdf8';ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();ctx.setLineDash([]);}
+}
+
+function dist(p1,p2){return Math.sqrt(Math.pow(p1.x-p2.x,2)+Math.pow(p1.y-p2.y,2));}
+function w2s(p){return{x:p.x*S.scale+S.ox,y:mc.height-(p.y*S.scale+S.oy)};}
+function s2w(x,y){return{x:(x-S.ox)/S.scale,y:(mc.height-y-S.oy)/S.scale};}
+function findPt(pts,p){for(var i=0;i<pts.length;i++){if(Math.abs(pts[i].x-p.x)<0.1&&Math.abs(pts[i].y-p.y)<0.1)return i;}return -1;}
+function inCirc(A,B,C,P){var ax=A.x-P.x,ay=A.y-P.y,bx=B.x-P.x,by=B.y-P.y,cx=C.x-P.x,cy=C.y-P.y;var det=(ax*ax+ay*ay)*(bx*cy-by*cx)-(bx*bx+by*by)*(ax*cy-ay*cx)+(cx*cx+cy*cy)*(ax*by-ay*bx);var area=(B.x-A.x)*(C.y-A.y)-(B.y-A.y)*(C.x-A.x);return area>0?det>1e-7:det<-1e-7;}
+function orient2(A,B,C){return(B.x-A.x)*(C.y-A.y)-(B.y-A.y)*(C.x-A.x);}
+function segsIntersect(A,B,C,D){var f1=orient2(A,B,C),f2=orient2(A,B,D),f3=orient2(C,D,A),f4=orient2(C,D,B);return((f1>0&&f2<0)||(f1<0&&f2>0))&&((f3>0&&f4<0)||(f3<0&&f4>0));}
+function edgeExists(tris,ai,bi){for(var i=0;i<tris.length;i++){var t=tris[i];if(t.del)continue;if((t.a===ai&&t.b===bi)||(t.b===ai&&t.a===bi)||(t.b===ai&&t.c===bi)||(t.c===ai&&t.b===bi)||(t.a===ai&&t.c===bi)||(t.c===ai&&t.a===bi))return true;}return false;}
+function fitView(){var b=S.bounds,pad=60,sw=mc.width-pad*2,sh=mc.height-pad*2;var dx=b.maxX-b.minX,dy=b.maxY-b.minY;S.scale=Math.min(sw/(dx||1),sh/(dy||1));S.ox=(mc.width-dx*S.scale)/2-b.minX*S.scale;S.oy=(mc.height-dy*S.scale)/2-b.minY*S.scale;}
+function notify(msg,type){var n=document.getElementById('notif');n.textContent=msg;n.style.display='block';n.style.borderColor=type==='warn'?'#ef4444':'#00d4ff';setTimeout(function(){n.style.display='none';},3000);}
+function updateLayerList(){var h='';for(var k in S.layers)h+='<div class="litem"><div class="ldot" style="background:#00d4ff"></div><div class="lname">'+k+'</div><div class="lcnt">'+S.layers[k].length+'</div></div>';document.getElementById('layerList').innerHTML=h;}
+function onDown(e){var rect=mc.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;S.isDown=true;S.lastM={x:x,y:y};if(S.tool==='sec'){S.secS=s2w(x,y);S.secE=null;}}
+function onMove(e){
+  var rect=mc.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+  if(S.isDown){
+    if(S.tool==='pan'){S.ox+=x-S.lastM.x;S.oy-=y-S.lastM.y;S.lastM={x:x,y:y};}
+    else if(S.tool==='sec'){S.secE=s2w(x,y);updateSection();}
+  }
+  if(S.bounds){
+    var wp=s2w(x,y);
+    document.getElementById('curX').textContent=wp.x.toFixed(1);
+    document.getElementById('curY').textContent=wp.y.toFixed(1);
+    var bZ=0,bD=50/S.scale;
+    S.tinPts.forEach(function(p){var d=dist(p,wp);if(d<bD){bD=d;bZ=p.z;}});
+    document.getElementById('curZ').textContent=bZ?bZ.toFixed(2)+'m':'-';
+    document.getElementById('statZ').innerHTML='Z: <b>'+(bZ?bZ.toFixed(1):'-')+'m</b>';
+  }
+}
+function onUp(){S.isDown=false;}
+function onWheel(e){e.preventDefault();var rect=mc.getBoundingClientRect(),mx=e.clientX-rect.left,my=e.clientY-rect.top;var wp=s2w(mx,my);S.scale*=(e.deltaY>0?0.9:1.1);S.ox=mx-wp.x*S.scale;S.oy=(mc.height-my)-wp.y*S.scale;}
+function updateSection(){
+  var d=dist(S.secS,S.secE);document.getElementById('sDist').textContent=d.toFixed(1);
+  var prof=[],minZ=Infinity,maxZ=-Infinity;
+  for(var i=0;i<=50;i++){
+    var t=i/50,wx=S.secS.x+(S.secE.x-S.secS.x)*t,wy=S.secS.y+(S.secE.y-S.secS.y)*t;
+    var bZ=0,bD=Infinity;S.zSamples.forEach(function(p){var d2=Math.pow(p.x-wx,2)+Math.pow(p.y-wy,2);if(d2<bD){bD=d2;bZ=p.z;}});
+    prof.push({d:d*t,z:bZ});if(bZ<minZ)minZ=bZ;if(bZ>maxZ)maxZ=bZ;
+  }
+  document.getElementById('sHeight').textContent=(maxZ-minZ).toFixed(1);
+  document.getElementById('sSlope').textContent=d>0?((maxZ-minZ)/d*100).toFixed(1):'0';
+  drawSection(prof,minZ,maxZ,d);
+}
+function drawSection(p,min,max,d){
+  sctx.clearRect(0,0,sc.width,sc.height);if(p.length<2)return;
+  var pad=24,w=sc.width-pad*2,h=sc.height-pad*2,r=Math.max(max-min,1);
+  var sx=function(v){return pad+(v/d)*w;},sy=function(v){return sc.height-pad-((v-min)/r)*h;};
+  sctx.fillStyle='rgba(0,212,255,0.1)';sctx.beginPath();sctx.moveTo(sx(0),sc.height-pad);p.forEach(function(v){sctx.lineTo(sx(v.d),sy(v.z));});sctx.lineTo(sx(d),sc.height-pad);sctx.fill();
+  sctx.strokeStyle='#00d4ff';sctx.lineWidth=2;sctx.beginPath();p.forEach(function(v,i){if(i===0)sctx.moveTo(sx(v.d),sy(v.z));else sctx.lineTo(sx(v.d),sy(v.z));});sctx.stroke();
+}
+function clearSection(){sctx.clearRect(0,0,sc.width,sc.height);['sDist','sHeight','sSlope'].forEach(function(id){document.getElementById(id).textContent='-';});}
+function exportPNG(){var link=document.createElement('a');link.download='slope_analysis.png';link.href=mc.toDataURL();link.click();}
+function exportDXF(){
+  var d='0\nSECTION\n2\nENTITIES\n';
+  S.tris.forEach(function(t){var p1=S.tinPts[t.a],p2=S.tinPts[t.b],p3=S.tinPts[t.c];d+='0\n3DFACE\n8\nTIN_SLOPE\n10\n'+p1.x+'\n20\n'+p1.y+'\n30\n'+p1.z+'\n11\n'+p2.x+'\n21\n'+p2.y+'\n31\n'+p2.z+'\n12\n'+p3.x+'\n22\n'+p3.y+'\n32\n'+p3.z+'\n13\n'+p3.x+'\n23\n'+p3.y+'\n33\n'+p3.z+'\n';});
+  d+='0\nENDSEC\n0\nEOF';
+  var blob=new Blob([d],{type:'text/plain'});var url=URL.createObjectURL(blob);var link=document.createElement('a');link.download='slope_TIN.dxf';link.href=url;link.click();
+}
+</script>
+</body>
+</html>

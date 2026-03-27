@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>G-DSP — 설정</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f7fa;--bg2:#eef1f6;--bg3:#e6eaf2;
+  --card:#ffffff;--line:#dde3ed;--line2:#c8d0e0;
+  --txt:#1a2540;--txt2:#3d5070;--txt3:#7a90b0;
+  --blue:#2563eb;--blue2:#3b82f6;--blue3:#1d4ed8;
+  --green:#059669;--red:#ef4444;--gold:#d97706;
+  --cyan:#0891b2;--neon:#2563eb;
+  --shadow:0 1px 4px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06);
+  --shadow2:0 2px 8px rgba(0,0,0,.1),0 8px 24px rgba(0,0,0,.08);
+  --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Noto Sans KR','Malgun Gothic',sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+button,input,select,textarea{font:inherit;cursor:pointer}
+button{border:none;background:none;color:inherit}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+
+/* ── 다크모드 ── */
+body.dark{
+  --bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;
+  --card:#1a2640;--line:#243552;--line2:#2e4168;
+  --txt:#e8f0ff;--txt2:#aabbd4;--txt3:#6a85a8;
+  --neon:#3b82f6;
+}
+
+/* ── 레이아웃 ── */
+.wrap{display:flex;flex-direction:column;height:100vh}
+
+/* ── 헤더 ── */
+.hdr{
+  height:52px;display:flex;align-items:center;gap:12px;
+  padding:0 20px;background:var(--card);
+  border-bottom:1px solid var(--line);
+  box-shadow:0 1px 4px rgba(0,0,0,.06);
+  flex-shrink:0;
+}
+.hdr-logo{font-family:'Noto Sans KR',sans-serif;font-size:15px;font-weight:900;color:var(--blue);letter-spacing:1px}
+.hdr-sep{width:1px;height:18px;background:var(--line);flex-shrink:0}
+.hdr-title{font-size:14px;font-weight:700;color:var(--txt)}
+.hdr-sub{font-size:11px;color:var(--txt3);margin-left:4px}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.hbtn{height:30px;padding:0 12px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--txt2);font-size:11px;font-weight:700;transition:.15s;cursor:pointer}
+.hbtn:hover{border-color:var(--blue2);color:var(--blue2);background:rgba(37,99,235,.05)}
+.hbtn.close{border-color:rgba(239,68,68,.3);color:var(--red);background:rgba(239,68,68,.05)}
+.hbtn.close:hover{background:rgba(239,68,68,.1)}
+
+/* ── 바디 ── */
+.body{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+
+/* ── 섹션 타이틀 ── */
+.sec-title{
+  font-size:11px;font-weight:700;color:var(--txt3);
+  letter-spacing:.8px;text-transform:uppercase;
+  display:flex;align-items:center;gap:7px;
+  padding:0 0 10px;border-bottom:1px solid var(--line);
+  margin-bottom:12px;
+}
+.sec-title svg{width:13px;height:13px;color:var(--neon)}
+
+/* ── API 카드 ── */
+.api-card{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:16px;
+  transition:.15s;
+}
+.api-card:hover{border-color:var(--line2);box-shadow:var(--shadow)}
+.api-card-hdr{
+  display:flex;align-items:center;gap:8px;margin-bottom:12px;
+}
+.api-card-ico{
+  width:32px;height:32px;border-radius:8px;
+  display:grid;place-items:center;flex-shrink:0;
+}
+.api-card-ico svg{width:15px;height:15px}
+.api-card-name{font-size:13px;font-weight:700;color:var(--txt)}
+.api-card-desc{font-size:11px;color:var(--txt3);margin-top:1px}
+.api-row{display:grid;gap:5px;margin-bottom:8px}
+.api-row-btns{display:flex;gap:5px;margin-top:5px}
+.mf{
+  width:100%;height:36px;padding:0 12px;
+  background:var(--bg2);border:1px solid var(--line2);
+  border-radius:8px;color:var(--txt);font-size:12px;
+  outline:none;transition:.15s;
+}
+.mf:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.mf::placeholder{color:var(--txt3)}
+.mbtn{
+  height:32px;padding:0 12px;border-radius:7px;
+  border:1px solid var(--line2);font-size:11px;font-weight:700;
+  cursor:pointer;transition:.15s;white-space:nowrap;
+}
+.mbtn:hover{filter:brightness(.95)}
+.mbtn-s{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.25);color:var(--blue2)}
+.mbtn-t{background:rgba(5,150,105,.08);border-color:rgba(5,150,105,.2);color:var(--green)}
+.mbtn-d{background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.2);color:var(--red)}
+
+/* ── 상태 뱃지 ── */
+.st-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.st-lbl{font-size:11px;color:var(--txt3)}
+.cbadge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:5px}
+.cb-ok{background:rgba(5,150,105,.1);color:var(--green);border:1px solid rgba(5,150,105,.25)}
+.cb-err{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+.cb-none{background:rgba(255,255,255,.04);color:var(--txt3);border:1px solid var(--line)}
+.st-extra{font-size:10px;margin-left:auto}
+
+/* ── 그리드 ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-1{display:grid;grid-template-columns:1fr;gap:12px}
+
+/* ── 서버 카드 ── */
+.server-card{
+  background:linear-gradient(135deg,rgba(37,99,235,.04),rgba(37,99,235,.02));
+  border:1.5px solid rgba(37,99,235,.2);
+  border-radius:var(--radius);padding:16px;
+}
+.server-info{
+  background:var(--bg2);border-radius:8px;
+  padding:10px 14px;margin-bottom:12px;
+  font-size:12px;color:var(--txt2);line-height:2;
+}
+.server-info code{
+  background:var(--card);padding:2px 7px;
+  border-radius:4px;border:1px solid var(--line2);
+  font-size:11px;font-family:monospace;
+}
+
+/* ── 알림 ── */
+.res-bar{
+  background:var(--bg2);border:1px solid var(--line);
+  border-radius:8px;padding:10px 14px;
+  font-size:12px;color:var(--txt3);min-height:38px;
+  display:flex;align-items:center;gap:8px;
+}
+
+/* ── 토스트 ── */
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#1e293b;color:#fff;padding:10px 22px;
+  border-radius:10px;font-size:13px;font-weight:600;
+  z-index:9999;opacity:0;transition:.25s;pointer-events:none;
+  white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.4);
+}
+
+/* ── 라이트/다크 ── */
+.theme-btn{
+  height:28px;padding:0 11px;border-radius:7px;
+  border:1px solid var(--line2);background:var(--bg2);
+  color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 헤더 -->
+  <div class="hdr">
+    <span class="hdr-logo">G-DSP</span>
+    <div class="hdr-sep"></div>
+    <span class="hdr-title">⚙️ 설정</span>
+    <span class="hdr-sub">API 키 · 서버 · 법적고지</span>
+    <div class="hdr-right">
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">🌙 다크</button>
+      <button class="hbtn close" onclick="window.close()">✕ 닫기</button>
+    </div>
+  </div>
+
+  <!-- 바디 -->
+  <div class="body">
+
+    <!-- 결과 바 -->
+    <div class="res-bar" id="resBar">▶ 각 항목 저장 → 테스트 순으로 진행하세요.</div>
+
+    <!-- API 키 섹션 -->
+    <div>
+      <div class="sec-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        API 키 설정
+      </div>
+      <div class="grid-2">
+
+        <!-- 카카오 -->
+        <div class="api-card">
+          <div class="api-card-hdr">
+            <div class="api-card-ico" style="background:rgba(255,196,0,.12);border:1px solid rgba(255,196,0,.25)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            </div>
+            <div>
+              <div class="api-card-name">카카오 API</div>
+              <div class="api-card-desc">developers.kakao.com · 무료</div>
+            </div>
+          </div>
+          <div class="api-row">
+            <input class="mf" id="kakaoKey" type="password" placeholder="REST API KEY">
+          </div>
+          <div class="api-row-btns">
+            <button class="mbtn mbtn-s" onclick="saveApi('kakao')">저장</button>
+            <button class="mbtn mbtn-d" onclick="delApi('kakao')">삭제</button>
+            <button class="mbtn mbtn-t" onclick="testApi('kakao')">테스트</button>
+          </div>
+          <div class="st-row">
+            <span class="st-lbl">연결 상태</span>
+            <span class="cbadge cb-none" id="kakaoSt">미확인</span>
+            <span class="st-extra" style="color:var(--blue2)">♾️ 만료 없음</span>
+          </div>
+        </div>
+
+        <!-- VWorld -->
+        <div class="api-card">
+          <div class="api-card-hdr">
+            <div class="api-card-ico" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+            </div>
+            <div>
+              <div class="api-card-name">VWorld API</div>
+              <div class="api-card-desc">map.vworld.kr · 무료 발급</div>
+            </div>
+          </div>
+          <div class="api-row">
+            <input class="mf" id="vworldKey" type="password" placeholder="API KEY">
+          </div>
+          <div class="api-row-btns">
+            <button class="mbtn mbtn-s" onclick="saveApi('vworld')">저장</button>
+            <button class="mbtn mbtn-d" onclick="delApi('vworld')">삭제</button>
+            <button class="mbtn mbtn-t" onclick="testApi('vworld')">테스트</button>
+          </div>
+          <div class="st-row">
+            <span class="st-lbl">연결 상태</span>
+            <span class="cbadge cb-none" id="vworldSt">미확인</span>
+            <span class="st-extra" style="color:var(--blue2)">♾️ 만료 없음</span>
+          </div>
+        </div>
+
+        <!-- 건축물대장 -->
+        <div class="api-card">
+          <div class="api-card-hdr">
+            <div class="api-card-ico" style="background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <div>
+              <div class="api-card-name">건축물대장 API</div>
+              <div class="api-card-desc">data.go.kr · 공공데이터포털</div>
+            </div>
+          </div>
+          <div class="api-row">
+            <input class="mf" id="buildingKey" type="password" placeholder="API KEY">
+          </div>
+          <div class="api-row-btns">
+            <button class="mbtn mbtn-s" onclick="saveApi('building')">저장</button>
+            <button class="mbtn mbtn-t" onclick="testApi('building')">테스트</button>
+          </div>
+          <div class="st-row">
+            <span class="st-lbl">연결 상태</span>
+            <span class="cbadge cb-none" id="buildingSt">미확인</span>
+            <span class="st-extra" style="color:var(--gold)">📅 만료 2028-03-17</span>
+          </div>
+        </div>
+
+        <!-- 토지이용 -->
+        <div class="api-card">
+          <div class="api-card-hdr">
+            <div class="api-card-ico" style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div>
+              <div class="api-card-name">토지이용 API</div>
+              <div class="api-card-desc">data.go.kr · 공공데이터포털</div>
+            </div>
+          </div>
+          <div class="api-row">
+            <input class="mf" id="landKey" type="password" placeholder="API KEY">
+          </div>
+          <div class="api-row-btns">
+            <button class="mbtn mbtn-s" onclick="saveApi('land')">저장</button>
+            <button class="mbtn mbtn-t" onclick="testApi('land')">테스트</button>
+          </div>
+          <div class="st-row">
+            <span class="st-lbl">연결 상태</span>
+            <span class="cbadge cb-none" id="landSt">미확인</span>
+            <span class="st-extra" style="color:var(--gold)">📅 만료 2028-03-17</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 국토정보플랫폼 -->
+    <div>
+      <div class="sec-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
+        국토정보플랫폼 로그인
+      </div>
+      <div class="api-card">
+        <div class="api-card-hdr">
+          <div class="api-card-ico" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.2)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div>
+            <div class="api-card-name">국토정보플랫폼 계정</div>
+            <div class="api-card-desc">map.ngii.go.kr · 수치지형도 다운로드용</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <input class="mf" id="ngiiId" type="text" placeholder="아이디">
+          <input class="mf" id="ngiiPw" type="password" placeholder="비밀번호">
+        </div>
+        <div class="api-row-btns">
+          <button class="mbtn mbtn-s" onclick="saveNgii()">저장</button>
+          <button class="mbtn mbtn-d" onclick="delNgii()">삭제</button>
+          <button class="mbtn mbtn-t" onclick="testNgii()">확인</button>
+        </div>
+        <div class="st-row">
+          <span class="st-lbl">연결 상태</span>
+          <span class="cbadge cb-none" id="ngiiSt">미확인</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 민원 자동갱신 서버 -->
+    <div>
+      <div class="sec-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        민원 자동갱신 서버
+      </div>
+      <div class="server-card">
+        <div class="server-info">
+          💻 <b>내 컴퓨터에서 실행</b>: <code>http://localhost:5050</code><br>
+          ☁️ <b>오라클 서버</b>: <code>http://168.107.15.68:5050</code><br>
+          <span style="color:var(--gold);font-size:11px">※ 서버가 연결되어야 ↻갱신 버튼이 실제로 작동합니다</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <input class="mf" id="crawlServerUrl" type="text" placeholder="http://localhost:5050" style="flex:1">
+          <button class="mbtn mbtn-s" onclick="saveCrawlServer()" style="width:56px">저장</button>
+          <button class="mbtn mbtn-t" onclick="testCrawlServer()" style="width:70px">연결 확인</button>
+        </div>
+        <div class="st-row">
+          <span class="st-lbl">연결 상태</span>
+          <span class="cbadge cb-none" id="crawlSt">미확인</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 법적고지 -->
+    <div>
+      <div class="sec-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        법적 고지
+      </div>
+      <div class="api-card" style="border-color:rgba(217,119,6,.2);background:rgba(217,119,6,.02)">
+        <div style="font-size:12px;color:var(--txt2);line-height:2">
+          ⚠ 본 시스템의 면적 계산 결과는 <b>공식 측량 성과가 아닙니다.</b><br>
+          인허가 신청·등기·계약·공문서 등에 <b>직접 사용을 금지합니다.</b><br>
+          정확한 면적은 반드시 <b>공인 측량사를 통해 확인</b>하시기 바랍니다.<br>
+          결과값 오류로 인한 모든 책임은 <b>사용자 본인에게 있습니다.</b>
+        </div>
+        <div style="margin-top:10px;font-size:10px;color:var(--txt3)">측량·수로조사 및 지적에 관한 법률 제2조·제39조 | 개발자: 유영대 | G-DSP 2026</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+var CRAWL_SERVER = localStorage.getItem('gdsp_crawl_server') || 'http://localhost:5050';
+var _tt;
+
+function toast(msg, type){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  t.style.background = type==='err' ? '#991b1b' : type==='ok' ? '#0f766e' : '#1e293b';
+  clearTimeout(_tt);
+  _tt = setTimeout(function(){
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(20px)';
+  }, 2400);
+}
+
+function setRes(msg){ var e = document.getElementById('resBar'); if(e) e.textContent = msg; }
+
+function saveApi(key){
+  var ids = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey'};
+  var el = document.getElementById(ids[key]);
+  if(el && el.value.trim()){
+    localStorage.setItem('gdsp_'+key, el.value.trim());
+    toast(key+' API 키 저장됨', 'ok');
+    setRes('✓ 저장됨. 테스트 버튼으로 연결 확인하세요.');
+  } else {
+    toast('API KEY를 입력하세요', 'err');
+  }
+}
+
+function delApi(key){
+  var ids = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey'};
+  var sts = {kakao:'kakaoSt', vworld:'vworldSt', building:'buildingSt', land:'landSt'};
+  var el = document.getElementById(ids[key]); if(el) el.value = '';
+  localStorage.removeItem('gdsp_'+key);
+  var st = document.getElementById(sts[key]);
+  if(st){ st.className = 'cbadge cb-none'; st.textContent = '미확인'; }
+  toast(key+' 삭제됨');
+}
+
+function testApi(key){
+  var ids = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey'};
+  var sts = {kakao:'kakaoSt', vworld:'vworldSt', building:'buildingSt', land:'landSt'};
+  var el = document.getElementById(ids[key]);
+  if(!el || !el.value.trim()){ toast('API KEY를 먼저 입력하세요', 'err'); return; }
+  var apiKey = el.value.trim();
+  var st = document.getElementById(sts[key]);
+  setRes('🔄 연결 테스트 중...');
+  if(st){ st.className = 'cbadge cb-none'; st.textContent = '확인 중...'; }
+
+  if(key === 'kakao'){
+    fetch('https://dapi.kakao.com/v2/local/search/address.json?query=화성시+남양읍+한가울길+70', {
+      headers: {'Authorization': 'KakaoAK '+apiKey}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var ok = d && d.documents && d.documents.length > 0;
+      if(st){ st.className = 'cbadge '+(ok?'cb-ok':'cb-err'); st.textContent = ok?'✓ 연결됨':'✗ 키 오류'; }
+      setRes(ok ? '✓ 카카오 API 정상 연결됨' : '✗ API 키를 확인하세요');
+    })
+    .catch(function(){
+      var ok = apiKey.length > 20;
+      if(st){ st.className = 'cbadge '+(ok?'cb-ok':'cb-err'); st.textContent = ok?'형식 OK':'키 오류'; }
+      setRes(ok ? '형식 확인됨' : '키 형식 오류');
+    });
+
+  } else if(key === 'vworld'){
+    var proxyBase = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+    var vwUrl = 'https://api.vworld.kr/req/address?service=address&request=getAddress&version=2.0&crs=epsg:4326&point=126.978,37.566&type=both&key='+apiKey;
+    fetch(proxyBase+'/api/proxy?url='+encodeURIComponent(vwUrl))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var ok = d && d.response && d.response.status === 'OK';
+      if(st){ st.className = 'cbadge '+(ok?'cb-ok':'cb-err'); st.textContent = ok?'✓ 연결됨':'✗ 키 오류'; }
+      setRes(ok ? '✓ VWorld API 정상 연결됨' : '✗ API 키를 확인하세요');
+    })
+    .catch(function(){
+      var ok = apiKey.length >= 20;
+      if(st){ st.className = 'cbadge '+(ok?'cb-ok':'cb-err'); st.textContent = ok?'형식 OK':'키 오류'; }
+      setRes(ok ? '형식 확인됨' : '키 형식 오류');
+    });
+
+  } else if(key === 'building'){
+    fetch('https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?serviceKey='+encodeURIComponent(apiKey)+'&sigunguCd=41590&numOfRows=1&pageNo=1&_type=json')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var code = d && d.response && d.response.header && d.response.header.resultCode;
+      var ok = (code === '00' || code === '000');
+      if(st){ st.className = 'cbadge '+(ok?'cb-ok':'cb-err'); st.textContent = ok?'✓ 연결됨':'✗ 키 오류'; }
+      setRes(ok ? '✓ 건축물대장 API 정상 연결됨' : '✗ 키 오류: '+code);
+    })
+    .catch(function(){
+      var ok = apiKey.length > 20;
+      if(st){ st.className = 'cbadge '+(ok?'cb-ok':'cb-err'); st.textContent = ok?'형식 OK':'키 오류'; }
+      setRes(ok ? '형식 확인됨 (지번 검색 시 실제 확인)' : '키 형식 오류');
+    });
+
+  } else {
+    setTimeout(function(){
+      var ok = apiKey.length > 20;
+      if(st){ st.className = 'cbadge '+(ok?'cb-ok':'cb-err'); st.textContent = ok?'형식 OK':'키 오류'; }
+      setRes(ok ? '형식 확인됨' : '키 형식 오류');
+    }, 400);
+  }
+}
+
+function saveNgii(){
+  var id = document.getElementById('ngiiId').value.trim();
+  var pw = document.getElementById('ngiiPw').value;
+  if(!id){ toast('아이디를 입력하세요', 'err'); return; }
+  localStorage.setItem('gdsp_ngiiId', id);
+  localStorage.setItem('gdsp_ngiiPw', pw);
+  toast('국토정보플랫폼 로그인 정보 저장됨', 'ok');
+}
+function delNgii(){
+  document.getElementById('ngiiId').value = '';
+  document.getElementById('ngiiPw').value = '';
+  localStorage.removeItem('gdsp_ngiiId');
+  localStorage.removeItem('gdsp_ngiiPw');
+  var st = document.getElementById('ngiiSt');
+  if(st){ st.className = 'cbadge cb-none'; st.textContent = '미확인'; }
+  toast('삭제됨');
+}
+function testNgii(){
+  var id = document.getElementById('ngiiId').value.trim();
+  if(!id){ toast('아이디를 입력하세요', 'err'); return; }
+  var st = document.getElementById('ngiiSt');
+  if(st){ st.className = 'cbadge cb-ok'; st.textContent = '저장됨'; }
+  toast('저장됨 — 실제 로그인은 국토정보플랫폼 이용 시 확인');
+}
+
+function saveCrawlServer(){
+  var el = document.getElementById('crawlServerUrl');
+  var url = (el && el.value.trim()) || 'http://localhost:5050';
+  url = url.replace(/\/+$/, '');
+  CRAWL_SERVER = url;
+  localStorage.setItem('gdsp_crawl_server', url);
+  toast('서버 주소 저장됨', 'ok');
+  testCrawlServer();
+}
+function testCrawlServer(){
+  var st = document.getElementById('crawlSt');
+  if(st){ st.className = 'cbadge cb-none'; st.textContent = '확인 중...'; }
+  fetch(CRAWL_SERVER+'/api/health', {method:'GET'})
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(st){ st.className = 'cbadge cb-ok'; st.textContent = '✓ 연결됨'; }
+    toast('✓ 크롤링 서버 연결 성공', 'ok');
+    setRes('✓ 서버 연결됨 — 민원 자동갱신 사용 가능');
+  })
+  .catch(function(){
+    if(st){ st.className = 'cbadge cb-err'; st.textContent = '✗ 미연결'; }
+    toast('서버 미연결 — server.py를 실행하세요', 'err');
+    setRes('✗ 서버 미연결 — server.py 실행 필요');
+  });
+}
+
+function toggleTheme(){
+  var isDark = document.body.classList.toggle('dark');
+  var btn = document.getElementById('themeBtn');
+  if(btn) btn.textContent = isDark ? '☀️ 라이트' : '🌙 다크';
+  localStorage.setItem('gdsp_theme', isDark ? 'dark' : 'light');
+}
+
+// ── 초기화
+(function(){
+  // 테마 복원
+  if(localStorage.getItem('gdsp_theme') === 'dark'){
+    document.body.classList.add('dark');
+    var btn = document.getElementById('themeBtn');
+    if(btn) btn.textContent = '☀️ 라이트';
+  }
+  // 저장된 값 불러오기
+  var keys = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey'};
+  for(var k in keys){
+    var v = localStorage.getItem('gdsp_'+k);
+    if(v){ var e = document.getElementById(keys[k]); if(e) e.value = v; }
+  }
+  var ngiiId = localStorage.getItem('gdsp_ngiiId'); if(ngiiId){ var e = document.getElementById('ngiiId'); if(e) e.value = ngiiId; }
+  var ngiiPw = localStorage.getItem('gdsp_ngiiPw'); if(ngiiPw){ var e = document.getElementById('ngiiPw'); if(e) e.value = ngiiPw; }
+  var cs = localStorage.getItem('gdsp_crawl_server');
+  var ce = document.getElementById('crawlServerUrl');
+  if(cs){ CRAWL_SERVER = cs; if(ce) ce.value = cs; }
+  else { if(ce) ce.value = 'http://localhost:5050'; }
+  // 서버 자동 연결 확인
+  setTimeout(testCrawlServer, 600);
+})();
+</script>
+</body>
+</html>

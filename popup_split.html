@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>G-DSP — 분할 모드</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f7fa;--bg2:#eef1f6;--bg3:#e6eaf2;
+  --card:#fff;--line:#dde3ed;--line2:#c8d0e0;
+  --txt:#1a2540;--txt2:#3d5070;--txt3:#7a90b0;
+  --blue:#2563eb;--blue2:#3b82f6;--blue3:#1d4ed8;
+  --green:#059669;--red:#ef4444;--gold:#d97706;
+  --neon:#2563eb;--shadow:0 1px 4px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Noto Sans KR','Malgun Gothic',sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+button,input,select,textarea{font:inherit}
+button{border:none;background:none;color:inherit;cursor:pointer}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552;--line2:#2e4168;--txt:#e8f0ff;--txt2:#aabbd4;--txt3:#6a85a8}
+
+.wrap{display:flex;flex-direction:column;height:100vh}
+.hdr{height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0}
+.hdr-logo{font-size:15px;font-weight:900;color:var(--blue);letter-spacing:1px}
+.hdr-sep{width:1px;height:18px;background:var(--line)}
+.hdr-title{font-size:14px;font-weight:700;color:var(--txt)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+.hbtn{height:30px;padding:0 11px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;transition:.15s}
+.hbtn:hover{border-color:var(--blue2);color:var(--blue2)}
+.hbtn.close{border-color:rgba(239,68,68,.3);color:var(--red)}
+.hbtn.close:hover{background:rgba(239,68,68,.08)}
+
+/* 법적고지 배너 */
+.warn-banner{padding:8px 16px;background:rgba(239,68,68,.06);border-bottom:1px solid rgba(239,68,68,.18);font-size:11px;color:var(--red);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.warn-banner svg{width:13px;height:13px;flex-shrink:0}
+
+/* 3분할 레이아웃 */
+.body{flex:1;display:grid;grid-template-columns:210px 1fr 230px;min-height:0;gap:1px;background:var(--line)}
+
+/* 좌: 컨트롤 */
+.ctrl{background:var(--bg2);display:flex;flex-direction:column;overflow-y:auto;padding:12px;scrollbar-width:thin}
+.ctrl-sec{margin-bottom:14px}
+.ctrl-t{font-size:10px;font-weight:700;color:var(--txt3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.ctrl-btn{display:flex;align-items:center;gap:7px;width:100%;padding:7px 10px;border:1px solid var(--line2);border-radius:7px;background:var(--card);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;margin-bottom:5px}
+.ctrl-btn:hover{border-color:var(--blue2);color:var(--blue2);background:rgba(37,99,235,.04)}
+.ctrl-btn.on{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.3);color:var(--blue2)}
+.ctrl-btn.red{border-color:rgba(239,68,68,.3);color:var(--red)}
+.ctrl-btn.red:hover{background:rgba(239,68,68,.06)}
+.ctrl-btn.green{border-color:rgba(5,150,105,.3);color:var(--green)}
+.ctrl-btn.green:hover{background:rgba(5,150,105,.06)}
+.ctrl-btn svg{width:13px;height:13px;flex-shrink:0}
+.inp-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.inp-lbl{font-size:11px;color:var(--txt3);width:60px;flex-shrink:0}
+.inp{flex:1;height:32px;padding:0 10px;background:var(--card);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;transition:.15s}
+.inp:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,.1)}
+.inp-unit{font-size:11px;color:var(--txt3);width:24px}
+.result-box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:50px}
+.result-val{font-size:22px;font-weight:900;color:var(--green)}
+.result-sub{font-size:11px;color:var(--txt3);margin-top:3px}
+
+/* 가운데: 캔버스 */
+.canvas-wrap{position:relative;background:#f0f4ff;overflow:hidden;cursor:crosshair}
+body.dark .canvas-wrap{background:#020810}
+#splitCanvas{position:absolute;top:0;left:0;width:100%;height:100%}
+.canvas-toolbar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(255,255,255,.95);border:1px solid var(--line2);border-radius:9px;padding:6px 10px;backdrop-filter:blur(8px);z-index:10;box-shadow:var(--shadow)}
+body.dark .canvas-toolbar{background:rgba(15,22,35,.95);border-color:var(--line)}
+.ctool{padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--txt3);transition:all .15s;display:flex;align-items:center;gap:5px}
+.ctool:hover{color:var(--txt);border-color:var(--line2);background:var(--bg2)}
+.ctool.act{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.3);color:var(--blue2)}
+.canvas-info{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.9);border:1px solid var(--line2);border-radius:7px;padding:6px 10px;font-size:10px;color:var(--txt3);z-index:10;line-height:1.8;backdrop-filter:blur(6px)}
+body.dark .canvas-info{background:rgba(15,22,35,.9);border-color:var(--line)}
+.canvas-empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--txt3);pointer-events:none}
+.canvas-empty-ico{font-size:48px;opacity:.2;margin-bottom:12px}
+
+/* 우: 정보 패널 */
+.info-panel{background:var(--bg2);display:flex;flex-direction:column;overflow-y:auto;padding:12px;scrollbar-width:thin}
+.info-sec{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+.info-t{font-size:11px;font-weight:700;color:var(--txt2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.info-t svg{width:13px;height:13px;color:var(--neon)}
+.info-row{display:flex;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:12px}
+.info-row:last-child{border-bottom:none}
+.info-k{color:var(--txt3);width:70px;flex-shrink:0}
+.info-v{font-weight:600;color:var(--txt);flex:1}
+.info-v.green{color:var(--green)}
+.info-v.blue{color:var(--blue2)}
+.split-list{display:flex;flex-direction:column;gap:4px}
+.split-item{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg2);border:1px solid var(--line);border-radius:6px;font-size:11px}
+.split-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.split-lbl{flex:1;color:var(--txt2)}
+.split-area{font-weight:700;color:var(--txt)}
+.split-del{color:var(--red);font-size:12px;cursor:pointer;padding:0 4px}
+
+/* 법적고지 오버레이 */
+.legal-overlay{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.legal-box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px;width:500px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.legal-t{font-size:16px;font-weight:800;color:var(--txt);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.legal-content{background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.15);border-radius:10px;padding:14px 16px;font-size:12px;color:var(--txt2);line-height:2;margin-bottom:16px}
+.legal-chk{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;font-size:12px;color:var(--txt2);line-height:1.6;cursor:pointer}
+.legal-chk input{margin-top:2px;accent-color:var(--blue)}
+.legal-agree{width:100%;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--blue3),var(--blue));border:none;color:#fff;font-weight:700;font-size:14px;cursor:pointer;transition:.15s;margin-top:6px;opacity:.4}
+.legal-agree.on{opacity:1}
+.legal-agree.on:hover{filter:brightness(1.08)}
+.legal-cancel{width:100%;height:36px;border-radius:8px;border:1px solid var(--line2);background:var(--bg2);color:var(--txt3);font-size:12px;font-weight:600;cursor:pointer;margin-top:6px}
+
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+</style>
+</head>
+<body>
+
+<!-- 법적고지 오버레이 (첫 진입 시) -->
+<div class="legal-overlay" id="legalOverlay">
+  <div class="legal-box">
+    <div class="legal-t">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      ⚠ 분할 모드 — 법적 고지 및 이용 동의
+    </div>
+    <div class="legal-content">
+      본 시스템의 면적 계산 결과는 <b>공식 측량 성과가 아닙니다.</b><br>
+      인허가 신청·등기·계약·공문서 등에 <b>직접 사용을 금지합니다.</b><br>
+      정확한 면적은 반드시 <b>공인 측량사를 통해 확인</b>하시기 바랍니다.<br>
+      결과값 오류로 인한 모든 책임은 <b>사용자 본인에게 있습니다.</b><br>
+      <em style="font-size:10px;color:var(--txt3)">측량·수로조사 및 지적에 관한 법률 제2조·제39조</em>
+    </div>
+    <label class="legal-chk"><input type="checkbox" id="chk1" onchange="chkAgree()"> 본 기능의 면적 계산이 <b>참고용이며 공식 성과가 아님</b>을 이해하고, 인허가·등기·계약에 직접 사용하지 않겠습니다.</label>
+    <label class="legal-chk"><input type="checkbox" id="chk2" onchange="chkAgree()"> 결과값 오류로 발생하는 손해에 대해 <b>개발자 및 서비스 제공자는 책임을 지지 않음</b>에 동의합니다.</label>
+    <button class="legal-agree" id="agreeBtn" onclick="startSplit()">동의하고 분할 모드 시작</button>
+    <button class="legal-cancel" onclick="window.close()">취소 (창 닫기)</button>
+  </div>
+</div>
+
+<div class="wrap" id="mainWrap" style="display:none">
+
+  <div class="hdr">
+    <span class="hdr-logo">G-DSP</span>
+    <div class="hdr-sep"></div>
+    <span class="hdr-title">✂️ 분할 모드</span>
+    <div style="margin-left:10px;font-size:11px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--red);padding:3px 10px;border-radius:5px;font-weight:700">참고용 · 공식 성과 아님</div>
+    <div class="hdr-right">
+      <button class="hbtn" id="themeBtn" onclick="toggleTheme()">🌙 다크</button>
+      <button class="hbtn close" onclick="window.close()">✕ 닫기</button>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- 좌: 컨트롤 -->
+    <div class="ctrl">
+      <div class="ctrl-sec">
+        <div class="ctrl-t">도구 선택</div>
+        <button class="ctrl-btn on" id="tool-select" onclick="setTool('select',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-7 1-3 7z"/></svg>선택 / 이동
+        </button>
+        <button class="ctrl-btn" id="tool-draw" onclick="setTool('draw',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>분할선 그리기
+        </button>
+        <button class="ctrl-btn" id="tool-measure" onclick="setTool('measure',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="5" y1="9" x2="5" y2="15"/><line x1="19" y1="9" x2="19" y2="15"/></svg>길이 측정
+        </button>
+      </div>
+
+      <div class="ctrl-sec">
+        <div class="ctrl-t">필지 설정</div>
+        <div class="inp-row">
+          <span class="inp-lbl">전체 면적</span>
+          <input class="inp" id="totalArea" type="number" placeholder="㎡" oninput="updateSplit()">
+          <span class="inp-unit">㎡</span>
+        </div>
+        <div class="inp-row">
+          <span class="inp-lbl">분할 기준</span>
+          <input class="inp" id="splitTarget" type="number" placeholder="㎡" oninput="updateSplit()">
+          <span class="inp-unit">㎡</span>
+        </div>
+        <div class="ctrl-btn green" onclick="autoSplit()" style="justify-content:center;margin-top:4px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          면적 자동 분할선
+        </div>
+      </div>
+
+      <div class="ctrl-sec">
+        <div class="ctrl-t">편집</div>
+        <button class="ctrl-btn" onclick="undoLine()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>실행 취소
+        </button>
+        <button class="ctrl-btn red" onclick="clearAll()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>전체 초기화
+        </button>
+      </div>
+
+      <div class="ctrl-sec">
+        <div class="ctrl-t">내보내기</div>
+        <button class="ctrl-btn" onclick="exportPNG()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>PNG 저장
+        </button>
+        <button class="ctrl-btn" onclick="exportDXF()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>DXF 내보내기
+        </button>
+        <button class="ctrl-btn" onclick="window.print()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>인쇄 / PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- 가운데: 캔버스 -->
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="splitCanvas"></canvas>
+      <div class="canvas-info" id="canvasInfo">
+        좌표: <span id="coordInfo">—</span><br>
+        총 점: <span id="ptCount">0</span>개 | 선: <span id="lineCount">0</span>개
+      </div>
+      <div class="canvas-empty" id="canvasEmpty">
+        <div class="canvas-empty-ico">✂️</div>
+        <div style="font-size:14px;font-weight:700;color:var(--txt2)">분할선을 그려보세요</div>
+        <div style="font-size:12px;margin-top:6px;color:var(--txt3)">좌측에서 도구를 선택하고<br>캔버스를 클릭하여 분할선을 그립니다</div>
+      </div>
+      <div class="canvas-toolbar">
+        <button class="ctool act" data-t="pan" onclick="setCanvasTool('pan',this)">🖐️ 이동</button>
+        <button class="ctool" data-t="draw" onclick="setCanvasTool('draw',this)">✏️ 그리기</button>
+        <button class="ctool" data-t="erase" onclick="setCanvasTool('erase',this)">🗑️ 지우개</button>
+        <button class="ctool" onclick="resetView()">⟳ 초기화</button>
+        <button class="ctool" onclick="zoomIn()">＋</button>
+        <button class="ctool" onclick="zoomOut()">－</button>
+      </div>
+    </div>
+
+    <!-- 우: 정보 패널 -->
+    <div class="info-panel">
+      <div class="info-sec">
+        <div class="info-t">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+          필지 정보
+        </div>
+        <div class="info-row"><span class="info-k">전체 면적</span><span class="info-v green" id="dispTotal">—</span></div>
+        <div class="info-row"><span class="info-k">분할 A</span><span class="info-v blue" id="dispA">—</span></div>
+        <div class="info-row"><span class="info-k">분할 B</span><span class="info-v blue" id="dispB">—</span></div>
+        <div class="info-row"><span class="info-k">잔여 면적</span><span class="info-v" id="dispRem">—</span></div>
+      </div>
+
+      <div class="info-sec">
+        <div class="info-t">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          분할선 목록
+        </div>
+        <div class="split-list" id="splitList">
+          <div style="text-align:center;color:var(--txt3);font-size:12px;padding:10px 0">분할선이 없습니다</div>
+        </div>
+      </div>
+
+      <div class="info-sec">
+        <div class="info-t">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          안내
+        </div>
+        <div style="font-size:11px;color:var(--txt3);line-height:1.9">
+          ⚠ 본 결과는 <b>참고용</b>입니다<br>
+          공식 측량은 <b>공인 측량사</b>를 통해<br>
+          진행하시기 바랍니다<br><br>
+          <span style="color:var(--txt2)">• 클릭: 점 추가</span><br>
+          <span style="color:var(--txt2)">• 더블클릭: 선 완료</span><br>
+          <span style="color:var(--txt2)">• Esc: 그리기 취소</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── 법적고지
+function chkAgree(){
+  var c1 = document.getElementById('chk1').checked;
+  var c2 = document.getElementById('chk2').checked;
+  var btn = document.getElementById('agreeBtn');
+  btn.classList.toggle('on', c1 && c2);
+}
+function startSplit(){
+  if(!document.getElementById('agreeBtn').classList.contains('on')) return;
+  document.getElementById('legalOverlay').style.display = 'none';
+  document.getElementById('mainWrap').style.display = 'flex';
+  initCanvas();
+}
+
+// ── 토스트
+var _tt;
+function toast(msg, type){
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)';
+  t.style.background = type==='err'?'#991b1b':type==='ok'?'#0f766e':'#1e293b';
+  clearTimeout(_tt); _tt = setTimeout(function(){ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(20px)'; },2400);
+}
+
+// ── 캔버스 상태
+var canvas, ctx;
+var scale = 1, offsetX = 0, offsetY = 0;
+var currentTool = 'pan';
+var lines = []; // {pts:[{x,y},...], color}
+var currentPts = [];
+var isDrawing = false;
+var isPanning = false, panStart = {x:0, y:0};
+var colors = ['#2563eb','#059669','#d97706','#7c3aed','#ef4444','#0891b2'];
+
+function initCanvas(){
+  canvas = document.getElementById('splitCanvas');
+  ctx = canvas.getContext('2d');
+  resize();
+  window.addEventListener('resize', resize);
+
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('dblclick', onDblClick);
+  canvas.addEventListener('wheel', onWheel, {passive:false});
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') cancelDraw(); });
+  drawCanvas();
+}
+
+function resize(){
+  var wrap = document.getElementById('canvasWrap');
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  drawCanvas();
+}
+
+function setCanvasTool(t, btn){
+  currentTool = t;
+  document.querySelectorAll('.ctool').forEach(function(b){ b.classList.remove('act'); });
+  if(btn) btn.classList.add('on');
+  canvas.style.cursor = t==='draw' ? 'crosshair' : t==='erase' ? 'cell' : 'grab';
+}
+
+function setTool(t, btn){
+  document.querySelectorAll('.ctrl-btn[id^="tool-"]').forEach(function(b){ b.classList.remove('on'); });
+  if(btn) btn.classList.add('on');
+  if(t === 'draw') setCanvasTool('draw', null);
+  else if(t === 'measure') setCanvasTool('draw', null);
+  else setCanvasTool('pan', null);
+}
+
+function toScreen(wx, wy){ return {x: wx * scale + offsetX, y: wy * scale + offsetY}; }
+function toWorld(sx, sy){ return {x: (sx - offsetX) / scale, y: (sy - offsetY) / scale}; }
+
+function onMouseDown(e){
+  var rect = canvas.getBoundingClientRect();
+  var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  if(currentTool === 'pan' || e.button === 1){
+    isPanning = true; panStart = {x: sx, y: sy};
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+  if(currentTool === 'draw'){
+    isDrawing = true;
+    var wp = toWorld(sx, sy);
+    currentPts.push(wp);
+    document.getElementById('canvasEmpty').style.display = 'none';
+    drawCanvas();
+  }
+  if(currentTool === 'erase'){
+    eraseAt(sx, sy);
+  }
+}
+
+function onMouseMove(e){
+  var rect = canvas.getBoundingClientRect();
+  var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  var wp = toWorld(sx, sy);
+  document.getElementById('coordInfo').textContent = wp.x.toFixed(1)+', '+wp.y.toFixed(1);
+  if(isPanning){
+    offsetX += sx - panStart.x; offsetY += sy - panStart.y;
+    panStart = {x: sx, y: sy};
+    drawCanvas();
+  }
+  if(isDrawing && currentPts.length > 0){
+    drawCanvas();
+    // 미리보기 선
+    var last = toScreen(currentPts[currentPts.length-1].x, currentPts[currentPts.length-1].y);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(sx, sy);
+    ctx.strokeStyle = 'rgba(37,99,235,.5)'; ctx.lineWidth = 1.5; ctx.setLineDash([5,4]);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
+function onMouseUp(e){
+  if(isPanning){ isPanning = false; canvas.style.cursor = currentTool==='draw'?'crosshair':'grab'; }
+}
+
+function onDblClick(e){
+  if(currentTool !== 'draw') return;
+  if(currentPts.length >= 2){
+    var color = colors[lines.length % colors.length];
+    lines.push({pts: currentPts.slice(), color: color});
+    updateSplitList();
+    updateAreaDisplay();
+    toast('분할선 추가됨 (총 '+lines.length+'개)','ok');
+  }
+  currentPts = []; isDrawing = false;
+  drawCanvas();
+}
+
+function cancelDraw(){ currentPts = []; isDrawing = false; drawCanvas(); }
+
+function onWheel(e){
+  e.preventDefault();
+  var rect = canvas.getBoundingClientRect();
+  var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  var wp = toWorld(mx, my);
+  scale *= e.deltaY < 0 ? 1.12 : 0.9;
+  scale = Math.max(0.1, Math.min(50, scale));
+  offsetX = mx - wp.x * scale; offsetY = my - wp.y * scale;
+  drawCanvas();
+}
+
+function eraseAt(sx, sy){
+  var threshold = 12;
+  for(var i = lines.length-1; i >= 0; i--){
+    var line = lines[i];
+    for(var j = 0; j < line.pts.length-1; j++){
+      var p1 = toScreen(line.pts[j].x, line.pts[j].y);
+      var p2 = toScreen(line.pts[j+1].x, line.pts[j+1].y);
+      if(distToSeg(sx, sy, p1.x, p1.y, p2.x, p2.y) < threshold){
+        lines.splice(i, 1);
+        updateSplitList(); updateAreaDisplay(); drawCanvas();
+        toast('분할선 삭제됨');
+        return;
+      }
+    }
+  }
+}
+
+function distToSeg(px, py, ax, ay, bx, by){
+  var dx = bx-ax, dy = by-ay, len2 = dx*dx+dy*dy;
+  if(len2 === 0) return Math.sqrt((px-ax)**2+(py-ay)**2);
+  var t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/len2));
+  return Math.sqrt((px-(ax+t*dx))**2+(py-(ay+t*dy))**2);
+}
+
+function drawCanvas(){
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // 격자
+  ctx.strokeStyle = 'rgba(0,0,0,.06)'; ctx.lineWidth = 0.5;
+  var gridSize = 50 * scale;
+  if(gridSize > 10){
+    var startX = offsetX % gridSize, startY = offsetY % gridSize;
+    for(var x = startX; x < canvas.width; x += gridSize){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+    for(var y = startY; y < canvas.height; y += gridSize){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
+  }
+  // 분할선들
+  lines.forEach(function(line, idx){
+    if(line.pts.length < 2) return;
+    ctx.beginPath();
+    var first = toScreen(line.pts[0].x, line.pts[0].y);
+    ctx.moveTo(first.x, first.y);
+    for(var i=1; i<line.pts.length; i++){
+      var p = toScreen(line.pts[i].x, line.pts[i].y);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.strokeStyle = line.color; ctx.lineWidth = 2; ctx.setLineDash([]);
+    ctx.stroke();
+    // 점들
+    line.pts.forEach(function(pt){
+      var sp = toScreen(pt.x, pt.y);
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, 4, 0, Math.PI*2);
+      ctx.fillStyle = line.color; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    });
+  });
+  // 현재 그리는 선
+  if(currentPts.length > 0){
+    ctx.beginPath();
+    var fp = toScreen(currentPts[0].x, currentPts[0].y);
+    ctx.moveTo(fp.x, fp.y);
+    for(var i=1; i<currentPts.length; i++){
+      var p = toScreen(currentPts[i].x, currentPts[i].y);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2; ctx.setLineDash([6,4]);
+    ctx.stroke(); ctx.setLineDash([]);
+    currentPts.forEach(function(pt){
+      var sp = toScreen(pt.x, pt.y);
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, 4, 0, Math.PI*2);
+      ctx.fillStyle = '#2563eb'; ctx.fill();
+    });
+  }
+  // 카운트 업데이트
+  var total = lines.reduce(function(sum, l){ return sum + l.pts.length; }, 0);
+  document.getElementById('ptCount').textContent = total;
+  document.getElementById('lineCount').textContent = lines.length;
+}
+
+function calcLineLength(pts){
+  var len = 0;
+  for(var i=0; i<pts.length-1; i++) len += Math.sqrt((pts[i+1].x-pts[i].x)**2+(pts[i+1].y-pts[i].y)**2);
+  return len;
+}
+
+function updateSplitList(){
+  var list = document.getElementById('splitList');
+  if(!lines.length){ list.innerHTML = '<div style="text-align:center;color:var(--txt3);font-size:12px;padding:10px 0">분할선이 없습니다</div>'; return; }
+  list.innerHTML = lines.map(function(line, i){
+    var len = (calcLineLength(line.pts) / scale).toFixed(2);
+    return '<div class="split-item">'
+      +'<div class="split-dot" style="background:'+line.color+'"></div>'
+      +'<span class="split-lbl">분할선 '+(i+1)+'</span>'
+      +'<span class="split-area">~'+len+'m</span>'
+      +'<span class="split-del" onclick="delLine('+i+')">✕</span>'
+      +'</div>';
+  }).join('');
+}
+
+function delLine(i){ lines.splice(i,1); updateSplitList(); updateAreaDisplay(); drawCanvas(); toast('삭제됨'); }
+function undoLine(){ if(!lines.length && !currentPts.length){ toast('취소할 작업이 없습니다'); return; } if(currentPts.length){ currentPts.pop(); } else { lines.pop(); updateSplitList(); } drawCanvas(); }
+function clearAll(){ if(!confirm('모든 분할선을 삭제하시겠습니까?')) return; lines=[]; currentPts=[]; document.getElementById('canvasEmpty').style.display='block'; updateSplitList(); updateAreaDisplay(); drawCanvas(); toast('초기화됨'); }
+
+function updateSplit(){
+  var total = parseFloat(document.getElementById('totalArea').value) || 0;
+  var target = parseFloat(document.getElementById('splitTarget').value) || 0;
+  if(total > 0){
+    document.getElementById('dispTotal').textContent = total.toLocaleString() + ' ㎡';
+    if(target > 0 && target <= total){
+      document.getElementById('dispA').textContent = target.toLocaleString() + ' ㎡';
+      document.getElementById('dispB').textContent = (total - target).toLocaleString() + ' ㎡';
+      document.getElementById('dispRem').textContent = (total - target).toLocaleString() + ' ㎡';
+    }
+  }
+}
+
+function updateAreaDisplay(){
+  if(lines.length > 0){
+    var totalLen = lines.reduce(function(s, l){ return s + calcLineLength(l.pts)/scale; }, 0);
+    toast('총 분할선 길이: ~'+totalLen.toFixed(1)+'m (참고값)');
+  }
+}
+
+function autoSplit(){
+  var total = parseFloat(document.getElementById('totalArea').value) || 0;
+  var target = parseFloat(document.getElementById('splitTarget').value) || 0;
+  if(!total || !target){ toast('전체 면적과 분할 기준 면적을 입력하세요', 'err'); return; }
+  if(target >= total){ toast('분할 기준이 전체 면적보다 작아야 합니다', 'err'); return; }
+  var ratio = target / total;
+  var cx = canvas.width / 2, cy = canvas.height / 2, halfW = canvas.width * 0.3;
+  var splitX = cx - halfW + (halfW * 2) * ratio;
+  var wp1 = toWorld(splitX, cy - canvas.height*0.3);
+  var wp2 = toWorld(splitX, cy + canvas.height*0.3);
+  lines.push({pts:[wp1, wp2], color: colors[lines.length % colors.length]});
+  document.getElementById('canvasEmpty').style.display = 'none';
+  updateSplitList(); updateAreaDisplay(); drawCanvas();
+  toast('자동 분할선 추가됨 ('+Math.round(ratio*100)+'% : '+Math.round((1-ratio)*100)+'%)', 'ok');
+}
+
+function resetView(){ scale=1; offsetX=50; offsetY=50; drawCanvas(); }
+function zoomIn(){ scale *= 1.2; drawCanvas(); }
+function zoomOut(){ scale /= 1.2; drawCanvas(); }
+
+function exportPNG(){
+  var link = document.createElement('a'); link.download = 'split_result.png'; link.href = canvas.toDataURL(); link.click();
+  toast('PNG 저장됨', 'ok');
+}
+function exportDXF(){
+  var d = '0\nSECTION\n2\nENTITIES\n';
+  lines.forEach(function(line){
+    for(var i=0; i<line.pts.length-1; i++){
+      d += '0\nLINE\n8\nSPLIT\n10\n'+(line.pts[i].x/scale)+'\n20\n'+(line.pts[i].y/scale)+'\n30\n0\n11\n'+(line.pts[i+1].x/scale)+'\n21\n'+(line.pts[i+1].y/scale)+'\n31\n0\n';
+    }
+  });
+  d += '0\nENDSEC\n0\nEOF';
+  var blob = new Blob([d],{type:'text/plain'});
+  var url = URL.createObjectURL(blob);
+  var link = document.createElement('a'); link.download='split_lines.dxf'; link.href=url; link.click();
+  toast('DXF 내보내기 완료', 'ok');
+}
+
+function toggleTheme(){
+  var isDark = document.body.classList.toggle('dark');
+  document.getElementById('themeBtn').textContent = isDark ? '☀️ 라이트' : '🌙 다크';
+  localStorage.setItem('gdsp_theme', isDark ? 'dark' : 'light');
+  drawCanvas();
+}
+
+(function(){
+  if(localStorage.getItem('gdsp_theme') === 'dark'){
+    document.body.classList.add('dark');
+    var b = document.getElementById('themeBtn'); if(b) b.textContent = '☀️ 라이트';
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>G-DSP — 다운로드 · 발급</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f7fa;--bg2:#eef1f6;--bg3:#e6eaf2;
+  --card:#fff;--line:#dde3ed;--line2:#c8d0e0;
+  --txt:#1a2540;--txt2:#3d5070;--txt3:#7a90b0;
+  --blue:#2563eb;--blue2:#3b82f6;--blue3:#1d4ed8;
+  --green:#059669;--red:#ef4444;--gold:#d97706;
+  --cyan:#0891b2;--purple:#7c3aed;--neon:#2563eb;
+  --shadow:0 1px 4px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Noto Sans KR','Malgun Gothic',sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+button,input,select,textarea{font:inherit}
+button{border:none;background:none;color:inherit;cursor:pointer}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552;--line2:#2e4168;--txt:#e8f0ff;--txt2:#aabbd4;--txt3:#6a85a8}
+
+.wrap{display:flex;flex-direction:column;height:100vh}
+.hdr{height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0}
+.hdr-logo{font-size:15px;font-weight:900;color:var(--blue);letter-spacing:1px}
+.hdr-sep{width:1px;height:18px;background:var(--line)}
+.hdr-title{font-size:14px;font-weight:700;color:var(--txt)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+.hbtn{height:30px;padding:0 11px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer;transition:.15s}
+.hbtn:hover{border-color:var(--blue2);color:var(--blue2)}
+.hbtn.close{border-color:rgba(239,68,68,.3);color:var(--red)}
+.hbtn.close:hover{background:rgba(239,68,68,.08)}
+
+.tabs{display:flex;gap:2px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0}
+.tab{height:42px;padding:0 16px;font-size:13px;font-weight:700;color:var(--txt3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:.15s;display:flex;align-items:center;gap:7px}
+.tab:hover{color:var(--txt2)}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+.tab svg{width:13px;height:13px}
+.tab-view{display:none;flex:1;overflow:hidden;flex-direction:column}
+.tab-view.on{display:flex}
+
+.body{flex:1;overflow-y:auto;padding:20px}
+.sec{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+.sec-t{font-size:12px;font-weight:700;color:var(--txt2);margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.sec-t svg{width:14px;height:14px;color:var(--neon)}
+.inp{flex:1;height:36px;padding:0 12px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;color:var(--txt);font-size:12px;outline:none;transition:.15s}
+.inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.inp::placeholder{color:var(--txt3)}
+.btn-primary{height:36px;padding:0 16px;border-radius:8px;background:linear-gradient(135deg,var(--blue3),var(--blue));border:none;color:#fff;font-weight:700;font-size:12px;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-outline{height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--line2);background:var(--bg2);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn-outline:hover{border-color:var(--blue2);color:var(--blue2)}
+.btn-green{height:36px;padding:0 14px;border-radius:8px;background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.25);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;transition:.15s}
+.btn-green:hover{background:rgba(5,150,105,.18)}
+
+.rad-btn{height:30px;padding:0 14px;border-radius:6px;border:1px solid var(--line2);background:var(--bg2);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.rad-btn.on{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.3);color:var(--blue2)}
+
+.tile-row{display:flex;align-items:center;gap:8px;padding:4px 10px;background:var(--bg2);border:1px solid var(--line);border-radius:6px;font-size:12px}
+
+.jd-btn{height:34px;border-radius:7px;border:1px solid var(--line2);background:var(--bg2);color:var(--txt2);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:8px;padding:0 12px;width:100%;margin-bottom:5px}
+.jd-btn.on{background:rgba(37,99,235,.08);border-color:rgba(37,99,235,.3);color:var(--blue2)}
+
+.info-row{display:flex;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.info-row:last-child{border-bottom:none}
+.info-k{font-size:11px;color:var(--txt3);width:80px;flex-shrink:0}
+.info-v{font-size:13px;font-weight:600;color:var(--txt);flex:1}
+.info-v.blue{color:var(--blue2)}
+.info-v.green{color:var(--green)}
+
+.bld-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bld-preview{height:160px;background:var(--bg2);border:1px dashed var(--line2);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:10px;transition:.15s}
+.bld-preview:hover{border-color:rgba(37,99,235,.3)}
+
+.issue-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.issue-card{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;text-decoration:none;color:var(--txt);transition:.15s}
+.issue-card:hover{border-color:var(--blue2);background:rgba(37,99,235,.03)}
+.issue-ico{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.issue-ico svg{width:16px;height:16px}
+.issue-name{font-size:13px;font-weight:700}
+.issue-url{font-size:11px;color:var(--txt3);margin-top:2px}
+
+.reg-list-item{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border:1px solid var(--line);border-radius:6px;margin-bottom:5px;font-size:12px}
+
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hdr">
+    <span class="hdr-logo">G-DSP</span>
+    <div class="hdr-sep"></div>
+    <span class="hdr-title">⬇️ 다운로드 · 발급</span>
+    <div class="hdr-right">
+      <button class="hbtn" id="themeBtn" onclick="toggleTheme()">🌙 다크</button>
+      <button class="hbtn close" onclick="window.close()">✕ 닫기</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" id="tab-dtm" onclick="switchTab('dtm')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>수치지형도
+    </button>
+    <button class="tab" id="tab-jideok" onclick="switchTab('jideok')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>지적도
+    </button>
+    <button class="tab" id="tab-bld" onclick="switchTab('bld')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>건축물대장
+    </button>
+    <button class="tab" id="tab-reg" onclick="switchTab('reg')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>등기부등본
+    </button>
+    <button class="tab" id="tab-issue" onclick="switchTab('issue')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>민원 발급
+    </button>
+  </div>
+
+  <!-- 수치지형도 -->
+  <div class="tab-view on" id="view-dtm">
+    <div class="body">
+      <div class="sec">
+        <div class="sec-t">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
+          수치지형도 다운로드
+        </div>
+        <div style="font-size:12px;color:var(--txt3);margin-bottom:14px">국토정보플랫폼 도각 기반 수치지형도를 다운로드합니다.</div>
+
+        <div style="margin-bottom:10px">
+          <div style="font-size:11px;color:var(--txt3);margin-bottom:6px">반경 설정</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <button class="rad-btn on" onclick="setRad(this,'100m')">100m</button>
+            <button class="rad-btn" onclick="setRad(this,'200m')">200m</button>
+            <button class="rad-btn" onclick="setRad(this,'300m')">300m</button>
+            <input type="number" min="50" max="5000" placeholder="직접입력(m)" style="height:30px;width:110px;padding:0 8px;background:var(--bg2);border:1px solid var(--line2);border-radius:6px;color:var(--txt);font-size:11px;outline:none" oninput="toast(this.value+'m 반경 설정됨')">
+          </div>
+        </div>
+
+        <div style="margin-bottom:8px">
+          <div style="font-size:11px;color:var(--txt3);margin-bottom:6px">도각번호 목록</div>
+          <div id="tileBox" style="display:flex;flex-direction:column;gap:4px;max-height:100px;overflow-y:auto;margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px">
+            <input class="inp" id="tileInput" placeholder="도각번호 (8자리)" onkeydown="if(event.key==='Enter')addTile(this.value)">
+            <button class="btn-outline" onclick="addTile(document.getElementById('tileInput').value)">＋ 추가</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:6px;margin-top:12px">
+          <button class="btn-primary" style="flex:1" onclick="doDl()">⬇ 수치지형도 다운로드</button>
+          <a class="btn-outline" href="https://map.ngii.go.kr/ms/map/NlipMap.do" target="_blank">국토정보플랫폼 열기</a>
+        </div>
+        <div style="margin-top:12px;padding:10px 14px;background:rgba(217,119,6,.05);border:1px solid rgba(217,119,6,.15);border-radius:8px;font-size:11px;color:var(--gold);line-height:1.8">
+          ⚠ 국토정보플랫폼 계정 로그인 필요 — 설정에서 아이디/비밀번호를 먼저 저장하세요
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 지적도 -->
+  <div class="tab-view" id="view-jideok">
+    <div class="body">
+      <div class="sec">
+        <div class="sec-t">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+          지적도 다운로드
+        </div>
+        <div style="font-size:12px;color:var(--txt3);margin-bottom:14px">영역을 선택하여 지적도를 다운로드합니다.</div>
+
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:8px">영역 선택 방식</div>
+          <button class="jd-btn on" id="jdb-rect" onclick="setJdMode('rect',this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/></svg>사각형 선택
+          </button>
+          <button class="jd-btn" id="jdb-circle" onclick="setJdMode('circle',this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>원형 선택
+          </button>
+          <button class="jd-btn" id="jdb-poly" onclick="setJdMode('poly',this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 20 2 20"/></svg>직접 그리기
+          </button>
+        </div>
+
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:8px">파일 형식</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="radio" name="jdFmt" value="shp" checked style="accent-color:var(--blue)"> SHP (Shape)</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="radio" name="jdFmt" value="dxf" style="accent-color:var(--blue)"> DXF (CAD)</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="radio" name="jdFmt" value="geojson" style="accent-color:var(--blue)"> GeoJSON</label>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:6px">
+          <button class="btn-primary" style="flex:1" onclick="toast('지적도 다운로드: 국토정보플랫폼 연동 필요')">영역 다운로드</button>
+          <a class="btn-outline" href="https://map.ngii.go.kr/ms/map/NlipMap.do" target="_blank">국토정보플랫폼 열기</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 건축물대장 -->
+  <div class="tab-view" id="view-bld">
+    <div class="body">
+      <div style="display:flex;gap:6px;margin-bottom:14px">
+        <input class="inp" id="bldJibunInput" placeholder="지번 입력 (예: 남양읍 남양리 123)">
+        <button class="btn-primary" onclick="callBldApi()">조회</button>
+        <a class="btn-outline" href="https://www.eais.go.kr/" target="_blank">건축물대장 사이트</a>
+      </div>
+      <div class="bld-grid">
+        <div class="sec" style="margin-bottom:0">
+          <div class="sec-t">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            건축물대장 정보
+          </div>
+          <div class="info-row"><span class="info-k">지번</span><span class="info-v blue" id="bJibun">—</span></div>
+          <div class="info-row"><span class="info-k">용도</span><span class="info-v" id="bUse">—</span></div>
+          <div class="info-row"><span class="info-k">층수</span><span class="info-v" id="bFloor">—</span></div>
+          <div class="info-row"><span class="info-k">건축면적</span><span class="info-v" id="bBcArea">—</span></div>
+          <div class="info-row"><span class="info-k">연면적</span><span class="info-v green" id="bArea">—</span></div>
+          <div class="info-row"><span class="info-k">건축년도</span><span class="info-v" id="bYear">—</span></div>
+          <div style="display:flex;gap:5px;margin-top:12px">
+            <button class="btn-primary" style="flex:1" onclick="callBldApi()">API 조회</button>
+            <button class="btn-outline" onclick="window.print()">PDF 인쇄</button>
+          </div>
+        </div>
+        <div class="sec" style="margin-bottom:0">
+          <div class="sec-t">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            배치도 미리보기
+          </div>
+          <div class="bld-preview" onclick="toast('배치도: API 키 연동 후 표시됩니다')">
+            <div style="text-align:center;color:var(--txt3)">
+              <svg style="width:36px;height:36px;opacity:.25;margin-bottom:8px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+              <div style="font-size:12px">배치도 보기</div>
+              <div style="font-size:10px;margin-top:3px">클릭하여 확대</div>
+            </div>
+          </div>
+          <button class="btn-green" style="width:100%" onclick="toast('PDF 저장: API 연동 후 가능합니다')">PDF 저장</button>
+        </div>
+      </div>
+      <div class="sec" style="margin-top:14px">
+        <div class="sec-t">발급 서비스</div>
+        <div class="issue-grid">
+          <a class="issue-card" href="https://www.eais.go.kr/" target="_blank">
+            <div class="issue-ico" style="background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
+            <div><div class="issue-name">건축물대장</div><div class="issue-url">eais.go.kr</div></div>
+          </a>
+          <a class="issue-card" href="https://www.eum.go.kr/" target="_blank">
+            <div class="issue-ico" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg></div>
+            <div><div class="issue-name">토지이용확인원</div><div class="issue-url">eum.go.kr</div></div>
+          </a>
+          <a class="issue-card" href="https://www.iros.go.kr/" target="_blank">
+            <div class="issue-ico" style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg></div>
+            <div><div class="issue-name">인터넷등기소</div><div class="issue-url">iros.go.kr</div></div>
+          </a>
+          <a class="issue-card" href="https://plus.gov.kr/" target="_blank">
+            <div class="issue-ico" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+            <div><div class="issue-name">정부24</div><div class="issue-url">gov.kr</div></div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 등기부등본 -->
+  <div class="tab-view" id="view-reg">
+    <div class="body">
+      <div class="sec">
+        <div class="sec-t">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
+          지번 / 고유번호 조회
+        </div>
+        <div style="display:flex;gap:7px;margin-bottom:12px">
+          <input class="inp" id="regJibun" placeholder="지번 입력 (예: 남양읍 남양리 123)">
+          <button class="btn-primary" onclick="searchReg()">조회</button>
+        </div>
+        <div class="info-row"><span class="info-k">고유번호</span><span class="info-v blue" id="regUniq">—</span></div>
+        <div class="info-row"><span class="info-k">소유자</span><span class="info-v" id="regOwner">—</span></div>
+        <div style="display:flex;gap:6px;margin-top:12px">
+          <button class="btn-green" style="flex:1" onclick="addRegToList()">목록에 추가</button>
+          <button class="btn-outline" style="flex:1" onclick="makeRegExcel()">엑셀 양식 생성</button>
+          <a class="btn-outline" href="https://www.iros.go.kr/" target="_blank" style="flex:1">등기소 바로가기</a>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-t">지번 목록</div>
+        <div id="regList"><div style="text-align:center;color:var(--txt3);font-size:12px;padding:14px 0">추가된 지번이 없습니다</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 민원 발급 -->
+  <div class="tab-view" id="view-issue">
+    <div class="body">
+      <div class="sec">
+        <div class="sec-t">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          민원 발급 서비스
+        </div>
+        <div style="font-size:12px;color:var(--txt3);margin-bottom:16px">자주 사용하는 민원 발급 서비스 모음입니다.</div>
+        <div class="issue-grid">
+          <a class="issue-card" href="https://www.eais.go.kr/" target="_blank">
+            <div class="issue-ico" style="background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
+            <div><div class="issue-name">건축물대장</div><div class="issue-url">eais.go.kr</div></div>
+          </a>
+          <a class="issue-card" href="https://www.eum.go.kr/" target="_blank">
+            <div class="issue-ico" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg></div>
+            <div><div class="issue-name">토지이용확인원</div><div class="issue-url">eum.go.kr</div></div>
+          </a>
+          <a class="issue-card" href="https://www.iros.go.kr/" target="_blank">
+            <div class="issue-ico" style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg></div>
+            <div><div class="issue-name">인터넷등기소</div><div class="issue-url">iros.go.kr</div></div>
+          </a>
+          <a class="issue-card" href="https://plus.gov.kr/" target="_blank">
+            <div class="issue-ico" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+            <div><div class="issue-name">정부24</div><div class="issue-url">gov.kr</div></div>
+          </a>
+          <a class="issue-card" href="https://luris.molit.go.kr/" target="_blank">
+            <div class="issue-ico" style="background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg></div>
+            <div><div class="issue-name">토지이용규제</div><div class="issue-url">luris.molit.go.kr</div></div>
+          </a>
+          <a class="issue-card" href="https://www.hscity.go.kr/" target="_blank">
+            <div class="issue-ico" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.15)"><svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
+            <div><div class="issue-name">화성시청</div><div class="issue-url">hscity.go.kr</div></div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script>
+var regItems = [];
+var _tt;
+
+function toast(msg, type){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  t.style.background = type==='err' ? '#991b1b' : type==='ok' ? '#0f766e' : '#1e293b';
+  clearTimeout(_tt);
+  _tt = setTimeout(function(){ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(20px)'; }, 2400);
+}
+
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(function(b){ b.classList.remove('on'); });
+  document.querySelectorAll('.tab-view').forEach(function(v){ v.classList.remove('on'); });
+  document.getElementById('tab-'+t).classList.add('on');
+  document.getElementById('view-'+t).classList.add('on');
+}
+
+function setRad(btn, r){
+  document.querySelectorAll('.rad-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+  toast(r + ' 반경 설정됨');
+}
+
+function addTile(code){
+  code = (code || '').trim();
+  if(!code){ toast('도각번호를 입력하세요', 'err'); return; }
+  var box = document.getElementById('tileBox');
+  if(box.querySelector('[data-c="'+code+'"]')){ toast('이미 추가된 도각번호입니다'); return; }
+  var d = document.createElement('div');
+  d.className = 'tile-row';
+  d.dataset.c = code;
+  d.innerHTML = '<span style="color:var(--blue2);font-size:11px">▪</span>'
+    + '<span style="flex:1;font-size:12px">'+code+'</span>'
+    + '<button onclick="this.parentNode.remove()" style="color:var(--txt3);font-size:14px;background:none;border:none;cursor:pointer">×</button>';
+  box.appendChild(d);
+  document.getElementById('tileInput').value = '';
+  toast(code + ' 추가됨', 'ok');
+}
+
+function doDl(){
+  var tiles = document.querySelectorAll('#tileBox .tile-row');
+  if(!tiles.length){ toast('도각번호를 먼저 추가하세요', 'err'); return; }
+  toast('국토정보플랫폼 연동 필요 — 다운로드 페이지를 열겠습니다');
+  setTimeout(function(){ window.open('https://map.ngii.go.kr/ms/map/NlipMap.do', '_blank'); }, 800);
+}
+
+function setJdMode(mode, btn){
+  document.querySelectorAll('.jd-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+}
+
+function callBldApi(){
+  var jibun = document.getElementById('bldJibunInput').value.trim();
+  if(!jibun){ toast('지번을 입력하세요', 'err'); return; }
+  var apiKey = localStorage.getItem('gdsp_building') || '';
+  if(!apiKey){ toast('건축물대장 API 키를 설정에서 먼저 입력하세요', 'err'); return; }
+  document.getElementById('bJibun').textContent = jibun;
+  toast('조회 중...');
+  var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo'
+    + '?serviceKey=' + encodeURIComponent(apiKey)
+    + '&sigunguCd=41590&bjdongCd=&platGbCd=0&bun=&ji=&startDate=&endDate=&numOfRows=1&pageNo=1&_type=json';
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var item = d && d.response && d.response.body && d.response.body.items && d.response.body.items.item;
+      if(item){
+        var it = Array.isArray(item) ? item[0] : item;
+        document.getElementById('bUse').textContent    = it.mainPurpsCdNm || '—';
+        document.getElementById('bFloor').textContent  = (it.grndFlrCnt || '—') + '층';
+        document.getElementById('bBcArea').textContent = it.bcArea  ? it.bcArea  + '㎡' : '—';
+        document.getElementById('bArea').textContent   = it.totArea ? it.totArea + '㎡' : '—';
+        document.getElementById('bYear').textContent   = it.useAprDay ? it.useAprDay.substring(0,4) + '년' : '—';
+        toast('건축물대장 조회 완료', 'ok');
+      } else {
+        toast('조회 결과가 없습니다', 'err');
+      }
+    })
+    .catch(function(){ toast('조회 실패 — API 키 또는 네트워크 확인', 'err'); });
+}
+
+function searchReg(){
+  var jibun = document.getElementById('regJibun').value.trim();
+  if(!jibun){ toast('지번을 입력하세요', 'err'); return; }
+  toast('등기부등본 조회: 인터넷등기소 연동 필요');
+  document.getElementById('regUniq').textContent  = '인터넷등기소에서 확인';
+  document.getElementById('regOwner').textContent = '—';
+}
+
+function addRegToList(){
+  var jibun = document.getElementById('regJibun').value.trim();
+  if(!jibun){ toast('지번을 입력하세요', 'err'); return; }
+  if(regItems.indexOf(jibun) >= 0){ toast('이미 추가된 지번입니다'); return; }
+  regItems.push(jibun);
+  renderRegList();
+  toast(jibun + ' 추가됨', 'ok');
+}
+
+function renderRegList(){
+  var list = document.getElementById('regList');
+  if(!regItems.length){
+    list.innerHTML = '<div style="text-align:center;color:var(--txt3);font-size:12px;padding:14px 0">추가된 지번이 없습니다</div>';
+    return;
+  }
+  list.innerHTML = regItems.map(function(j, i){
+    return '<div class="reg-list-item">'
+      + '<span style="flex:1;color:var(--blue2);font-weight:700">'+j+'</span>'
+      + '<button onclick="regItems.splice('+i+',1);renderRegList()" style="height:24px;padding:0 8px;border-radius:5px;border:1px solid var(--line);color:var(--txt3);font-size:10px;cursor:pointer;background:transparent">삭제</button>'
+      + '</div>';
+  }).join('');
+}
+
+function makeRegExcel(){
+  if(!regItems.length){ toast('목록에 지번을 먼저 추가하세요', 'err'); return; }
+  toast('엑셀 양식 생성: SheetJS 연동 예정');
+}
+
+function toggleTheme(){
+  var isDark = document.body.classList.toggle('dark');
+  document.getElementById('themeBtn').textContent = isDark ? '☀️ 라이트' : '🌙 다크';
+  localStorage.setItem('gdsp_theme', isDark ? 'dark' : 'light');
+}
+
+(function(){
+  if(localStorage.getItem('gdsp_theme') === 'dark'){
+    document.body.classList.add('dark');
+    document.getElementById('themeBtn').textContent = '☀️ 라이트';
+  }
+})();
+</script>
+</body>
+</html>
