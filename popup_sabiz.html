@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>G-DSP — 사업계획서 작성</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --bg3: #21262d;
+  --bg4: #30363d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text2: #7d8590;
+  --text3: #484f58;
+  --accent: #2f81f7;
+  --accent2: #3fb950;
+  --accent3: #f78166;
+  --accent4: #d2a8ff;
+  --accent5: #ffa657;
+  --yellow: #e3b341;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 13px;
+  min-height: 100vh;
+}
+
+/* ── 헤더 ── */
+.header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-logo { font-size: 15px; font-weight: 900; color: var(--accent); letter-spacing: -0.5px; font-family: 'Orbitron', 'Noto Sans KR', sans-serif; }
+.header-sep { width: 1px; height: 18px; background: var(--border); }
+.header-title { font-size: 13px; font-weight: 700; color: var(--text2); }
+.header-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; background: rgba(47,129,247,.12); color: var(--accent); border: 1px solid rgba(47,129,247,.25); }
+.header-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.hdr-btn { height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .12s; }
+.hdr-btn:hover { border-color: var(--accent); color: var(--accent); }
+.hdr-btn-close { border-color: rgba(247,129,102,.3); color: var(--accent3); background: rgba(247,129,102,.08); }
+.hdr-btn-close:hover { background: rgba(247,129,102,.18); border-color: var(--accent3); }
+
+.main { padding: 20px 24px; max-width: 1000px; margin: 0 auto; }
+
+.breadcrumb {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 20px; font-size: 12px; color: var(--text2);
+}
+.breadcrumb span { color: var(--text3); }
+
+/* 스텝 */
+.steps {
+  display: flex; align-items: center;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 20px; margin-bottom: 28px;
+  overflow-x: auto; gap: 0;
+}
+.step { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.step-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bg4); color: var(--text2);
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.step.active .step-num { background: var(--accent); color: white; }
+.step.done .step-num { background: var(--accent2); color: white; }
+.step-label { font-size: 11px; color: var(--text2); white-space: nowrap; }
+.step.active .step-label { color: var(--text); font-weight: 600; }
+.step.done .step-label { color: var(--accent2); }
+.step-arrow { color: var(--text3); margin: 0 6px; font-size: 11px; flex-shrink: 0; }
+
+/* 섹션 라벨 */
+.section-label {
+  font-size: 11px; font-weight: 700; color: var(--text2);
+  letter-spacing: 0.8px; text-transform: uppercase;
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* 허가유형 카드 */
+.permit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px; margin-bottom: 28px;
+}
+.permit-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; cursor: pointer;
+  transition: all 0.15s; position: relative; overflow: hidden;
+}
+.permit-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 2px; background: var(--card-color); opacity: 0; transition: opacity 0.15s;
+}
+.permit-card:hover { border-color: var(--card-color); transform: translateY(-1px); }
+.permit-card:hover::before { opacity: 1; }
+.permit-card.selected { border-color: var(--card-color); background: var(--bg3); }
+.permit-card.selected::before { opacity: 1; }
+.permit-icon {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; margin-bottom: 10px;
+}
+.permit-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.permit-desc { font-size: 11px; color: var(--text2); line-height: 1.5; }
+.permit-badge {
+  display: inline-block; font-size: 10px; padding: 1px 6px;
+  border-radius: 8px; margin-top: 6px; font-weight: 600;
+}
+
+/* 의제 + 신규변경 통합 */
+.uije-section {
+  display: none; margin-bottom: 28px; animation: fadeIn 0.2s ease;
+}
+.uije-section.show { display: block; }
+
+.uije-items { display: flex; flex-direction: column; gap: 10px; }
+
+.uije-row {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.uije-row.main-permit {
+  border-color: var(--accent);
+  background: rgba(47,129,247,0.05);
+}
+.uije-name {
+  font-size: 13px; font-weight: 700; min-width: 100px;
+}
+.uije-tag {
+  font-size: 10px; padding: 2px 8px; border-radius: 8px;
+  font-weight: 600; flex-shrink: 0;
+}
+.tag-main { background: rgba(47,129,247,0.15); color: var(--accent); border: 1px solid rgba(47,129,247,0.3); }
+.tag-uije { background: rgba(63,185,80,0.12); color: var(--accent2); border: 1px solid rgba(63,185,80,0.3); }
+
+.mode-btns {
+  display: flex; gap: 6px; margin-left: auto;
+}
+.mode-btn {
+  padding: 6px 14px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--bg3);
+  color: var(--text2); font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.12s;
+}
+.mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mode-btn.new.selected { background: var(--accent); border-color: var(--accent); color: white; }
+.mode-btn.chg.selected { background: var(--accent2); border-color: var(--accent2); color: white; }
+.mode-btn.none.selected { background: var(--bg4); border-color: var(--text3); color: var(--text2); }
+
+.uije-add-btns {
+  display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 0 0 0;
+}
+.uije-add-btn {
+  padding: 6px 14px; border-radius: 6px;
+  border: 1px dashed var(--border); background: transparent;
+  color: var(--text2); font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.12s;
+  display: flex; align-items: center; gap: 5px;
+}
+.uije-add-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+.uije-add-btn.added {
+  border-color: var(--accent2); color: var(--accent2);
+  background: rgba(63,185,80,0.08);
+}
+.uije-add-btn.added::before { content: '✓ '; }
+
+/* 변경 - 이전기록 */
+.prev-record {
+  display: none; margin-top: 8px; padding: 10px 12px;
+  background: var(--bg3); border-radius: 7px;
+  border: 1px solid var(--border);
+  animation: fadeIn 0.15s ease;
+}
+.prev-record.show { display: block; }
+.prev-record-title {
+  font-size: 11px; color: var(--text2); margin-bottom: 6px;
+}
+.prev-search {
+  display: flex; gap: 6px; margin-bottom: 8px;
+}
+.prev-search input {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 5px; padding: 6px 10px; color: var(--text);
+  font-size: 12px; outline: none; font-family: inherit;
+}
+.prev-search input:focus { border-color: var(--accent); }
+.prev-list { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow-y: auto; }
+.prev-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--bg2);
+  cursor: pointer; transition: all 0.1s; font-size: 12px;
+}
+.prev-item:hover { border-color: var(--accent2); }
+.prev-item.selected { border-color: var(--accent2); background: rgba(63,185,80,0.06); }
+.prev-date { color: var(--text2); font-size: 11px; width: 65px; flex-shrink: 0; }
+.prev-name { font-weight: 600; width: 60px; flex-shrink: 0; }
+.prev-loc { color: var(--text2); flex: 1; }
+.prev-tag {
+  font-size: 10px; padding: 1px 7px; border-radius: 8px;
+  font-weight: 600; flex-shrink: 0;
+}
+.tag-solar { background: rgba(255,166,87,0.15); color: var(--accent5); border: 1px solid rgba(255,166,87,0.3); }
+.tag-store { background: rgba(63,185,80,0.12); color: var(--accent2); border: 1px solid rgba(63,185,80,0.3); }
+.tag-factory { background: rgba(47,129,247,0.12); color: var(--accent); border: 1px solid rgba(47,129,247,0.3); }
+.tag-house { background: rgba(210,168,255,0.12); color: var(--accent4); border: 1px solid rgba(210,168,255,0.3); }
+.prev-none { text-align: center; padding: 16px; color: var(--text2); font-size: 11px; }
+
+/* 요약바 */
+.summary-bar {
+  display: none; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 16px; margin-bottom: 20px;
+  align-items: center; gap: 8px; flex-wrap: wrap;
+  animation: fadeIn 0.2s ease;
+}
+.summary-bar.show { display: flex; }
+.sum-chip {
+  padding: 3px 10px; border-radius: 12px; font-size: 11px;
+  font-weight: 700; background: var(--bg3); border: 1px solid var(--border);
+}
+.sum-arrow { color: var(--text3); font-size: 11px; }
+
+/* 시작버튼 */
+.start-wrap { display: none; animation: fadeIn 0.2s ease; }
+.start-wrap.show { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+.btn {
+  padding: 10px 20px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text); font-size: 13px;
+  font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: white; padding: 10px 28px; }
+.btn.primary:hover { opacity: 0.85; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">G-DSP</div>
+  <div class="header-sep"></div>
+  <div class="header-title">사업계획서 작성</div>
+  <div class="header-badge">문서작업</div>
+  <div class="header-right">
+    <button class="hdr-btn" onclick="resetAll()">🔄 초기화</button>
+    <button class="hdr-btn" onclick="alert('작업기록 저장 기능 준비중')">📂 작업기록</button>
+    <button class="hdr-btn hdr-btn-close" onclick="window.close()">✕ 닫기</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="breadcrumb">
+    G-DSP <span>›</span> 사업계획서 <span>›</span> 새 작업
+  </div>
+
+  <!-- 스텝 -->
+  <div class="steps">
+    <div class="step active" id="step1"><div class="step-num">1</div><div class="step-label">허가유형 선택</div></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="step2"><div class="step-num">2</div><div class="step-label">의제 · 신규/변경</div></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="step3"><div class="step-num">3</div><div class="step-label">도면 업로드</div></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="step4"><div class="step-num">4</div><div class="step-label">공사내역</div></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="step5"><div class="step-num">5</div><div class="step-label">사업계획서 작성</div></div>
+    <div class="step-arrow">›</div>
+    <div class="step" id="step6"><div class="step-num">6</div><div class="step-label">출력</div></div>
+  </div>
+
+  <!-- 요약바 -->
+  <div class="summary-bar" id="summaryBar"></div>
+
+  <!-- STEP 1 허가유형 -->
+  <div class="section-label">허가 유형 선택</div>
+  <div class="permit-grid">
+    <div class="permit-card" style="--card-color:#2f81f7" onclick="selectPermit(this,'공장설립','🏭','#2f81f7',true)">
+      <div class="permit-icon">🏭</div>
+      <div class="permit-name">공장설립</div>
+      <div class="permit-desc">제조업소 · 공장 신설 및 변경</div>
+      <div class="permit-badge" style="background:rgba(47,129,247,0.12);color:#2f81f7;border:1px solid rgba(47,129,247,0.3)">의제처리 가능</div>
+    </div>
+    <div class="permit-card" style="--card-color:#3fb950" onclick="selectPermit(this,'개발행위','🌿','#3fb950',true)">
+      <div class="permit-icon">🌿</div>
+      <div class="permit-name">개발행위</div>
+      <div class="permit-desc">토지형질변경 · 부지조성</div>
+      <div class="permit-badge" style="background:rgba(63,185,80,0.12);color:#3fb950;border:1px solid rgba(63,185,80,0.3)">의제처리 가능</div>
+    </div>
+    <div class="permit-card" style="--card-color:#ffa657" onclick="selectPermit(this,'도로점용','🛣️','#ffa657',false)">
+      <div class="permit-icon">🛣️</div>
+      <div class="permit-name">도로점용</div>
+      <div class="permit-desc">도로 점용허가 신청</div>
+      <div class="permit-badge" style="background:rgba(255,166,87,0.12);color:#ffa657;border:1px solid rgba(255,166,87,0.3)">단독허가</div>
+    </div>
+    <div class="permit-card" style="--card-color:#d2a8ff" onclick="selectPermit(this,'국유재산허가','🏛️','#d2a8ff',false)">
+      <div class="permit-icon">🏛️</div>
+      <div class="permit-name">국유재산허가</div>
+      <div class="permit-desc">국유지 사용허가 신청</div>
+      <div class="permit-badge" style="background:rgba(210,168,255,0.12);color:#d2a8ff;border:1px solid rgba(210,168,255,0.3)">단독허가</div>
+    </div>
+    <div class="permit-card" style="--card-color:#f78166" onclick="selectPermit(this,'공유재산허가','🏢','#f78166',false)">
+      <div class="permit-icon">🏢</div>
+      <div class="permit-name">공유재산허가</div>
+      <div class="permit-desc">공유재산 사용허가 신청</div>
+      <div class="permit-badge" style="background:rgba(247,129,102,0.12);color:#f78166;border:1px solid rgba(247,129,102,0.3)">단독허가</div>
+    </div>
+    <div class="permit-card" style="--card-color:#58a6ff" onclick="selectPermit(this,'공유수면허가','🌊','#58a6ff',false)">
+      <div class="permit-icon">🌊</div>
+      <div class="permit-name">공유수면허가</div>
+      <div class="permit-desc">공유수면 점용·사용허가</div>
+      <div class="permit-badge" style="background:rgba(88,166,255,0.12);color:#58a6ff;border:1px solid rgba(88,166,255,0.3)">단독허가</div>
+    </div>
+    <div class="permit-card" style="--card-color:#e3b341" onclick="selectPermit(this,'농업생산기반시설','🌾','#e3b341',false)">
+      <div class="permit-icon">🌾</div>
+      <div class="permit-name">농업생산기반시설</div>
+      <div class="permit-desc">농업기반시설 목적외 사용</div>
+      <div class="permit-badge" style="background:rgba(227,179,65,0.12);color:#e3b341;border:1px solid rgba(227,179,65,0.3)">단독허가</div>
+    </div>
+  </div>
+
+  <!-- STEP 2 의제 + 신규/변경 -->
+  <div class="uije-section" id="uijeSection">
+    <div class="section-label">의제 선택 및 신규 / 변경</div>
+
+    <div class="uije-items" id="uijeItems"></div>
+
+    <!-- 의제 추가 버튼 (공장설립만) -->
+    <div class="uije-add-btns" id="uijeAddBtns"></div>
+  </div>
+
+  <!-- 시작 버튼 -->
+  <div class="start-wrap" id="startWrap">
+    <button class="btn" onclick="resetAll()">초기화</button>
+    <button class="btn primary" onclick="startWork()">작성 시작 →</button>
+  </div>
+
+</div>
+
+<script>
+// ==================== 샘플 작업기록 ====================
+const RECORDS = [
+  { date:'2026-04-02', name:'홍길동', loc:'천등리 192-3', purpose:'태양광', permit:'개발행위' },
+  { date:'2026-03-15', name:'이철수', loc:'청원리 64', purpose:'소매점', permit:'개발행위' },
+  { date:'2026-02-20', name:'김영희', loc:'마도면 128-3', purpose:'공장', permit:'공장설립' },
+  { date:'2026-01-10', name:'박민수', loc:'송산면 55-2', purpose:'태양광', permit:'개발행위' },
+  { date:'2025-12-05', name:'최지수', loc:'봉담읍 33-1', purpose:'소매점', permit:'개발행위' },
+];
+
+const TAG_MAP = { '태양광':'tag-solar', '소매점':'tag-store', '공장':'tag-factory', '주택':'tag-house' };
+
+// 의제 목록 정의
+const UIJE_MAP = {
+  '공장설립': ['산지전용', '농지전용', '개발행위'],
+  '개발행위': ['산지전용', '농지전용'],
+};
+
+// 상태
+let state = {
+  permit: null,
+  rows: [], // [{ name, isMain, mode, record }]
+  addedUije: [],
+};
+
+// ==================== 허가유형 선택 ====================
+function selectPermit(el, name, icon, color, hasUije) {
+  document.querySelectorAll('.permit-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+
+  state.permit = name;
+  state.rows = [];
+  state.addedUije = [];
+
+  // 메인 허가 row
+  state.rows.push({ name, isMain: true, mode: null, record: null });
+
+  renderUijeSection(name, hasUije);
+  updateStep(2);
+  updateSummary();
+  document.getElementById('startWrap').classList.remove('show');
+}
+
+// ==================== 의제 섹션 렌더 ====================
+function renderUijeSection(permitName, hasUije) {
+  const section = document.getElementById('uijeSection');
+  const itemsEl = document.getElementById('uijeItems');
+  const addBtns = document.getElementById('uijeAddBtns');
+
+  section.classList.add('show');
+
+  // 메인 row 렌더
+  renderRows();
+
+  // 의제 추가 버튼
+  if (hasUije && UIJE_MAP[permitName]) {
+    addBtns.innerHTML = '<span style="font-size:11px;color:var(--text2);align-self:center">+ 의제 추가:</span>' +
+      UIJE_MAP[permitName].map(u => `
+        <button class="uije-add-btn" id="addBtn_${u}" onclick="addUije('${u}')">
+          ${u}
+        </button>
+      `).join('');
+  } else {
+    addBtns.innerHTML = '';
+  }
+}
+
+// ==================== Row 렌더 ====================
+function renderRows() {
+  const itemsEl = document.getElementById('uijeItems');
+  itemsEl.innerHTML = state.rows.map((row, idx) => `
+    <div class="uije-row ${row.isMain ? 'main-permit' : ''}" id="row_${idx}">
+      <span class="uije-name">${row.name}</span>
+      <span class="uije-tag ${row.isMain ? 'tag-main' : 'tag-uije'}">${row.isMain ? '주허가' : '의제'}</span>
+
+      <div class="mode-btns">
+        <button class="mode-btn new ${row.mode==='신규'?'selected':''}"
+          onclick="setMode(${idx},'신규')">신규</button>
+        <button class="mode-btn chg ${row.mode==='변경'?'selected':''}"
+          onclick="setMode(${idx},'변경')">변경</button>
+        ${!row.isMain ? `<button class="mode-btn none" onclick="removeUije(${idx})" style="font-size:11px">✕ 제거</button>` : ''}
+      </div>
+    </div>
+
+    <!-- 변경 선택시 이전기록 -->
+    <div class="prev-record ${row.mode==='변경'?'show':''}" id="prev_${idx}">
+      <div class="prev-record-title">이전 작업 불러오기 (없으면 건너뛰기)</div>
+      <div class="prev-search">
+        <input type="text" placeholder="🔍 이름 · 지번 · 목적 검색"
+          oninput="filterPrev(${idx}, this.value)">
+      </div>
+      <div class="prev-list" id="prevList_${idx}">
+        ${renderPrevList(idx, RECORDS)}
+      </div>
+    </div>
+  `).join('');
+
+  checkShowStart();
+}
+
+function renderPrevList(rowIdx, data) {
+  if (!data.length) return `<div class="prev-none">검색 결과 없음</div>`;
+  return data.map((r, i) => `
+    <div class="prev-item ${state.rows[rowIdx]?.record===r?'selected':''}"
+      onclick="selectPrev(${rowIdx},${i})">
+      <span class="prev-date">${r.date}</span>
+      <span class="prev-name">${r.name}</span>
+      <span class="prev-loc">${r.loc}</span>
+      <span class="prev-tag ${TAG_MAP[r.purpose]||''}">${r.purpose}</span>
+    </div>
+  `).join('');
+}
+
+// ==================== 의제 추가/제거 ====================
+function addUije(name) {
+  if (state.addedUije.includes(name)) return;
+  state.addedUije.push(name);
+  state.rows.push({ name, isMain: false, mode: null, record: null });
+
+  // 버튼 표시 변경
+  const btn = document.getElementById('addBtn_' + name);
+  if (btn) btn.classList.add('added');
+
+  renderRows();
+  updateSummary();
+}
+
+function removeUije(idx) {
+  const name = state.rows[idx].name;
+  state.addedUije = state.addedUije.filter(u => u !== name);
+  state.rows.splice(idx, 1);
+
+  const btn = document.getElementById('addBtn_' + name);
+  if (btn) btn.classList.remove('added');
+
+  renderRows();
+  updateSummary();
+}
+
+// ==================== 신규/변경 선택 ====================
+function setMode(idx, mode) {
+  state.rows[idx].mode = mode;
+  if (mode === '신규') state.rows[idx].record = null;
+  renderRows();
+  updateSummary();
+  checkShowStart();
+}
+
+function filterPrev(rowIdx, val) {
+  const filtered = RECORDS.filter(r =>
+    r.name.includes(val) || r.loc.includes(val) || r.purpose.includes(val)
+  );
+  document.getElementById('prevList_' + rowIdx).innerHTML = renderPrevList(rowIdx, filtered);
+}
+
+function selectPrev(rowIdx, recIdx) {
+  state.rows[rowIdx].record = RECORDS[recIdx];
+  renderRows();
+  updateSummary();
+}
+
+// ==================== 시작버튼 표시 조건 ====================
+function checkShowStart() {
+  const allSet = state.rows.length > 0 && state.rows.every(r => r.mode !== null);
+  document.getElementById('startWrap').classList.toggle('show', allSet);
+}
+
+// ==================== 요약바 ====================
+function updateSummary() {
+  const bar = document.getElementById('summaryBar');
+  if (!state.permit) { bar.classList.remove('show'); return; }
+
+  const chips = state.rows.map(r => {
+    let txt = r.name;
+    if (r.mode) txt += ` <span style="color:${r.mode==='신규'?'var(--accent)':'var(--accent2)'}; font-size:10px">${r.mode}</span>`;
+    if (r.record) txt += ` <span style="color:var(--text2);font-size:10px">(${r.record.name}·${r.record.loc})</span>`;
+    return `<span class="sum-chip">${txt}</span>`;
+  }).join('<span class="sum-arrow"> + </span>');
+
+  bar.innerHTML = '<span style="font-size:11px;color:var(--text2);margin-right:4px">선택</span>' + chips;
+  bar.classList.add('show');
+}
+
+// ==================== 스텝 ====================
+function updateStep(n) {
+  for (let i = 1; i <= 6; i++) {
+    const el = document.getElementById('step' + i);
+    el.classList.remove('active', 'done');
+    if (i < n) el.classList.add('done');
+    else if (i === n) el.classList.add('active');
+  }
+}
+
+// ==================== 초기화 ====================
+function resetAll() {
+  state = { permit: null, rows: [], addedUije: [] };
+  document.querySelectorAll('.permit-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('uijeSection').classList.remove('show');
+  document.getElementById('uijeItems').innerHTML = '';
+  document.getElementById('uijeAddBtns').innerHTML = '';
+  document.getElementById('startWrap').classList.remove('show');
+  document.getElementById('summaryBar').classList.remove('show');
+  updateStep(1);
+}
+
+// ==================== 작성 시작 ====================
+function startWork() {
+  const summary = state.rows.map(r =>
+    `${r.name} [${r.mode}]${r.record ? ' ← ' + r.record.name + ' 불러오기' : ''}`
+  ).join('\n');
+  // TODO: 실제 작성 화면으로 이동
+  alert('✅ 작성 시작!\n\n' + summary + '\n\n→ 도면 업로드 화면으로 이동합니다\n(3단계 개발 예정)');
+}
+</script>
+</body>
+</html>

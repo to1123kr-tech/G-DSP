@@ -586,8 +586,8 @@ body.dark .toast{background:#08111f}
     <div class="hdr-sep"></div>
     <div class="hdr-search">
       <div class="hs-lbl">🔍 통합검색</div>
-      <input class="hs-inp" id="mainSearch" placeholder="통합검색 — 지번·지역·도각번호·시청 등 검색" autocomplete="off"/>
-      <button class="hs-btn" onclick="doSearch()">검색</button>
+      <input class="hs-inp" id="mainSearch" placeholder="🔍 지번 검색 — 예) 송산면 사강리 100-5" autocomplete="off"/>
+      <button class="hs-btn" onclick="hdrSearch()">검색</button>
     </div>
     <div class="hdr-status">
       <div class="s-dot s-off" id="sDot"></div>
@@ -604,18 +604,18 @@ body.dark .toast{background:#08111f}
 
   <!-- SIDEBAR -->
   <div class="sidebar" id="sidebar">
-    <!-- 대분류 1: 핵심 기능 -->
+    <!-- 대시보드 -->
     <div class="nav-group">
-      <div class="nav-cat on" onclick="toggleCat(this,'cat1')">
-        <div class="nav-cat-ico nc-blue"><svg viewBox="0 0 24 24" fill="none" stroke="#3e7cff" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
-        <div class="nav-cat-txt"><div class="nav-cat-name">핵심 기능</div><div class="nav-cat-sub">검색 · 지도 · 도각</div></div>
-        <span class="nav-cat-arr">›</span>
+      <div class="nav-cat on" onclick="showView('dash',this)" id="navDash">
+        <div class="nav-cat-ico nc-blue"><svg viewBox="0 0 24 24" fill="none" stroke="#3e7cff" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
+        <div class="nav-cat-txt"><div class="nav-cat-name">대시보드</div><div class="nav-cat-sub">지번검색 · 지도 · 토지정보</div></div>
       </div>
-      <div class="nav-sub on" id="cat1">
-        <div class="nav-item on" onclick="showView('dash',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>대시보드</div>
-        <div class="nav-item" onclick="showView('geo',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>통합 지도</div>
-        <div class="nav-item" onclick="showView('geo',this);document.getElementById('mainSearch').focus()" ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>지번 검색</div>
-        <div class="nav-item" onclick="showView('geo',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>도각 선택</div>
+    </div>
+    <!-- 통합지도 (상세보기용) -->
+    <div class="nav-group">
+      <div class="nav-cat" onclick="showView('geo',this)" id="navGeo">
+        <div class="nav-cat-ico nc-blue"><svg viewBox="0 0 24 24" fill="none" stroke="#3e7cff" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg></div>
+        <div class="nav-cat-txt"><div class="nav-cat-name">통합 지도</div><div class="nav-cat-sub">카카오맵 · 지적도 · 고도</div></div>
       </div>
     </div>
     <!-- 대분류 2: 다운로드·발급 -->
@@ -638,7 +638,15 @@ body.dark .toast{background:#08111f}
     <div class="nav-group">
       <div class="nav-cat" onclick="openPopup('popup_split.html')">
         <div class="nav-cat-ico nc-gold"><svg viewBox="0 0 24 24" fill="none" stroke="#f1c65b" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
-        <div class="nav-cat-txt"><div class="nav-cat-name">분할 모드</div><div class="nav-cat-sub">필지 분할 · 면적 계산</div></div>
+        <div class="nav-cat-txt"><div class="nav-cat-name">토지분할 · 면적</div><div class="nav-cat-sub">필지 분할 · 면적 계산</div></div>
+        <span class="nav-cat-arr">↗</span>
+      </div>
+    </div>
+    <!-- 문서작업: 사업계획서 자동화 -->
+    <div class="nav-group">
+      <div class="nav-cat" onclick="openPopup('popup_sabiz.html')">
+        <div class="nav-cat-ico" style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+        <div class="nav-cat-txt"><div class="nav-cat-name">사업계획서 작성</div><div class="nav-cat-sub">개발행위 · 공장 · 산지전용</div></div>
         <span class="nav-cat-arr">↗</span>
       </div>
     </div>
@@ -662,7 +670,7 @@ body.dark .toast{background:#08111f}
     <div class="nav-group">
       <div class="nav-cat" onclick="openPopup('popup_flow.html')">
         <div class="nav-cat-ico nc-cyan"><svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><path d="M12 2a10 10 0 00-6.88 17.19C7 21 9 22 12 22s5-1 6.88-2.81A10 10 0 0012 2z"/><path d="M12 8c-2 2-3 4-3 6s1 4 3 6"/><path d="M12 8c2 2 3 4 3 6s-1 4-3 6"/></svg></div>
-        <div class="nav-cat-txt"><div class="nav-cat-name">물흐름 분석</div><div class="nav-cat-sub">Flow · 우수 계산</div></div>
+        <div class="nav-cat-txt"><div class="nav-cat-name">재해 · 우수분석</div><div class="nav-cat-sub">유출계수 · 우수량 산정</div></div>
         <span class="nav-cat-arr">↗</span>
       </div>
     </div>
@@ -699,64 +707,266 @@ body.dark .toast{background:#08111f}
     </div>
 
     <div class="view on" id="view-dash">
-      <div class="panel-hdr">
-        <svg style="width:14px;height:14px;color:var(--neon)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        <span class="panel-hdr-title">대시보드</span>
-        <span class="panel-hdr-sub" id="dashDate"></span>
-      </div>
-      <div class="dash">
-        <!-- 검색결과 카드 -->
-        <div class="rc" id="rcCard">
-          <div class="rc-top">
-            <div class="rc-dot"></div>
-            <div class="rc-title" id="rcTitle">검색 결과</div>
-            <div class="rc-jibun" id="rcJibun"></div>
-          </div>
-          <div class="rc-grid">
-            <div class="rci"><div class="rci-k">용도지역</div><div class="rci-v" id="rcYd">—</div></div>
-            <div class="rci"><div class="rci-k">지목</div><div class="rci-v" id="rcJm">—</div></div>
-            <div class="rci"><div class="rci-k">건폐율</div><div class="rci-v g" id="rcBcr">—</div></div>
-            <div class="rci"><div class="rci-k">용적률</div><div class="rci-v g" id="rcFar">—</div></div>
-            <div class="rci"><div class="rci-k">공시지가</div><div class="rci-v m" id="rcGonsi">—</div></div>
-            <div class="rci"><div class="rci-k">건물용도</div><div class="rci-v" id="rcUse">—</div></div>
-          </div>
-          <div class="rc-acts">
-            <button class="ra" onclick="showView('geo')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>지도</button>
-            
-            <a class="ra" href="https://luris.molit.go.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>토지이용규제</a>
-            <a class="ra" href="https://plus.gov.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>정부24</a>
-            <a class="ra" href="https://www.iros.go.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>등기소</a>
-          </div>
-        </div>
-        <!-- 기능카드 + 우측 패널 -->
-        <div class="dash-main">
-          <div class="fc-grid">
-            <div class="fc" onclick="showView('geo')"><div class="fc-ico ic-blue"><svg viewBox="0 0 24 24" fill="none" stroke="#3e7cff" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg></div><div class="fc-name">GeoDesk 지도</div><div class="fc-desc">통합지도 · 수치지형도 · 지적도</div><div class="fc-arr">›</div></div>
-            <div class="fc" onclick="showView('dxf')"><div class="fc-ico ic-purple"><svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div><div class="fc-name">도면 수량산출</div><div class="fc-desc">DXF · 레이어 · 보정</div><div class="fc-arr">›</div></div>
-            <div class="fc" onclick="showView('bld')"><div class="fc-ico ic-green"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3a5" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="fc-name">건축물대장</div><div class="fc-desc">대장조회 · 배치도 · PDF</div><div class="fc-arr">›</div></div>
-            <div class="fc" onclick="showLegalModal()"><div class="fc-ico ic-gold"><svg viewBox="0 0 24 24" fill="none" stroke="#f1c65b" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg></div><div class="fc-name">분할 모드</div><div class="fc-desc">필지분할 · 면적계산</div><div class="fc-arr">›</div></div>
-            <div class="fc" onclick="showView('rcp')"><div class="fc-ico ic-cyan"><svg viewBox="0 0 24 24" fill="none" stroke="#00f0ff" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div><div class="fc-name">민원 진행조회</div><div class="fc-desc">접수번호 · 지역별 · 3단계</div><div class="fc-arr">›</div></div>
-            <div class="fc" onclick="showView('conv')"><div class="fc-ico ic-orange"><svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></div><div class="fc-name">공간정보 변환</div><div class="fc-desc">좌표계 · DXF변환</div><div class="fc-arr">›</div></div>
-            <div class="fc" onclick="showView('reg')"><div class="fc-ico ic-red"><svg viewBox="0 0 24 24" fill="none" stroke="#ff6b78" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="fc-name">등기부등본</div><div class="fc-desc">조회 · 고유번호 · 양식</div><div class="fc-arr">›</div></div>
-            <div class="fc" onclick="showView('con')"><div class="fc-ico ic-blue"><svg viewBox="0 0 24 24" fill="none" stroke="#3e7cff" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div><div class="fc-name">담당자 연락처</div><div class="fc-desc">화성시 부서별 DB</div><div class="fc-arr">›</div></div>
-            <div class="fc" onclick="showView('api')"><div class="fc-ico ic-purple"><svg viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M22 12h-2M19.07 19.07l-1.41-1.41M12 22v-2M4.93 19.07l1.41 1.41M2 12h2M4.93 4.93l1.41 1.41M12 2v2"/></svg></div><div class="fc-name">설정 / API 키</div><div class="fc-desc">카카오 · 건축물 · 국토정보</div><div class="fc-arr">›</div></div>
-          </div>
-          <div class="dash-right">
-            <div class="ds-card">
-              <div class="ds-t">최근 활동</div>
-              <div id="actList"><div class="act"><div class="act-d" style="background:var(--blue)"></div><div class="act-t">G-DSP 시작됨</div><div class="act-tm" id="actT0"></div></div></div>
-            </div>
-            <div class="ds-card">
-              <div class="ds-t">빠른 사이트</div>
-              <a class="qs" href="https://plus.gov.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>정부24<span class="qs-arr">›</span></a>
-              <a class="qs" href="https://www.iros.go.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>인터넷등기소<span class="qs-arr">›</span></a>
-              <a class="qs" href="https://map.ngii.go.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>국토정보플랫폼<span class="qs-arr">›</span></a>
-              <a class="qs" href="https://luris.molit.go.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>토지이용규제<span class="qs-arr">›</span></a>
+      <!-- ══ 새 대시보드: 3단 레이아웃 ══ -->
+      <style>
+        /* ── 새 대시보드 레이아웃 ── */
+        .nd-wrap{display:grid;grid-template-columns:1fr 320px;grid-template-rows:auto 1fr;height:100%;overflow:hidden}
+        .nd-left{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--line)}
+        .nd-right{display:flex;flex-direction:column;overflow-y:auto;background:var(--bg);padding:14px;gap:12px}
 
-              <a class="qs" href="https://www.hscity.go.kr/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>화성시청<span class="qs-arr">›</span></a>
+        /* 검색바 섹션 */
+        .nd-search-zone{padding:14px 16px 12px;background:#fff;border-bottom:1px solid var(--line);flex-shrink:0}
+        body.dark .nd-search-zone{background:var(--bg2)}
+        .nd-search-row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+        .nd-s-inp{flex:1;height:40px;padding:0 14px;background:var(--bg2);border:1.5px solid var(--line2);border-radius:10px;color:var(--txt);font-size:13px;outline:none;transition:.15s}
+        .nd-s-inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1);background:#fff}
+        body.dark .nd-s-inp:focus{background:var(--bg3)}
+        .nd-s-inp::placeholder{color:var(--txt3);font-size:12px}
+        .nd-s-btn{height:40px;padding:0 20px;background:linear-gradient(135deg,var(--blue3),var(--blue));border:none;border-radius:10px;color:#fff;font-weight:700;font-size:13px;cursor:pointer;flex-shrink:0;transition:.15s;letter-spacing:.3px}
+        .nd-s-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+
+        /* 검색결과 배지 행 */
+        .nd-result-row{display:none;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 12px;background:rgba(37,99,235,.04);border:1px solid rgba(37,99,235,.15);border-radius:9px;animation:fadeUp .25s ease}
+        .nd-result-row.on{display:flex}
+        .nd-rc-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:dotPulse 2s infinite;flex-shrink:0}
+        .nd-rc-label{font-size:12px;font-weight:700;color:var(--txt);flex:1}
+        .nd-rc-chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;border:1px solid rgba(37,99,235,.25);background:rgba(37,99,235,.08);color:var(--blue2)}
+        .nd-rc-fields{display:flex;gap:10px;width:100%;flex-wrap:wrap}
+        .nd-rci{display:flex;flex-direction:column;gap:1px;min-width:80px}
+        .nd-rci-k{font-size:9px;color:var(--txt3);letter-spacing:.3px}
+        .nd-rci-v{font-size:12px;font-weight:700;color:var(--txt)}
+        .nd-rc-acts{display:flex;gap:5px;flex-wrap:wrap;width:100%;padding-top:6px;border-top:1px solid var(--line)}
+        .nd-ra{height:27px;padding:0 10px;border-radius:6px;border:1px solid rgba(37,99,235,.25);background:rgba(37,99,235,.07);color:var(--blue2);font-size:11px;font-weight:700;cursor:pointer;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+        .nd-ra:hover{background:rgba(37,99,235,.18);color:var(--blue)}
+
+        /* 지도 영역 */
+        .nd-map-wrap{flex:1;position:relative;overflow:hidden;min-height:0}
+        .nd-map-inner{position:absolute;inset:0}
+        .nd-map-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--txt3);font-size:12px;pointer-events:none}
+        .nd-map-empty svg{opacity:.25}
+        .nd-map-type-btns{position:absolute;top:10px;left:10px;z-index:10;display:flex;gap:4px}
+        .nd-mt-btn{height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--line2);background:rgba(255,255,255,.9);color:var(--txt2);font-size:10px;font-weight:700;cursor:pointer;transition:.15s;backdrop-filter:blur(4px)}
+        body.dark .nd-mt-btn{background:rgba(10,20,40,.9)}
+        .nd-mt-btn:hover,.nd-mt-btn.on{border-color:var(--blue);color:var(--blue);background:rgba(37,99,235,.08)}
+        .nd-cad-btn{position:absolute;top:10px;right:10px;z-index:10;height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--line2);background:rgba(255,255,255,.9);color:var(--txt2);font-size:10px;font-weight:700;cursor:pointer;transition:.15s;backdrop-filter:blur(4px)}
+        body.dark .nd-cad-btn{background:rgba(10,20,40,.9)}
+        .nd-cad-btn.on{border-color:rgba(0,240,255,.5);color:var(--neon)}
+
+        /* ── 우측 패널 ── */
+        .nd-sec-title{font-size:9px;font-weight:900;color:var(--txt3);letter-spacing:.9px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:7px}
+        .nd-sec-title::after{content:'';flex:1;height:1px;background:var(--line)}
+
+        /* 문서작업 섹션 (예약) */
+        .nd-doc-section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+        .nd-doc-placeholder{display:flex;align-items:center;gap:10px;padding:14px;background:rgba(124,58,237,.04);border:1.5px dashed rgba(124,58,237,.2);border-radius:9px;cursor:pointer;transition:.15s}
+        .nd-doc-placeholder:hover{background:rgba(124,58,237,.08);border-color:rgba(124,58,237,.4)}
+        .nd-doc-ico{width:36px;height:36px;border-radius:9px;background:rgba(124,58,237,.1);display:grid;place-items:center;flex-shrink:0}
+        .nd-doc-txt{flex:1}
+        .nd-doc-txt strong{font-size:12px;font-weight:700;color:var(--purple);display:block}
+        .nd-doc-txt span{font-size:10px;color:var(--txt3)}
+        .nd-doc-arr{font-size:16px;color:rgba(124,58,237,.4)}
+
+        /* 업무관리 / 빠른기능 */
+        .nd-work-section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+        .nd-menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+        .nd-menu-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;cursor:pointer;transition:.15s;text-decoration:none;color:var(--txt2)}
+        .nd-menu-item:hover{border-color:var(--blue2);color:var(--blue);background:rgba(37,99,235,.04);transform:translateY(-1px)}
+        .nd-mi-ico{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;flex-shrink:0}
+        .nd-mi-ico svg{width:13px;height:13px}
+        .nd-mi-name{font-size:11px;font-weight:700;line-height:1.2}
+        .nd-mi-desc{font-size:9px;color:var(--txt3)}
+
+        /* 셀프 링크 섹션 */
+        .nd-links-section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+        .nd-link-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:5px;cursor:pointer;transition:.15s;text-decoration:none;color:var(--txt2);font-size:12px;font-weight:600}
+        .nd-link-item:hover{border-color:rgba(0,240,255,.25);color:var(--neon);background:rgba(0,240,255,.04)}
+        .nd-link-item:last-child{margin-bottom:0}
+        .nd-link-arr{margin-left:auto;font-size:12px;color:var(--txt3)}
+        .nd-link-add{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1.5px dashed var(--line2);border-radius:8px;cursor:pointer;transition:.15s;color:var(--txt3);font-size:11px;font-weight:600;margin-top:6px}
+        .nd-link-add:hover{border-color:var(--blue2);color:var(--blue)}
+        .nd-link-input-row{display:grid;grid-template-columns:1fr 1fr auto;gap:5px;margin-top:7px;display:none}
+        .nd-link-input-row.show{display:grid}
+        .nd-li{height:32px;padding:0 9px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:11px;outline:none;transition:.15s;width:100%}
+        .nd-li:focus{border-color:var(--blue)}
+        .nd-li::placeholder{color:var(--txt3)}
+        .nd-li-save{height:32px;padding:0 11px;border-radius:7px;background:var(--blue);border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+        .nd-link-icon{width:20px;height:20px;border-radius:4px;background:var(--bg3);display:grid;place-items:center;flex-shrink:0;font-size:11px}
+
+        .nd-act-section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+        .nd-act-item,.act{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--line);font-size:11px}
+        .nd-act-item:last-child,.act:last-child{border-bottom:none}
+        .nd-act-dot,.act-d{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+        .nd-act-txt,.act-t{flex:1;color:var(--txt2)}
+        .nd-act-tm,.act-tm{font-size:10px;color:var(--txt3)}
+        /* ── 토지정보 패널 ── */
+        .nd-info-section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+        .nd-info-block{border:1px solid var(--line);border-radius:9px;overflow:hidden}
+        .nd-info-block-title{font-size:9px;font-weight:900;color:var(--txt3);letter-spacing:.8px;text-transform:uppercase;padding:7px 11px;background:var(--bg2);border-bottom:1px solid var(--line)}
+        .nd-irow{display:grid;grid-template-columns:52px 1fr;padding:5px 11px;border-bottom:1px solid var(--line);align-items:center}
+        .nd-irow:last-child{border-bottom:none}
+        .nd-ik{font-size:10px;color:var(--txt3)}
+        .nd-iv{font-size:12px;font-weight:700;text-align:right;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .nd-iv-accent{color:var(--blue2)}
+        .nd-iv-g{color:var(--green)}
+        .nd-iv-m{color:var(--gold)}
+        .nd-bld-btn{width:100%;height:30px;background:rgba(37,99,235,.06);border:none;border-top:1px solid var(--line);color:var(--blue2);font-size:11px;font-weight:700;cursor:pointer;transition:.15s}
+        .nd-bld-btn:hover{background:rgba(37,99,235,.14);color:var(--blue)}
+        .nd-issue-link{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--txt2);font-size:12px;font-weight:600;transition:.15s}
+        .nd-issue-link:last-child{border-bottom:none}
+        .nd-issue-link:hover{background:rgba(0,240,255,.04);color:var(--neon)}
+        /* 국토정보 WMS 레이어 버튼 */
+        .nd-layer-btns{position:absolute;bottom:10px;left:10px;z-index:10;display:flex;gap:4px;flex-wrap:wrap;max-width:300px}
+        .nd-layer-btn{height:26px;padding:0 9px;border-radius:5px;border:1px solid rgba(200,208,224,.9);background:rgba(255,255,255,.92);color:#444;font-size:10px;font-weight:700;cursor:pointer;transition:.15s;backdrop-filter:blur(4px);white-space:nowrap;font-family:inherit}
+        body.dark .nd-layer-btn{border-color:rgba(30,53,85,.9);background:rgba(6,13,24,.9);color:var(--txt2)}
+        .nd-layer-btn.on{border-color:var(--blue);color:var(--blue);background:rgba(37,99,235,.12)}
+        .nd-layer-btn.on-g{border-color:var(--green);color:var(--green);background:rgba(5,150,105,.1)}
+        .nd-layer-btn.on-o{border-color:var(--gold);color:var(--gold);background:rgba(217,119,6,.08)}
+        /* 통계바 */
+        .nd-stat-bar{display:flex;flex-direction:column;gap:6px;padding:8px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px;font-size:10px}
+        .nd-stat-chips{display:flex;gap:5px;flex-wrap:wrap}
+        .nd-stat-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid}
+        .nd-stat-chip strong{font-size:11px;font-weight:800}
+        .nd-stat-today{background:rgba(37,99,235,.07);border-color:rgba(37,99,235,.2);color:var(--blue2)}
+        .nd-stat-total{background:rgba(5,150,105,.07);border-color:rgba(5,150,105,.2);color:var(--green)}
+        .nd-stat-my{background:rgba(217,119,6,.07);border-color:rgba(217,119,6,.2);color:var(--gold)}
+      </style>
+
+      <div class="nd-wrap">
+        <!-- 좌측: 검색 + 지도 -->
+        <div class="nd-left">
+          <!-- 검색 존 -->
+          <div class="nd-search-zone">
+            <div class="nd-search-row">
+              <input class="nd-s-inp" id="ndSearch" placeholder="🔍  지번 입력  —  예) 장안면 석포리 100-5" autocomplete="off"/>
+              <button class="nd-s-btn" onclick="ndDoSearch()">검색</button>
+            </div>
+            <!-- 검색결과 -->
+            <div class="nd-result-row" id="ndResultRow">
+              <div class="nd-rc-dot"></div>
+              <div class="nd-rc-label" id="ndRcLabel">—</div>
+              <div class="nd-rc-chip" id="ndRcJibun"></div>
+              <div class="nd-rc-fields">
+                <div class="nd-rci"><div class="nd-rci-k">용도지역</div><div class="nd-rci-v" id="ndRcYd">—</div></div>
+                <div class="nd-rci"><div class="nd-rci-k">지목</div><div class="nd-rci-v" id="ndRcJm">—</div></div>
+                <div class="nd-rci"><div class="nd-rci-k">건폐율</div><div class="nd-rci-v" style="color:var(--green)" id="ndRcBcr">—</div></div>
+                <div class="nd-rci"><div class="nd-rci-k">용적률</div><div class="nd-rci-v" style="color:var(--green)" id="ndRcFar">—</div></div>
+                <div class="nd-rci"><div class="nd-rci-k">공시지가</div><div class="nd-rci-v" style="color:var(--gold)" id="ndRcGonsi">—</div></div>
+                <div class="nd-rci"><div class="nd-rci-k">건물용도</div><div class="nd-rci-v" id="ndRcUse">—</div></div>
+              </div>
+              <div class="nd-rc-acts">
+                <button class="nd-ra" onclick="showView('geo')">🗺 지도 전체보기</button>
+                <a class="nd-ra" id="ndRaLuris" href="https://luris.molit.go.kr/" target="_blank">토지이용규제</a>
+                <a class="nd-ra" href="https://plus.gov.kr/" target="_blank">정부24</a>
+                <a class="nd-ra" href="https://www.iros.go.kr/" target="_blank">등기소</a>
+                <a class="nd-ra" href="https://www.eum.go.kr/" target="_blank">토지이음</a>
+              </div>
+            </div>
+          </div>
+          <!-- 지도 -->
+          <div class="nd-map-wrap">
+            <div class="nd-map-inner" id="ndKakaoMap"></div>
+            <div class="nd-map-empty" id="ndMapEmpty">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+              <span>지번을 검색하면 지도가 표시됩니다</span>
+            </div>
+            <div class="nd-map-type-btns">
+              <button class="nd-mt-btn on" id="ndMpNormal" onclick="ndSetMapType('normal',this)">일반</button>
+              <button class="nd-mt-btn" id="ndMpSkyview" onclick="ndSetMapType('skyview',this)">위성</button>
+              <button class="nd-mt-btn" id="ndMpHybrid" onclick="ndSetMapType('hybrid',this)">위성+라벨</button>
+            </div>
+            <button class="nd-cad-btn" id="ndCadBtn" onclick="ndToggleCadastral()">지적도</button>
+            <!-- 국토정보 WMS 레이어 버튼 -->
+            <div class="nd-layer-btns">
+              <button class="nd-layer-btn" id="ndLayerContour" onclick="ndToggleLayer('contour',this)">📈 등고선</button>
+              <button class="nd-layer-btn" id="ndLayerElev" onclick="ndToggleLayer('elev',this)">📍 표고점</button>
+              <button class="nd-layer-btn" id="ndLayerSlope" onclick="ndToggleLayer('slope',this)">⛰ 경사도</button>
+              <button class="nd-layer-btn" id="ndLayerDem" onclick="ndToggleLayer('dem',this)">🗺 DEM</button>
             </div>
           </div>
         </div>
+
+        <!-- 우측 패널 -->
+        <div class="nd-right">
+
+          <!-- ① 토지정보 -->
+          <div class="nd-info-section">
+            <div class="nd-sec-title" style="margin-bottom:10px">🏡 토지 · 건축물</div>
+            <div class="nd-info-block">
+              <div class="nd-info-block-title">토지이용</div>
+              <div class="nd-irow"><span class="nd-ik">지번</span><span class="nd-iv nd-iv-accent" id="ndInfoJibun">—</span></div>
+              <div class="nd-irow"><span class="nd-ik">용도지역</span><span class="nd-iv" id="ndInfoYd">—</span></div>
+              <div class="nd-irow"><span class="nd-ik">건폐율</span><span class="nd-iv nd-iv-g" id="ndInfoBcr">—</span></div>
+              <div class="nd-irow"><span class="nd-ik">용적률</span><span class="nd-iv nd-iv-g" id="ndInfoFar">—</span></div>
+              <div class="nd-irow"><span class="nd-ik">지목</span><span class="nd-iv" id="ndInfoJimok">—</span></div>
+              <div class="nd-irow"><span class="nd-ik">공시지가</span><span class="nd-iv nd-iv-m" id="ndInfoGonsi">—</span></div>
+            </div>
+            <div class="nd-info-block" style="margin-top:6px">
+              <div class="nd-info-block-title">건축물대장</div>
+              <div class="nd-irow"><span class="nd-ik">용도</span><span class="nd-iv" id="ndInfoUse">—</span></div>
+              <div class="nd-irow"><span class="nd-ik">층수</span><span class="nd-iv" id="ndInfoFloor">—</span></div>
+              <div class="nd-irow"><span class="nd-ik">연면적</span><span class="nd-iv" id="ndInfoArea">—</span></div>
+              <div class="nd-irow"><span class="nd-ik">건축년도</span><span class="nd-iv" id="ndInfoYear">—</span></div>
+              <button class="nd-bld-btn" onclick="showView('bld')">건축물대장 상세보기</button>
+            </div>
+          </div>
+
+          <!-- ② 발급연결 + 나만의 링크 통합 -->
+          <div class="nd-links-section">
+            <div style="display:flex;align-items:center;margin-bottom:8px">
+              <span class="nd-sec-title" style="margin-bottom:0">🔗 발급 · 즐겨찾기</span>
+              <button onclick="ndToggleEdit()" id="ndEditToggleBtn"
+                style="margin-left:auto;height:22px;padding:0 9px;border-radius:5px;border:1px solid var(--line2);background:transparent;color:var(--txt3);font-size:10px;font-weight:700;cursor:pointer;transition:.12s"
+                onmouseover="this.style.color='var(--blue)';this.style.borderColor='var(--blue2)'"
+                onmouseout="this.style.color='';this.style.borderColor=''">✏️ 편집</button>
+            </div>
+            <div id="ndLinkList"></div>
+          </div>
+
+          <!-- ③ 최근 활동 -->
+          <div class="nd-act-section">
+            <div class="nd-sec-title">🕐 최근 활동</div>
+            <div id="actList">
+              <div class="act nd-act-item">
+                <div class="act-d nd-act-dot" style="background:var(--blue)"></div>
+                <div class="act-t nd-act-txt">G-DSP 시작됨</div>
+                <div class="act-tm nd-act-tm" id="actT0"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ④ 날짜 + 방문자 통계 -->
+          <div class="nd-stat-bar">
+            <span id="dashDate" style="color:var(--txt3)"></span>
+            <div class="nd-stat-chips">
+              <span class="nd-stat-chip nd-stat-today" title="오늘 방문">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                오늘 <strong id="statToday">-</strong>명
+              </span>
+              <span class="nd-stat-chip nd-stat-total" title="누적 방문">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                누적 <strong id="statTotal">-</strong>명
+              </span>
+              <span class="nd-stat-chip nd-stat-my" title="내 방문횟수">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                내 방문 <strong id="statMy">-</strong>회
+              </span>
+            </div>
+          </div>
+
+        </div><!-- /nd-right -->
+      </div><!-- /nd-wrap -->
+
+      <!-- ★ 기존 호환 유지용 숨김 요소들 ★ -->
+      <div style="display:none">
+        <div id="rcCard" class="rc"></div>
+        <div id="rcTitle"></div><div id="rcJibun"></div>
+        <div id="rcYd"></div><div id="rcJm"></div>
+        <div id="rcBcr"></div><div id="rcFar"></div>
+        <div id="rcGonsi"></div><div id="rcUse"></div>
+        <div id="mapT"></div><div id="mapD"></div>
+        <div id="mapActiveLabel"></div>
+        <div id="landBanner" class="land-banner"></div>
+        <a id="rc-toolbox" href="#"></a>
       </div>
     </div>
 
@@ -769,30 +979,31 @@ body.dark .toast{background:#08111f}
       </div>
       <div class="geo-body">
         <div class="gp">
-          <div class="gp-hdr">지도 선택 · 다운로드</div>
+          <div class="gp-hdr">지도 · 즐겨찾기</div>
           <div class="gp-body">
+            <!-- 지도 타입 선택 -->
             <div class="gsec">
               <div class="gsec-t">지도 선택</div>
               <div class="map-picker" style="grid-template-columns:1fr 1fr 1fr">
-                <button class="mp-btn on" id="mpNormal" onclick="setKakaoMapType('normal',this)">일반<br>지도</button>
-                <button class="mp-btn" id="mpSkyview" onclick="setKakaoMapType('skyview',this)">위성<br>지도</button>
-                <button class="mp-btn" id="mpHybrid" onclick="setKakaoMapType('hybrid',this)">위성+<br>라벨</button>
+                <button class="mp-btn on" id="mpNormal" onclick="setKakaoMapType('normal',this)">일반</button>
+                <button class="mp-btn" id="mpSkyview" onclick="setKakaoMapType('skyview',this)">위성</button>
+                <button class="mp-btn" id="mpHybrid" onclick="setKakaoMapType('hybrid',this)">위성+라벨</button>
               </div>
               <button onclick="toggleCadastral()" id="btnCadastral2" class="gbtn-out" style="margin-top:5px;font-size:11px">🗺 지적도 오버레이</button>
-              <button onclick="showElevPopup()" class="gbtn-neon" style="margin-top:4px;font-size:11px">📐 지형 절대고도 조회</button>
+              <button onclick="showElevPopup()" class="gbtn-neon" style="margin-top:4px;font-size:11px">📐 절대고도 조회</button>
+              <button onclick="openPopup('popup_download.html')" class="gbtn-out" style="margin-top:4px;font-size:11px">📥 지형도·지적도 다운로드</button>
             </div>
+
+            <!-- 자주 가는 지도 (셀프 등록 5슬롯) -->
             <div class="gsec">
-              <div class="gsec-t">수치지형도 다운로드</div>
-              <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:7px">
-                <button class="grbtn on" onclick="setRad(this,'100m')" style='height:26px;font-size:11px'>100m</button>
-                <button class="grbtn" onclick="setRad(this,'200m')" style='height:26px;font-size:11px'>200m</button>
-                <button class="grbtn" onclick="setRad(this,'300m')" style='height:26px;font-size:11px'>300m</button>
-                <input id='radCustom' placeholder='직접입력(m)' style='height:24px;width:76px;padding:0 8px;background:var(--bg2);border:1px solid var(--line2);border-radius:6px;color:var(--txt);font-size:11px;outline:none;font-weight:700' oninput="setRadCustom(this.value)" type='number' min='50' max='5000'>
+              <div class="gsec-t" style="display:flex;align-items:center;justify-content:space-between">
+                <span>자주 가는 지도</span>
+                <button onclick="geoMapToggleEdit()" id="geoMapEditBtn"
+                  style="height:18px;padding:0 7px;border-radius:4px;border:1px solid var(--line2);background:transparent;color:var(--txt3);font-size:9px;font-weight:700;cursor:pointer">✏ 편집</button>
               </div>
-              <div id="tileBox" style="display:flex;flex-direction:column;gap:3px;max-height:70px;overflow-y:auto;margin-bottom:6px;scrollbar-width:thin"></div>
-              <button class="gbtn" onclick="doDl('수치지형도')">수치지형도 다운로드</button>
-              <button class="gbtn-out" onclick="openJideokMap()">지적도 다운로드 (영역 선택)</button>
+              <div id="geoMapSlots" style="margin-top:6px"></div>
             </div>
+
             <!-- 토지이용 연동 -->
             <div class="land-banner" id="landBanner">
               <div class="land-banner-t">지번 연동 — 바로 열기</div>
@@ -2035,7 +2246,7 @@ function doLogin(){
 }
 function doLogout(){if(!confirm('로그아웃 하시겠습니까?'))return;document.getElementById('app').classList.remove('show');document.getElementById('app').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginScreen').style.pointerEvents='auto';document.getElementById('loginId').value='';document.getElementById('loginPw').value='';}
 document.getElementById('loginPw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
-document.getElementById('mainSearch').addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
+// mainSearch 엔터는 hdrSearch()로 통합 (위에서 처리)
 function toggleCat(el,catId){var isOn=el.classList.contains('on');el.classList.toggle('on',!isOn);var sub=document.getElementById(catId);if(sub)sub.classList.toggle('on',!isOn);}
 function showView(name,el){document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('on')});if(el)el.classList.add('on');document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on')});var v=document.getElementById('view-'+name);if(v)v.classList.add('on');if(name==='geo')setTimeout(initKakaoOnGeoView,80);if(name==='con')renderCon('');if(name==='jideok')setTimeout(initJdCanvas,100);if(name==='rcp')renderRcp();if(name==='hist')renderHist();}
 // switchMap → 카카오 API로 대체
@@ -3528,7 +3739,530 @@ window.addEve
 var _ao=document.getElementById('aboutOverlay');if(_ao)_ao.addEventListener('click',function(){var _ap=document.getElementById('aboutPopup');if(_ap)_ap.style.display='none';var _ao2=document.getElementById('aboutOverlay');if(_ao2)_ao2.style.display='none';});
 }catch(e){console.warn('DXF:',e);}
 
+// ══════════════════════════════════════════════
+// 새 대시보드 전용 함수들
+// ══════════════════════════════════════════════
+var ndMap=null, ndGeocoder=null, ndMarker=null, ndMapType='normal', ndCadOn=false, ndMapInited=false;
 
+function ndInitMap(){
+  if(!window.kakao||!window.kakao.maps){setTimeout(ndInitMap,300);return;}
+  var container=document.getElementById('ndKakaoMap');
+  if(!container||ndMapInited)return;
+  ndMapInited=true;
+  var options={center:new kakao.maps.LatLng(37.2055,126.8317),level:7};
+  ndMap=new kakao.maps.Map(container,options);
+  ndGeocoder=new kakao.maps.services.Geocoder();
+  ndMarker=new kakao.maps.Marker();
+  document.getElementById('ndMapEmpty').style.display='none';
+}
+
+function ndSetMapType(type,btn){
+  if(!ndMap)return;
+  document.querySelectorAll('.nd-mt-btn').forEach(function(b){b.classList.remove('on')});
+  if(btn)btn.classList.add('on');
+  ndMapType=type;
+  if(type==='normal'){ndMap.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);}
+  else if(type==='skyview'){ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW);ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);}
+  else if(type==='hybrid'){ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW);ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);}
+}
+
+function ndToggleCadastral(){
+  if(!ndMap)return;
+  ndCadOn=!ndCadOn;
+  var btn=document.getElementById('ndCadBtn');
+  if(ndCadOn){ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);if(btn)btn.classList.add('on');}
+  else{ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);if(btn)btn.classList.remove('on');}
+}
+
+function ndDoSearch(){
+  var q=(document.getElementById('ndSearch').value||'').trim();
+  if(!q){toast('검색어를 입력하세요','err');return;}
+  if(!ndMap){ndInitMap();}
+  setTimeout(function(){
+    if(!ndMap){toast('지도 초기화 중, 잠시 후 다시 시도하세요');return;}
+    document.getElementById('ndMapEmpty').style.display='none';
+    var searchAddr='화성시 '+q;
+    ndGeocoder.addressSearch(searchAddr,function(result,status){
+      if(status===kakao.maps.services.Status.OK){
+        var coords=new kakao.maps.LatLng(result[0].y,result[0].x);
+        ndMap.setCenter(coords); ndMap.setLevel(3);
+        ndMarker.setPosition(coords); ndMarker.setMap(ndMap);
+        document.getElementById('ndResultRow').classList.add('on');
+        document.getElementById('ndRcLabel').textContent=q+' 검색결과';
+        document.getElementById('ndRcJibun').textContent=searchAddr;
+        // 기존 시스템 연동
+        armed=true; currentJibun=searchAddr;
+        var rc=document.getElementById('rcCard'); if(rc)rc.classList.add('on');
+        var lb=document.getElementById('landBanner'); if(lb)lb.classList.add('on');
+        setText('rcTitle',q+' 검색 결과'); setText('rcJibun',searchAddr);
+        setText('gJibun',searchAddr); setText('bJibun',searchAddr); setText('bldJibun',searchAddr);
+        addAct(q+' 검색됨','방금'); addHistItem('검색: '+q);
+        var dot=document.getElementById('sDot');if(dot)dot.className='s-dot s-on';
+        setText('sTxt','연동됨');
+        toast('✓ '+q+' — 연동 완료','ok');
+      } else {
+        toast('주소를 찾을 수 없습니다 (화성시 지번 확인)','err');
+      }
+    });
+  },ndMapInited?0:500);
+}
+
+// ── 검색창 통합 연동 ──
+// 헤더 검색 → 대시보드 검색창으로 값 복사 후 실행
+function hdrSearch(){
+  var hdrVal = (document.getElementById('mainSearch').value||'').trim();
+  var ndEl   = document.getElementById('ndSearch');
+  if(hdrVal && ndEl){ ndEl.value = hdrVal; }
+  // 대시보드가 아닌 뷰면 대시보드로 먼저 전환
+  if(!document.getElementById('view-dash').classList.contains('on')){
+    showView('dash');
+    setTimeout(ndDoSearch, 100);
+  } else {
+    ndDoSearch();
+  }
+}
+// 헤더 엔터
+document.getElementById('mainSearch').addEventListener('keydown',function(e){
+  if(e.key==='Enter') hdrSearch();
+});
+// 헤더 ↔ 대시보드 검색창 양방향 동기화
+document.getElementById('mainSearch').addEventListener('input',function(){
+  var nd=document.getElementById('ndSearch');
+  if(nd) nd.value=this.value;
+});
+// 대시보드 검색창 엔터
+(function(){
+  var el=document.getElementById('ndSearch');
+  if(el){
+    el.addEventListener('keydown',function(e){if(e.key==='Enter')ndDoSearch();});
+    el.addEventListener('input',function(){
+      var ms=document.getElementById('mainSearch');
+      if(ms) ms.value=this.value;
+    });
+  }
+})();
+
+// 대시보드 활성화 시 지도 초기화
+(function(){
+  var origShow=window.showView;
+  window.showView=function(name,el){
+    origShow&&origShow(name,el);
+    if(name==='dash')setTimeout(ndInitMap,80);
+  };
+  // 초기 로드시에도 초기화
+  setTimeout(ndInitMap,500);
+})();
+
+
+// ══════════════════════════════════════
+// 링크 관리 — 단일 통합 시스템
+// ══════════════════════════════════════
+var ND_DEFAULTS = [
+  {name:'토지이용확인원', url:'https://luris.molit.go.kr/',  icon:'🏛'},
+  {name:'인터넷등기소',   url:'https://www.iros.go.kr/',     icon:'📋'},
+  {name:'정부24',        url:'https://plus.gov.kr/',         icon:'🏢'},
+  {name:'토지이음',      url:'https://www.eum.go.kr/',       icon:'🌐'},
+  {name:'세움터',        url:'https://www.seumter.go.kr/',   icon:'🏗'},
+  {name:'국토정보플랫폼', url:'https://map.ngii.go.kr/',     icon:'📐'},
+  {name:'화성시청',      url:'https://www.hscity.go.kr/',    icon:'🏢'},
+  {name:'', url:'', icon:'🔗'},
+  {name:'', url:'', icon:'🔗'},
+  {name:'', url:'', icon:'🔗'}
+];
+var ndLinks = [];
+var ndEditMode = false;
+
+function ndLoadLinks(){
+  var saved = localStorage.getItem('gdsp_links_v3');
+  if(saved){ try{ ndLinks=JSON.parse(saved); }catch(e){ ndLinks=ND_DEFAULTS.map(function(d){return Object.assign({},d);}); } }
+  else { ndLinks=ND_DEFAULTS.map(function(d){return Object.assign({},d);}); }
+}
+
+function ndSaveAllLinks(){
+  localStorage.setItem('gdsp_links_v3', JSON.stringify(ndLinks));
+}
+
+var ND_ICONS = ['🔗','🏛','📋','🏢','🌐','🏗','📐','🗺','🏠','⭐','📌','🔍','📊','📁','🖥'];
+
+function ndCycleIcon(i){
+  var cur = ND_ICONS.indexOf(ndLinks[i].icon||'🔗');
+  ndLinks[i].icon = ND_ICONS[(cur+1)%ND_ICONS.length];
+  ndRender();
+}
+
+function ndAddRow(){
+  ndLinks.push({name:'',url:'',icon:'🔗'});
+  ndRender();
+}
+
+function ndDeleteRow(i){
+  if(!confirm('"'+(ndLinks[i].name||'빈 슬롯')+'" 항목을 삭제할까요?'))return;
+  ndLinks.splice(i,1);
+  ndRender();
+}
+
+function ndRender(){
+  var c = document.getElementById('ndLinkList');
+  if(!c) return;
+  var html = '';
+
+  ndLinks.forEach(function(l,i){
+    var isEmpty = !l.name && !l.url;
+    var icon = l.icon||'🔗';
+    if(ndEditMode){
+      html += '<div style="background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:7px 8px;margin-bottom:4px">'
+        // 줄1: 아이콘 + 이름 + 삭제
+        +'<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">'
+        +'<span style="font-size:15px;cursor:pointer;user-select:none;flex-shrink:0" title="아이콘 변경" onclick="ndCycleIcon('+i+')">'+icon+'</span>'
+        +'<input id="ndName'+i+'" value="'+escHtml(l.name||'')+'" placeholder="이름 (URL 입력시 자동)" '
+        +'oninput="ndLinks['+i+'].name=this.value" '
+        +'style="flex:1;min-width:0;height:26px;padding:0 7px;background:var(--bg3);border:1px solid var(--line);border-radius:5px;color:var(--txt);font-size:11px;outline:none;font-family:inherit"/>'
+        +'<button onclick="ndDeleteRow('+i+')" '
+        +'style="width:24px;height:24px;border-radius:5px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.06);color:var(--red);font-size:12px;cursor:pointer;flex-shrink:0;padding:0;line-height:1;font-family:inherit">✕</button>'
+        +'</div>'
+        // 줄2: URL 전체 너비 + paste시 자동 타이틀
+        +'<input id="ndUrl'+i+'" value="'+escHtml(l.url||'')+'" placeholder="https:// 주소 붙여넣기 → 이름 자동입력" '
+        +'oninput="ndLinks['+i+'].url=this.value" '
+        +'onpaste="ndFetchTitle('+i+',event)" '
+        +'onblur="ndFetchTitle('+i+')" '
+        +'style="width:100%;height:26px;padding:0 7px;background:var(--bg3);border:1px solid var(--line);border-radius:5px;color:var(--txt2);font-size:10px;outline:none;font-family:inherit;box-sizing:border-box"/>'
+        +'</div>';
+    } else {
+      if(isEmpty){
+        html += '<div style="display:flex;align-items:center;gap:7px;padding:7px 2px;border-bottom:1px solid var(--line);opacity:.5">'
+          +'<span style="font-size:13px">🔗</span>'
+          +'<span style="font-size:11px;color:var(--txt3);font-style:italic">빈 슬롯 — 편집에서 추가</span>'
+          +'</div>';
+      } else {
+        html += '<a href="'+escHtml(l.url)+'" target="_blank" class="nd-link-item">'
+          +'<span style="font-size:14px;flex-shrink:0">'+icon+'</span>'
+          +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600">'+escHtml(l.name)+'</span>'
+          +'<span class="nd-link-arr">›</span>'
+          +'</a>';
+      }
+    }
+  });
+
+  if(ndEditMode){
+    html += '<div style="display:flex;gap:5px;margin-top:9px">'
+      +'<button onclick="ndAddRow()" '
+      +'style="flex:1;height:30px;border-radius:7px;border:1.5px dashed var(--blue2);background:rgba(37,99,235,.05);color:var(--blue2);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">+ 줄 추가</button>'
+      +'<button onclick="ndSaveEdit()" '
+      +'style="flex:1;height:30px;border-radius:7px;background:var(--blue);border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✓ 저장 완료</button>'
+      +'</div>';
+  }
+  c.innerHTML = html;
+}
+
+// URL → 타이틀 자동 가져오기 (대시보드 링크용)
+function ndFetchTitle(i, e){
+  // paste면 살짝 기다렸다가 처리
+  var delay = e ? 120 : 0;
+  setTimeout(function(){
+    var urlEl  = document.getElementById('ndUrl'+i);
+    var nameEl = document.getElementById('ndName'+i);
+    if(!urlEl) return;
+    var url = urlEl.value.trim();
+    if(!url) return;
+    if(!url.startsWith('http')) url = 'https://' + url;
+    ndLinks[i].url = url;
+    urlEl.value = url;
+    // 이름 이미 있으면 스킵
+    if(nameEl && nameEl.value.trim()){ ndLinks[i].name=nameEl.value.trim(); return; }
+    // 로딩 표시
+    if(nameEl){ nameEl.placeholder='가져오는 중...'; nameEl.disabled=true; }
+    var proxy = localStorage.getItem('gdsp_crawl_server')||'http://168.107.15.68:5050';
+    fetch(proxy+'/api/fetch-title?url='+encodeURIComponent(url), {signal:AbortSignal.timeout(4000)})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var title=(d&&d.title)?d.title.trim().slice(0,40):'';
+        ndLinks[i].name = title || new URL(url).hostname.replace('www.','');
+        if(nameEl){nameEl.value=ndLinks[i].name;nameEl.placeholder='이름 (URL 입력시 자동)';nameEl.disabled=false;}
+      })
+      .catch(function(){
+        try{ ndLinks[i].name=new URL(url).hostname.replace('www.',''); }catch(e2){ ndLinks[i].name=''; }
+        if(nameEl){nameEl.value=ndLinks[i].name;nameEl.placeholder='이름 (URL 입력시 자동)';nameEl.disabled=false;}
+      });
+  }, delay);
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function ndToggleEdit(){
+  ndEditMode = !ndEditMode;
+  var btn = document.getElementById('ndEditToggleBtn');
+  if(btn){
+    if(ndEditMode){
+      btn.textContent='✕ 닫기'; btn.style.color='var(--red)'; btn.style.borderColor='rgba(239,68,68,.4)';
+    } else {
+      ndSaveAllLinks();
+      btn.textContent='✏️ 편집'; btn.style.color=''; btn.style.borderColor='';
+      toast('링크 저장됨','ok');
+    }
+  }
+  ndRender();
+}
+
+function ndSaveEdit(){
+  ndSaveAllLinks();
+  ndEditMode=false;
+  var btn=document.getElementById('ndEditToggleBtn');
+  if(btn){btn.textContent='✏️ 편집';btn.style.color='';btn.style.borderColor='';}
+  ndRender();
+  toast('링크 저장됨','ok');
+}
+
+// 하단 추가 버튼 호환
+function ndShowAddLink(){ ndAddRow(); if(!ndEditMode) ndToggleEdit(); }
+function ndHideAddLink(){ if(ndEditMode){ndSaveAllLinks();ndEditMode=false;var b=document.getElementById('ndEditToggleBtn');if(b){b.textContent='✏️ 편집';b.style.color='';b.style.borderColor='';}ndRender();} }
+function ndSaveLink(){ ndSaveEdit(); }
+function ndDelLink(i){ ndDeleteRow(i); }
+
+ndLoadLinks();
+ndRender();
+
+// actList는 기존 addAct 함수가 관리하므로 별도 패치 불필요
+
+// ══════════════════════════════════════
+// 방문자 통계 시스템
+// - 내 방문 횟수: localStorage (기기별)
+// - 오늘/누적 방문자: Oracle 서버 집계 (없으면 로컬 추정)
+// ══════════════════════════════════════
+(function(){
+  var PROXY = localStorage.getItem('gdsp_crawl_server')||'http://168.107.15.68:5050';
+  var TODAY = new Date().toISOString().slice(0,10);
+
+  // 내 방문횟수 (로컬 누적)
+  var myVisits = parseInt(localStorage.getItem('gdsp_my_visits')||'0') + 1;
+  localStorage.setItem('gdsp_my_visits', myVisits);
+  var elMy = document.getElementById('statMy');
+  if(elMy) elMy.textContent = myVisits.toLocaleString();
+
+  // 오늘 방문 로컬 fallback
+  var todayKey = 'gdsp_today_'+TODAY;
+  var localToday = parseInt(localStorage.getItem(todayKey)||'0') + 1;
+  localStorage.setItem(todayKey, localToday);
+
+  function updateStatUI(today, total){
+    var elT = document.getElementById('statToday');
+    var elA = document.getElementById('statTotal');
+    if(elT) elT.textContent = (today||localToday).toLocaleString();
+    if(elA) elA.textContent = (total||localToday).toLocaleString();
+  }
+
+  // UID 생성
+  function genUid(){
+    var uid='u_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);
+    localStorage.setItem('gdsp_uid',uid); return uid;
+  }
+  if(!localStorage.getItem('gdsp_uid')) genUid();
+
+  // Oracle 서버 방문 기록 & 통계
+  fetch(PROXY+'/api/stats/visit',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({date:TODAY, uid:localStorage.getItem('gdsp_uid')})
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d&&d.today!==undefined) updateStatUI(d.today, d.total);
+    else updateStatUI(localToday, null);
+  })
+  .catch(function(){
+    // 서버 오프라인 → 로컬값 표시
+    updateStatUI(localToday, myVisits);
+  });
+})();
+
+
+// ══════════════════════════════════════════════════════════
+// 자주 가는 지도 슬롯 — URL 붙여넣기 → 자동 타이틀 fetch
+// ══════════════════════════════════════════════════════════
+var GM = {
+  STORE_KEY: 'gdsp_geo_maps_v2',
+  ICONS: ['🗺','📐','🌏','🔵','⛰','🛰','📍','🏔','🌊','📊','🏛','⭐','📌','🔗'],
+  defaults: [
+    {name:'국토정보플랫폼', url:'https://map.ngii.go.kr/ms/map/NlipMap.do', icon:'📐'},
+    {name:'VWorld 지도',    url:'https://map.vworld.kr/',                    icon:'🌏'},
+    {name:'카카오맵',       url:'https://map.kakao.com/',                    icon:'🗺'},
+    {name:'네이버지도',     url:'https://map.naver.com/',                    icon:'🔵'},
+    {name:'지형분석(DEM)', url:'https://map.ngii.go.kr/',                   icon:'⛰'},
+  ],
+  slots: [],
+  editMode: false,
+
+  load: function(){
+    var s = localStorage.getItem(GM.STORE_KEY);
+    GM.slots = s ? JSON.parse(s) : GM.defaults.map(function(d){ return Object.assign({},d); });
+  },
+  save: function(){
+    localStorage.setItem(GM.STORE_KEY, JSON.stringify(GM.slots));
+  },
+  render: function(){
+    var c = document.getElementById('geoMapSlots');
+    if(!c) return;
+    var html = '';
+
+    if(GM.editMode){
+      // ── 편집 모드 ──
+      GM.slots.forEach(function(m, i){
+        html += '<div style="background:var(--bg2);border:1px solid var(--line2);border-radius:8px;padding:7px 8px;margin-bottom:4px">'
+          // 줄1: 아이콘 + 이름 + 삭제
+          + '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">'
+          + '<span style="font-size:15px;cursor:pointer;user-select:none;flex-shrink:0" title="아이콘 변경" onclick="GM.cycleIcon('+i+')">'+(m.icon||'🔗')+'</span>'
+          + '<input id="gmName'+i+'" value="'+(m.name||'')+'" placeholder="이름 (URL 입력시 자동)" '
+          + 'oninput="GM.slots['+i+'].name=this.value" '
+          + 'style="flex:1;min-width:0;height:26px;padding:0 7px;background:var(--bg3);border:1px solid var(--line);border-radius:5px;color:var(--txt);font-size:11px;outline:none;font-family:inherit"/>'
+          + '<button onclick="GM.del('+i+')" title="삭제" '
+          + 'style="width:24px;height:24px;border-radius:5px;border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.07);color:var(--red);font-size:12px;cursor:pointer;flex-shrink:0;padding:0;line-height:1;font-family:inherit">✕</button>'
+          + '</div>'
+          // 줄2: URL (전체 너비, 포커스 벗어나면 자동 타이틀)
+          + '<input id="gmUrl'+i+'" value="'+(m.url||'')+'" placeholder="https:// 주소 붙여넣기 → 이름 자동입력" '
+          + 'oninput="GM.slots['+i+'].url=this.value" '
+          + 'onpaste="GM.onPaste('+i+',event)" '
+          + 'onblur="GM.fetchTitle('+i+')" '
+          + 'style="width:100%;height:26px;padding:0 7px;background:var(--bg3);border:1px solid var(--line);border-radius:5px;color:var(--txt2);font-size:10px;outline:none;font-family:inherit;box-sizing:border-box"/>'
+          + '</div>';
+      });
+
+      // + 추가 / 저장 버튼
+      html += '<div style="display:flex;gap:5px;margin-top:7px">'
+        + '<button onclick="GM.add()" '
+        + 'style="flex:1;height:30px;border-radius:7px;border:1.5px dashed var(--blue2);background:rgba(37,99,235,.05);color:var(--blue2);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">＋ 추가</button>'
+        + '<button onclick="GM.saveEdit()" '
+        + 'style="flex:1;height:30px;border-radius:7px;background:var(--blue);border:none;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✓ 저장</button>'
+        + '</div>';
+
+    } else {
+      // ── 일반 모드 ──
+      if(GM.slots.length === 0){
+        html = '<div style="text-align:center;padding:20px 0;color:var(--txt3);font-size:11px">편집 버튼으로 자주 가는 지도를 등록하세요</div>';
+      } else {
+        GM.slots.forEach(function(m, i){
+          var empty = !m.name && !m.url;
+          if(empty){
+            html += '<div style="display:flex;align-items:center;gap:7px;padding:7px 2px;border-bottom:1px solid var(--line);opacity:.35">'
+              + '<span style="font-size:13px">🔗</span>'
+              + '<span style="font-size:10px;color:var(--txt3);font-style:italic">빈 슬롯 — 편집에서 추가</span>'
+              + '</div>';
+          } else {
+            html += '<a href="'+m.url+'" target="_blank" '
+              + 'style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--txt2);transition:.12s;cursor:pointer" '
+              + 'onmouseover="this.style.color=\'var(--neon)\';this.style.background=\'rgba(0,240,255,.03)\'" '
+              + 'onmouseout="this.style.color=\'var(--txt2)\';this.style.background=\'\'">'
+              + '<span style="font-size:14px;flex-shrink:0">'+(m.icon||'🔗')+'</span>'
+              + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700">'+( m.name||m.url||'')+'</span>'
+              + '<span style="font-size:11px;color:var(--txt3)">›</span>'
+              + '</a>';
+          }
+        });
+      }
+    }
+    c.innerHTML = html;
+  },
+
+  toggleEdit: function(){
+    GM.editMode = !GM.editMode;
+    var btn = document.getElementById('geoMapEditBtn');
+    if(btn){
+      if(GM.editMode){
+        btn.textContent='✕ 닫기'; btn.style.color='var(--red)'; btn.style.borderColor='rgba(239,68,68,.4)';
+      } else {
+        GM.save();
+        btn.textContent='✏ 편집'; btn.style.color=''; btn.style.borderColor='';
+        toast('저장됨','ok');
+      }
+    }
+    GM.render();
+  },
+
+  saveEdit: function(){
+    GM.save();
+    GM.editMode = false;
+    var btn = document.getElementById('geoMapEditBtn');
+    if(btn){ btn.textContent='✏ 편집'; btn.style.color=''; btn.style.borderColor=''; }
+    GM.render();
+    toast('지도 즐겨찾기 저장됨','ok');
+  },
+
+  add: function(){
+    GM.slots.push({name:'', url:'', icon:'🔗'});
+    GM.render();
+  },
+
+  del: function(i){
+    GM.slots.splice(i, 1);
+    GM.render();
+  },
+
+  cycleIcon: function(i){
+    var cur = GM.ICONS.indexOf(GM.slots[i].icon||'🔗');
+    GM.slots[i].icon = GM.ICONS[(cur+1) % GM.ICONS.length];
+    GM.render();
+  },
+
+  // 붙여넣기 즉시 처리
+  onPaste: function(i, e){
+    setTimeout(function(){ GM.fetchTitle(i); }, 100);
+  },
+
+  // URL → 타이틀 자동 가져오기 (버튼 없이 자동)
+  fetchTitle: function(i){
+    var urlEl  = document.getElementById('gmUrl'+i);
+    var nameEl = document.getElementById('gmName'+i);
+    if(!urlEl) return;
+    var url = urlEl.value.trim();
+    if(!url) return;
+    if(!url.startsWith('http')) url = 'https://' + url;
+    GM.slots[i].url = url;
+    urlEl.value = url;
+
+    // 이름이 이미 있으면 URL만 저장하고 끝
+    if(nameEl && nameEl.value.trim()){
+      GM.slots[i].name = nameEl.value.trim();
+      return;
+    }
+
+    // 로딩 표시
+    if(nameEl){ nameEl.placeholder='가져오는 중...'; nameEl.disabled=true; }
+
+    var proxy = localStorage.getItem('gdsp_crawl_server')||'http://168.107.15.68:5050';
+
+    fetch(proxy + '/api/fetch-title?url=' + encodeURIComponent(url), {signal: AbortSignal.timeout(4000)})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var title = (d && d.title) ? d.title.trim().slice(0,40) : '';
+        GM.slots[i].name = title || new URL(url).hostname.replace('www.','');
+        if(nameEl){ nameEl.value=GM.slots[i].name; nameEl.placeholder='이름 (URL 입력시 자동)'; nameEl.disabled=false; }
+      })
+      .catch(function(){
+        // 서버 없으면 도메인으로
+        try{ GM.slots[i].name = new URL(url).hostname.replace('www.',''); }catch(e){ GM.slots[i].name=''; }
+        if(nameEl){ nameEl.value=GM.slots[i].name; nameEl.placeholder='이름 (URL 입력시 자동)'; nameEl.disabled=false; }
+      });
+  }
+};
+
+// 초기화
+GM.load();
+
+// showView 패치 — geo 뷰 열릴 때 렌더
+(function(){
+  var _o = window.showView;
+  window.showView = function(name, el){
+    _o && _o(name, el);
+    if(name === 'geo') setTimeout(GM.render.bind(GM), 60);
+  };
+  // 이미 geo 뷰면 바로 렌더
+  if(document.getElementById('view-geo') && document.getElementById('view-geo').classList.contains('on')){
+    GM.render();
+  }
+})();
+
+// HTML에서 onclick 연결용 전역 함수
+function geoMapToggleEdit(){ GM.toggleEdit(); }
 
 </script>
 </body>
