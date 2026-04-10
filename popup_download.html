@@ -6,13 +6,23 @@
 <title>G-DSP — 다운로드 · 발급</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script>
-// VWorld 키 미리 확인 — 있으면 스크립트를 head에 동기 삽입
-(function(){
-  var k = localStorage.getItem('gdsp_vworld_key') || '';
-  if(k){
-    document.write('<script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+k+'">\x3C/script>');
-  }
-})();
+// VWorld 스크립트 동적 로드 (키는 Oracle 서버에서 받아옴)
+var _vwScriptLoaded = false;
+var _vwScriptCallbacks = [];
+function loadVworldScript(key, cb){
+  if(_vwScriptLoaded){ if(cb) cb(); return; }
+  if(cb) _vwScriptCallbacks.push(cb);
+  if(document.getElementById('vw-script')) return;
+  var s = document.createElement('script');
+  s.id = 'vw-script';
+  s.src = 'https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+key;
+  s.onload = function(){
+    _vwScriptLoaded = true;
+    _vwScriptCallbacks.forEach(function(fn){ fn(); });
+    _vwScriptCallbacks = [];
+  };
+  document.head.appendChild(s);
+}
 </script>
 <style>
 :root{
@@ -368,8 +378,26 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
 <script>
 /* ===================== 공통 ===================== */
 var regItems = [], _tt;
-var _vwKey = localStorage.getItem('gdsp_vworld_key') || '';
+var _vwKey = '';
 var _kakaoKey = (window.opener && window.opener.KAKAO_APP_KEY) || localStorage.getItem('gdsp_kakao_key') || '';
+
+// Oracle 서버에서 VWorld 키 받아오기
+var GDSP_SERVER = 'http://168.107.15.68:5050';
+fetch(GDSP_SERVER + '/api/vworld/key')
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(!d.key){ toast('VWorld 키 로드 실패','err'); return; }
+    _vwKey = d.key;
+    loadVworldScript(_vwKey, function(){
+      var activeTab = document.querySelector('.tab.on');
+      if(activeTab){
+        var tid = activeTab.id.replace('tab-','');
+        if(tid==='dtm') initVmap();
+        if(tid==='jideok') initVmap2();
+      }
+    });
+  })
+  .catch(function(){ toast('서버 연결 실패','err'); });
 
 function toast(msg, type){
   var t = document.getElementById('toast');
@@ -391,20 +419,7 @@ function switchTab(t){
 }
 
 function promptVworldKey(){
-  var k = prompt('VWorld API 키를 입력하세요:','');
-  if(k && k.trim()){
-    _vwKey = k.trim();
-    localStorage.setItem('gdsp_vworld_key', _vwKey);
-    // 스크립트가 이미 로드됐으면 바로 초기화, 아니면 새로고침
-    if(typeof vw !== 'undefined'){
-      initVmap();
-      initVmap2();
-    } else {
-      if(confirm('키가 저장됐습니다. 지도를 표시하려면 새로고침이 필요합니다. 지금 새로고침할까요?')){
-        location.reload();
-      }
-    }
-  }
+  toast('VWorld 키는 G-DSP 서버에서 자동 관리됩니다','err');
 }
 
 function toggleTheme(){
@@ -424,14 +439,7 @@ var _map1 = null, _map1loaded = false, _jideokOn = true;
 
 function initVmap(){
   if(_map1loaded || !_vwKey) return;
-  if(typeof vw === 'undefined'){
-    toast('VWorld 스크립트 로드 안됨 — 페이지 새로고침 필요', 'err');
-    // 키 저장 후 새로고침 안내
-    document.getElementById('vmapOverlay').innerHTML =
-      '<p style="font-size:12px;color:var(--txt2);text-align:center;padding:0 20px">키가 저장됐습니다.<br>페이지를 <b>새로고침(F5)</b>하면 지도가 표시됩니다.</p>'
-      +'<button onclick="location.reload()" style="height:32px;padding:0 16px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;margin-top:4px">🔄 새로고침</button>';
-    return;
-  }
+  if(typeof vw === 'undefined'){ toast('VWorld 스크립트 로딩 중...'); setTimeout(initVmap, 500); return; }
   document.getElementById('vmapOverlay').style.display='none';
   var opts = {
     mapId: 'vmap',
@@ -743,7 +751,7 @@ function makeRegExcel(){ if(!regItems.length){ toast('목록에 지번을 먼저
 
 /* ===================== 초기화 ===================== */
 window.addEventListener('DOMContentLoaded', function(){
-  if(_vwKey) initVmap();
+  // VWorld 초기화는 fetch 콜백에서 처리
   // jQuery (WFS ajax용) 동적 로드
   if(typeof $ === 'undefined'){
     var jq = document.createElement('script');
