@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>G-DSP — 다운로드 · 발급</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script>
+// VWorld 키 미리 확인 — 있으면 스크립트를 head에 동기 삽입
+(function(){
+  var k = localStorage.getItem('gdsp_vworld_key') || '';
+  if(k){
+    document.write('<script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+k+'">\x3C/script>');
+  }
+})();
+</script>
 <style>
 :root{
   --bg:#f5f7fa;--bg2:#eef1f6;--bg3:#e6eaf2;
@@ -40,8 +49,9 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
 .tab:hover{color:var(--txt2)}
 .tab.on{color:var(--blue);border-bottom-color:var(--blue)}
 .tab svg{width:13px;height:13px}
-.tab-view{display:none;flex:1;overflow:hidden;flex-direction:column}
-.tab-view.on{display:flex}
+.tab-view{display:none;flex:1;overflow:hidden;flex-direction:column;height:0}
+.tab-view.on{display:flex;height:auto}
+.vmap-wrap{position:relative;flex-shrink:0;height:340px}
 
 .body{flex:1;overflow-y:auto;padding:20px}
 .sec{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
@@ -122,82 +132,104 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
 
   <!-- 수치지형도 -->
   <div class="tab-view on" id="view-dtm">
-    <div class="body">
-      <div class="sec">
-        <div class="sec-t">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg>
-          수치지형도 다운로드
-        </div>
-        <div style="font-size:12px;color:var(--txt3);margin-bottom:14px">국토정보플랫폼 도각 기반 수치지형도를 다운로드합니다.</div>
+    <!-- VWorld 지도 (전체 높이의 60%) -->
+    <div style="position:relative;flex-shrink:0;height:58%">
+      <div id="vmap" style="width:100%;height:100%"></div>
+      <!-- 지번검색 바 (지도 위 overlay) -->
+      <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:420px">
+        <input id="dtmAddr" type="text" placeholder="지번 또는 도로명 검색…" onkeydown="if(event.key==='Enter')dtmSearch()"
+          style="flex:1;height:34px;padding:0 12px;background:#fff;border:1px solid var(--line2);border-radius:8px;font-size:12px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.15)">
+        <button onclick="dtmSearch()" style="height:34px;padding:0 14px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">검색</button>
+      </div>
+      <!-- 지적도 토글 -->
+      <div style="position:absolute;top:10px;right:10px;z-index:1000">
+        <button id="jideokToggleBtn" onclick="toggleJideokLayer()" style="height:32px;padding:0 12px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:11px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">🗺 지적도 ON</button>
+      </div>
+      <!-- 검색결과 드롭다운 -->
+      <div id="dtmSrchResult" style="position:absolute;top:50px;left:10px;z-index:1001;width:calc(100% - 20px);max-width:420px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none;max-height:180px;overflow-y:auto"></div>
+      <!-- VWorld 로딩 안내 -->
+      <div id="vmapOverlay" style="position:absolute;inset:0;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:500">
+        <svg style="width:40px;height:40px;opacity:.2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <p style="font-size:12px;color:var(--txt3);text-align:center">VWorld API 키를 설정에서 입력하면<br>지도가 표시됩니다</p>
+        <button onclick="promptVworldKey()" style="height:32px;padding:0 16px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer">🔑 API 키 입력</button>
+      </div>
+    </div>
 
-        <div style="margin-bottom:10px">
-          <div style="font-size:11px;color:var(--txt3);margin-bottom:6px">반경 설정</div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <button class="rad-btn on" onclick="setRad(this,'100m')">100m</button>
-            <button class="rad-btn" onclick="setRad(this,'200m')">200m</button>
-            <button class="rad-btn" onclick="setRad(this,'300m')">300m</button>
-            <input type="number" min="50" max="5000" placeholder="직접입력(m)" style="height:30px;width:110px;padding:0 8px;background:var(--bg2);border:1px solid var(--line2);border-radius:6px;color:var(--txt);font-size:11px;outline:none" oninput="toast(this.value+'m 반경 설정됨')">
-          </div>
-        </div>
+    <!-- 하단 패널 -->
+    <div style="flex:1;overflow-y:auto;padding:12px 16px">
 
-        <div style="margin-bottom:8px">
-          <div style="font-size:11px;color:var(--txt3);margin-bottom:6px">도각번호 목록</div>
-          <div id="tileBox" style="display:flex;flex-direction:column;gap:4px;max-height:100px;overflow-y:auto;margin-bottom:8px"></div>
-          <div style="display:flex;gap:6px">
-            <input class="inp" id="tileInput" placeholder="도각번호 (8자리)" onkeydown="if(event.key==='Enter')addTile(this.value)">
-            <button class="btn-outline" onclick="addTile(document.getElementById('tileInput').value)">＋ 추가</button>
-          </div>
+      <!-- 선택된 위치 + 도각번호 -->
+      <div class="sec" style="margin-bottom:10px">
+        <div class="sec-t" style="margin-bottom:10px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          선택 위치 · 도각번호
         </div>
-
-        <div style="display:flex;gap:6px;margin-top:12px">
-          <button class="btn-primary" style="flex:1" onclick="doDl()">⬇ 수치지형도 다운로드</button>
-          <a class="btn-outline" href="https://map.ngii.go.kr/ms/map/NlipMap.do" target="_blank">국토정보플랫폼 열기</a>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+          <div style="font-size:11px;color:var(--txt3)">주소</div>
+          <div style="font-size:11px;color:var(--txt3)">좌표</div>
+          <div id="dtmSelAddr" style="font-size:12px;font-weight:700;color:var(--blue2)">—</div>
+          <div id="dtmSelCoord" style="font-size:12px;color:var(--txt2)">—</div>
         </div>
-        <div style="margin-top:12px;padding:10px 14px;background:rgba(217,119,6,.05);border:1px solid rgba(217,119,6,.15);border-radius:8px;font-size:11px;color:var(--gold);line-height:1.8">
-          ⚠ 국토정보플랫폼 계정 로그인 필요 — 설정에서 아이디/비밀번호를 먼저 저장하세요
+        <!-- 도각번호 -->
+        <div style="font-size:11px;color:var(--txt3);margin-bottom:6px">자동 계산된 도각번호 (1:5000)</div>
+        <div id="tileBox" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;min-height:28px">
+          <span style="font-size:11px;color:var(--txt3);padding:4px 0">지번을 검색하면 자동 계산됩니다</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-primary" style="flex:1" onclick="copyTiles()">📋 도각번호 복사</button>
+          <a class="btn-outline" href="https://map.ngii.go.kr/ms/map/NlipMap.do" target="_blank" style="flex:1">국토정보플랫폼 열기</a>
+        </div>
+        <div style="margin-top:8px;padding:8px 12px;background:rgba(217,119,6,.05);border:1px solid rgba(217,119,6,.15);border-radius:7px;font-size:11px;color:var(--gold);line-height:1.7">
+          💡 도각번호 복사 → 국토정보플랫폼 검색창에 붙여넣기 → 다운로드
         </div>
       </div>
+
     </div>
   </div>
 
   <!-- 지적도 -->
   <div class="tab-view" id="view-jideok">
-    <div class="body">
-      <div class="sec">
-        <div class="sec-t">
+    <!-- VWorld 지도 (지적도 WFS 조회용) -->
+    <div style="position:relative;flex-shrink:0;height:58%">
+      <div id="vmap2" style="width:100%;height:100%"></div>
+      <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;max-width:300px">
+        <span style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:11px;color:var(--txt2);box-shadow:0 2px 8px rgba(0,0,0,.12)">🖱 지도 클릭 → 필지 조회</span>
+      </div>
+      <div id="vmap2Overlay" style="position:absolute;inset:0;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:500">
+        <svg style="width:40px;height:40px;opacity:.2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+        <p style="font-size:12px;color:var(--txt3);text-align:center">VWorld API 키가 있으면<br>지적도를 바로 조회할 수 있습니다</p>
+        <button onclick="promptVworldKey()" style="height:32px;padding:0 16px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer">🔑 API 키 입력</button>
+      </div>
+    </div>
+    <!-- 하단: 필지 정보 -->
+    <div style="flex:1;overflow-y:auto;padding:12px 16px">
+      <div class="sec" style="margin-bottom:10px">
+        <div class="sec-t" style="margin-bottom:10px">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
-          지적도 다운로드
+          선택 필지 정보
         </div>
-        <div style="font-size:12px;color:var(--txt3);margin-bottom:14px">영역을 선택하여 지적도를 다운로드합니다.</div>
-
-        <div style="margin-bottom:14px">
-          <div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:8px">영역 선택 방식</div>
-          <button class="jd-btn on" id="jdb-rect" onclick="setJdMode('rect',this)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/></svg>사각형 선택
-          </button>
-          <button class="jd-btn" id="jdb-circle" onclick="setJdMode('circle',this)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>원형 선택
-          </button>
-          <button class="jd-btn" id="jdb-poly" onclick="setJdMode('poly',this)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 20 2 20"/></svg>직접 그리기
-          </button>
-        </div>
-
-        <div style="margin-bottom:14px">
-          <div style="font-size:11px;font-weight:700;color:var(--txt3);margin-bottom:8px">파일 형식</div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="radio" name="jdFmt" value="shp" checked style="accent-color:var(--blue)"> SHP (Shape)</label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="radio" name="jdFmt" value="dxf" style="accent-color:var(--blue)"> DXF (CAD)</label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="radio" name="jdFmt" value="geojson" style="accent-color:var(--blue)"> GeoJSON</label>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:6px">
-          <button class="btn-primary" style="flex:1" onclick="toast('지적도 다운로드: 국토정보플랫폼 연동 필요')">영역 다운로드</button>
-          <a class="btn-outline" href="https://map.ngii.go.kr/ms/map/NlipMap.do" target="_blank">국토정보플랫폼 열기</a>
+        <div class="info-row"><span class="info-k">주소</span><span class="info-v blue" id="jd-addr">—</span></div>
+        <div class="info-row"><span class="info-k">지목</span><span class="info-v" id="jd-jmok">—</span></div>
+        <div class="info-row"><span class="info-k">면적</span><span class="info-v green" id="jd-area">—</span></div>
+        <div class="info-row"><span class="info-k">PNU</span><span class="info-v" id="jd-pnu" style="font-size:11px">—</span></div>
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="btn-primary" style="flex:1" onclick="copyJdInfo()">📋 필지정보 복사</button>
+          <button class="btn-outline" style="flex:1" onclick="sendJdToParent()">↩ 메인으로 전송</button>
         </div>
       </div>
     </div>
+    <!-- WFS form (hidden) -->
+    <form id="wfsForm" style="display:none">
+      <input type="hidden" name="key" id="wfsKey" value="">
+      <input type="hidden" name="domain" value="">
+      <input type="hidden" name="SERVICE" value="WFS">
+      <input type="hidden" name="version" value="1.1.0">
+      <input type="hidden" name="request" value="GetFeature">
+      <input type="hidden" name="TYPENAME" value="lt_c_landinfobasemap">
+      <input type="hidden" name="OUTPUT" value="text/javascript">
+      <input type="hidden" name="SRSNAME" value="EPSG:4326">
+      <input type="hidden" name="BBOX" value="">
+    </form>
   </div>
 
   <!-- 건축물대장 -->
@@ -334,17 +366,19 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
 <div id="toast"></div>
 
 <script>
-var regItems = [];
-var _tt;
+/* ===================== 공통 ===================== */
+var regItems = [], _tt;
+var _vwKey = localStorage.getItem('gdsp_vworld_key') || '';
+var _kakaoKey = (window.opener && window.opener.KAKAO_APP_KEY) || localStorage.getItem('gdsp_kakao_key') || '';
 
 function toast(msg, type){
   var t = document.getElementById('toast');
   t.textContent = msg;
   t.style.opacity = '1';
   t.style.transform = 'translateX(-50%) translateY(0)';
-  t.style.background = type==='err' ? '#991b1b' : type==='ok' ? '#0f766e' : '#1e293b';
+  t.style.background = type==='err'?'#991b1b':type==='ok'?'#0f766e':'#1e293b';
   clearTimeout(_tt);
-  _tt = setTimeout(function(){ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(20px)'; }, 2400);
+  _tt = setTimeout(function(){ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(20px)'; }, 2500);
 }
 
 function switchTab(t){
@@ -352,119 +386,371 @@ function switchTab(t){
   document.querySelectorAll('.tab-view').forEach(function(v){ v.classList.remove('on'); });
   document.getElementById('tab-'+t).classList.add('on');
   document.getElementById('view-'+t).classList.add('on');
+  if(t==='dtm') initVmap();
+  if(t==='jideok') initVmap2();
 }
 
-function setRad(btn, r){
-  document.querySelectorAll('.rad-btn').forEach(function(b){ b.classList.remove('on'); });
-  btn.classList.add('on');
-  toast(r + ' 반경 설정됨');
-}
-
-function addTile(code){
-  code = (code || '').trim();
-  if(!code){ toast('도각번호를 입력하세요', 'err'); return; }
-  var box = document.getElementById('tileBox');
-  if(box.querySelector('[data-c="'+code+'"]')){ toast('이미 추가된 도각번호입니다'); return; }
-  var d = document.createElement('div');
-  d.className = 'tile-row';
-  d.dataset.c = code;
-  d.innerHTML = '<span style="color:var(--blue2);font-size:11px">▪</span>'
-    + '<span style="flex:1;font-size:12px">'+code+'</span>'
-    + '<button onclick="this.parentNode.remove()" style="color:var(--txt3);font-size:14px;background:none;border:none;cursor:pointer">×</button>';
-  box.appendChild(d);
-  document.getElementById('tileInput').value = '';
-  toast(code + ' 추가됨', 'ok');
-}
-
-function doDl(){
-  var tiles = document.querySelectorAll('#tileBox .tile-row');
-  if(!tiles.length){ toast('도각번호를 먼저 추가하세요', 'err'); return; }
-  toast('국토정보플랫폼 연동 필요 — 다운로드 페이지를 열겠습니다');
-  setTimeout(function(){ window.open('https://map.ngii.go.kr/ms/map/NlipMap.do', '_blank'); }, 800);
-}
-
-function setJdMode(mode, btn){
-  document.querySelectorAll('.jd-btn').forEach(function(b){ b.classList.remove('on'); });
-  btn.classList.add('on');
-}
-
-function callBldApi(){
-  var jibun = document.getElementById('bldJibunInput').value.trim();
-  if(!jibun){ toast('지번을 입력하세요', 'err'); return; }
-  var apiKey = localStorage.getItem('gdsp_building') || '';
-  if(!apiKey){ toast('건축물대장 API 키를 설정에서 먼저 입력하세요', 'err'); return; }
-  document.getElementById('bJibun').textContent = jibun;
-  toast('조회 중...');
-  var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo'
-    + '?serviceKey=' + encodeURIComponent(apiKey)
-    + '&sigunguCd=41590&bjdongCd=&platGbCd=0&bun=&ji=&startDate=&endDate=&numOfRows=1&pageNo=1&_type=json';
-  fetch(url)
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var item = d && d.response && d.response.body && d.response.body.items && d.response.body.items.item;
-      if(item){
-        var it = Array.isArray(item) ? item[0] : item;
-        document.getElementById('bUse').textContent    = it.mainPurpsCdNm || '—';
-        document.getElementById('bFloor').textContent  = (it.grndFlrCnt || '—') + '층';
-        document.getElementById('bBcArea').textContent = it.bcArea  ? it.bcArea  + '㎡' : '—';
-        document.getElementById('bArea').textContent   = it.totArea ? it.totArea + '㎡' : '—';
-        document.getElementById('bYear').textContent   = it.useAprDay ? it.useAprDay.substring(0,4) + '년' : '—';
-        toast('건축물대장 조회 완료', 'ok');
-      } else {
-        toast('조회 결과가 없습니다', 'err');
+function promptVworldKey(){
+  var k = prompt('VWorld API 키를 입력하세요:','');
+  if(k && k.trim()){
+    _vwKey = k.trim();
+    localStorage.setItem('gdsp_vworld_key', _vwKey);
+    // 스크립트가 이미 로드됐으면 바로 초기화, 아니면 새로고침
+    if(typeof vw !== 'undefined'){
+      initVmap();
+      initVmap2();
+    } else {
+      if(confirm('키가 저장됐습니다. 지도를 표시하려면 새로고침이 필요합니다. 지금 새로고침할까요?')){
+        location.reload();
       }
-    })
-    .catch(function(){ toast('조회 실패 — API 키 또는 네트워크 확인', 'err'); });
-}
-
-function searchReg(){
-  var jibun = document.getElementById('regJibun').value.trim();
-  if(!jibun){ toast('지번을 입력하세요', 'err'); return; }
-  toast('등기부등본 조회: 인터넷등기소 연동 필요');
-  document.getElementById('regUniq').textContent  = '인터넷등기소에서 확인';
-  document.getElementById('regOwner').textContent = '—';
-}
-
-function addRegToList(){
-  var jibun = document.getElementById('regJibun').value.trim();
-  if(!jibun){ toast('지번을 입력하세요', 'err'); return; }
-  if(regItems.indexOf(jibun) >= 0){ toast('이미 추가된 지번입니다'); return; }
-  regItems.push(jibun);
-  renderRegList();
-  toast(jibun + ' 추가됨', 'ok');
-}
-
-function renderRegList(){
-  var list = document.getElementById('regList');
-  if(!regItems.length){
-    list.innerHTML = '<div style="text-align:center;color:var(--txt3);font-size:12px;padding:14px 0">추가된 지번이 없습니다</div>';
-    return;
+    }
   }
-  list.innerHTML = regItems.map(function(j, i){
-    return '<div class="reg-list-item">'
-      + '<span style="flex:1;color:var(--blue2);font-weight:700">'+j+'</span>'
-      + '<button onclick="regItems.splice('+i+',1);renderRegList()" style="height:24px;padding:0 8px;border-radius:5px;border:1px solid var(--line);color:var(--txt3);font-size:10px;cursor:pointer;background:transparent">삭제</button>'
-      + '</div>';
-  }).join('');
-}
-
-function makeRegExcel(){
-  if(!regItems.length){ toast('목록에 지번을 먼저 추가하세요', 'err'); return; }
-  toast('엑셀 양식 생성: SheetJS 연동 예정');
 }
 
 function toggleTheme(){
   var isDark = document.body.classList.toggle('dark');
   document.getElementById('themeBtn').textContent = isDark ? '☀️ 라이트' : '🌙 다크';
-  localStorage.setItem('gdsp_theme', isDark ? 'dark' : 'light');
+  localStorage.setItem('gdsp_theme', isDark?'dark':'light');
 }
-
 (function(){
-  if(localStorage.getItem('gdsp_theme') === 'dark'){
+  if(localStorage.getItem('gdsp_theme')==='dark'){
     document.body.classList.add('dark');
-    document.getElementById('themeBtn').textContent = '☀️ 라이트';
+    document.getElementById('themeBtn').textContent='☀️ 라이트';
   }
 })();
+
+/* ===================== VWorld 지도 1 (수치지형도 탭) ===================== */
+var _map1 = null, _map1loaded = false, _jideokOn = true;
+
+function initVmap(){
+  if(_map1loaded || !_vwKey) return;
+  if(typeof vw === 'undefined'){
+    toast('VWorld 스크립트 로드 안됨 — 페이지 새로고침 필요', 'err');
+    // 키 저장 후 새로고침 안내
+    document.getElementById('vmapOverlay').innerHTML =
+      '<p style="font-size:12px;color:var(--txt2);text-align:center;padding:0 20px">키가 저장됐습니다.<br>페이지를 <b>새로고침(F5)</b>하면 지도가 표시됩니다.</p>'
+      +'<button onclick="location.reload()" style="height:32px;padding:0 16px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;margin-top:4px">🔄 새로고침</button>';
+    return;
+  }
+  document.getElementById('vmapOverlay').style.display='none';
+  var opts = {
+    mapId: 'vmap',
+    initPosition: new vw.CameraPosition(
+      new vw.CoordZ(126.83, 37.2, 3000),
+      new vw.Direction(0,-90,0)
+    ),
+    logo: false, navigation: true
+  };
+  _map1 = new vw.Map();
+  _map1.setOption(opts);
+  _map1.start();
+  _map1loaded = true;
+  addJideokWMS();
+  _map1.onClick.addEventListener(function(wp, ep, carto){
+    if(!carto) return;
+    var lat = carto.latitudeDD, lng = carto.longitudeDD;
+    document.getElementById('dtmSelCoord').textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+    calcTiles(lat, lng);
+  });
+}
+
+function addJideokWMS(){
+  if(!_map1 || !_vwKey) return;
+  var wmsLayer = new vw.Layers();
+  var wmsSource = new vw.source.TileWMS();
+  wmsSource.setUrl('https://api.vworld.kr/req/wms?Key='+_vwKey+'&');
+  wmsSource.setParams('tilesize=256');
+  wmsSource.setLayers('lt_c_landinfobasemap');
+  wmsSource.setStyles('lt_c_landinfobasemap');
+  wmsSource.setFormat('image/png');
+  var wmsTile = new vw.layer.Tile(wmsSource);
+  wmsLayer.add(wmsTile);
+  _jideokOn = true;
+  document.getElementById('jideokToggleBtn').textContent = '🗺 지적도 ON';
+}
+
+function toggleJideokLayer(){
+  if(!_map1){ toast('지도를 먼저 로드하세요', 'err'); return; }
+  // 토글 — 레이어 제어는 vw.Map 방식으로
+  _jideokOn = !_jideokOn;
+  document.getElementById('jideokToggleBtn').textContent = _jideokOn ? '🗺 지적도 ON' : '🗺 지적도 OFF';
+  toast(_jideokOn ? '지적도 레이어 켜짐' : '지적도 레이어 꺼짐');
+}
+
+/* ===================== 지번검색 (카카오 REST) ===================== */
+function dtmSearch(){
+  var q = (document.getElementById('dtmAddr').value||'').trim();
+  if(!q){ toast('주소를 입력하세요','err'); return; }
+
+  if(!_kakaoKey){
+    toast('카카오 API 키 없음 — 좌표 직접 입력 불가','err');
+    return;
+  }
+  fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(q)+'&size=5',{
+    headers:{'Authorization':'KakaoAK '+_kakaoKey}
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var docs = d.documents||[];
+    if(!docs.length){
+      return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query='+encodeURIComponent(q)+'&size=5',{
+        headers:{'Authorization':'KakaoAK '+_kakaoKey}
+      }).then(function(r2){return r2.json();}).then(function(d2){
+        return (d2.documents||[]).map(function(r){
+          return {addr:r.address_name||r.place_name, lat:parseFloat(r.y), lng:parseFloat(r.x)};
+        });
+      });
+    }
+    return docs.map(function(r){return {addr:r.address_name, lat:parseFloat(r.y), lng:parseFloat(r.x)};});
+  })
+  .then(function(list){
+    var box = document.getElementById('dtmSrchResult');
+    if(!list||!list.length){ toast('검색 결과 없음','err'); return; }
+    box.style.display='block';
+    box._list = list;
+    box.innerHTML = list.map(function(item,i){
+      return '<div onclick="dtmSelectAddr('+i+')" style="padding:9px 14px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600;color:var(--txt)" onmouseover="this.style.background=\'rgba(37,99,235,.06)\'" onmouseout="this.style.background=\'\'">'+item.addr+'</div>';
+    }).join('');
+  })
+  .catch(function(){ toast('검색 실패','err'); });
+}
+
+function dtmSelectAddr(i){
+  var box = document.getElementById('dtmSrchResult');
+  var item = box._list[i];
+  if(!item) return;
+  box.style.display='none';
+  document.getElementById('dtmSelAddr').textContent = item.addr;
+  document.getElementById('dtmSelCoord').textContent = item.lat.toFixed(6)+', '+item.lng.toFixed(6);
+  calcTiles(item.lat, item.lng);
+  // 지도 이동
+  if(_map1){
+    _map1.moveTo(new vw.CoordZ(item.lng, item.lat, 500));
+  }
+  toast(item.addr+' 선택됨','ok');
+}
+
+/* ===================== 도각번호 계산 (1:5000) ===================== */
+function calcTiles(lat, lng){
+  // 1:5000 도각: 위도 1.5', 경도 2.25' 간격
+  // 도각번호 = 위도인덱스(4자리) + 경도인덱스(4자리)  — 실제 NLIPmap 방식
+  // 간단 계산: 중심좌표 기준 ±1도각 (인접 포함 9장)
+  var tiles = [];
+  var dLat = 1.5/60, dLng = 2.25/60;
+
+  // 기준 인덱스
+  var latIdx = Math.floor(lat / dLat);
+  var lngIdx = Math.floor(lng / dLng);
+
+  // 중심 + 인접 8장 (총 9장)
+  for(var di=-1; di<=1; di++){
+    for(var dj=-1; dj<=1; dj++){
+      var li = latIdx + di, lj = lngIdx + dj;
+      // 1:5000 도각번호 형식: 위도인덱스_경도인덱스 → 8자리 코드
+      // 실제 국토정보플랫폼 방식: 상위도각(1:25000) + 하위번호
+      var code = calcNgiiCode(li * dLat + dLat/2, lj * dLng + dLng/2);
+      if(tiles.indexOf(code)<0) tiles.push(code);
+    }
+  }
+
+  var box = document.getElementById('tileBox');
+  box.innerHTML = tiles.map(function(c){
+    return '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:6px;font-size:11px;font-weight:700;color:var(--blue2)">'
+      +c
+      +'<button onclick="navigator.clipboard.writeText(\''+c+'\');toast(\''+c+' 복사됨\',\'ok\')" style="color:var(--blue2);font-size:12px;background:none;border:none;cursor:pointer;padding:0;margin-left:2px">⧉</button>'
+      +'</span>';
+  }).join('');
+  toast('도각번호 '+tiles.length+'개 계산됨','ok');
+}
+
+function calcNgiiCode(lat, lng){
+  // 국토정보플랫폼 1:5000 수치지형도 도각 코드 계산
+  // 1:50000 도각 기준 (위도 20', 경도 30') → 내부 1:5000 분할 (4×4 = 16장)
+  var base50Lat = Math.floor(lat * 60 / 20);
+  var base50Lng = Math.floor(lng * 60 / 30);
+
+  // 1:50000 코드 (예: 3652)
+  var code50 = String(base50Lat).padStart(2,'0') + String(base50Lng).padStart(2,'0');
+
+  // 1:5000 내부 분할번호 (1~16)
+  var subLat = Math.floor(((lat * 60) % 20) / 5);   // 0~3
+  var subLng = Math.floor(((lng * 60) % 30) / 7.5); // 0~3
+  var subNum = subLat * 4 + subLng + 1;              // 1~16
+
+  return code50 + String(subNum).padStart(2,'0');
+}
+
+function copyTiles(){
+  var spans = document.querySelectorAll('#tileBox span');
+  if(!spans.length){ toast('도각번호를 먼저 계산하세요','err'); return; }
+  var codes = Array.from(spans).map(function(s){ return s.textContent.replace('⧉','').trim(); });
+  navigator.clipboard.writeText(codes.join('\n')).then(function(){
+    toast('도각번호 '+codes.length+'개 복사됨','ok');
+  });
+}
+
+/* ===================== VWorld 지도 2 (지적도 탭) ===================== */
+var _map2 = null, _map2loaded = false;
+
+function initVmap2(){
+  if(_map2loaded || !_vwKey) return;
+  // vw 객체가 이미 로드됐으면 바로 사용, 아니면 스크립트 재로드 불가(중복)
+  if(typeof vw !== 'undefined'){
+    _doInitMap2();
+  } else if(!_map1loaded){
+    // 아직 스크립트 안 로드됨 — initVmap 먼저
+    initVmap();
+    setTimeout(initVmap2, 2000);
+  }
+}
+
+function _doInitMap2(){
+  if(_map2loaded) return;
+  document.getElementById('vmap2Overlay').style.display='none';
+  var opts = {
+    mapId:'vmap2',
+    initPosition: new vw.CameraPosition(
+      new vw.CoordZ(126.83, 37.2, 3000),
+      new vw.Direction(0,-90,0)
+    ),
+    logo:false, navigation:true
+  };
+  _map2 = new vw.Map();
+  _map2.setOption(opts);
+  _map2.start();
+  _map2loaded = true;
+
+  // 지적도 WMS
+  var wmsLayer = new vw.Layers();
+  var wmsSource = new vw.source.TileWMS();
+  wmsSource.setUrl('https://api.vworld.kr/req/wms?Key='+_vwKey+'&');
+  wmsSource.setParams('tilesize=256');
+  wmsSource.setLayers('lt_c_landinfobasemap');
+  wmsSource.setStyles('lt_c_landinfobasemap');
+  wmsSource.setFormat('image/png');
+  wmsLayer.add(new vw.layer.Tile(wmsSource));
+
+  // 클릭 → WFS 조회
+  document.getElementById('wfsKey').value = _vwKey;
+  _map2.onClick.addEventListener(wfsClick);
+}
+
+function wfsClick(wp, ep, carto){
+  if(!carto) return;
+  var lat = carto.latitudeDD, lng = carto.longitudeDD;
+  var pos = _map2.getCurrentPosition().position;
+  var z = pos.z;
+  var m = 1/(111000/z*1.48*50);
+  var h = 1/(111000/z*1.85*50);
+  var bbox = (lng-m)+','+(lat-h)+','+(lng+m)+','+(lat+h);
+  document.querySelector('#wfsForm [name=BBOX]').value = bbox;
+
+  $.ajax({
+    type:'get',
+    url:'https://api.vworld.kr/req/wfs',
+    data: $('#wfsForm').serialize(),
+    dataType:'jsonp',
+    async:false,
+    jsonpCallback:'parseWfsResponse',
+    success: function(data){
+      if(!data || data.totalFeatures===0){ toast('필지 조회 결과 없음','err'); return; }
+      var p = data.features[0].properties;
+      var addr = (p.sido_nm||'') + ' ' + (p.sgg_nm||'') + ' ' + (p.emd_nm||'')
+               + (p.ri_nm ? ' '+p.ri_nm : '') + ' ' + (p.jibun||'').replace(/\s+$/,'');
+      document.getElementById('jd-addr').textContent = addr;
+      document.getElementById('jd-jmok').textContent = p.jimok_nm || p.jimok || '—';
+      document.getElementById('jd-area').textContent = p.bchk ? p.bchk+'㎡' : (p.area ? p.area+'㎡' : '—');
+      document.getElementById('jd-pnu').textContent = p.pnu || '—';
+      toast('필지 조회됨','ok');
+    },
+    error: function(){ toast('WFS 조회 실패','err'); }
+  });
+}
+
+function copyJdInfo(){
+  var addr = document.getElementById('jd-addr').textContent;
+  var jmok = document.getElementById('jd-jmok').textContent;
+  var area = document.getElementById('jd-area').textContent;
+  if(addr==='—'){ toast('먼저 필지를 클릭하세요','err'); return; }
+  var txt = '주소: '+addr+'\n지목: '+jmok+'\n면적: '+area;
+  navigator.clipboard.writeText(txt).then(function(){ toast('필지정보 복사됨','ok'); });
+}
+
+function sendJdToParent(){
+  try{
+    if(window.opener && window.opener.onJdFromPopup){
+      window.opener.onJdFromPopup({
+        addr: document.getElementById('jd-addr').textContent,
+        pnu: document.getElementById('jd-pnu').textContent
+      });
+      toast('메인으로 전송됨','ok');
+    } else { toast('메인창 연동 없음','err'); }
+  }catch(e){ toast('전송 실패','err'); }
+}
+
+/* ===================== 건축물대장 ===================== */
+function callBldApi(){
+  var jibun = document.getElementById('bldJibunInput').value.trim();
+  if(!jibun){ toast('지번을 입력하세요','err'); return; }
+  var apiKey = localStorage.getItem('gdsp_building')||'';
+  if(!apiKey){ toast('건축물대장 API 키를 설정에서 먼저 입력하세요','err'); return; }
+  document.getElementById('bJibun').textContent = jibun;
+  toast('조회 중...');
+  var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo'
+    +'?serviceKey='+encodeURIComponent(apiKey)
+    +'&sigunguCd=41590&bjdongCd=&platGbCd=0&bun=&ji=&startDate=&endDate=&numOfRows=1&pageNo=1&_type=json';
+  fetch(url)
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var item = d&&d.response&&d.response.body&&d.response.body.items&&d.response.body.items.item;
+      if(item){
+        var it = Array.isArray(item)?item[0]:item;
+        document.getElementById('bUse').textContent = it.mainPurpsCdNm||'—';
+        document.getElementById('bFloor').textContent = (it.grndFlrCnt||'—')+'층';
+        document.getElementById('bBcArea').textContent = it.bcArea?it.bcArea+'㎡':'—';
+        document.getElementById('bArea').textContent = it.totArea?it.totArea+'㎡':'—';
+        document.getElementById('bYear').textContent = it.useAprDay?it.useAprDay.substring(0,4)+'년':'—';
+        toast('조회 완료','ok');
+      } else { toast('조회 결과 없음','err'); }
+    })
+    .catch(function(){ toast('조회 실패','err'); });
+}
+
+/* ===================== 등기부등본 ===================== */
+function searchReg(){
+  var jibun = document.getElementById('regJibun').value.trim();
+  if(!jibun){ toast('지번을 입력하세요','err'); return; }
+  toast('인터넷등기소 연동 필요');
+  document.getElementById('regUniq').textContent='인터넷등기소에서 확인';
+  document.getElementById('regOwner').textContent='—';
+}
+function addRegToList(){
+  var jibun = document.getElementById('regJibun').value.trim();
+  if(!jibun){ toast('지번을 입력하세요','err'); return; }
+  if(regItems.indexOf(jibun)>=0){ toast('이미 추가됨'); return; }
+  regItems.push(jibun); renderRegList();
+  toast(jibun+' 추가됨','ok');
+}
+function renderRegList(){
+  var list = document.getElementById('regList');
+  if(!regItems.length){ list.innerHTML='<div style="text-align:center;color:var(--txt3);font-size:12px;padding:14px 0">추가된 지번이 없습니다</div>'; return; }
+  list.innerHTML = regItems.map(function(j,i){
+    return '<div class="reg-list-item"><span style="flex:1;color:var(--blue2);font-weight:700">'+j+'</span>'
+      +'<button onclick="regItems.splice('+i+',1);renderRegList()" style="height:24px;padding:0 8px;border-radius:5px;border:1px solid var(--line);color:var(--txt3);font-size:10px;cursor:pointer;background:transparent">삭제</button></div>';
+  }).join('');
+}
+function makeRegExcel(){ if(!regItems.length){ toast('목록에 지번을 먼저 추가하세요','err'); return; } toast('SheetJS 연동 예정'); }
+
+/* ===================== 초기화 ===================== */
+window.addEventListener('DOMContentLoaded', function(){
+  if(_vwKey) initVmap();
+  // jQuery (WFS ajax용) 동적 로드
+  if(typeof $ === 'undefined'){
+    var jq = document.createElement('script');
+    jq.src = 'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js';
+    document.head.appendChild(jq);
+  }
+});
 </script>
 </body>
 </html>
