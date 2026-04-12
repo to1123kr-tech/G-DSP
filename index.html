@@ -6,6 +6,12 @@
   <meta http-equiv="X-UA-Compatible" content="IE=11">
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>G-DSP - 공간정보 통합 업무 플랫폼</title>
+  <script>
+  (function(){
+    var k = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
+    if(k){ document.write('<script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+k+'">\x3C/script>'); }
+  })();
+  </script>
   <script type="text/javascript"
     src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
   <link
