@@ -5831,7 +5831,15 @@
       kakaoGeocoder.addressSearch(jibun, function (result, status) {
         if (status === kakao.maps.services.Status.OK) {
           var coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-          kakaoMap.setCenter(coords); kakaoMap.setLevel(3);
+          // 지도 이동
+          kakaoMap.setCenter(coords);
+          // 마커 표시
+          if (kakaoMarker) kakaoMarker.setMap(null);
+          kakaoMarker = new kakao.maps.Marker({
+            map: kakaoMap,
+            position: coords
+          });
+setCenter(coords); kakaoMap.setLevel(3);
           kakaoMarker.setPosition(coords); kakaoMarker.setMap(kakaoMap);
           setText('mapD', jibun + ' 연동됨');
           // VWorld 동기화
