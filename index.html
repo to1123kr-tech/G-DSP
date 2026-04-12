@@ -7451,7 +7451,6 @@
     function ndInitMap() {
       ndGetVwKey(function(key) {
         if (!key) {
-          // VWorld 키 없으면 카카오로 fallback
           ndInitKakaoFallback();
           return;
         }
@@ -7459,32 +7458,39 @@
           if (ndVwMapInited) return;
           var container = document.getElementById('ndKakaoMap');
           if (!container) return;
-          ndVwMapInited = true;
-          ndMapInited = true;
-          document.getElementById('ndMapEmpty').style.display = 'none';
-          try {
-            var opts = {
-              mapId: 'ndKakaoMap',
-              initPosition: new vw.CameraPosition(
-                new vw.CoordZ(126.83, 37.20, 3000),
-                new vw.Direction(0, -90, 0)
-              ),
-              logo: false, navigation: true
-            };
-            ndVwMap = new vw.Map();
-            ndVwMap.setOption(opts);
-            ndVwMap.start();
-            // 지적도 WMS 기본 ON
-            ndAddCadastralWMS(key);
-            // 클릭 이벤트
-            ndVwMap.onClick.addEventListener(function(wp, ep, carto) {
-              if (!carto) return;
-              ndOnMapClick(carto.longitudeDD, carto.latitudeDD);
-            });
-          } catch(e) {
-            console.warn('VWorld init error:', e);
-            ndInitKakaoFallback();
+          // vw 객체 완전 초기화 대기
+          function _tryInit(retry) {
+            if (typeof vw === 'undefined' || !vw.CameraPosition) {
+              if (retry > 0) setTimeout(function(){ _tryInit(retry-1); }, 300);
+              else ndInitKakaoFallback();
+              return;
+            }
+            ndVwMapInited = true;
+            ndMapInited = true;
+            document.getElementById('ndMapEmpty').style.display = 'none';
+            try {
+              var opts = {
+                mapId: 'ndKakaoMap',
+                initPosition: new vw.CameraPosition(
+                  new vw.CoordZ(126.83, 37.20, 3000),
+                  new vw.Direction(0, -90, 0)
+                ),
+                logo: false, navigation: true
+              };
+              ndVwMap = new vw.Map();
+              ndVwMap.setOption(opts);
+              ndVwMap.start();
+              ndAddCadastralWMS(key);
+              ndVwMap.onClick.addEventListener(function(wp, ep, carto) {
+                if (!carto) return;
+                ndOnMapClick(carto.longitudeDD, carto.latitudeDD);
+              });
+            } catch(e) {
+              console.warn('VWorld init error:', e);
+              ndInitKakaoFallback();
+            }
           }
+          _tryInit(10);
         });
       });
       // 카카오 geocoder 초기화 (주소검색용)
@@ -7581,40 +7587,34 @@
       .catch(function(){});
     }
 
-    // 토지이용 정보 - VWorld WFS로 조회 (CORS 문제 없음)
+    // 토지이용 정보 - VWorld WFS로 조회 (Oracle 서버 프록시 경유)
     function ndCallLandApi(pnu) {
       if (!pnu || pnu.length < 19) return;
-      var vwKey = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
-      if (!vwKey) {
-        // VWorld 키 없으면 공공데이터 API fallback
-        var apiKey = localStorage.getItem('gdsp_land') || '';
-        if (apiKey) ndCallLandApi2(pnu, apiKey);
-        return;
-      }
-      // VWorld 연속지적도 WFS - 지목, 면적 등 조회
-      var url = 'https://api.vworld.kr/req/data?service=data&request=GetFeature'
-        + '&data=LP_PA_CBND_BUBUN&key=' + vwKey
+      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+      var url = PROXY + '/api/vworld?path=req/data&service=data&request=GetFeature'
+        + '&data=LP_PA_CBND_BUBUN'
         + '&attrFilter=pnu:=:' + pnu
         + '&size=1&page=1&format=json&domain=168.107.15.68';
       fetch(url)
         .then(function(r){ return r.json(); })
         .then(function(d){
           var features = d && d.response && d.response.result && d.response.result.featureCollection && d.response.result.featureCollection.features;
-          if (!features || !features.length) {
-            // fallback to 공공데이터 API
-            var apiKey = localStorage.getItem('gdsp_land') || '';
-            if (apiKey) ndCallLandApi2(pnu, apiKey);
-            return;
-          }
+          if (!features || !features.length) return;
           var props = features[0].properties;
-          var jimok = props.lndcgrCodeNm || props.jimok_nm || '-';
-          var area = props.area ? parseFloat(props.area).toLocaleString() + '㎡' : '-';
-          setText('ndInfoJimok', jimok);
-          setText('ndRcJm', jimok);
-          setText('gJimok', jimok);
-          setText('rcJm', jimok);
-          // 용도지역은 별도 레이어로 조회
-          ndCallVwYongdo(pnu, vwKey);
+          var jimok = props.jibun ? props.jibun.replace(/[0-9\-]/g,'').trim() : '-';
+          // jibun 필드에서 지목 추출 (예: "604-181 대" → "대")
+          var jibunParts = (props.jibun || '').trim().split(' ');
+          jimok = jibunParts.length > 1 ? jibunParts[jibunParts.length-1] : '-';
+          var gonsi = props.jiga ? Number(props.jiga).toLocaleString() + '원/㎡' : '-';
+          setText('ndInfoJimok', jimok); setText('ndInfoGonsi', gonsi);
+          setText('ndRcJm', jimok); setText('ndRcGonsi', gonsi);
+          setText('gJimok', jimok); setText('gGonsi', gonsi);
+          setText('rcJm', jimok); setText('rcGonsi', gonsi);
+          // 용도지역 별도 조회
+          if(kakaoMap){
+            var c = kakaoMap.getCenter();
+            ndCallVwYongdo(c.getLng(), c.getLat());
+          }
         })
         .catch(function(){
           var apiKey = localStorage.getItem('gdsp_land') || '';
@@ -7622,11 +7622,14 @@
         });
     }
 
-    // VWorld 용도지역 조회
-    function ndCallVwYongdo(pnu, vwKey) {
-      var url = 'https://api.vworld.kr/req/data?service=data&request=GetFeature'
-        + '&data=LT_C_UQ111&key=' + vwKey
-        + '&geomFilter=BOX(' + pnuToBbox(pnu) + ')'
+    // VWorld 용도지역 조회 (Oracle 프록시)
+    function ndCallVwYongdo(lng, lat) {
+      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+      var d = 0.001;
+      var bbox = (lng-d) + ',' + (lat-d) + ',' + (lng+d) + ',' + (lat+d);
+      var url = PROXY + '/api/vworld?path=req/data&service=data&request=GetFeature'
+        + '&data=LT_C_UQ111'
+        + '&geomFilter=BOX(' + bbox + ')'
         + '&size=1&page=1&format=json&domain=168.107.15.68';
       fetch(url)
         .then(function(r){ return r.json(); })
@@ -7641,17 +7644,6 @@
           setText('rcYd', yd);
         })
         .catch(function(){});
-    }
-
-    // PNU → 대략적인 bbox (용도지역 조회용)
-    function pnuToBbox(pnu) {
-      // PNU로 좌표 추정은 어려우므로 카카오맵 현재 중심 사용
-      if (kakaoMap) {
-        var c = kakaoMap.getCenter();
-        var d = 0.002;
-        return (c.getLng()-d) + ',' + (c.getLat()-d) + ',' + (c.getLng()+d) + ',' + (c.getLat()+d);
-      }
-      return '126.8,37.1,126.9,37.3';
     }
 
     // 토지이용 API 대체 엔드포인트 (fallback)
