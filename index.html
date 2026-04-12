@@ -4187,6 +4187,10 @@
                   <button class="mp-btn" id="mpSkyview" onclick="setKakaoMapType('skyview',this)">위성</button>
                   <button class="mp-btn" id="mpHybrid" onclick="setKakaoMapType('hybrid',this)">위성+라벨</button>
                 </div>
+                <div class="map-picker" style="grid-template-columns:1fr 1fr;margin-top:5px">
+                  <button class="mp-btn" id="mpKakao" onclick="switchMainMap('kakao',this)" style="border-color:var(--gold);color:var(--gold)">🗺 카카오</button>
+                  <button class="mp-btn" id="mpVworld" onclick="switchMainMap('vworld',this)" style="border-color:var(--cyan);color:var(--cyan)">🌏 VWorld</button>
+                </div>
                 <button onclick="toggleCadastral()" id="btnCadastral2" class="gbtn-out"
                   style="margin-top:5px;font-size:11px">🗺 지적도 오버레이</button>
                 <button onclick="showElevPopup()" class="gbtn-neon" style="margin-top:4px;font-size:11px">📐 절대고도
@@ -4225,6 +4229,7 @@
           <!-- 지도 -->
           <div class="map-area" id="mapArea">
             <div id="kakaoMapDiv" style="position:absolute;inset:0;width:100%;height:100%;z-index:2"></div>
+            <div id="vworldMapDiv" style="position:absolute;inset:0;width:100%;height:100%;z-index:1;display:none"></div>
             <div class="map-tools">
               <button class="mt" id="btnSatellite" onclick="toggleMapType()" title="위성/일반 전환"><svg viewBox="0 0 24 24"
                   fill="none" stroke="currentColor" stroke-width="2">
@@ -5679,6 +5684,90 @@
     // ── 카카오 지도 API ──────────────────────────────
     var kakaoMap = null, kakaoGeocoder = null, kakaoMarker = null;
     var kakaoMapType = 'normal', cadastralOn = false;
+
+    /* ── VWorld 메인맵 ── */
+    var mainVwMap = null, mainVwMapInited = false, mainMapMode = 'kakao';
+    var mainVwCadOn = true, mainVwMarker = null;
+
+    function switchMainMap(mode, btn) {
+      mainMapMode = mode;
+      // 버튼 스타일
+      document.querySelectorAll('#mpKakao,#mpVworld').forEach(function(b){ b.classList.remove('on'); });
+      if(btn) btn.classList.add('on');
+
+      if(mode === 'kakao'){
+        document.getElementById('kakaoMapDiv').style.zIndex = '2';
+        document.getElementById('vworldMapDiv').style.zIndex = '1';
+        document.getElementById('kakaoMapDiv').style.display = '';
+        setText('mapT','카카오 지도');
+        // 카카오 리사이즈
+        if(kakaoMap) kakao.maps.event.trigger(kakaoMap,'resize');
+      } else {
+        // VWorld
+        document.getElementById('vworldMapDiv').style.display = '';
+        document.getElementById('vworldMapDiv').style.zIndex = '3';
+        document.getElementById('kakaoMapDiv').style.zIndex = '1';
+        setText('mapT','VWorld 지도');
+        if(!mainVwMapInited) _initMainVwMap();
+        else if(mainVwMap && currentJibun) _moveMainVwMap();
+      }
+    }
+
+    function _initMainVwMap(){
+      ndGetVwKey(function(key){
+        if(!key){ toast('VWorld 키를 설정에서 입력하세요','err'); switchMainMap('kakao'); return; }
+        // 스크립트 로드 (이미 로드됐으면 skip)
+        function _doInit(){
+          if(mainVwMapInited) return;
+          mainVwMapInited = true;
+          var opts = {
+            mapId: 'vworldMapDiv',
+            initPosition: new vw.CameraPosition(
+              new vw.CoordZ(126.83, 37.20, 3000),
+              new vw.Direction(0,-90,0)
+            ),
+            logo: false, navigation: true
+          };
+          mainVwMap = new vw.Map();
+          mainVwMap.setOption(opts);
+          mainVwMap.start();
+          // 지적도 WMS
+          _addMainVwCadastral(key);
+          // 클릭
+          mainVwMap.onClick.addEventListener(function(wp,ep,carto){
+            if(!carto) return;
+            ndOnMapClick(carto.longitudeDD, carto.latitudeDD);
+          });
+          setText('mapT','VWorld 지도');
+          if(currentJibun) _moveMainVwMap();
+        }
+        if(typeof vw !== 'undefined'){ _doInit(); }
+        else { ndLoadVwScript(key, _doInit); }
+      });
+    }
+
+    function _addMainVwCadastral(key){
+      if(!mainVwMap) return;
+      try{
+        var wmsLayer = new vw.Layers();
+        var wmsSource = new vw.source.TileWMS();
+        wmsSource.setUrl('https://api.vworld.kr/req/wms?Key='+key+'&');
+        wmsSource.setParams('tilesize=256');
+        wmsSource.setLayers('lt_c_landinfobasemap');
+        wmsSource.setStyles('lt_c_landinfobasemap');
+        wmsSource.setFormat('image/png');
+        wmsLayer.add(new vw.layer.Tile(wmsSource));
+      }catch(e){}
+    }
+
+    function _moveMainVwMap(){
+      if(!mainVwMap || !currentJibun) return;
+      // 카카오에서 현재 중심 가져와서 VWorld 이동
+      if(kakaoMap){
+        var c = kakaoMap.getCenter();
+        try{ mainVwMap.moveTo(new vw.CoordZ(c.getLng(), c.getLat(), 500)); }catch(e){}
+      }
+    }
     var _kakaoInited = false;
 
     function initKakaoMap() {
@@ -5739,6 +5828,10 @@
           kakaoMap.setCenter(coords); kakaoMap.setLevel(3);
           kakaoMarker.setPosition(coords); kakaoMarker.setMap(kakaoMap);
           setText('mapD', jibun + ' 연동됨');
+          // VWorld 동기화
+          if(mainVwMap && mainVwMapInited){
+            try{ mainVwMap.moveTo(new vw.CoordZ(parseFloat(result[0].x), parseFloat(result[0].y), 500)); }catch(e){}
+          }
         }
       });
     }
