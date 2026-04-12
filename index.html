@@ -6035,24 +6035,7 @@
     function hideHist(i) { histItems[i].hidden = true; localStorage.setItem('gdsp_hist', JSON.stringify(histItems)); renderHist(); toast('숨겼습니다 (언제든 다시 표시 가능)'); }
     function showAllHist() { histItems.forEach(function (h) { h.hidden = false; }); localStorage.setItem('gdsp_hist', JSON.stringify(histItems)); renderHist(); }
     function delHist(i) { if (!confirm('이 항목을 삭제하시겠습니까?')) return; histItems.splice(i, 1); localStorage.setItem('gdsp_hist', JSON.stringify(histItems)); renderHist(); }
-    function printHist(i) { var h = histItems[i]; var w = window.open('', '_blank'); w.document.write('<html><body style="font-family:sans-serif;padding:20px"><h3>작업 이력</h3><p>' + h.date + ' ' + h.time + '</p><p>' + h.txt + '</p>
-<script>
-(function(){
-  try {
-    var bad = document.querySelectorAll('iframe[src*="map.ngii.go.kr"]');
-    bad.forEach(function(f){
-      var p = f.parentNode;
-      if (!p) return;
-      var note = document.createElement('div');
-      note.style.cssText = 'padding:12px;border:1px solid #f0b44c;background:#fff7e8;border-radius:8px;margin:8px;font-size:12px;color:#8a5a00;line-height:1.5';
-      note.textContent = '국토정보플랫폼 지도는 보안정책으로 화면 안에 직접 띄울 수 없어 새 창으로 연결됩니다.';
-      p.replaceChild(note, f);
-    });
-  } catch(e) {}
-})();
-</script>
-
-</body></html>'); w.document.close(); w.print(); }
+    function printHist(i) { var h = histItems[i]; var w = window.open('', '_blank'); w.document.write('<html><body style="font-family:sans-serif;padding:20px"><h3>작업 이력</h3><p>' + h.date + ' ' + h.time + '</p><p>' + h.txt + '</p></body></html>'); w.document.close(); w.print(); }
     function clearHist() {
       if (!confirm('작업 이력 전체를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) { return; }
       if (!confirm('정말로 삭제하시겠습니까? 한 번 더 확인합니다.')) { return; }
@@ -6314,12 +6297,12 @@
     function makeRegExcel() { if (!regItems.length) { toast('목록에 지번을 먼저 추가하세요', 'err'); return; } toast('엑셀 양식 생성: SheetJS 연동 예정'); }
     const sampleContacts = [
       { dept: '만세구청', rank: '산지전용 1팀장', name: '권애란', region: '', phone: '031-5189-1270', email: '', work: '산지전용2팀 업무총괄 / 세움터 협의 / 온라인실무심의 협의(향남 운동장)', team: '산지전용' },
-      { dept: '만세구청', rank: '주무관', name: '이재학', region: '장안면/향남읍', phone: '031-5189-1284', email: 'yushin8604@korea.kr', work: '산지전용허가/협의 [장안면]/[향남읍-구문천리,상신리]', team: '산지전용' },
-      { dept: '만세구청', rank: '주무관', name: '홍세연', region: '우정읍/양감면/향남읍', phone: '031-5189-1285', email: 'senii@korea.kr', work: '산지전용허가/협의 [우정읍]/[양감면]/[향남읍-길성리,상두리,수직리,요리]', team: '산지전용' },
+      { dept: '만세구청', rank: '주무관', name: '이재학', region: '장안면/향남읍', phone: '031-5189-1284', email: '<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="770e02041f1e194f414743371c18051216591c05">[email&#160;protected]</a>', work: '산지전용허가/협의 [장안면]/[향남읍-구문천리,상신리]', team: '산지전용' },
+      { dept: '만세구청', rank: '주무관', name: '홍세연', region: '우정읍/양감면/향남읍', phone: '031-5189-1285', email: '<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="493a2c2720200922263b2c2867223b">[email&#160;protected]</a>', work: '산지전용허가/협의 [우정읍]/[양감면]/[향남읍-길성리,상두리,수직리,요리]', team: '산지전용' },
       { dept: '만세구청', rank: '주무관', name: '권용찬', region: '팔탄면/향남읍', phone: '031-5189-1286', email: '', work: '산지전용허가/협의 [팔탄면]/[향남읍-행정리,방축리,제암리,하길리,평리,송곡리,관리,동오리,도이리,장짐리,발안리,증거리,갈천리,화리현리,백토리]', team: '산지전용' },
-      { dept: '만세구청', rank: '서무', name: '정준상', region: '', phone: '031-5189-4270', email: 'jjshalom@korea.kr', work: '과태료', team: '' },
+      { dept: '만세구청', rank: '서무', name: '정준상', region: '', phone: '031-5189-4270', email: '<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="cba1a1b8a3aaa7a4a68ba0a4b9aeaae5a0b9">[email&#160;protected]</a>', work: '과태료', team: '' },
       { dept: '만세구청 출장소', rank: '산지전용 2팀장', name: '최민경', region: '', phone: '031-5189-1298', email: '', work: '산지전용1팀 업무총괄 / 민원종합실무심의 및 세움터 협의', team: '산지전용' },
-      { dept: '만세구청 출장소', rank: '주무관', name: '안지선', region: '송산/마도', phone: '031-5189-1309', email: 'berries83@korea.kr', work: '산지전용허가 및 협의 [송산]/[마도-석교,두곡,송정,슬항,해문]', team: '산지전용' },
+      { dept: '만세구청 출장소', rank: '주무관', name: '안지선', region: '송산/마도', phone: '031-5189-1309', email: '<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="6d0f081f1f04081e555e2d06021f080c43061f">[email&#160;protected]</a>', work: '산지전용허가 및 협의 [송산]/[마도-석교,두곡,송정,슬항,해문]', team: '산지전용' },
       { dept: '만세구청 출장소', rank: '주무관', name: '남신호', region: '서신/마도', phone: '031-5189-1310', email: '', work: '산지전용허가 및 협의 [서신,마도-쌍송,청원,백곡,금당,고모]', team: '산지전용' },
       { dept: '만세구청 출장소', rank: '주무관', name: '이희정', region: '남양', phone: '031-5189-1311', email: '', work: '산지전용허가 및 협의 [남양]', team: '산지전용' },
       { dept: '효행구 도시건축과', rank: '허가민원2팀장', name: '신용균', region: '봉담읍', phone: '031-5189-7693', email: '', work: '효행구청 임시출장소 (봉담읍 최루백로 165)', team: '허가민원' },
@@ -6329,7 +6312,7 @@
       { dept: '동탄구 도시건축과', rank: '허가민원팀장', name: '강??', region: '동탄구', phone: '031-5189-5168', email: '', work: '허가민원팀 업무총괄 (동탄역로 122)', team: '허가민원' },
       { dept: '동탄구 도시건축과', rank: '', name: '임??', region: '동탄1~9동', phone: '031-5189-5170', email: '', work: '동탄1~9동', team: '' },
       { dept: '도시정책실 도시개발과', rank: '팀장', name: '이원일', region: '화성시청', phone: '031-5189-2343', email: '', work: '허가민원팀 업무총괄, 도시계획심의 5000㎡ 이상', team: '' },
-      { dept: '도시정책실 도시개발과', rank: '주무관', name: '김기훈', region: '', phone: '031-5189-6038', email: 'dingreend@korea.kr', work: '산지전용협의 5000㎡ 이상', team: '산지전용' },
+      { dept: '도시정책실 도시개발과', rank: '주무관', name: '김기훈', region: '', phone: '031-5189-6038', email: '<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="34505d5a534651515a50745f5b4651551a5f46">[email&#160;protected]</a>', work: '산지전용협의 5000㎡ 이상', team: '산지전용' },
       { dept: '효행구 경제환경과', rank: '팀장', name: '김??', region: '', phone: '031-5189-7735', email: '', work: '산림보호팀 업무총괄', team: '' },
       { dept: '효행구 경제환경과', rank: '', name: '장인환', region: '', phone: '031-5189-7749', email: '', work: '녹지 점용허가 및 불법행위 단속', team: '' },
       { dept: '만세구 환경관리과', rank: '팀장', name: '박??', region: '', phone: '031-5189-1330', email: '', work: '산림보호팀 업무총괄', team: '' },
@@ -6349,7 +6332,7 @@
       { dept: '만세구 허가민원2과', rank: '주무관', name: '양선아', region: '서신/마도/송산', phone: '031-5189-1308', email: '', work: '개발행위 허가·협의(5,000㎡미만)[마도-백곡,금당리/서신-용두,홍법,사곳,상안,전곡/송산-독지,전동,신전,방정]', team: '개발행위' },
       { dept: '만세구 허가민원2과', rank: '주무관', name: '박상요', region: '마산/육일/봉가', phone: '031-5189-1318', email: '', work: '개발행위 허가·협의(5,000㎡미만)[마산,육일,봉가,고포,사강,용포]', team: '개발행위' },
       { dept: '만세구 허가민원2과', rank: '팀장', name: '최민경', region: '남양/마도/송산/서신', phone: '031-5189-1298', email: '', work: '산지전용2팀 업무총괄 / 민원종합실무심의 및 세움터 협의(남양,마도,송산,서신)', team: '산지전용' },
-      { dept: '만세구 허가민원2과', rank: '주무관', name: '안지선', region: '송산/마도', phone: '031-5189-1309', email: 'berries83@korea.kr', work: '산지전용 허가·협의(5,000㎡미만)[송산,마도-석교,두곡,송정,슬항,해문]', team: '산지전용' },
+      { dept: '만세구 허가민원2과', rank: '주무관', name: '안지선', region: '송산/마도', phone: '031-5189-1309', email: '<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f6949384849f9385cec5b69d99849397d89d84">[email&#160;protected]</a>', work: '산지전용 허가·협의(5,000㎡미만)[송산,마도-석교,두곡,송정,슬항,해문]', team: '산지전용' },
       { dept: '만세구 허가민원2과', rank: '주무관', name: '남신호', region: '서신/마도', phone: '031-5189-1310', email: '', work: '산지전용 허가·협의(5,000㎡미만)[서신,마도-쌍송,청원,백곡,금당,고모]', team: '산지전용' },
       { dept: '만세구 허가민원2과', rank: '주무관', name: '이희정', region: '남양', phone: '031-5189-1311', email: '', work: '산지전용 허가·협의(5,000㎡미만)[남양]', team: '산지전용' },
       { dept: '만세구 허가민원2과', rank: '팀장', name: '이재열', region: '남양/마도/송산/서신/세솔동', phone: '031-5189-1299', email: '', work: '공장설립2팀 업무총괄 / 민원종합실무심의 및 세움터협의(남양,마도,송산,서신,세솔동)', team: '공장설립' },
@@ -7353,11 +7336,11 @@
       }
 
       function copyEmail() {
-        navigator.clipboard.writeText('fbi1431@hanmail.net').then(() => {
+        navigator.clipboard.writeText('<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="ff999d96cecbcccebf979e91929e9693d1919a8b">[email&#160;protected]</a>').then(() => {
           document.getElementById('copyMsg').textContent = '✓ 클립보드에 복사됐습니다';
           setTimeout(() => { document.getElementById('copyMsg').textContent = ''; }, 2000);
         }).catch(() => {
-          document.getElementById('copyMsg').textContent = 'fbi1431@hanmail.net';
+          document.getElementById('copyMsg').textContent = '<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="8aece8e3bbbeb9bbcae2ebe4e7ebe3e6a4e4effe">[email&#160;protected]</a>';
         });
       }
       var _ao = document.getElementById('aboutOverlay'); if (_ao) _ao.addEventListener('click', hideAbout);
@@ -8266,33 +8249,4 @@
             if (nameEl) { nameEl.value = GM.slots[i].name; nameEl.placeholder = '이름 (URL 입력시 자동)'; nameEl.disabled = false; }
           })
           .catch(function () {
-            // 서버 없으면 도메인으로
-            try { GM.slots[i].name = new URL(url).hostname.replace('www.', ''); } catch (e) { GM.slots[i].name = ''; }
-            if (nameEl) { nameEl.value = GM.slots[i].name; nameEl.placeholder = '이름 (URL 입력시 자동)'; nameEl.disabled = false; }
-          });
-      }
-    };
-
-    // 초기화
-    GM.load();
-
-    // showView 패치 - geo 뷰 열릴 때 렌더
-    (function () {
-      var _o = window.showView;
-      window.showView = function (name, el) {
-        _o && _o(name, el);
-        if (name === 'geo') setTimeout(GM.render.bind(GM), 60);
-      };
-      // 이미 geo 뷰면 바로 렌더
-      if (document.getElementById('view-geo') && document.getElementById('view-geo').classList.contains('on')) {
-        GM.render();
-      }
-    })();
-
-    // HTML에서 onclick 연결용 전역 함수
-    function geoMapToggleEdit() { GM.toggleEdit(); }
-
-  </script>
-</body>
-
-</html>
+        
