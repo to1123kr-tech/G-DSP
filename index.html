@@ -7587,13 +7587,19 @@
       .catch(function(){});
     }
 
-    // 토지이용 정보 - VWorld WFS로 조회 (Oracle 서버 프록시 경유)
+    // 토지이용 정보 - VWorld WFS 좌표 기반 조회 (Oracle 서버 프록시 경유)
     function ndCallLandApi(pnu) {
       if (!pnu || pnu.length < 19) return;
+      // 카카오맵 현재 중심 좌표 사용
+      if (!kakaoMap) return;
+      var c = kakaoMap.getCenter();
+      var lng = c.getLng(), lat = c.getLat();
+      var d = 0.0003;
+      var bbox = (lng-d)+','+(lat-d)+','+(lng+d)+','+(lat+d);
       var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
       var url = PROXY + '/api/vworld?path=req/data&service=data&request=GetFeature'
         + '&data=LP_PA_CBND_BUBUN'
-        + '&attrFilter=pnu:=:' + pnu
+        + '&geomFilter=BOX(' + bbox + ')'
         + '&size=1&page=1&format=json&domain=168.107.15.68';
       fetch(url)
         .then(function(r){ return r.json(); })
@@ -7601,20 +7607,15 @@
           var features = d && d.response && d.response.result && d.response.result.featureCollection && d.response.result.featureCollection.features;
           if (!features || !features.length) return;
           var props = features[0].properties;
-          var jimok = props.jibun ? props.jibun.replace(/[0-9\-]/g,'').trim() : '-';
-          // jibun 필드에서 지목 추출 (예: "604-181 대" → "대")
           var jibunParts = (props.jibun || '').trim().split(' ');
-          jimok = jibunParts.length > 1 ? jibunParts[jibunParts.length-1] : '-';
+          var jimok = jibunParts.length > 1 ? jibunParts[jibunParts.length-1] : '-';
           var gonsi = props.jiga ? Number(props.jiga).toLocaleString() + '원/㎡' : '-';
           setText('ndInfoJimok', jimok); setText('ndInfoGonsi', gonsi);
           setText('ndRcJm', jimok); setText('ndRcGonsi', gonsi);
           setText('gJimok', jimok); setText('gGonsi', gonsi);
           setText('rcJm', jimok); setText('rcGonsi', gonsi);
-          // 용도지역 별도 조회
-          if(kakaoMap){
-            var c = kakaoMap.getCenter();
-            ndCallVwYongdo(c.getLng(), c.getLat());
-          }
+          // 용도지역 조회
+          ndCallVwYongdo(c.getLng(), c.getLat());
         })
         .catch(function(){
           var apiKey = localStorage.getItem('gdsp_land') || '';
