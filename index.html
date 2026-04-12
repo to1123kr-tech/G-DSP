@@ -7581,36 +7581,80 @@
       .catch(function(){});
     }
 
-    // 토지이용 API 자동 조회
+    // 토지이용 정보 - VWorld WFS로 조회 (CORS 문제 없음)
     function ndCallLandApi(pnu) {
-      var apiKey = localStorage.getItem('gdsp_land') || '';
-      if (!apiKey || !pnu || pnu.length < 19) return;
-      var url = 'https://apis.data.go.kr/1611000/nsdi/LandUseService/wfs/getLandUseInfo'
-        + '?serviceKey=' + encodeURIComponent(apiKey)
-        + '&pnu=' + pnu + '&numOfRows=1&pageNo=1&format=json';
+      if (!pnu || pnu.length < 19) return;
+      var vwKey = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
+      if (!vwKey) {
+        // VWorld 키 없으면 공공데이터 API fallback
+        var apiKey = localStorage.getItem('gdsp_land') || '';
+        if (apiKey) ndCallLandApi2(pnu, apiKey);
+        return;
+      }
+      // VWorld 연속지적도 WFS - 지목, 면적 등 조회
+      var url = 'https://api.vworld.kr/req/data?service=data&request=GetFeature'
+        + '&data=LP_PA_CBND_BUBUN&key=' + vwKey
+        + '&attrFilter=pnu:=:' + pnu
+        + '&size=1&page=1&format=json&domain=168.107.15.68';
       fetch(url)
         .then(function(r){ return r.json(); })
         .then(function(d){
-          var item = d && d.response && d.response.body && d.response.body.items && d.response.body.items.item;
-          if (!item) return ndCallLandApi2(pnu, apiKey);
-          var it = Array.isArray(item) ? item[0] : item;
-          var yd = it.prposArea1Nm || it.prposAreaNm || '-';
-          var bcr = it.bldgCvrgRt ? it.bldgCvrgRt + '%' : '-';
-          var far = it.flrAreaRt ? it.flrAreaRt + '%' : '-';
-          var jimok = it.jimokNm || '-';
-          var gonsi = it.pblntfPclnd ? Number(it.pblntfPclnd).toLocaleString() + '원/㎡' : '-';
-          setText('ndInfoYd', yd); setText('ndInfoBcr', bcr); setText('ndInfoFar', far);
-          setText('ndInfoJimok', jimok); setText('ndInfoGonsi', gonsi);
-          setText('ndRcYd', yd); setText('ndRcJm', jimok);
-          setText('ndRcBcr', bcr); setText('ndRcFar', far); setText('ndRcGonsi', gonsi);
-          setText('gYongdo', yd); setText('gJimok', jimok); setText('gGonsi', gonsi);
-          setText('gBcr', bcr); setText('gFar', far);
-          setText('rcYd', yd); setText('rcJm', jimok); setText('rcBcr', bcr); setText('rcFar', far); setText('rcGonsi', gonsi);
+          var features = d && d.response && d.response.result && d.response.result.featureCollection && d.response.result.featureCollection.features;
+          if (!features || !features.length) {
+            // fallback to 공공데이터 API
+            var apiKey = localStorage.getItem('gdsp_land') || '';
+            if (apiKey) ndCallLandApi2(pnu, apiKey);
+            return;
+          }
+          var props = features[0].properties;
+          var jimok = props.lndcgrCodeNm || props.jimok_nm || '-';
+          var area = props.area ? parseFloat(props.area).toLocaleString() + '㎡' : '-';
+          setText('ndInfoJimok', jimok);
+          setText('ndRcJm', jimok);
+          setText('gJimok', jimok);
+          setText('rcJm', jimok);
+          // 용도지역은 별도 레이어로 조회
+          ndCallVwYongdo(pnu, vwKey);
         })
-        .catch(function(){ ndCallLandApi2(pnu, apiKey); });
+        .catch(function(){
+          var apiKey = localStorage.getItem('gdsp_land') || '';
+          if (apiKey) ndCallLandApi2(pnu, apiKey);
+        });
     }
 
-    // 토지이용 API 대체 엔드포인트
+    // VWorld 용도지역 조회
+    function ndCallVwYongdo(pnu, vwKey) {
+      var url = 'https://api.vworld.kr/req/data?service=data&request=GetFeature'
+        + '&data=LT_C_UQ111&key=' + vwKey
+        + '&geomFilter=BOX(' + pnuToBbox(pnu) + ')'
+        + '&size=1&page=1&format=json&domain=168.107.15.68';
+      fetch(url)
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var features = d && d.response && d.response.result && d.response.result.featureCollection && d.response.result.featureCollection.features;
+          if (!features || !features.length) return;
+          var props = features[0].properties;
+          var yd = props.prposAreaNm || props.uname || '-';
+          setText('ndInfoYd', yd);
+          setText('ndRcYd', yd);
+          setText('gYongdo', yd);
+          setText('rcYd', yd);
+        })
+        .catch(function(){});
+    }
+
+    // PNU → 대략적인 bbox (용도지역 조회용)
+    function pnuToBbox(pnu) {
+      // PNU로 좌표 추정은 어려우므로 카카오맵 현재 중심 사용
+      if (kakaoMap) {
+        var c = kakaoMap.getCenter();
+        var d = 0.002;
+        return (c.getLng()-d) + ',' + (c.getLat()-d) + ',' + (c.getLng()+d) + ',' + (c.getLat()+d);
+      }
+      return '126.8,37.1,126.9,37.3';
+    }
+
+    // 토지이용 API 대체 엔드포인트 (fallback)
     function ndCallLandApi2(pnu, apiKey) {
       var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
       var platGbCd = pnu.substring(10,11);
