@@ -6149,9 +6149,7 @@
             setText('apiRes', ok ? '형식 확인됨' : '키 형식 오류');
           });
       } else if (key === 'building') {
-        var _bldTestUrl = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?serviceKey=' + encodeURIComponent(apiKey) + '&sigunguCd=41590&numOfRows=1&pageNo=1&_type=json';
-        var _bldProxy = (localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050') + '/api/proxy?url=' + encodeURIComponent(_bldTestUrl);
-        fetch(_bldProxy)
+        fetch('https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?serviceKey=' + encodeURIComponent(apiKey) + '&sigunguCd=41590&numOfRows=1&pageNo=1&_type=json')
           .then(function (r) { return r.json(); })
           .then(function (d) {
             var code = d && d.response && d.response.header && d.response.header.resultCode;
@@ -7587,11 +7585,9 @@
     function ndCallLandApi(pnu) {
       var apiKey = localStorage.getItem('gdsp_land') || '';
       if (!apiKey || !pnu || pnu.length < 19) return;
-      var rawUrl = 'https://apis.data.go.kr/1611000/nsdi/LandUseService/wfs/getLandUseInfo'
+      var url = 'https://apis.data.go.kr/1611000/nsdi/LandUseService/wfs/getLandUseInfo'
         + '?serviceKey=' + encodeURIComponent(apiKey)
         + '&pnu=' + pnu + '&numOfRows=1&pageNo=1&format=json';
-      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
-      var url = PROXY + '/api/proxy?url=' + encodeURIComponent(rawUrl);
       fetch(url)
         .then(function(r){ return r.json(); })
         .then(function(d){
@@ -7620,13 +7616,11 @@
       var platGbCd = pnu.substring(10,11);
       var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
       var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
-      var rawUrl = 'https://apis.data.go.kr/1613000/LandUseService/getLandUseInfo'
+      var url = 'https://apis.data.go.kr/1613000/LandUseService/getLandUseInfo'
         + '?serviceKey=' + encodeURIComponent(apiKey)
         + '&sigunguCd=' + sigunguCd + '&bjdongCd=' + bjdongCd
         + '&platGbCd=' + platGbCd + '&bun=' + bun + '&ji=' + ji
         + '&numOfRows=1&pageNo=1&_type=json';
-      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
-      var url = PROXY + '/api/proxy?url=' + encodeURIComponent(rawUrl);
       fetch(url)
         .then(function(r){ return r.json(); })
         .then(function(d){
@@ -7652,13 +7646,11 @@
       var platGbCd = pnu.substring(10,11);
       var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
       var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
-      var rawUrl = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo'
+      var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo'
         + '?serviceKey=' + encodeURIComponent(apiKey)
         + '&sigunguCd=' + sigunguCd + '&bjdongCd=' + bjdongCd
         + '&platGbCd=' + platGbCd + '&bun=' + bun + '&ji=' + ji
         + '&numOfRows=5&pageNo=1&_type=json';
-      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
-      var url = PROXY + '/api/proxy?url=' + encodeURIComponent(rawUrl);
       fetch(url)
         .then(function(r){ return r.json(); })
         .then(function(d){
