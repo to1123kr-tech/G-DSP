@@ -7313,69 +7313,347 @@
     // ══════════════════════════════════════════════
     // 새 대시보드 전용 함수들
     // ══════════════════════════════════════════════
-    var ndMap = null, ndGeocoder = null, ndMarker = null, ndMapType = 'normal', ndCadOn = false, ndMapInited = false;
+    // ══════════════════════════════════════
+    // VWorld 대시보드 지도
+    // ══════════════════════════════════════
+    var ndVwMap = null, ndVwMapInited = false, ndVwKey = '', ndVwCadOn = true;
+    var ndVwMarker = null, ndVwWmsLayer = null;
+    var ndGeocoder = null; // 카카오 geocoder (주소검색용)
+    // 하위 호환용
+    var ndMap = null, ndMapInited = false, ndMapType = 'normal', ndCadOn = false;
+
+    var GDSP_SERVER = 'http://168.107.15.68:5050';
+
+    // VWorld 키 Oracle 서버에서 받아오기
+    function ndGetVwKey(cb) {
+      if (ndVwKey) { cb(ndVwKey); return; }
+      var saved = localStorage.getItem('gdsp_vworld');
+      if (saved) { ndVwKey = saved; cb(ndVwKey); return; }
+      fetch(GDSP_SERVER + '/api/vworld/key')
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if(d.key){ ndVwKey = d.key; cb(ndVwKey); } else cb(''); })
+        .catch(function(){ cb(''); });
+    }
+
+    // VWorld 스크립트 동적 로드
+    function ndLoadVwScript(key, cb) {
+      if (typeof vw !== 'undefined') { cb(); return; }
+      if (document.getElementById('vw-script-nd')) {
+        var wait = setInterval(function(){ if(typeof vw !== 'undefined'){ clearInterval(wait); cb(); } }, 200);
+        return;
+      }
+      var s = document.createElement('script');
+      s.id = 'vw-script-nd';
+      s.src = 'https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=' + key;
+      s.onload = function(){ setTimeout(cb, 300); };
+      document.head.appendChild(s);
+    }
 
     function ndInitMap() {
-      if (!window.kakao || !window.kakao.maps) { setTimeout(ndInitMap, 300); return; }
+      ndGetVwKey(function(key) {
+        if (!key) {
+          // VWorld 키 없으면 카카오로 fallback
+          ndInitKakaoFallback();
+          return;
+        }
+        ndLoadVwScript(key, function() {
+          if (ndVwMapInited) return;
+          var container = document.getElementById('ndKakaoMap');
+          if (!container) return;
+          ndVwMapInited = true;
+          ndMapInited = true;
+          document.getElementById('ndMapEmpty').style.display = 'none';
+          try {
+            var opts = {
+              mapId: 'ndKakaoMap',
+              initPosition: new vw.CameraPosition(
+                new vw.CoordZ(126.83, 37.20, 3000),
+                new vw.Direction(0, -90, 0)
+              ),
+              logo: false, navigation: true
+            };
+            ndVwMap = new vw.Map();
+            ndVwMap.setOption(opts);
+            ndVwMap.start();
+            // 지적도 WMS 기본 ON
+            ndAddCadastralWMS(key);
+            // 클릭 이벤트
+            ndVwMap.onClick.addEventListener(function(wp, ep, carto) {
+              if (!carto) return;
+              ndOnMapClick(carto.longitudeDD, carto.latitudeDD);
+            });
+          } catch(e) {
+            console.warn('VWorld init error:', e);
+            ndInitKakaoFallback();
+          }
+        });
+      });
+      // 카카오 geocoder 초기화 (주소검색용)
+      if (window.kakao && window.kakao.maps) {
+        if (!ndGeocoder) ndGeocoder = new kakao.maps.services.Geocoder();
+      } else {
+        setTimeout(function(){ if(window.kakao && window.kakao.maps && !ndGeocoder) ndGeocoder = new kakao.maps.services.Geocoder(); }, 1000);
+      }
+    }
+
+    function ndAddCadastralWMS(key) {
+      if (!ndVwMap) return;
+      try {
+        var wmsLayer = new vw.Layers();
+        var wmsSource = new vw.source.TileWMS();
+        wmsSource.setUrl('https://api.vworld.kr/req/wms?Key=' + key + '&');
+        wmsSource.setParams('tilesize=256');
+        wmsSource.setLayers('lt_c_landinfobasemap');
+        wmsSource.setStyles('lt_c_landinfobasemap');
+        wmsSource.setFormat('image/png');
+        ndVwWmsLayer = new vw.layer.Tile(wmsSource);
+        wmsLayer.add(ndVwWmsLayer);
+        ndVwCadOn = true;
+        var btn = document.getElementById('ndCadBtn');
+        if (btn) btn.classList.add('on');
+      } catch(e) {}
+    }
+
+    function ndInitKakaoFallback() {
+      if (!window.kakao || !window.kakao.maps) { setTimeout(ndInitKakaoFallback, 300); return; }
       var container = document.getElementById('ndKakaoMap');
       if (!container || ndMapInited) return;
-      ndMapInited = true;
+      ndMapInited = true; ndVwMapInited = true;
       var options = { center: new kakao.maps.LatLng(37.2055, 126.8317), level: 7 };
       ndMap = new kakao.maps.Map(container, options);
       ndGeocoder = new kakao.maps.services.Geocoder();
-      ndMarker = new kakao.maps.Marker();
+      ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
       document.getElementById('ndMapEmpty').style.display = 'none';
     }
 
     function ndSetMapType(type, btn) {
-      if (!ndMap) return;
-      document.querySelectorAll('.nd-mt-btn').forEach(function (b) { b.classList.remove('on') });
+      document.querySelectorAll('.nd-mt-btn').forEach(function(b){ b.classList.remove('on'); });
       if (btn) btn.classList.add('on');
       ndMapType = type;
-      if (type === 'normal') { ndMap.setMapTypeId(kakao.maps.MapTypeId.ROADMAP); ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID); }
-      else if (type === 'skyview') { ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW); ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID); }
-      else if (type === 'hybrid') { ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW); ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID); }
+      if (ndVwMap) {
+        // VWorld 배경지도 전환
+        try {
+          if (type === 'normal') ndVwMap.setBasemap('GRAPHIC');
+          else if (type === 'skyview') ndVwMap.setBasemap('SATELLITE');
+          else if (type === 'hybrid') ndVwMap.setBasemap('HYBRID');
+        } catch(e) {}
+      } else if (ndMap) {
+        if (type === 'normal') { ndMap.setMapTypeId(kakao.maps.MapTypeId.ROADMAP); ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID); }
+        else if (type === 'skyview') { ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW); ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID); }
+        else if (type === 'hybrid') { ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW); ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID); }
+      }
     }
 
     function ndToggleCadastral() {
-      if (!ndMap) return;
-      ndCadOn = !ndCadOn;
+      ndVwCadOn = !ndVwCadOn;
       var btn = document.getElementById('ndCadBtn');
-      if (ndCadOn) { ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT); if (btn) btn.classList.add('on'); }
-      else { ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT); if (btn) btn.classList.remove('on'); }
+      if (btn) btn.classList.toggle('on', ndVwCadOn);
+      toast(ndVwCadOn ? '지적도 ON' : '지적도 OFF');
+      if (ndMap) {
+        if (ndVwCadOn) ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+        else ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+      }
+    }
+
+    // 지도 클릭 → 역지오코딩 → 토지정보 조회
+    function ndOnMapClick(lng, lat) {
+      var kakaoKey = localStorage.getItem('gdsp_kakao') || '';
+      if (!kakaoKey) return;
+      fetch('https://dapi.kakao.com/v2/local/geo/coord2address.json?x=' + lng + '&y=' + lat + '&input_coord=WGS84', {
+        headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var addr = d && d.documents && d.documents[0] && d.documents[0].address;
+        if (!addr) return;
+        var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+        var jibun = addr.address_name || '';
+        currentPnu = pnu; currentJibun = jibun; armed = true;
+        setText('ndInfoJibun', jibun);
+        setText('ndRcJibun', jibun);
+        setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
+        var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
+        document.getElementById('ndResultRow').classList.add('on');
+        document.getElementById('ndRcLabel').textContent = jibun;
+        ndCallLandApi(pnu);
+        ndCallBldApi(pnu);
+        toast('✓ ' + jibun, 'ok');
+      })
+      .catch(function(){});
+    }
+
+    // 토지이용 API 자동 조회
+    function ndCallLandApi(pnu) {
+      var apiKey = localStorage.getItem('gdsp_land') || '';
+      if (!apiKey || !pnu || pnu.length < 19) return;
+      var url = 'https://apis.data.go.kr/1611000/nsdi/LandUseService/wfs/getLandUseInfo'
+        + '?serviceKey=' + encodeURIComponent(apiKey)
+        + '&pnu=' + pnu + '&numOfRows=1&pageNo=1&format=json';
+      fetch(url)
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var item = d && d.response && d.response.body && d.response.body.items && d.response.body.items.item;
+          if (!item) return ndCallLandApi2(pnu, apiKey);
+          var it = Array.isArray(item) ? item[0] : item;
+          var yd = it.prposArea1Nm || it.prposAreaNm || '-';
+          var bcr = it.bldgCvrgRt ? it.bldgCvrgRt + '%' : '-';
+          var far = it.flrAreaRt ? it.flrAreaRt + '%' : '-';
+          var jimok = it.jimokNm || '-';
+          var gonsi = it.pblntfPclnd ? Number(it.pblntfPclnd).toLocaleString() + '원/㎡' : '-';
+          setText('ndInfoYd', yd); setText('ndInfoBcr', bcr); setText('ndInfoFar', far);
+          setText('ndInfoJimok', jimok); setText('ndInfoGonsi', gonsi);
+          setText('ndRcYd', yd); setText('ndRcJm', jimok);
+          setText('ndRcBcr', bcr); setText('ndRcFar', far); setText('ndRcGonsi', gonsi);
+          setText('gYongdo', yd); setText('gJimok', jimok); setText('gGonsi', gonsi);
+          setText('gBcr', bcr); setText('gFar', far);
+          setText('rcYd', yd); setText('rcJm', jimok); setText('rcBcr', bcr); setText('rcFar', far); setText('rcGonsi', gonsi);
+        })
+        .catch(function(){ ndCallLandApi2(pnu, apiKey); });
+    }
+
+    // 토지이용 API 대체 엔드포인트
+    function ndCallLandApi2(pnu, apiKey) {
+      var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
+      var platGbCd = pnu.substring(10,11);
+      var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
+      var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
+      var url = 'https://apis.data.go.kr/1613000/LandUseService/getLandUseInfo'
+        + '?serviceKey=' + encodeURIComponent(apiKey)
+        + '&sigunguCd=' + sigunguCd + '&bjdongCd=' + bjdongCd
+        + '&platGbCd=' + platGbCd + '&bun=' + bun + '&ji=' + ji
+        + '&numOfRows=1&pageNo=1&_type=json';
+      fetch(url)
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var item = d && d.response && d.response.body && d.response.body.items && d.response.body.items.item;
+          if (!item) return;
+          var it = Array.isArray(item) ? item[0] : item;
+          var yd = it.prposArea1Nm || it.prposAreaNm || it.lndcgrCodeNm || '-';
+          var jimok = it.lndcgrCodeNm || it.jimokNm || '-';
+          var gonsi = it.pblntfPclnd ? Number(it.pblntfPclnd).toLocaleString() + '원/㎡' : '-';
+          setText('ndInfoYd', yd); setText('ndInfoJimok', jimok); setText('ndInfoGonsi', gonsi);
+          setText('ndRcYd', yd); setText('ndRcJm', jimok); setText('ndRcGonsi', gonsi);
+          setText('gYongdo', yd); setText('gJimok', jimok); setText('gGonsi', gonsi);
+          setText('rcYd', yd); setText('rcJm', jimok); setText('rcGonsi', gonsi);
+        })
+        .catch(function(){});
+    }
+
+    // 건축물대장 자동 조회
+    function ndCallBldApi(pnu) {
+      var apiKey = localStorage.getItem('gdsp_building') || '';
+      if (!apiKey || !pnu || pnu.length < 19) return;
+      var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
+      var platGbCd = pnu.substring(10,11);
+      var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
+      var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
+      var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo'
+        + '?serviceKey=' + encodeURIComponent(apiKey)
+        + '&sigunguCd=' + sigunguCd + '&bjdongCd=' + bjdongCd
+        + '&platGbCd=' + platGbCd + '&bun=' + bun + '&ji=' + ji
+        + '&numOfRows=5&pageNo=1&_type=json';
+      fetch(url)
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var items = d && d.response && d.response.body && d.response.body.items && d.response.body.items.item;
+          if (!items) return;
+          if (!Array.isArray(items)) items = [items];
+          var it = items[0];
+          var use = it.mainPurpsCdNm || it.etcPurps || '-';
+          var floor = it.grndFlrCnt ? it.grndFlrCnt + '층' : '-';
+          var area = it.totArea ? parseFloat(it.totArea).toLocaleString() + '㎡' : '-';
+          var year = it.useAprDay ? it.useAprDay.substring(0,4) + '년' : '-';
+          setText('ndInfoUse', use); setText('ndInfoFloor', floor);
+          setText('ndInfoArea', area); setText('ndInfoYear', year);
+          setText('ndRcUse', use);
+          setText('gUse', use); setText('gFloor', floor); setText('gArea', area); setText('gYear', year);
+          setText('bUse', use); setText('bFloor', floor); setText('bArea', area); setText('bYear', year);
+          setText('rcUse', use);
+        })
+        .catch(function(){});
     }
 
     function ndDoSearch() {
       var q = (document.getElementById('ndSearch').value || '').trim();
       if (!q) { toast('검색어를 입력하세요', 'err'); return; }
-      if (!ndMap) { ndInitMap(); }
-      setTimeout(function () {
-        if (!ndMap) { toast('지도 초기화 중, 잠시 후 다시 시도하세요'); return; }
-        document.getElementById('ndMapEmpty').style.display = 'none';
-        var searchAddr = '화성시 ' + q;
-        ndGeocoder.addressSearch(searchAddr, function (result, status) {
-          if (status === kakao.maps.services.Status.OK) {
-            var coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-            ndMap.setCenter(coords); ndMap.setLevel(3);
-            ndMarker.setPosition(coords); ndMarker.setMap(ndMap);
-            document.getElementById('ndResultRow').classList.add('on');
-            document.getElementById('ndRcLabel').textContent = q + ' 검색결과';
-            document.getElementById('ndRcJibun').textContent = searchAddr;
-            // 기존 시스템 연동
-            armed = true; currentJibun = searchAddr;
-            var rc = document.getElementById('rcCard'); if (rc) rc.classList.add('on');
-            var lb = document.getElementById('landBanner'); if (lb) lb.classList.add('on');
-            setText('rcTitle', q + ' 검색 결과'); setText('rcJibun', searchAddr);
-            setText('gJibun', searchAddr); setText('bJibun', searchAddr); setText('bldJibun', searchAddr);
-            addAct(q + ' 검색됨', '방금'); addHistItem('검색: ' + q);
-            var dot = document.getElementById('sDot'); if (dot) dot.className = 's-dot s-on';
-            setText('sTxt', '연동됨');
-            toast('✓ ' + q + ' - 연동 완료', 'ok');
-          } else {
-            toast('주소를 찾을 수 없습니다 (화성시 지번 확인)', 'err');
-          }
-        });
-      }, ndMapInited ? 0 : 500);
+      if (!ndVwMapInited) { ndInitMap(); }
+      var kakaoKey = localStorage.getItem('gdsp_kakao') || '';
+      if (!kakaoKey) { toast('카카오 API 키를 설정에서 입력하세요', 'err'); return; }
+      var searchAddr = '화성시 ' + q;
+      // 카카오 주소검색 → 좌표+PNU
+      fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(searchAddr) + '&size=1', {
+        headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var docs = d && d.documents;
+        if (!docs || !docs.length) {
+          // 키워드 fallback
+          return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(searchAddr) + '&size=1', {
+            headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
+          }).then(function(r2){ return r2.json(); }).then(function(d2){
+            var doc = d2 && d2.documents && d2.documents[0];
+            if (!doc) throw new Error('not found');
+            return ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, searchAddr, kakaoKey);
+          });
+        }
+        var doc = docs[0];
+        var addr = doc.address;
+        if (addr && addr.b_code) {
+          var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+          ndApplySearch(parseFloat(doc.x), parseFloat(doc.y), addr.address_name || searchAddr, pnu);
+        } else {
+          // 도로명 → 역지오코딩
+          ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, searchAddr, kakaoKey);
+        }
+      })
+      .catch(function(){ toast('검색 결과 없음', 'err'); });
+    }
+
+    function ndDoSearchByCoord(lng, lat, q, searchAddr, kakaoKey) {
+      fetch('https://dapi.kakao.com/v2/local/geo/coord2address.json?x=' + lng + '&y=' + lat + '&input_coord=WGS84', {
+        headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var addr = d && d.documents && d.documents[0] && d.documents[0].address;
+        var pnu = '';
+        var jibun = searchAddr;
+        if (addr && addr.b_code) {
+          pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+          jibun = addr.address_name || searchAddr;
+        }
+        ndApplySearch(lng, lat, jibun, pnu);
+      })
+      .catch(function(){ ndApplySearch(lng, lat, searchAddr, ''); });
+    }
+
+    function ndApplySearch(lng, lat, jibun, pnu) {
+      // 지도 이동
+      if (ndVwMap) {
+        try { ndVwMap.moveTo(new vw.CoordZ(lng, lat, 500)); } catch(e) {}
+      } else if (ndMap) {
+        ndMap.setCenter(new kakao.maps.LatLng(lat, lng));
+        ndMap.setLevel(3);
+      }
+      // 정보 업데이트
+      currentPnu = pnu; currentJibun = jibun; armed = true;
+      setText('ndInfoJibun', jibun);
+      document.getElementById('ndResultRow').classList.add('on');
+      document.getElementById('ndRcLabel').textContent = jibun;
+      document.getElementById('ndRcJibun').textContent = jibun;
+      setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
+      var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
+      var rc = document.getElementById('rcCard'); if (rc) rc.classList.add('on');
+      var lb = document.getElementById('landBanner'); if (lb) lb.classList.add('on');
+      setText('rcTitle', jibun + ' 검색 결과'); setText('rcJibun', jibun);
+      var dot = document.getElementById('sDot'); if (dot) dot.className = 's-dot s-on';
+      setText('sTxt', '연동됨');
+      addAct(jibun + ' 검색됨', '방금'); addHistItem('검색: ' + jibun);
+      document.getElementById('ndMapEmpty').style.display = 'none';
+      toast('✓ ' + jibun + (pnu ? ' (PNU확인)' : ''), 'ok');
+      // API 자동 조회
+      if (pnu) { ndCallLandApi(pnu); ndCallBldApi(pnu); }
     }
 
     // ── 검색창 통합 연동 ──
