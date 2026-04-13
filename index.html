@@ -7607,37 +7607,30 @@
       .catch(function(){});
     }
 
-    // 토지이용 정보 - VWorld WFS 좌표 기반 조회 (Oracle 서버 프록시 경유)
+    // 토지이용 정보 - Oracle 서버 /api/landinfo 경유 (ned API)
     function ndCallLandApi(pnu, lng, lat) {
       if (!pnu || pnu.length < 19) return;
-      // 좌표가 없으면 카카오맵 중심 사용
-      if (!lng || !lat) {
-        if (!kakaoMap) return;
-        var c = kakaoMap.getCenter();
-        lng = c.getLng(); lat = c.getLat();
-      }
-      var d = 0.0003;
-      var bbox = (lng-d)+','+(lat-d)+','+(lng+d)+','+(lat+d);
       var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
-      var url = PROXY + '/api/vworld?path=req/data&service=data&request=GetFeature'
-        + '&data=LP_PA_CBND_BUBUN'
-        + '&geomFilter=BOX(' + bbox + ')'
-        + '&size=1&page=1&format=json&domain=168.107.15.68';
-      fetch(url)
+      fetch(PROXY + '/api/landinfo?pnu=' + pnu)
         .then(function(r){ return r.json(); })
         .then(function(d){
-          var features = d && d.response && d.response.result && d.response.result.featureCollection && d.response.result.featureCollection.features;
-          if (!features || !features.length) return;
-          var props = features[0].properties;
-          var jibunParts = (props.jibun || '').trim().split(' ');
-          var jimok = jibunParts.length > 1 ? jibunParts[jibunParts.length-1] : '-';
-          var gonsi = props.jiga ? Number(props.jiga).toLocaleString() + '원/㎡' : '-';
-          setText('ndInfoJimok', jimok); setText('ndInfoGonsi', gonsi);
-          setText('ndRcJm', jimok); setText('ndRcGonsi', gonsi);
-          setText('gJimok', jimok); setText('gGonsi', gonsi);
-          setText('rcJm', jimok); setText('rcGonsi', gonsi);
-          // 용도지역 조회
-          ndCallVwYongdo(lng, lat);
+          var field = d && d.landCharacteristicss && d.landCharacteristicss.field;
+          if (!field || !field.length) return;
+          var p = Array.isArray(field) ? field[0] : field;
+          var yd = p.prposArea1Nm || '-';
+          var jimok = p.lndcgrCodeNm || '-';
+          var gonsi = p.pblntfPclnd ? Number(p.pblntfPclnd).toLocaleString() + '원/㎡' : '-';
+          var bcr = p.buildingToLandRatio ? p.buildingToLandRatio + '%' : '-';
+          var far = p.floorAreaRatio ? p.floorAreaRatio + '%' : '-';
+          var area = p.lndpclAr ? Number(p.lndpclAr).toLocaleString() + '㎡' : '-';
+          setText('ndInfoYd', yd); setText('ndInfoJimok', jimok); setText('ndInfoGonsi', gonsi);
+          setText('ndInfoBcr', bcr); setText('ndInfoFar', far);
+          setText('ndRcYd', yd); setText('ndRcJm', jimok); setText('ndRcGonsi', gonsi);
+          setText('ndRcBcr', bcr); setText('ndRcFar', far);
+          setText('gYongdo', yd); setText('gJimok', jimok); setText('gGonsi', gonsi);
+          setText('gBcr', bcr); setText('gFar', far);
+          setText('rcYd', yd); setText('rcJm', jimok); setText('rcGonsi', gonsi);
+          setText('rcBcr', bcr); setText('rcFar', far);
         })
         .catch(function(){
           var apiKey = localStorage.getItem('gdsp_land') || '';
@@ -7645,7 +7638,7 @@
         });
     }
 
-    // VWorld 용도지역 조회 (Oracle 프록시)
+        // VWorld 용도지역 조회 (Oracle 프록시)
     function ndCallVwYongdo(lng, lat) {
       var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
       var d = 0.001;
