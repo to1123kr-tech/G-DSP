@@ -3156,6 +3156,30 @@
           <span class="nav-cat-arr">↗</span>
         </div>
       </div>
+      <!-- 지형계획분석 -->
+      <div class="nav-group">
+        <div class="nav-cat" style="opacity:.6;cursor:default">
+          <div class="nav-cat-ico" style="background:rgba(234,88,12,.1);border:1px solid rgba(234,88,12,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2">
+              <polygon points="12 2 2 19 22 19"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg></div>
+          <div class="nav-cat-txt">
+            <div class="nav-cat-name">지형계획 분석</div>
+            <div class="nav-cat-sub">계획고 · 절토 · 성토 분석<br><span style="font-size:9px;color:var(--orange);font-weight:700">🚧 개발 중</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- 3D 배치 계획 -->
+      <div class="nav-group">
+        <div class="nav-cat" style="opacity:.6;cursor:default">
+          <div class="nav-cat-ico" style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+            </svg></div>
+          <div class="nav-cat-txt">
+            <div class="nav-cat-name">3D 배치 계획</div>
+            <div class="nav-cat-sub">부지 조감도 · 입체 배치<br><span style="font-size:9px;color:var(--purple);font-weight:700">🚧 개발 중</span></div>
+          </div>
+        </div>
+      </div>
       <!-- 대분류 6: 설정 -->
       <div class="nav-group">
         <div class="nav-cat" onclick="openPopup('popup_settings.html')">
@@ -5673,10 +5697,7 @@
       return fetch(proxyBase + '/api/proxy?url=' + encodeURIComponent(url));
     }
     function openPopup(file) {
-      var w = 1280, h = 820;
-      var left = Math.round((screen.width - w) / 2);
-      var top = Math.round((screen.height - h) / 2);
-      window.open(file, '_blank', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top + ',resizable=yes,scrollbars=yes');
+      window.open(file, '_blank');
     }
     function toggleTheme() {
       var isDark = document.body.classList.toggle('dark');
