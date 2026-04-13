@@ -6035,23 +6035,7 @@
     function hideHist(i) { histItems[i].hidden = true; localStorage.setItem('gdsp_hist', JSON.stringify(histItems)); renderHist(); toast('숨겼습니다 (언제든 다시 표시 가능)'); }
     function showAllHist() { histItems.forEach(function (h) { h.hidden = false; }); localStorage.setItem('gdsp_hist', JSON.stringify(histItems)); renderHist(); }
     function delHist(i) { if (!confirm('이 항목을 삭제하시겠습니까?')) return; histItems.splice(i, 1); localStorage.setItem('gdsp_hist', JSON.stringify(histItems)); renderHist(); }
-    function printHist(i) { var h = histItems[i]; var w = window.open('', '_blank'); w.document.write('<html><body style="font-family:sans-serif;padding:20px"><h3>작업 이력</h3><p>' + h.date + ' ' + h.time + '</p><p>' + h.txt + '</p>
-<script>
-function doLogin(){
-  var login = document.getElementById('loginScreen');
-  var app = document.getElementById('app');
-  if(login){ login.style.display='none'; }
-  if(app){
-    app.classList.add('show');
-    app.style.display='grid';
-  }
-}
-function checkCrawlServer(cb){
-  if(cb) cb(false);
-}
-</script>
-
-</body></html>'); w.document.close(); w.print(); }
+    function printHist(i) { var h = histItems[i]; var w = window.open('', '_blank'); w.document.write('<html><body style="font-family:sans-serif;padding:20px"><h3>작업 이력</h3><p>' + h.date + ' ' + h.time + '</p><p>' + h.txt + '</p></body></html>'); w.document.close(); w.print(); }
     function clearHist() {
       if (!confirm('작업 이력 전체를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) { return; }
       if (!confirm('정말로 삭제하시겠습니까? 한 번 더 확인합니다.')) { return; }
@@ -8271,22 +8255,6 @@ function checkCrawlServer(cb){
     function geoMapToggleEdit() { GM.toggleEdit(); }
 
   </script>
-
-<script>
-function doLogin(){
-  var login = document.getElementById('loginScreen');
-  var app = document.getElementById('app');
-  if(login){ login.style.display='none'; }
-  if(app){
-    app.classList.add('show');
-    app.style.display='grid';
-  }
-}
-function checkCrawlServer(cb){
-  if(cb) cb(false);
-}
-</script>
-
 </body>
 
 </html>
