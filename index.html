@@ -5946,6 +5946,58 @@
         setText('sTxt', '연동됨'); showView('geo');
         setTimeout(function () { if (currentJibun) moveMapToJibun(currentJibun); }, 200);
         toast('✓ ' + q + ' - 연동 완료' + (pnu ? ' (PNU확인)' : ''), 'ok');
+        // 등기소 소유자 조회
+        fetchIrosOwner(searchJibun);
+      }
+
+      function fetchIrosOwner(jibun) {
+        var el = document.getElementById('ndInfoOwner');
+        if (el) el.innerHTML = '<span style="font-size:9px;color:var(--txt3)">조회 중...</span>';
+        fetch('https://www.iros.go.kr/biz/Pr20ViaRlrgSrchCtrl/retrieveSmplSrchList.do?IS_NMBR_LOGIN__=null', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ websquare_param: {
+            conn_menu_cls_cd:'01', prgs_mode_cls_cd:'01', inet_srch_cls_cd:'PR01',
+            prgs_stg_cd:'', move_cls:'P', swrd: jibun, addr_cls:'3', kind_cls:'all',
+            land_bing_yn:'', rgs_rec_stat:'현행', admin_regn1:'all',
+            admin_regn2:'', admin_regn3:'', lot_no:'', buld_name:'',
+            buld_no_buld:'', buld_no_room:'', rd_name:'', rd_buld_no:'', rd_buld_no2:'',
+            issue_cls:'5', pageIndex:'', pageUnit:10,
+            cmort_flag:'', kap_seq_flag:'', trade_seq_flag:'', etdoc_sel_yn:'',
+            show_cls:'', real_pin_con:'', svc_cls_con:'', item_cls_con:'',
+            judge_enr_cls_con:'', cmort_cls_con:'', trade_cls_con:'',
+            extend_srch:'N', usg_cls_con:''
+          }})
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var land = d && d.dataList && d.dataList.find(function(x){ return x.real_cls_cd === '토지'; });
+          if (!land) { if(el) el.innerHTML = '-'; return; }
+          return fetch('https://www.iros.go.kr/biz/Pr20ViaRlrgSrchCtrl/retrievePinSrchCont.do?IS_NMBR_LOGIN__=null', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ realPinList: [{
+              wk_pin: land.wk_pin, real_cls_cd:'토지', rd_addr:'',
+              rd_addr_prt: land.real_indi_cont, real_indi_cont: land.real_indi_cont,
+              real_indi_cont_detail: land.real_indi_cont_detail,
+              rd_addr_detail:'', addItem:'', use_cls_cd:'현행',
+              chk_sel:'1', rnum:1, chk_all:'', rowStatus:'C'
+            }]})
+          })
+          .then(function(r){ return r.json(); })
+          .then(function(d2){
+            var item = d2 && d2.dataList && d2.dataList.find(function(x){ return x.real_cls_name === '토지'; });
+            if (!item) { if(el) el.innerHTML = '-'; return; }
+            var owner = item.nomprs_name || '-';
+            var pin = item.real_pin || '';
+            if (el) el.innerHTML = owner
+              + (pin ? '<br><span style="font-size:9px;color:var(--txt3)">고유번호: ' + pin + '</span>' : '');
+          });
+        })
+        .catch(function(e){
+          console.warn('등기소 조회 실패:', e);
+          if (el) el.innerHTML = '<span style="font-size:9px;color:var(--txt3)">조회 실패</span>';
+        });
       }
       var kakaoKey = localStorage.getItem('gdsp_kakao') || '';
       if (kakaoKey) {
