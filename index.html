@@ -3836,7 +3836,11 @@
           }
 
           .nd-iv-accent {
-            color: var(--blue2)
+            color: var(--blue2);
+            white-space: normal;
+            word-break: keep-all;
+            font-size: 11px;
+            line-height: 1.4;
           }
 
           .nd-iv-g {
@@ -4079,10 +4083,6 @@
                 <div class="nd-irow"><span class="nd-ik">지번</span><span class="nd-iv nd-iv-accent"
                     id="ndInfoJibun">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">용도지역</span><span class="nd-iv" id="ndInfoYd">-</span></div>
-                <div class="nd-irow"><span class="nd-ik">건폐율</span><span class="nd-iv nd-iv-g" id="ndInfoBcr">-</span>
-                </div>
-                <div class="nd-irow"><span class="nd-ik">용적률</span><span class="nd-iv nd-iv-g" id="ndInfoFar">-</span>
-                </div>
                 <div class="nd-irow"><span class="nd-ik">지목</span><span class="nd-iv" id="ndInfoJimok">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">공시지가</span><span class="nd-iv nd-iv-m"
                     id="ndInfoGonsi">-</span></div>
@@ -7440,7 +7440,7 @@
     var ndVwMarker = null, ndVwWmsLayer = null;
     var ndGeocoder = null; // 카카오 geocoder (주소검색용)
     // 하위 호환용
-    var ndMap = null, ndMapInited = false, ndMapType = 'normal', ndCadOn = false;
+    var ndMap = null, ndMapInited = false, ndMapType = 'normal', ndCadOn = false, ndMarker = null;
 
     var GDSP_SERVER = 'http://168.107.15.68:5050';
 
@@ -7507,6 +7507,12 @@
       ndMap = new kakao.maps.Map(container, options);
       ndGeocoder = new kakao.maps.services.Geocoder();
       ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+      // 마커 초기화
+      ndMarker = new kakao.maps.Marker({ map: null });
+      // 클릭 이벤트
+      kakao.maps.event.addListener(ndMap, 'click', function(e) {
+        ndOnMapClick(e.latLng.getLng(), e.latLng.getLat());
+      });
       document.getElementById('ndMapEmpty').style.display = 'none';
     }
 
@@ -7555,8 +7561,10 @@
         currentPnu = pnu; currentJibun = jibun; armed = true;
         // 카카오맵 이동
         if(ndMap){ 
-          ndMap.setCenter(new kakao.maps.LatLng(lat, lng));
+          var _pos = new kakao.maps.LatLng(lat, lng);
+          ndMap.setCenter(_pos);
           ndMap.setLevel(3);
+          if(ndMarker){ ndMarker.setPosition(_pos); ndMarker.setMap(ndMap); }
         }
         setText('ndInfoJibun', jibun);
         setText('ndRcJibun', jibun);
@@ -7763,8 +7771,10 @@
     function ndApplySearch(lng, lat, jibun, pnu) {
       // 카카오맵으로 이동 (대시보드는 카카오맵 전용)
       if (ndMap) {
-        ndMap.setCenter(new kakao.maps.LatLng(lat, lng));
+        var _pos2 = new kakao.maps.LatLng(lat, lng);
+        ndMap.setCenter(_pos2);
         ndMap.setLevel(3);
+        if(ndMarker){ ndMarker.setPosition(_pos2); ndMarker.setMap(ndMap); }
       }
       // 정보 업데이트
       currentPnu = pnu; currentJibun = jibun; armed = true;
