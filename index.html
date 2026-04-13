@@ -7713,17 +7713,16 @@
           var yd = p.prposArea1Nm || '-';
           var jimok = p.lndcgrCodeNm || '-';
           var gonsi = p.pblntfPclnd ? Number(p.pblntfPclnd).toLocaleString() + '원/㎡' : '-';
-          var bcr = p.buildingToLandRatio ? p.buildingToLandRatio + '%' : '-';
-          var far = p.floorAreaRatio ? p.floorAreaRatio + '%' : '-';
+          var bcr = p.buildingToLandRatio ? p.buildingToLandRatio + '%' : null;
+          var far = p.floorAreaRatio ? p.floorAreaRatio + '%' : null;
           var area = p.lndpclAr ? Number(p.lndpclAr).toLocaleString() + '㎡' : '-';
           setText('ndInfoYd', yd); setText('ndInfoJimok', jimok); setText('ndInfoGonsi', gonsi);
-          setText('ndInfoBcr', bcr); setText('ndInfoFar', far); setText('ndInfoArea', area);
+          setText('ndInfoArea', area);
+          if (bcr) { setText('ndInfoBcr', bcr); setText('ndRcBcr', bcr); setText('gBcr', bcr); setText('rcBcr', bcr); }
+          if (far) { setText('ndInfoFar', far); setText('ndRcFar', far); setText('gFar', far); setText('rcFar', far); }
           setText('ndRcYd', yd); setText('ndRcJm', jimok); setText('ndRcGonsi', gonsi);
-          setText('ndRcBcr', bcr); setText('ndRcFar', far);
           setText('gYongdo', yd); setText('gJimok', jimok); setText('gGonsi', gonsi);
-          setText('gBcr', bcr); setText('gFar', far);
           setText('rcYd', yd); setText('rcJm', jimok); setText('rcGonsi', gonsi);
-          setText('rcBcr', bcr); setText('rcFar', far);
         })
         .catch(function(){
           var apiKey = localStorage.getItem('gdsp_land') || '';
