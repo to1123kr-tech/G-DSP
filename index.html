@@ -4086,6 +4086,8 @@
                 <div class="nd-irow"><span class="nd-ik">지목</span><span class="nd-iv" id="ndInfoJimok">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">공시지가</span><span class="nd-iv nd-iv-m"
                     id="ndInfoGonsi">-</span></div>
+                <div class="nd-irow"><span class="nd-ik">면적</span><span class="nd-iv" id="ndInfoArea">-</span></div>
+                <div class="nd-irow"><span class="nd-ik">소유구분</span><span class="nd-iv" id="ndInfoOwner">- <span style="font-size:9px;color:var(--txt3)">(등기 연동 예정)</span></span></div>
               </div>
               <div class="nd-info-block" style="margin-top:6px">
                 <div class="nd-info-block-title">건축물대장</div>
@@ -7586,7 +7588,7 @@
           var far = p.floorAreaRatio ? p.floorAreaRatio + '%' : '-';
           var area = p.lndpclAr ? Number(p.lndpclAr).toLocaleString() + '㎡' : '-';
           setText('ndInfoYd', yd); setText('ndInfoJimok', jimok); setText('ndInfoGonsi', gonsi);
-          setText('ndInfoBcr', bcr); setText('ndInfoFar', far);
+          setText('ndInfoBcr', bcr); setText('ndInfoFar', far); setText('ndInfoArea', area);
           setText('ndRcYd', yd); setText('ndRcJm', jimok); setText('ndRcGonsi', gonsi);
           setText('ndRcBcr', bcr); setText('ndRcFar', far);
           setText('gYongdo', yd); setText('gJimok', jimok); setText('gGonsi', gonsi);
@@ -7689,25 +7691,43 @@
     function ndDoSearch() {
       var q = (document.getElementById('ndSearch').value || '').trim();
       if (!q) { toast('검색어를 입력하세요', 'err'); return; }
-      if (!ndVwMapInited) { ndInitMap(); }
+      if (!ndMapInited) { ndInitMap(); }
       var kakaoKey = localStorage.getItem('gdsp_kakao') || '';
       if (!kakaoKey) { toast('카카오 API 키를 설정에서 입력하세요', 'err'); return; }
-      var searchAddr = '화성시 ' + q;
+      // 시/군/구 없이 동/리만 입력 시 화성시 자동 붙임
+      var hasCity = /시$|군$|구$|도$/.test(q.split(' ')[0]);
+      var searchAddr = hasCity ? q : '화성시 ' + q;
       // 카카오 주소검색 → 좌표+PNU
-      fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(searchAddr) + '&size=1', {
+      fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(searchAddr) + '&size=5', {
         headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
       })
       .then(function(r){ return r.json(); })
       .then(function(d){
         var docs = d && d.documents;
         if (!docs || !docs.length) {
-          // 키워드 fallback
-          return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(searchAddr) + '&size=1', {
+          // 원래 입력어로 재시도
+          return fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(q) + '&size=5', {
             headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
           }).then(function(r2){ return r2.json(); }).then(function(d2){
-            var doc = d2 && d2.documents && d2.documents[0];
-            if (!doc) throw new Error('not found');
-            return ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, searchAddr, kakaoKey);
+            var docs2 = d2 && d2.documents;
+            if (!docs2 || !docs2.length) {
+              // 키워드 fallback
+              return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(q) + '&size=1', {
+                headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
+              }).then(function(r3){ return r3.json(); }).then(function(d3){
+                var doc = d3 && d3.documents && d3.documents[0];
+                if (!doc) throw new Error('not found');
+                return ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, q, kakaoKey);
+              });
+            }
+            var doc = docs2[0];
+            var addr = doc.address;
+            if (addr && addr.b_code) {
+              var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+              ndApplySearch(parseFloat(doc.x), parseFloat(doc.y), addr.address_name || q, pnu);
+            } else {
+              ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, q, kakaoKey);
+            }
           });
         }
         var doc = docs[0];
@@ -7716,7 +7736,6 @@
           var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
           ndApplySearch(parseFloat(doc.x), parseFloat(doc.y), addr.address_name || searchAddr, pnu);
         } else {
-          // 도로명 → 역지오코딩
           ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, searchAddr, kakaoKey);
         }
       })
