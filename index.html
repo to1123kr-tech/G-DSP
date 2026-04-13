@@ -4095,6 +4095,8 @@
                 <div class="nd-irow"><span class="nd-ik">층수</span><span class="nd-iv" id="ndInfoFloor">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">건축면적</span><span class="nd-iv" id="ndInfoBldArea">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">연면적</span><span class="nd-iv" id="ndInfoTotArea">-</span></div>
+                <div class="nd-irow"><span class="nd-ik">건폐율</span><span class="nd-iv nd-iv-g" id="ndInfoBcr">-</span></div>
+                <div class="nd-irow"><span class="nd-ik">용적률</span><span class="nd-iv nd-iv-g" id="ndInfoFar">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">건축년도</span><span class="nd-iv" id="ndInfoYear">-</span></div>
                 <button class="nd-bld-btn" onclick="showView('bld')">건축물대장 상세보기</button>
               </div>
@@ -7731,10 +7733,14 @@
           var bldArea = it.archArea ? parseFloat(it.archArea).toLocaleString() + '㎡' : '-';
           var area = it.totArea ? parseFloat(it.totArea).toLocaleString() + '㎡' : '-';
           var year = it.useAprDay ? it.useAprDay.substring(0,4) + '년' : '-';
+          var bcr = it.bcRat ? parseFloat(it.bcRat).toFixed(1) + '%' : '-';
+          var far = it.vlRat ? parseFloat(it.vlRat).toFixed(1) + '%' : '-';
           setText('ndInfoUse', use); setText('ndInfoFloor', floor);
           setText('ndInfoBldArea', bldArea); setText('ndInfoTotArea', area); setText('ndInfoYear', year);
-          setText('ndRcUse', use);
+          setText('ndInfoBcr', bcr); setText('ndInfoFar', far);
+          setText('ndRcUse', use); setText('ndRcBcr', bcr); setText('ndRcFar', far);
           setText('gUse', use); setText('gFloor', floor); setText('gArea', area); setText('gYear', year);
+          setText('gBcr', bcr); setText('gFar', far);
           setText('bUse', use); setText('bFloor', floor); setText('bArea', area); setText('bYear', year);
           setText('rcUse', use);
         })
