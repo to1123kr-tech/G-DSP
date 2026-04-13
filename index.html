@@ -5828,34 +5828,93 @@
     }
     function moveMapToJibun(jibun) {
       if (!jibun) return;
+      currentJibun = jibun;
+
+      function _moveAll(lat, lng) {
+        // visible main map
+        try {
+          if (mainMapMode === 'vworld') {
+            document.getElementById('vworldMapDiv').style.display = '';
+            document.getElementById('vworldMapDiv').style.zIndex = '3';
+            document.getElementById('kakaoMapDiv').style.zIndex = '1';
+            setText('mapT', 'VWorld 지도');
+          }
+        } catch (e) {}
+
+        // kakao move
+        try {
+          if (!kakaoMap && typeof initKakaoMap === 'function') initKakaoMap();
+          if (kakaoMap) {
+            var coords = new kakao.maps.LatLng(lat, lng);
+            kakaoMap.setCenter(coords);
+            if (typeof kakaoMap.setLevel === 'function') kakaoMap.setLevel(3);
+            if (!kakaoMarker) kakaoMarker = new kakao.maps.Marker();
+            kakaoMarker.setPosition(coords);
+            kakaoMarker.setMap(kakaoMap);
+            if (window.kakao && kakao.maps && kakao.maps.event) {
+              setTimeout(function(){ try { kakao.maps.event.trigger(kakaoMap, 'resize'); } catch(e) {} }, 50);
+            }
+          }
+        } catch (e) { console.warn('kakao move error', e); }
+
+        // main VWorld move
+        try {
+          function _moveMain() {
+            try { mainVwMap.moveTo(new vw.CoordZ(lng, lat, 500)); } catch (e) {}
+          }
+          if (!mainVwMapInited && typeof _initMainVwMap === 'function') {
+            _initMainVwMap();
+            setTimeout(function(){ if (mainVwMap) _moveMain(); }, 500);
+            setTimeout(function(){ if (mainVwMap) _moveMain(); }, 1200);
+          } else if (mainVwMap && typeof vw !== 'undefined' && vw.CoordZ) {
+            _moveMain();
+          }
+        } catch (e) { console.warn('main vworld move error', e); }
+
+        // nd dashboard VWorld move
+        try {
+          function _moveNd() {
+            try { ndVwMap.moveTo(new vw.CoordZ(lng, lat, 500)); } catch (e) {}
+          }
+          if (!ndVwMapInited && typeof ndInitMap === 'function') {
+            ndInitMap();
+            setTimeout(function(){ if (ndVwMap) _moveNd(); }, 500);
+            setTimeout(function(){ if (ndVwMap) _moveNd(); }, 1200);
+          } else if (ndVwMap && typeof vw !== 'undefined' && vw.CoordZ) {
+            _moveNd();
+          }
+        } catch (e) { console.warn('nd vworld move error', e); }
+
+        setText('mapD', '위도: ' + Number(lat).toFixed(5) + ' / 경도: ' + Number(lng).toFixed(5));
+        var empty = document.getElementById('ndMapEmpty');
+        if (empty) empty.style.display = 'none';
+      }
 
       function _moveByKeyword() {
-        if (!window.kakao || !kakao.maps || !kakao.maps.services) return;
+        if (!window.kakao || !kakao.maps || !kakao.maps.services) {
+          setTimeout(_moveByKeyword, 300);
+          return;
+        }
         if (!kakaoGeocoder) kakaoGeocoder = new kakao.maps.services.Geocoder();
 
         kakaoGeocoder.addressSearch(jibun, function (result, status) {
           if (status === kakao.maps.services.Status.OK && result && result[0]) {
-            var coords = new kakao.maps.LatLng(result[0].y, result[0].x);
-
-            if (kakaoMap) {
-              kakaoMap.setCenter(coords);
-              if (typeof kakaoMap.setLevel === 'function') kakaoMap.setLevel(3);
-            }
-
-            if (kakaoMarker) kakaoMarker.setMap(null);
-            kakaoMarker = new kakao.maps.Marker({
-              map: kakaoMap,
-              position: coords
+            _moveAll(parseFloat(result[0].y), parseFloat(result[0].x));
+          } else {
+            kakaoGeocoder.keywordSearch(jibun, function (result2, status2) {
+              if (status2 === kakao.maps.services.Status.OK && result2 && result2[0]) {
+                _moveAll(parseFloat(result2[0].y), parseFloat(result2[0].x));
+              } else {
+                console.warn('moveMapToJibun geocode failed:', jibun);
+              }
             });
           }
         });
       }
 
-      if (!kakaoMap) {
-        if (typeof initKakaoMap === 'function') {
-          try { initKakaoMap(); } catch (e) {}
-        }
-        setTimeout(_moveByKeyword, 250);
+      if (!kakaoMap && typeof initKakaoMap === 'function') {
+        try { initKakaoMap(); } catch (e) {}
+        setTimeout(_moveByKeyword, 350);
       } else {
         _moveByKeyword();
       }
@@ -5940,7 +5999,7 @@
         addTile('3761' + Math.floor(2000 + Math.random() * 9000));
         addAct(q + ' 검색됨', '방금'); addHistItem('검색: ' + q);
         var dot = document.getElementById('sDot'); if (dot) dot.className = 's-dot s-on';
-        setText('sTxt', '연동됨'); showView('geo');
+        setText('sTxt', '연동됨'); showView('geo'); try { switchMainMap('vworld', document.getElementById('mpVworld')); } catch(e) {}
         setTimeout(function () { if (currentJibun) moveMapToJibun(currentJibun); }, 200);
         toast('✓ ' + q + ' - 연동 완료' + (pnu ? ' (PNU확인)' : ''), 'ok');
       }
@@ -7787,6 +7846,17 @@
       } else if (ndMap) {
         ndMap.setCenter(new kakao.maps.LatLng(lat, lng));
         ndMap.setLevel(3);
+      }
+      if (mainVwMap) {
+        try { mainVwMap.moveTo(new vw.CoordZ(lng, lat, 500)); } catch(e) {}
+      }
+      if (kakaoMap) {
+        try {
+          var _coords = new kakao.maps.LatLng(lat, lng);
+          kakaoMap.setCenter(_coords);
+          kakaoMap.setLevel(3);
+          if (kakaoMarker) kakaoMarker.setPosition(_coords);
+        } catch(e) {}
       }
       // 정보 업데이트
       currentPnu = pnu; currentJibun = jibun; armed = true;
