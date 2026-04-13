@@ -3038,7 +3038,7 @@
       </div>
       <!-- 통합지도 (상세보기용) -->
       <div class="nav-group">
-        <div class="nav-cat" onclick="showView('geo',this)" id="navGeo">
+        <div class="nav-cat" onclick="window.open('map.html','_blank')" id="navGeo">
           <div class="nav-cat-ico nc-blue"><svg viewBox="0 0 24 24" fill="none" stroke="#3e7cff" stroke-width="2">
               <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
               <line x1="8" y1="2" x2="8" y2="18" />
@@ -7468,50 +7468,8 @@
     }
 
     function ndInitMap() {
-      ndGetVwKey(function(key) {
-        if (!key) {
-          ndInitKakaoFallback();
-          return;
-        }
-        ndLoadVwScript(key, function() {
-          if (ndVwMapInited) return;
-          var container = document.getElementById('ndKakaoMap');
-          if (!container) return;
-          // vw 객체 완전 초기화 대기
-          function _tryInit(retry) {
-            if (typeof vw === 'undefined' || !vw.CameraPosition) {
-              if (retry > 0) setTimeout(function(){ _tryInit(retry-1); }, 300);
-              else ndInitKakaoFallback();
-              return;
-            }
-            ndVwMapInited = true;
-            ndMapInited = true;
-            document.getElementById('ndMapEmpty').style.display = 'none';
-            try {
-              var opts = {
-                mapId: 'ndKakaoMap',
-                initPosition: new vw.CameraPosition(
-                  new vw.CoordZ(126.83, 37.20, 3000),
-                  new vw.Direction(0, -90, 0)
-                ),
-                logo: false, navigation: true
-              };
-              ndVwMap = new vw.Map();
-              ndVwMap.setOption(opts);
-              ndVwMap.start();
-              ndAddCadastralWMS(key);
-              ndVwMap.onClick.addEventListener(function(wp, ep, carto) {
-                if (!carto) return;
-                ndOnMapClick(carto.longitudeDD, carto.latitudeDD);
-              });
-            } catch(e) {
-              console.warn('VWorld init error:', e);
-              ndInitKakaoFallback();
-            }
-          }
-          _tryInit(10);
-        });
-      });
+      // 대시보드 지도는 카카오맵 전용 (빠르고 안정적)
+      ndInitKakaoFallback();
       // 카카오 geocoder 초기화 (주소검색용)
       if (window.kakao && window.kakao.maps) {
         if (!ndGeocoder) ndGeocoder = new kakao.maps.services.Geocoder();
@@ -7593,8 +7551,11 @@
         var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
         var jibun = addr.address_name || '';
         currentPnu = pnu; currentJibun = jibun; armed = true;
-        // 지도 이동
-        if(ndVwMap){ try{ ndVwMap.moveTo(new vw.CoordZ(lng, lat, 500)); }catch(e){} }
+        // 카카오맵 이동
+        if(ndMap){ 
+          ndMap.setCenter(new kakao.maps.LatLng(lat, lng));
+          ndMap.setLevel(3);
+        }
         setText('ndInfoJibun', jibun);
         setText('ndRcJibun', jibun);
         setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
@@ -7781,10 +7742,8 @@
     }
 
     function ndApplySearch(lng, lat, jibun, pnu) {
-      // 지도 이동
-      if (ndVwMap) {
-        try { ndVwMap.moveTo(new vw.CoordZ(lng, lat, 500)); } catch(e) {}
-      } else if (ndMap) {
+      // 카카오맵으로 이동 (대시보드는 카카오맵 전용)
+      if (ndMap) {
         ndMap.setCenter(new kakao.maps.LatLng(lat, lng));
         ndMap.setLevel(3);
       }
