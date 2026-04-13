@@ -7837,6 +7837,37 @@
           setText('ndRcUse', use);
           setText('bUse', use); setText('bFloor', floor); setText('bArea', area); setText('bYear', year);
           setText('rcUse', use);
+          // bcRat/vlRat 없으면 총괄표제부 API 추가 시도
+          if (!bcr || !far) ndCallBldRecapApi(pnu, apiKey, !bcr, !far);
+        })
+        .catch(function(){});
+    }
+
+    // 총괄표제부 API - 건폐율/용적률 보완
+    function ndCallBldRecapApi(pnu, apiKey, needBcr, needFar) {
+      var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
+      var platGbCd = pnu.substring(10,11);
+      var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
+      var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
+      var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo'
+        + '?serviceKey=' + encodeURIComponent(apiKey)
+        + '&sigunguCd=' + sigunguCd + '&bjdongCd=' + bjdongCd
+        + '&platGbCd=' + platGbCd + '&bun=' + bun + '&ji=' + ji
+        + '&numOfRows=1&pageNo=1&_type=json';
+      fetch(url)
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var items = d && d.response && d.response.body && d.response.body.items && d.response.body.items.item;
+          if (!items) return;
+          var it = Array.isArray(items) ? items[0] : items;
+          if (needBcr && it.bcRat) {
+            var bcr = parseFloat(it.bcRat).toFixed(1) + '%';
+            setText('ndInfoBcr', bcr); setText('ndRcBcr', bcr); setText('gBcr', bcr);
+          }
+          if (needFar && it.vlRat) {
+            var far = parseFloat(it.vlRat).toFixed(1) + '%';
+            setText('ndInfoFar', far); setText('ndRcFar', far); setText('gFar', far);
+          }
         })
         .catch(function(){});
     }
