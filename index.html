@@ -3399,6 +3399,15 @@
           }
 
           /* 지도 영역 */
+          .ndctx-item {
+            padding: 9px 14px;
+            cursor: pointer;
+            color: var(--txt);
+            border-top: 1px solid var(--line);
+            transition: background .1s;
+          }
+          .ndctx-item:hover { background: var(--bg2); color: var(--blue); }
+
           .nd-map-wrap {
             flex: 1;
             position: relative;
@@ -4039,6 +4048,15 @@
             <!-- 지도 -->
             <div class="nd-map-wrap">
               <div class="nd-map-inner" id="ndKakaoMap"></div>
+              <!-- 우클릭 컨텍스트 메뉴 -->
+              <div id="ndCtxMenu" style="display:none;position:absolute;z-index:9999;background:var(--card);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--shadow2);min-width:160px;overflow:hidden;font-size:12px">
+                <div id="ndCtxAddr" style="padding:8px 14px;background:var(--blue);color:#fff;font-weight:700;font-size:11px;white-space:nowrap">필지 선택</div>
+                <div class="ndctx-item" onclick="ndCtxAction('land')">🏛 토지정보</div>
+                <div class="ndctx-item" onclick="ndCtxAction('bld')">🏠 건축물정보</div>
+                <div class="ndctx-item" onclick="ndCtxAction('gonsi')">💰 개별공시지가</div>
+                <div class="ndctx-item" onclick="ndCtxAction('eum')">📄 토지이용계획확인서</div>
+                <div class="ndctx-item" onclick="ndCtxAction('reg')">📋 건축물대장</div>
+              </div>
               <div class="nd-map-empty" id="ndMapEmpty">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
                   <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
@@ -4053,13 +4071,7 @@
                 <button class="nd-mt-btn" id="ndMpHybrid" onclick="ndSetMapType('hybrid',this)">위성+라벨</button>
               </div>
               <button class="nd-cad-btn" id="ndCadBtn" onclick="ndToggleCadastral()">지적도</button>
-              <!-- 국토정보 WMS 레이어 버튼 -->
-              <div class="nd-layer-btns">
-                <button class="nd-layer-btn" id="ndLayerContour" onclick="ndToggleLayer('contour',this)">📈 등고선</button>
-                <button class="nd-layer-btn" id="ndLayerElev" onclick="ndToggleLayer('elev',this)">📍 표고점</button>
-                <button class="nd-layer-btn" id="ndLayerSlope" onclick="ndToggleLayer('slope',this)">⛰ 경사도</button>
-                <button class="nd-layer-btn" id="ndLayerDem" onclick="ndToggleLayer('dem',this)">🗺 DEM</button>
-              </div>
+
             </div>
           </div>
 
@@ -7549,9 +7561,79 @@
       // 클릭 이벤트
       kakao.maps.event.addListener(ndMap, 'click', function(e) {
         ndOnMapClick(e.latLng.getLng(), e.latLng.getLat());
+        ndHideCtxMenu();
+      });
+      // 우클릭 이벤트
+      kakao.maps.event.addListener(ndMap, 'rightclick', function(e) {
+        var lat = e.latLng.getLat(), lng = e.latLng.getLng();
+        ndShowCtxMenu(e.point.x, e.point.y, lat, lng);
       });
       document.getElementById('ndMapEmpty').style.display = 'none';
     }
+
+    var _ndCtxLat = 0, _ndCtxLng = 0, _ndCtxJibun = '';
+
+    function ndShowCtxMenu(x, y, lat, lng) {
+      _ndCtxLat = lat; _ndCtxLng = lng; _ndCtxJibun = '';
+      var menu = document.getElementById('ndCtxMenu');
+      var addrEl = document.getElementById('ndCtxAddr');
+      if (!menu) return;
+      addrEl.textContent = '주소 조회 중...';
+      // 좌표→주소 변환
+      if (ndGeocoder) {
+        ndGeocoder.coord2Address(lng, lat, function(result, status) {
+          if (status === kakao.maps.services.Status.OK && result[0]) {
+            var a = result[0].address;
+            _ndCtxJibun = (a.region_3depth_name || '') + ' ' + (a.main_address_no || '') + (a.sub_address_no && a.sub_address_no !== '0' ? '-' + a.sub_address_no : '');
+            addrEl.textContent = '📍 ' + _ndCtxJibun;
+          } else {
+            addrEl.textContent = '📍 주소 없음';
+          }
+        });
+      }
+      var wrap = document.getElementById('ndKakaoMap');
+      var rect = wrap ? wrap.getBoundingClientRect() : {left:0, top:0};
+      menu.style.left = x + 'px';
+      menu.style.top = y + 'px';
+      menu.style.display = 'block';
+    }
+
+    function ndHideCtxMenu() {
+      var menu = document.getElementById('ndCtxMenu');
+      if (menu) menu.style.display = 'none';
+    }
+
+    function ndCtxAction(type) {
+      ndHideCtxMenu();
+      if (type === 'land') {
+        // 주소로 검색 연동 후 토지정보 패널로
+        if (_ndCtxJibun) { document.getElementById('mainSearch').value = _ndCtxJibun; hdrSearch(); }
+        setTimeout(function(){ var el = document.querySelector('.nd-info-section'); if(el) el.scrollIntoView({behavior:'smooth'}); }, 600);
+      } else if (type === 'bld' || type === 'reg') {
+        if (_ndCtxJibun) { document.getElementById('mainSearch').value = _ndCtxJibun; hdrSearch(); }
+        setTimeout(function(){ showView('bld'); }, 600);
+      } else if (type === 'gonsi') {
+        if (_ndCtxJibun) { document.getElementById('mainSearch').value = _ndCtxJibun; hdrSearch(); }
+        setTimeout(function(){ var el = document.getElementById('ndInfoGonsi'); if(el) el.scrollIntoView({behavior:'smooth'}); }, 600);
+      } else if (type === 'eum') {
+        if (_ndCtxJibun) {
+          document.getElementById('mainSearch').value = _ndCtxJibun; hdrSearch();
+          setTimeout(function(){
+            var pnu = currentPnu || '';
+            var url = pnu ? 'https://www.eum.go.kr/web/ar/lu/luLandUseRegulationList.jsp?pnu=' + pnu : 'https://www.eum.go.kr';
+            window.open(url, '_blank');
+          }, 800);
+        } else {
+          window.open('https://www.eum.go.kr', '_blank');
+        }
+      }
+    }
+
+    // 다른 곳 클릭 시 메뉴 닫기
+    document.addEventListener('click', function(e) {
+      var menu = document.getElementById('ndCtxMenu');
+      if (menu && !menu.contains(e.target)) ndHideCtxMenu();
+    });
 
     function ndSetMapType(type, btn) {
       document.querySelectorAll('.nd-mt-btn').forEach(function(b){ b.classList.remove('on'); });
