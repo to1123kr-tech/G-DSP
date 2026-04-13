@@ -7803,7 +7803,7 @@
         .catch(function(){});
     }
 
-    // 건축물대장 자동 조회
+    // 건축물대장 자동 조회 - 총괄표제부 먼저, 없으면 일반건축물
     function ndCallBldApi(pnu) {
       var apiKey = localStorage.getItem('gdsp_building') || '';
       if (!apiKey || !pnu || pnu.length < 19) return;
@@ -7811,6 +7811,51 @@
       var platGbCd = pnu.substring(10,11);
       var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
       var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
+      var base = '?serviceKey=' + encodeURIComponent(apiKey)
+        + '&sigunguCd=' + sigunguCd + '&bjdongCd=' + bjdongCd
+        + '&platGbCd=' + platGbCd + '&bun=' + bun + '&ji=' + ji
+        + '&numOfRows=1&pageNo=1&_type=json';
+
+      function applyBldData(it, isRecap) {
+        var use = it.mainPurpsCdNm || it.etcPurps || '-';
+        var floor = it.grndFlrCnt ? it.grndFlrCnt + '층' : '-';
+        var bldArea = it.archArea ? parseFloat(it.archArea).toLocaleString() + '㎡' : '-';
+        var area = it.totArea ? parseFloat(it.totArea).toLocaleString() + '㎡' : '-';
+        var year = it.useAprDay ? it.useAprDay.substring(0,4) + '년' : (it.crtnDay ? it.crtnDay.substring(0,4) + '년' : '-');
+        var bcr = it.bcRat ? parseFloat(it.bcRat) + '%' : null;
+        var far = it.vlRat ? parseFloat(it.vlRat) + '%' : null;
+        setText('ndInfoUse', use); setText('ndInfoFloor', floor);
+        setText('ndInfoBldArea', bldArea); setText('ndInfoTotArea', area); setText('ndInfoYear', year);
+        if (bcr) { setText('ndInfoBcr', bcr); setText('ndRcBcr', bcr); setText('gBcr', bcr); }
+        if (far) { setText('ndInfoFar', far); setText('ndRcFar', far); setText('gFar', far); }
+        setText('ndRcUse', use);
+        setText('bUse', use); setText('bFloor', floor); setText('bArea', area); setText('bYear', year);
+        setText('rcUse', use);
+        return { bcr: bcr, far: far };
+      }
+
+      // 1차: 총괄표제부
+      fetch('https://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo' + base)
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var items = d && d.response && d.response.body && d.response.body.items && d.response.body.items.item;
+          if (items) {
+            var it = Array.isArray(items) ? items[0] : items;
+            var res = applyBldData(it, true);
+            // 총괄표제부에 bcr/far 없으면 일반건축물도 시도
+            if (!res.bcr || !res.far) ndCallBldTitleApi(pnu, apiKey, bun, ji, sigunguCd, bjdongCd, platGbCd, !res.bcr, !res.far);
+          } else {
+            // 총괄표제부 없으면 일반건축물
+            ndCallBldTitleApi(pnu, apiKey, bun, ji, sigunguCd, bjdongCd, platGbCd, true, true);
+          }
+        })
+        .catch(function(){
+          ndCallBldTitleApi(pnu, apiKey, bun, ji, sigunguCd, bjdongCd, platGbCd, true, true);
+        });
+    }
+
+    // 일반건축물 API
+    function ndCallBldTitleApi(pnu, apiKey, bun, ji, sigunguCd, bjdongCd, platGbCd, needBcr, needFar) {
       var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo'
         + '?serviceKey=' + encodeURIComponent(apiKey)
         + '&sigunguCd=' + sigunguCd + '&bjdongCd=' + bjdongCd
@@ -7828,22 +7873,24 @@
           var bldArea = it.archArea ? parseFloat(it.archArea).toLocaleString() + '㎡' : '-';
           var area = it.totArea ? parseFloat(it.totArea).toLocaleString() + '㎡' : '-';
           var year = it.useAprDay ? it.useAprDay.substring(0,4) + '년' : '-';
-          var bcr = it.bcRat ? parseFloat(it.bcRat).toFixed(1) + '%' : null;
-          var far = it.vlRat ? parseFloat(it.vlRat).toFixed(1) + '%' : null;
           setText('ndInfoUse', use); setText('ndInfoFloor', floor);
           setText('ndInfoBldArea', bldArea); setText('ndInfoTotArea', area); setText('ndInfoYear', year);
-          if (bcr) { setText('ndInfoBcr', bcr); setText('ndRcBcr', bcr); setText('gBcr', bcr); }
-          if (far) { setText('ndInfoFar', far); setText('ndRcFar', far); setText('gFar', far); }
           setText('ndRcUse', use);
           setText('bUse', use); setText('bFloor', floor); setText('bArea', area); setText('bYear', year);
           setText('rcUse', use);
-          // bcRat/vlRat 없으면 총괄표제부 API 추가 시도
-          if (!bcr || !far) ndCallBldRecapApi(pnu, apiKey, !bcr, !far);
+          if (needBcr && it.bcRat) {
+            var bcr = parseFloat(it.bcRat) + '%';
+            setText('ndInfoBcr', bcr); setText('ndRcBcr', bcr); setText('gBcr', bcr);
+          }
+          if (needFar && it.vlRat) {
+            var far = parseFloat(it.vlRat) + '%';
+            setText('ndInfoFar', far); setText('ndRcFar', far); setText('gFar', far);
+          }
         })
         .catch(function(){});
     }
 
-    // 총괄표제부 API - 건폐율/용적률 보완
+    // 총괄표제부 API - 건폐율/용적률 보완(레거시 호환)
     function ndCallBldRecapApi(pnu, apiKey, needBcr, needFar) {
       var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
       var platGbCd = pnu.substring(10,11);
@@ -7861,11 +7908,11 @@
           if (!items) return;
           var it = Array.isArray(items) ? items[0] : items;
           if (needBcr && it.bcRat) {
-            var bcr = parseFloat(it.bcRat).toFixed(1) + '%';
+            var bcr = parseFloat(it.bcRat) + '%';
             setText('ndInfoBcr', bcr); setText('ndRcBcr', bcr); setText('gBcr', bcr);
           }
           if (needFar && it.vlRat) {
-            var far = parseFloat(it.vlRat).toFixed(1) + '%';
+            var far = parseFloat(it.vlRat) + '%';
             setText('ndInfoFar', far); setText('ndRcFar', far); setText('gFar', far);
           }
         })
