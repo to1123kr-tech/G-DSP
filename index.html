@@ -7592,15 +7592,16 @@
         if (!addr) return;
         var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
         var jibun = addr.address_name || '';
-        currentPnu = pnu;
-      try { moveMapToJibun(searchJibun || currentJibun); } catch(e) { console.warn('moveMapToJibun error', e); } currentJibun = jibun; armed = true;
+        currentPnu = pnu; currentJibun = jibun; armed = true;
+        // 지도 이동
+        if(ndVwMap){ try{ ndVwMap.moveTo(new vw.CoordZ(lng, lat, 500)); }catch(e){} }
         setText('ndInfoJibun', jibun);
         setText('ndRcJibun', jibun);
         setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
         var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
         document.getElementById('ndResultRow').classList.add('on');
         document.getElementById('ndRcLabel').textContent = jibun;
-        ndCallLandApi(pnu, lng, lat);
+        setTimeout(function(){ ndCallLandApi(pnu, lng, lat); }, 300);
         ndCallBldApi(pnu);
         toast('✓ ' + jibun, 'ok');
       })
