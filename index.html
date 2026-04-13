@@ -7838,14 +7838,15 @@
       fetch('https://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo' + base)
         .then(function(r){ return r.json(); })
         .then(function(d){
-          var items = d && d.response && d.response.body && d.response.body.items && d.response.body.items.item;
-          if (items) {
+          var body = d && d.response && d.response.body;
+          var totalCount = body && body.totalCount;
+          var items = body && body.items && body.items.item;
+          if (totalCount > 0 && items) {
             var it = Array.isArray(items) ? items[0] : items;
             var res = applyBldData(it, true);
-            // 총괄표제부에 bcr/far 없으면 일반건축물도 시도
             if (!res.bcr || !res.far) ndCallBldTitleApi(pnu, apiKey, bun, ji, sigunguCd, bjdongCd, platGbCd, !res.bcr, !res.far);
           } else {
-            // 총괄표제부 없으면 일반건축물
+            // 총괄표제부 없으면 일반건축물 시도
             ndCallBldTitleApi(pnu, apiKey, bun, ji, sigunguCd, bjdongCd, platGbCd, true, true);
           }
         })
@@ -7864,8 +7865,10 @@
       fetch(url)
         .then(function(r){ return r.json(); })
         .then(function(d){
-          var items = d && d.response && d.response.body && d.response.body.items && d.response.body.items.item;
-          if (!items) return;
+          var body = d && d.response && d.response.body;
+          var totalCount = body && body.totalCount;
+          var items = body && body.items && body.items.item;
+          if (!totalCount || !items) return;
           if (!Array.isArray(items)) items = [items];
           var it = items[0];
           var use = it.mainPurpsCdNm || it.etcPurps || '-';
