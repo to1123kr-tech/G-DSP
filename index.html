@@ -4066,9 +4066,9 @@
                 <span>지번을 검색하면 지도가 표시됩니다</span>
               </div>
               <div class="nd-map-type-btns">
-                <button class="nd-mt-btn on" id="ndMpNormal" onclick="ndSetMapType('normal',this)">일반</button>
+                <button class="nd-mt-btn" id="ndMpNormal" onclick="ndSetMapType('normal',this)">일반</button>
                 <button class="nd-mt-btn" id="ndMpSkyview" onclick="ndSetMapType('skyview',this)">위성</button>
-                <button class="nd-mt-btn" id="ndMpHybrid" onclick="ndSetMapType('hybrid',this)">위성+라벨</button>
+                <button class="nd-mt-btn on" id="ndMpHybrid" onclick="ndSetMapType('hybrid',this)">위성+라벨</button>
               </div>
               <button class="nd-cad-btn" id="ndCadBtn" onclick="ndToggleCadastral()">지적도</button>
 
@@ -7554,6 +7554,8 @@
       ndMapInited = true; ndVwMapInited = true;
       var options = { center: new kakao.maps.LatLng(37.2055, 126.8317), level: 7 };
       ndMap = new kakao.maps.Map(container, options);
+      ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW);
+      ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
       ndGeocoder = new kakao.maps.services.Geocoder();
       // ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT); // 지적도 기본 OFF
       // 마커 초기화
@@ -7806,14 +7808,13 @@
           var bldArea = it.archArea ? parseFloat(it.archArea).toLocaleString() + '㎡' : '-';
           var area = it.totArea ? parseFloat(it.totArea).toLocaleString() + '㎡' : '-';
           var year = it.useAprDay ? it.useAprDay.substring(0,4) + '년' : '-';
-          var bcr = it.bcRat ? parseFloat(it.bcRat).toFixed(1) + '%' : '-';
-          var far = it.vlRat ? parseFloat(it.vlRat).toFixed(1) + '%' : '-';
+          var bcr = it.bcRat ? parseFloat(it.bcRat).toFixed(1) + '%' : null;
+          var far = it.vlRat ? parseFloat(it.vlRat).toFixed(1) + '%' : null;
           setText('ndInfoUse', use); setText('ndInfoFloor', floor);
           setText('ndInfoBldArea', bldArea); setText('ndInfoTotArea', area); setText('ndInfoYear', year);
-          setText('ndInfoBcr', bcr); setText('ndInfoFar', far);
-          setText('ndRcUse', use); setText('ndRcBcr', bcr); setText('ndRcFar', far);
-          setText('gUse', use); setText('gFloor', floor); setText('gArea', area); setText('gYear', year);
-          setText('gBcr', bcr); setText('gFar', far);
+          if (bcr) { setText('ndInfoBcr', bcr); setText('ndRcBcr', bcr); setText('gBcr', bcr); }
+          if (far) { setText('ndInfoFar', far); setText('ndRcFar', far); setText('gFar', far); }
+          setText('ndRcUse', use);
           setText('bUse', use); setText('bFloor', floor); setText('bArea', area); setText('bYear', year);
           setText('rcUse', use);
         })
