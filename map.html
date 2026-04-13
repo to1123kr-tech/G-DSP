@@ -614,8 +614,9 @@ function doSearch() {
   var q = document.getElementById('searchInput').value.trim();
   if (!q) { toast('지번을 입력하세요', 'err'); return; }
   setStatus('검색중...', false);
-  // 화성시 기본 prefix 붙이기
-  var query = q.includes('화성') ? q : '경기도 화성시 ' + q;
+  // 화성시 기본 prefix 붙이기 - 동/리만 입력 시만
+  var hasCity = /시$|군$|구$|도$/.test(q.split(' ')[0]);
+  var query = hasCity ? q : '화성시 ' + q;
   fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(query) + '&size=5', {
     headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
   })
@@ -623,8 +624,20 @@ function doSearch() {
   .then(function(d){
     var docs = d.documents || [];
     if (!docs.length) {
-      // 키워드 검색으로 fallback
-      return searchKeyword(query);
+      // 원래 입력어로 재시도
+      return fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(q) + '&size=5', {
+        headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
+      }).then(function(r2){ return r2.json(); }).then(function(d2){
+        var docs2 = d2.documents || [];
+        if (docs2.length) return docs2;
+        // 키워드 검색으로 fallback
+        return searchKeyword(q).then(function(){ return null; });
+      }).then(function(docs2){
+        if (!docs2) return;
+        if (docs2.length === 1) applyResult(docs2[0]);
+        else if (docs2.length > 1) showDropdown(docs2);
+        else { toast('검색 결과 없음', 'err'); setStatus('대기중', true); }
+      });
     }
     if (docs.length === 1) {
       applyResult(docs[0]);
