@@ -7507,7 +7507,7 @@
       var options = { center: new kakao.maps.LatLng(37.2055, 126.8317), level: 7 };
       ndMap = new kakao.maps.Map(container, options);
       ndGeocoder = new kakao.maps.services.Geocoder();
-      ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+      // ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT); // 지적도 기본 OFF
       // 마커 초기화
       ndMarker = new kakao.maps.Marker({ map: null });
       // 클릭 이벤트
