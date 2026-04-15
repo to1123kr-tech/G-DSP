@@ -512,7 +512,7 @@ function drawGrid(){
 
   // 줌 레벨에 따라 라벨 표시 여부 (카카오 level: 낮을수록 확대)
   var level = _kMap.getLevel();
-  var showLabel = (_gridScale === 5000 && level <= 12) || (_gridScale === 1000 && level <= 9);
+  var showLabel = true;
 
   // 격자선 그리기
   for(var lat = startLat; lat <= maxLat + dLat; lat += dLat){
@@ -534,7 +534,7 @@ function drawGrid(){
 
   // 도각번호 라벨 (격자 너무 많으면 생략)
   var gridCount = ((maxLat - startLat)/dLat) * ((maxLng - startLng)/dLng);
-  if(showLabel && gridCount < 500){
+  if(showLabel){
     for(var la = startLat; la <= maxLat; la += dLat){
       for(var lo = startLng; lo <= maxLng; lo += dLng){
         var centerLat = la + dLat/2;
@@ -936,5 +936,42 @@ window.addEventListener('DOMContentLoaded', function(){
   });
 });
 </script>
+
+<div id="ctxMenu" style="position:fixed;z-index:9999;background:#fff;border:1px solid #ccc;border-radius:6px;display:none;min-width:120px;box-shadow:0 4px 12px rgba(0,0,0,0.2)">
+  <div onclick="copyAddress()" style="padding:8px 12px;cursor:pointer;font-size:12px">📍 주소 복사</div>
+</div>
+
 </body>
+
+<script>
+var currentLat=null, currentLng=null;
+
+kakao.maps.event.addListener(_kMap,'rightclick', function(mouseEvent){
+  currentLat = mouseEvent.latLng.getLat();
+  currentLng = mouseEvent.latLng.getLng();
+
+  var menu = document.getElementById('ctxMenu');
+  menu.style.left = event.clientX + 'px';
+  menu.style.top = event.clientY + 'px';
+  menu.style.display = 'block';
+});
+
+document.addEventListener('click', function(){
+  document.getElementById('ctxMenu').style.display='none';
+});
+
+function copyAddress(){
+  if(!currentLat) return;
+  fetch('https://dapi.kakao.com/v2/local/geo/coord2address.json?x='+currentLng+'&y='+currentLat,{
+    headers:{'Authorization':'KakaoAK '+_kakaoKey}
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    var addr = d.documents[0].address.address_name;
+    navigator.clipboard.writeText(addr);
+    toast('주소 복사됨','ok');
+  });
+}
+</script>
+
 </html>
