@@ -108,7 +108,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 /* 지도 영역 */
 #mapWrap{flex:1;position:relative;overflow:hidden}
 #kakaoMapDiv{position:absolute;inset:0;z-index:2}
-#vworldMapDiv{position:absolute;inset:0;z-index:1;display:none}
+#vworldMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
 
 /* 워터마크 - 항상 표시, 지울 수 없음 */
 #watermark{
@@ -590,15 +590,15 @@ function switchEngine(engine, btn) {
   document.querySelectorAll('#btnKakao,#btnVworld').forEach(function(b){ b.classList.remove('on'); });
   btn.classList.add('on');
   currentEngine = engine;
+  var kDiv = document.getElementById('kakaoMapDiv');
+  var vDiv = document.getElementById('vworldMapDiv');
   if (engine === 'kakao') {
-    document.getElementById('kakaoMapDiv').style.zIndex = '3';
-    document.getElementById('vworldMapDiv').style.zIndex = '1';
-    document.getElementById('vworldMapDiv').style.display = 'none';
+    kDiv.style.zIndex = '3'; kDiv.style.visibility = 'visible';
+    vDiv.style.zIndex = '1'; vDiv.style.visibility = 'hidden';
     if (kakaoMap) kakao.maps.event.trigger(kakaoMap, 'resize');
   } else {
-    document.getElementById('vworldMapDiv').style.display = '';
-    document.getElementById('vworldMapDiv').style.zIndex = '3';
-    document.getElementById('kakaoMapDiv').style.zIndex = '1';
+    vDiv.style.visibility = 'visible'; vDiv.style.zIndex = '3';
+    kDiv.style.zIndex = '1';
     if (!vwMapInited) initVwMap();
     else if (vwMap) moveVwMap(currentLng, currentLat);
   }
