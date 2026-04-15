@@ -601,8 +601,6 @@ function switchEngine(engine, btn) {
     kDiv.style.zIndex = '1';
     if (!vwMapInited) {
       initVwMap();
-      // 초기화 직후 현재 좌표로 이동 (약간 딜레이)
-      setTimeout(function(){ if(vwMap) moveVwMap(currentLng, currentLat); }, 500);
     } else if (vwMap) {
       moveVwMap(currentLng, currentLat);
     }
@@ -618,7 +616,7 @@ function initVwMap() {
   }
   if (vwMap) { vwMapInited = true; return; }
   try {
-    var opts = { mapId:'vworldMapDiv', initPosition:new vw.CameraPosition(new vw.CoordZ(currentLng,currentLat,3000),new vw.Direction(0,-90,0)), logo:false, navigation:true };
+    var opts = { mapId:'vworldMapDiv', initPosition:new vw.CameraPosition(new vw.CoordZ(currentLng,currentLat,500),new vw.Direction(0,-90,0)), logo:false, navigation:true };
     vwMap = new vw.Map(); vwMap.setOption(opts); vwMap.start();
     vwMapInited = true;
     vwMap.onClick.addEventListener(function(wp,ep,carto){ if(!carto) return; onMapClick(carto.longitudeDD,carto.latitudeDD); });
