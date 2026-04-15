@@ -599,8 +599,13 @@ function switchEngine(engine, btn) {
   } else {
     vDiv.style.visibility = 'visible'; vDiv.style.zIndex = '3';
     kDiv.style.zIndex = '1';
-    if (!vwMapInited) initVwMap();
-    else if (vwMap) moveVwMap(currentLng, currentLat);
+    if (!vwMapInited) {
+      initVwMap();
+      // 초기화 직후 현재 좌표로 이동 (약간 딜레이)
+      setTimeout(function(){ if(vwMap) moveVwMap(currentLng, currentLat); }, 500);
+    } else if (vwMap) {
+      moveVwMap(currentLng, currentLat);
+    }
   }
   toast(engine === 'kakao' ? '카카오 지도' : 'VWorld 지도');
 }
@@ -809,7 +814,7 @@ function moveMarker(lng, lat) {
 }
 function moveVwMap(lng, lat) {
   if (!vwMap) return;
-  try{ vwMap.camera.lookTo(new vw.CameraPosition(new vw.CoordZ(lng,lat,500),new vw.Direction(0,-90,0))); }catch(e){}
+  try{ vwMap.moveTo(new vw.CoordZ(lng, lat, 500)); }catch(e){ console.error('VWorld 이동 오류:', e); }
 }
 function setSelBar(jibun) {
   var bar = document.getElementById('selBar');
