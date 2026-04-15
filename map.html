@@ -645,9 +645,43 @@ function setMapType(type, btn) {
 // ── 레이어 ──
 function toggleCadastral(on) {
   if (!kakaoMap) return;
-  if (on) kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-  else kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-  toast(on ? '지적선+지번 ON' : '지적선+지번 OFF');
+  if (on) {
+    if (!VWORLD_KEY) {
+      // VWorld 키 없으면 카카오 기본 지적도 사용
+      kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+      toast('지적선+지번 ON (카카오)');
+      return;
+    }
+    // VWorld WMS 지적도 (더 정확)
+    var tilesrc = new kakao.maps.ImageMapType({
+      getTileUrl: function(x, y, z) {
+        var n = Math.pow(2, z);
+        var lng1 = (x/n)*360 - 180;
+        var lng2 = ((x+1)/n)*360 - 180;
+        var lat1r = Math.atan(Math.sinh(Math.PI*(1-2*y/n)));
+        var lat2r = Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)));
+        var lat1 = lat1r*180/Math.PI, lat2 = lat2r*180/Math.PI;
+        var bbox = [Math.min(lat1,lat2),lng1,Math.max(lat1,lat2),lng2].join(',');
+        return 'https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
+          +'&layers=lt_c_landinfobasemap&styles=lt_c_landinfobasemap&crs=EPSG:4326'
+          +'&bbox='+bbox+'&width=256&height=256&format=image/png&transparent=true'
+          +'&Key='+VWORLD_KEY;
+      },
+      tileSize: new kakao.maps.Size(256,256),
+      opacity: 0.85
+    });
+    wmsOverlays['cad'] = tilesrc;
+    kakaoMap.addOverlayMapTypeId(tilesrc);
+    toast('지적선+지번 ON');
+  } else {
+    if (wmsOverlays['cad']) {
+      kakaoMap.removeOverlayMapTypeId(wmsOverlays['cad']);
+      delete wmsOverlays['cad'];
+    } else {
+      kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+    }
+    toast('지적선+지번 OFF');
+  }
 }
 
 function toggleWmsLayer(type, on) {
