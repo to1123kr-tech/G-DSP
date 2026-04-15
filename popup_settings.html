@@ -326,6 +326,38 @@ body.dark{
       </div>
     </div>
 
+    <!-- 국토정보플랫폼 오픈API 키 -->
+    <div>
+      <div class="sec-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/></svg>
+        국토정보플랫폼 오픈API (배경지도)
+      </div>
+      <div class="api-card">
+        <div class="api-card-hdr">
+          <div class="api-card-ico" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.2)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
+          </div>
+          <div>
+            <div class="api-card-name">바로e맵 WMTS 인증키</div>
+            <div class="api-card-desc">map.ngii.go.kr · 배경지도/영상지도 API</div>
+          </div>
+        </div>
+        <div class="api-row">
+          <input class="mf" id="ngiiApiKey" type="password" placeholder="인증키 (API KEY)" style="font-family:monospace">
+        </div>
+        <div class="api-row-btns">
+          <button class="mbtn mbtn-s" onclick="saveApi('ngii_apikey')">저장</button>
+          <button class="mbtn mbtn-d" onclick="delApi('ngii_apikey')">삭제</button>
+          <button class="mbtn mbtn-t" onclick="testApi('ngii_apikey')">테스트</button>
+        </div>
+        <div class="st-row">
+          <span class="st-lbl">연결 상태</span>
+          <span class="cbadge cb-none" id="ngii_apikeySt">미확인</span>
+          <span class="st-extra" style="color:var(--txt3)">🔑 map.ngii.go.kr 인증키관리에서 발급</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 민원 자동갱신 서버 -->
     <div>
       <div class="sec-title">
@@ -392,7 +424,7 @@ function toast(msg, type){
 function setRes(msg){ var e = document.getElementById('resBar'); if(e) e.textContent = msg; }
 
 function saveApi(key){
-  var ids = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey'};
+  var ids = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey', ngii_apikey:'ngiiApiKey'};
   var el = document.getElementById(ids[key]);
   if(el && el.value.trim()){
     localStorage.setItem('gdsp_'+key, el.value.trim());
@@ -404,8 +436,8 @@ function saveApi(key){
 }
 
 function delApi(key){
-  var ids = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey'};
-  var sts = {kakao:'kakaoSt', vworld:'vworldSt', building:'buildingSt', land:'landSt'};
+  var ids = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey', ngii_apikey:'ngiiApiKey'};
+  var sts = {kakao:'kakaoSt', vworld:'vworldSt', building:'buildingSt', land:'landSt', ngii_apikey:'ngii_apikeySt'};
   var el = document.getElementById(ids[key]); if(el) el.value = '';
   localStorage.removeItem('gdsp_'+key);
   var st = document.getElementById(sts[key]);
@@ -414,8 +446,8 @@ function delApi(key){
 }
 
 function testApi(key){
-  var ids = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey'};
-  var sts = {kakao:'kakaoSt', vworld:'vworldSt', building:'buildingSt', land:'landSt'};
+  var ids = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey', ngii_apikey:'ngiiApiKey'};
+  var sts = {kakao:'kakaoSt', vworld:'vworldSt', building:'buildingSt', land:'landSt', ngii_apikey:'ngii_apikeySt'};
   var el = document.getElementById(ids[key]);
   if(!el || !el.value.trim()){ toast('API KEY를 먼저 입력하세요', 'err'); return; }
   var apiKey = el.value.trim();
@@ -469,6 +501,27 @@ function testApi(key){
       if(st){ st.className = 'cbadge '+(ok?'cb-ok':'cb-err'); st.textContent = ok?'형식 OK':'키 오류'; }
       setRes(ok ? '형식 확인됨 (지번 검색 시 실제 확인)' : '키 형식 오류');
     });
+
+  } else if(key === 'ngii_apikey'){
+    // 바로e맵 WMTS 타일 이미지 요청으로 확인
+    var testUrl = 'https://map.ngii.go.kr/openapi/Gettile/EmapBg/'+apiKey+'/EPSG3857_GRAPHIC/17/111419/50879.png';
+    var img = new Image();
+    img.onload = function(){
+      var ok = (img.width > 0 && img.height > 0);
+      if(st){ st.className = 'cbadge '+(ok?'cb-ok':'cb-err'); st.textContent = ok?'✓ 연결됨':'✗ 키 오류'; }
+      setRes(ok ? '✓ 바로e맵 WMTS 정상 연결됨' : '✗ 타일 로드 실패');
+    };
+    img.onerror = function(){
+      fetch(testUrl, {mode:'no-cors'}).then(function(){
+        var ok = apiKey.length >= 20;
+        if(st){ st.className = 'cbadge '+(ok?'cb-ok':'cb-err'); st.textContent = ok?'형식 OK (CORS 제한)':'✗ 키 오류'; }
+        setRes(ok ? '형식 확인됨 — 실제 지도에서 확인 필요' : '✗ 키 형식 오류');
+      }).catch(function(){
+        if(st){ st.className = 'cbadge cb-err'; st.textContent = '✗ 연결 실패'; }
+        setRes('✗ 연결 실패 — 키 또는 활용URL을 확인하세요');
+      });
+    };
+    img.src = testUrl;
 
   } else {
     setTimeout(function(){
@@ -546,7 +599,7 @@ function toggleTheme(){
     if(btn) btn.textContent = '☀️ 라이트';
   }
   // 저장된 값 불러오기
-  var keys = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey'};
+  var keys = {kakao:'kakaoKey', vworld:'vworldKey', building:'buildingKey', land:'landKey', ngii_apikey:'ngiiApiKey'};
   for(var k in keys){
     var v = localStorage.getItem('gdsp_'+k);
     if(v){ var e = document.getElementById(keys[k]); if(e) e.value = v; }
