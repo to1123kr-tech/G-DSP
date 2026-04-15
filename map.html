@@ -628,22 +628,30 @@ function initVwMap() {
     var opts = { mapId:'vworldMapDiv', initPosition:new vw.CameraPosition(new vw.CoordZ(currentLng,currentLat,500),new vw.Direction(0,-90,0)), logo:false, navigation:true };
     vwMap = new vw.Map(); vwMap.setOption(opts); vwMap.start();
     vwMapInited = true;
+
+    // VWorld 좌클릭
     vwMap.onClick.addEventListener(function(wp,ep,carto){
       if(!carto) return;
       onMapClick(carto.longitudeDD,carto.latitudeDD);
     });
-    // VWorld 우클릭 — contextmenu에서 화면 중심 좌표 사용
-    document.getElementById('vworldMapDiv').addEventListener('contextmenu', function(e){
-      e.preventDefault();
-      // vwMap에서 현재 보이는 중심 좌표 가져오기
-      try {
-        var cp = vwMap.getCameraPosition();
-        ctxLng = cp.longitude; ctxLat = cp.latitude;
-      } catch(err){
+
+    // VWorld 우클릭 — 마지막 onClick 좌표 저장 후 활용
+    var _lastVwCarto = null;
+    vwMap.onClick.addEventListener(function(wp,ep,carto){ _lastVwCarto = carto; });
+
+    // canvas 요소에 직접 contextmenu 바인딩
+    setTimeout(function(){
+      var canvases = document.querySelectorAll('#vworldMapDiv canvas');
+      var target = canvases.length ? canvases[canvases.length-1] : document.getElementById('vworldMapDiv');
+      target.addEventListener('contextmenu', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        // 현재 좌표 사용
         ctxLng = currentLng; ctxLat = currentLat;
-      }
-      showCtxMenu(e.clientX, e.clientY);
-    });
+        showCtxMenu(e.clientX, e.clientY);
+      }, true);
+    }, 2500);
+
     // 줌인 완료될 때까지 오버레이로 가림
     setTimeout(function(){
       var ov = document.getElementById('vwLoadingOverlay');
@@ -865,7 +873,23 @@ function moveMarker(lng, lat) {
 }
 function moveVwMap(lng, lat) {
   if (!vwMap) return;
-  try{ vwMap.moveTo(new vw.CoordZ(lng, lat, 500)); }catch(e){ console.error('VWorld 이동 오류:', e); }
+  try {
+    // 방법1: moveTo
+    vwMap.moveTo(new vw.CoordZ(lng, lat, 500));
+  } catch(e1) {
+    try {
+      // 방법2: flyTo
+      vwMap.flyTo(new vw.CoordZ(lng, lat, 500));
+    } catch(e2) {
+      try {
+        // 방법3: setOption + 재시작 없이 카메라 이동
+        var cp = new vw.CameraPosition(new vw.CoordZ(lng, lat, 500), new vw.Direction(0,-90,0));
+        vwMap.camera.lookTo(cp);
+      } catch(e3) {
+        console.error('VWorld 이동 실패:', e3);
+      }
+    }
+  }
 }
 function setSelBar(jibun) {
   var bar = document.getElementById('selBar');
