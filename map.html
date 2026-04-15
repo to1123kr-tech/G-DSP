@@ -841,6 +841,10 @@ function applyResult(doc) {
     }
     currentPnu=pnu; currentJibun=jibun;
     moveMap(lng, lat);
+    // VWorld 모드일 때 확실하게 이동
+    if (currentEngine === 'vworld' && vwMap) {
+      setTimeout(function(){ moveVwMap(lng, lat); }, 300);
+    }
     setSelBar(jibun);
     setStatus('연동됨', true);
     toast('✓ '+jibun, 'ok');
@@ -872,23 +876,15 @@ function moveMarker(lng, lat) {
   if (kakaoMarker&&kakaoMap) { kakaoMarker.setPosition(new kakao.maps.LatLng(lat,lng)); kakaoMarker.setMap(kakaoMap); }
 }
 function moveVwMap(lng, lat) {
-  if (!vwMap) return;
+  if (!vwMap) { console.log('moveVwMap: vwMap 없음'); return; }
+  console.log('moveVwMap 호출:', lng, lat);
   try {
-    // 방법1: moveTo
-    vwMap.moveTo(new vw.CoordZ(lng, lat, 500));
-  } catch(e1) {
-    try {
-      // 방법2: flyTo
-      vwMap.flyTo(new vw.CoordZ(lng, lat, 500));
-    } catch(e2) {
-      try {
-        // 방법3: setOption + 재시작 없이 카메라 이동
-        var cp = new vw.CameraPosition(new vw.CoordZ(lng, lat, 500), new vw.Direction(0,-90,0));
-        vwMap.camera.lookTo(cp);
-      } catch(e3) {
-        console.error('VWorld 이동 실패:', e3);
-      }
-    }
+    // VWorld 3.0 공식 방식: setInitPosition 후 start
+    var cp = new vw.CameraPosition(new vw.CoordZ(lng, lat, 500), new vw.Direction(0,-90,0));
+    vwMap.setInitPosition(cp);
+    console.log('setInitPosition 호출 완료');
+  } catch(e) {
+    console.error('VWorld 이동 실패:', e);
   }
 }
 function setSelBar(jibun) {
@@ -919,6 +915,14 @@ document.addEventListener('click', function(e) {
   if (!document.getElementById('ctxMenu').contains(e.target)) document.getElementById('ctxMenu').style.display='none';
   if (!document.getElementById('srchDrop').contains(e.target)) document.getElementById('srchDrop').style.display='none';
 });
+
+// VWorld 모드 우클릭 — mapWrap 전체에서 처리
+document.getElementById('mapWrap').addEventListener('contextmenu', function(e){
+  if (currentEngine !== 'vworld') return; // 카카오는 자체 rightclick 사용
+  e.preventDefault();
+  ctxLng = currentLng; ctxLat = currentLat;
+  showCtxMenu(e.clientX, e.clientY);
+}, true);
 
 function cmSelect() {
   currentPnu=popupPnu; currentJibun=popupJibun; currentLng=ctxLng; currentLat=ctxLat;
