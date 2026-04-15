@@ -876,15 +876,28 @@ function moveMarker(lng, lat) {
   if (kakaoMarker&&kakaoMap) { kakaoMarker.setPosition(new kakao.maps.LatLng(lat,lng)); kakaoMarker.setMap(kakaoMap); }
 }
 function moveVwMap(lng, lat) {
-  if (!vwMap) { console.log('moveVwMap: vwMap 없음'); return; }
-  console.log('moveVwMap 호출:', lng, lat);
+  if (!VWORLD_KEY) return;
+  if (typeof vw === 'undefined') return;
+  // VWorld 3.0은 start() 후 카메라 이동 API가 없으므로 재생성
   try {
-    // VWorld 3.0 공식 방식: setInitPosition 후 start
-    var cp = new vw.CameraPosition(new vw.CoordZ(lng, lat, 500), new vw.Direction(0,-90,0));
-    vwMap.setInitPosition(cp);
-    console.log('setInitPosition 호출 완료');
+    // 전역 viewer 프로퍼티 삭제 (Cannot redefine property 방지)
+    try { delete window.viewer; } catch(ed){}
+    try { Object.defineProperty(window, 'viewer', {value:undefined, writable:true, configurable:true}); } catch(ed2){}
+    // 기존 지도 제거
+    var vDiv = document.getElementById('vworldMapDiv');
+    var children = vDiv.children;
+    for (var i = children.length - 1; i >= 0; i--) {
+      if (children[i].id !== 'vwLoadingOverlay') vDiv.removeChild(children[i]);
+    }
+    // 새 맵 생성
+    var opts = { mapId:'vworldMapDiv', initPosition:new vw.CameraPosition(new vw.CoordZ(lng,lat,500),new vw.Direction(0,-90,0)), logo:false, navigation:true };
+    vwMap = new vw.Map(); vwMap.setOption(opts); vwMap.start();
+    vwMap.onClick.addEventListener(function(wp,ep,carto){
+      if(!carto) return;
+      onMapClick(carto.longitudeDD,carto.latitudeDD);
+    });
   } catch(e) {
-    console.error('VWorld 이동 실패:', e);
+    console.error('VWorld 재생성 실패:', e);
   }
 }
 function setSelBar(jibun) {
