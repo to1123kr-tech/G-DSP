@@ -109,6 +109,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 #mapWrap{flex:1;position:relative;overflow:hidden}
 #kakaoMapDiv{position:absolute;inset:0;z-index:2}
 #vworldMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
+@keyframes vwSpin{to{transform:rotate(360deg)}}
 
 /* 워터마크 - 항상 표시, 지울 수 없음 */
 #watermark{
@@ -353,7 +354,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
   <!-- 지도 영역 -->
   <div id="mapWrap">
     <div id="kakaoMapDiv"></div>
-    <div id="vworldMapDiv"></div>
+    <div id="vworldMapDiv">
+      <div id="vwLoadingOverlay" style="position:absolute;inset:0;z-index:9999;background:#1a1f2e;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px">
+        <div style="width:32px;height:32px;border:3px solid rgba(255,255,255,.2);border-top-color:#4fc3f7;border-radius:50%;animation:vwSpin .8s linear infinite"></div>
+        <span style="color:#aab;font-size:12px">VWorld 지도 로딩중...</span>
+      </div>
+    </div>
     <canvas id="measureCanvas"></canvas>
 
     <!-- 워터마크 (항상 표시, 삭제 불가) -->
@@ -620,6 +626,11 @@ function initVwMap() {
     vwMap = new vw.Map(); vwMap.setOption(opts); vwMap.start();
     vwMapInited = true;
     vwMap.onClick.addEventListener(function(wp,ep,carto){ if(!carto) return; onMapClick(carto.longitudeDD,carto.latitudeDD); });
+    // 줌인 완료될 때까지 오버레이로 가림
+    setTimeout(function(){
+      var ov = document.getElementById('vwLoadingOverlay');
+      if(ov) ov.style.display = 'none';
+    }, 2000);
   } catch(e) {
     console.error('VWorld 초기화 오류:', e);
     toast('VWorld 초기화 실패: ' + e.message, 'err');
