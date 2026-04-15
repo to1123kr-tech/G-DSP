@@ -180,101 +180,94 @@ function updateScaleBtns(){
   <div class="tab-view on" id="view-dtm">
     <div style="display:flex;flex:1;overflow:hidden">
 
-      <!-- 좌측: 지도 -->
-      <div style="flex:1;position:relative;min-width:0">
-        <div id="kakaoMap" style="width:100%;height:100%"></div>
-        <!-- 지번검색 -->
-        <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:380px">
-          <input id="dtmAddr" type="text" placeholder="지번 또는 도로명 검색…" onkeydown="if(event.key==='Enter')dtmSearch()"
-            style="flex:1;height:34px;padding:0 12px;background:#fff;border:1px solid var(--line2);border-radius:8px;font-size:12px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.15)">
-          <button onclick="dtmSearch()" style="height:34px;padding:0 14px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">검색</button>
-        </div>
-        <!-- 도각 축척 -->
-        <div style="position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:4px">
-          <button id="scaleBtn5000" onclick="setGridScale(5000)" style="height:32px;padding:0 12px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:11px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:5,000</button>
-          <button id="scaleBtn1000" onclick="setGridScale(1000)" style="height:32px;padding:0 12px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:11px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:1,000</button>
-        </div>
-        <!-- 검색결과 드롭다운 -->
-        <div id="dtmSrchResult" style="position:absolute;top:50px;left:10px;z-index:1001;width:calc(100% - 20px);max-width:380px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none;max-height:180px;overflow-y:auto"></div>
-        <!-- 카카오 키 없을 때 -->
-        <div id="kakaoMapOverlay" style="position:absolute;inset:0;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:500">
-          <svg style="width:40px;height:40px;opacity:.2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
-          <p style="font-size:12px;color:var(--txt3);text-align:center">카카오 JavaScript 키가 필요합니다<br>메인 설정에서 등록하세요</p>
+      <!-- 좌측: 지도 + 이용안내 -->
+      <div style="flex:55;position:relative;min-width:0;display:flex;flex-direction:column">
+        <div style="flex:1;position:relative;min-height:0">
+          <div id="kakaoMap" style="width:100%;height:100%"></div>
+          <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:340px">
+            <input id="dtmAddr" type="text" placeholder="지번 또는 도로명 검색…" onkeydown="if(event.key==='Enter')dtmSearch()"
+              style="flex:1;height:32px;padding:0 10px;background:#fff;border:1px solid var(--line2);border-radius:8px;font-size:11px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.15)">
+            <button onclick="dtmSearch()" style="height:32px;padding:0 12px;border-radius:8px;background:var(--blue);color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">검색</button>
+          </div>
+          <div style="position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:4px">
+            <button id="scaleBtn5000" onclick="setGridScale(5000)" style="height:30px;padding:0 10px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:10px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:5,000</button>
+            <button id="scaleBtn1000" onclick="setGridScale(1000)" style="height:30px;padding:0 10px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:10px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:1,000</button>
+          </div>
+          <div id="dtmSrchResult" style="position:absolute;top:48px;left:10px;z-index:1001;width:calc(100% - 20px);max-width:340px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none;max-height:160px;overflow-y:auto"></div>
+          <div id="kakaoMapOverlay" style="position:absolute;inset:0;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:500">
+            <svg style="width:36px;height:36px;opacity:.2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
+            <p style="font-size:11px;color:var(--txt3);text-align:center">카카오 JavaScript 키 필요<br>메인 설정에서 등록</p>
+          </div>
         </div>
       </div>
 
-      <!-- 우측: 다운로드 패널 -->
-      <div style="width:320px;flex-shrink:0;overflow-y:auto;padding:12px;background:var(--card);border-left:1px solid var(--line)">
+      <!-- 우측: 다운로드 패널 (넓게) -->
+      <div style="flex:45;flex-shrink:0;overflow-y:auto;padding:14px;background:var(--card);border-left:1px solid var(--line);display:flex;flex-direction:column;gap:10px">
 
-        <!-- 선택 위치 + 도각번호 -->
-        <div class="sec" style="margin-bottom:10px">
-          <div class="sec-t" style="margin-bottom:8px;font-size:11px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            선택 위치 · 도각번호
+        <!-- 도각번호 -->
+        <div class="sec" style="margin:0;padding:14px">
+          <div class="sec-t" style="margin-bottom:8px">📍 도각번호</div>
+          <div id="tileBox" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;min-height:26px">
+            <span style="font-size:11px;color:var(--txt3)">지도 클릭 또는 아래 직접 입력</span>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">
-            <div style="font-size:10px;color:var(--txt3)">주소</div>
-            <div style="font-size:10px;color:var(--txt3)">좌표</div>
-            <div id="dtmSelAddr" style="font-size:11px;font-weight:700;color:var(--blue2)">—</div>
-            <div id="dtmSelCoord" style="font-size:11px;color:var(--txt2)">—</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input class="inp" id="ngiiCodeInput" type="text" placeholder="도각번호 직접 입력 (예: 37616024)" style="height:34px;font-size:12px;flex:1" onkeydown="if(event.key==='Enter')addManualCode()">
+            <button class="btn-primary" style="height:34px;font-size:11px;padding:0 14px;white-space:nowrap" onclick="addManualCode()">추가</button>
           </div>
-          <div style="font-size:10px;color:var(--txt3);margin-bottom:4px">도각번호</div>
-          <div id="tileBox" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;min-height:24px">
-            <span style="font-size:10px;color:var(--txt3);padding:2px 0">지번 검색 또는 지도 클릭</span>
-          </div>
-          <button class="btn-primary" style="width:100%;height:30px;font-size:11px" onclick="copyTiles()">📋 도각번호 복사</button>
+          <button class="btn-outline" style="width:100%;height:32px;font-size:11px" onclick="copyTiles()">📋 도각번호 복사</button>
         </div>
 
-        <!-- 로그인 정보 -->
-        <div class="sec" style="margin-bottom:10px">
-          <div class="sec-t" style="margin-bottom:8px;font-size:11px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            국토정보플랫폼 로그인
-          </div>
-          <div style="display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:center">
+        <!-- 로그인 -->
+        <div class="sec" style="margin:0;padding:14px">
+          <div class="sec-t" style="margin-bottom:8px">🔐 국토정보플랫폼 로그인</div>
+          <div style="display:grid;grid-template-columns:60px 1fr;gap:6px;align-items:center">
             <span style="font-size:11px;color:var(--txt3)">아이디</span>
-            <input class="inp" id="ngiiDlId" type="text" placeholder="아이디" style="height:30px;font-size:11px">
+            <input class="inp" id="ngiiDlId" type="text" placeholder="아이디" style="height:34px;font-size:12px">
             <span style="font-size:11px;color:var(--txt3)">비밀번호</span>
-            <input class="inp" id="ngiiDlPw" type="password" placeholder="비밀번호" style="height:30px;font-size:11px">
+            <input class="inp" id="ngiiDlPw" type="password" placeholder="비밀번호" style="height:34px;font-size:12px">
           </div>
+          <button class="btn-outline" style="width:100%;height:30px;font-size:10px;margin-top:8px" onclick="saveLoginConfig()">💾 로그인 정보 저장</button>
         </div>
 
         <!-- 용도 선택 -->
-        <div class="sec" style="margin-bottom:10px">
-          <div class="sec-t" style="margin-bottom:8px;font-size:11px">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            사용 용도
-          </div>
-          <select id="ngiiPurpose1" onchange="updatePurpose2()" style="width:100%;height:30px;margin-bottom:6px;padding:0 8px;background:var(--bg2);border:1px solid var(--line2);border-radius:6px;color:var(--txt);font-size:11px;outline:none">
+        <div class="sec" style="margin:0;padding:14px">
+          <div class="sec-t" style="margin-bottom:8px">📋 사용 용도</div>
+          <select id="ngiiPurpose1" onchange="updatePurpose2()" style="width:100%;height:34px;margin-bottom:6px;padding:0 10px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;color:var(--txt);font-size:12px;outline:none">
             <option value="">대분류 선택</option>
             <option value="행위허가">행위허가</option>
             <option value="도시계획">도시계획</option>
             <option value="제작 및 활용">제작 및 활용</option>
             <option value="행정 및 소송">행정 및 소송</option>
           </select>
-          <select id="ngiiPurpose2" style="width:100%;height:30px;padding:0 8px;background:var(--bg2);border:1px solid var(--line2);border-radius:6px;color:var(--txt);font-size:11px;outline:none">
+          <select id="ngiiPurpose2" style="width:100%;height:34px;padding:0 10px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;color:var(--txt);font-size:12px;outline:none">
             <option value="">소분류 선택</option>
           </select>
+          <button class="btn-outline" style="width:100%;height:30px;font-size:10px;margin-top:8px" onclick="savePurposeConfig()">💾 용도 저장</button>
         </div>
 
         <!-- 옵션 -->
-        <div class="sec" style="margin-bottom:10px">
-          <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt2);cursor:pointer">
-            <input type="checkbox" id="ngiiFirstRun" checked style="accent-color:var(--blue)">
-            첫 실행 모드 (브라우저 표시)
-          </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt2);cursor:pointer;padding:0 4px">
+          <input type="checkbox" id="ngiiFirstRun" checked style="accent-color:var(--blue);width:16px;height:16px">
+          첫 실행 모드 (브라우저 표시 — 첫 회 필수)
+        </label>
+
+        <!-- 버튼 -->
+        <div style="display:flex;gap:6px">
+          <button class="btn-primary" id="ngiiDlBtn" style="flex:1;height:44px;font-size:14px;font-weight:900" onclick="startNgiiDownload()">⬇ 다운로드</button>
         </div>
 
-        <!-- 저장 + 다운로드 버튼 -->
-        <div style="display:flex;gap:6px;margin-bottom:10px">
-          <button class="btn-outline" style="flex:1;height:34px;font-size:11px" onclick="saveNgiiDlConfig()">💾 설정 저장</button>
-          <button class="btn-primary" id="ngiiDlBtn" style="flex:2;height:34px;font-size:12px" onclick="startNgiiDownload()">⬇ 다운로드</button>
-        </div>
-
-        <!-- 안내 -->
-        <div style="padding:8px 10px;background:rgba(217,119,6,.05);border:1px solid rgba(217,119,6,.15);border-radius:7px;font-size:10px;color:var(--gold);line-height:1.7">
-          💡 처음 사용 시 다운로드 프로그램 설치 필요<br>
-          💡 도각번호 클릭 후 ⬇다운로드 버튼
+        <!-- 법적 고지 -->
+        <div style="padding:12px 14px;background:rgba(239,68,68,.06);border:1.5px solid rgba(239,68,68,.25);border-radius:10px;margin-top:2px">
+          <div style="font-size:12px;font-weight:900;color:var(--red);margin-bottom:8px">⚠ 이용 안내 (필독)</div>
+          <div style="font-size:11px;color:var(--txt2);line-height:1.9">
+            📄 서버 보호를 위해 <b>1장씩만</b> 다운로드됩니다<br>
+            🚫 다운로드된 수치지형도는<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b style="color:var(--red)">상업적 판매 · 재배포 금지</b><br>
+            ⚖ 「공간정보의 구축 및 관리 등에 관한 법률」<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;위반 시 <b>처벌 대상</b>입니다<br>
+            👤 본 서비스 사용에 따른<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>모든 책임은 사용자 본인</b>에게 있습니다
+          </div>
         </div>
 
       </div>
@@ -544,7 +537,8 @@ function initKakaoMap(){
     kakao.maps.event.addListener(_kMap, 'click', function(mouseEvent){
       var lat = mouseEvent.latLng.getLat();
       var lng = mouseEvent.latLng.getLng();
-      document.getElementById('dtmSelCoord').textContent = lat.toFixed(6)+', '+lng.toFixed(6);
+      var coordEl = document.getElementById('dtmSelCoord');
+      if(coordEl) coordEl.textContent = lat.toFixed(6)+', '+lng.toFixed(6);
       calcTiles(lat, lng);
       // 마커
       if(_clickMarker) _clickMarker.setMap(null);
@@ -705,44 +699,79 @@ function updatePurpose2(){
   if(saved) p2.value = saved;
 }
 
-function saveNgiiDlConfig(){
+function addManualCode(){
+  var inp = document.getElementById('ngiiCodeInput');
+  var code = (inp.value||'').trim();
+  if(!code || !/^\d{7,10}$/.test(code)){ toast('올바른 도각번호를 입력하세요 (7~10자리 숫자)','err'); return; }
+  var box = document.getElementById('tileBox');
+  // 이미 있는지 확인
+  var existing = Array.from(box.querySelectorAll('span')).map(function(s){ return s.textContent.replace('⧉','').trim(); });
+  if(existing.indexOf(code) >= 0){ toast('이미 추가됨'); return; }
+  // 안내 텍스트 제거
+  if(box.querySelector('span') && !box.querySelector('span button')) box.innerHTML = '';
+  box.innerHTML += '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);border-radius:6px;font-size:11px;font-weight:700;color:var(--blue2)">'
+    +code
+    +'<button onclick="navigator.clipboard.writeText(\''+code+'\');toast(\''+code+' 복사됨\',\'ok\')" style="color:var(--blue2);font-size:12px;background:none;border:none;cursor:pointer;padding:0;margin-left:2px">⧉</button>'
+    +'</span>';
+  inp.value = '';
+  toast(code+' 추가됨','ok');
+}
+
+function saveLoginConfig(){
   var id = document.getElementById('ngiiDlId').value.trim();
   var pw = document.getElementById('ngiiDlPw').value;
+  if(!id){ toast('아이디를 입력하세요','err'); return; }
+  localStorage.setItem('gdsp_ngii_dl_id', id);
+  if(pw) localStorage.setItem('gdsp_ngii_dl_pw', btoa(unescape(encodeURIComponent(pw))));
+  toast('로그인 정보 저장됨','ok');
+}
+
+function savePurposeConfig(){
   var p1 = document.getElementById('ngiiPurpose1').value;
   var p2 = document.getElementById('ngiiPurpose2').value;
+  if(!p1 || !p2){ toast('대분류/소분류 모두 선택하세요','err'); return; }
+  localStorage.setItem('gdsp_ngii_purpose1', p1);
+  localStorage.setItem('gdsp_ngii_purpose2', p2);
+  toast('용도 저장됨','ok');
+}
+
+function saveNgiiDlConfig(){
+  saveLoginConfig();
+  savePurposeConfig();
   var first = document.getElementById('ngiiFirstRun').checked;
-  if(id) localStorage.setItem('gdsp_ngii_dl_id', id);
-  if(pw) localStorage.setItem('gdsp_ngii_dl_pw', pw);
-  if(p1) localStorage.setItem('gdsp_ngii_purpose1', p1);
-  if(p2) localStorage.setItem('gdsp_ngii_purpose2', p2);
   localStorage.setItem('gdsp_ngii_firstrun', first ? '1' : '0');
-  toast('설정 저장됨','ok');
 }
 
 function loadNgiiDlConfig(){
   var id = localStorage.getItem('gdsp_ngii_dl_id');
-  var pw = localStorage.getItem('gdsp_ngii_dl_pw');
+  var pwB64 = localStorage.getItem('gdsp_ngii_dl_pw');
   var p1 = localStorage.getItem('gdsp_ngii_purpose1');
   var p2 = localStorage.getItem('gdsp_ngii_purpose2');
   var first = localStorage.getItem('gdsp_ngii_firstrun');
   if(id){ var e=document.getElementById('ngiiDlId'); if(e) e.value=id; }
-  if(pw){ var e=document.getElementById('ngiiDlPw'); if(e) e.value=pw; }
+  if(pwB64){ try{ var e=document.getElementById('ngiiDlPw'); if(e) e.value=decodeURIComponent(escape(atob(pwB64))); }catch(ex){} }
   if(p1){ var e=document.getElementById('ngiiPurpose1'); if(e){ e.value=p1; updatePurpose2(); } }
   if(p2){ var e=document.getElementById('ngiiPurpose2'); if(e) e.value=p2; }
   if(first==='0'){ var e=document.getElementById('ngiiFirstRun'); if(e) e.checked=false; }
 }
 
 function startNgiiDownload(){
+  // 도각번호 수집 (tileBox + 직접입력)
   var codes = [];
   document.querySelectorAll('#tileBox span').forEach(function(s){
     var c = s.textContent.replace('⧉','').trim();
     if(c && /^\d+$/.test(c)) codes.push(c);
   });
-  if(!codes.length){ toast('도각번호를 먼저 계산하세요 (지번 검색 또는 지도 클릭)','err'); return; }
+  if(!codes.length){ toast('도각번호를 먼저 선택하세요 (지도 클릭 또는 직접 입력)','err'); return; }
+  if(codes.length > 1){
+    toast('서버 부하 방지를 위해 1장씩만 다운로드 가능합니다. 첫 번째 도각만 다운로드합니다.');
+    codes = [codes[0]];
+  }
 
   var id = document.getElementById('ngiiDlId').value.trim();
   var pw = document.getElementById('ngiiDlPw').value;
-  if(!id || !pw){ toast('아이디/비밀번호를 입력하세요','err'); return; }
+  if(!id){ toast('아이디를 입력하세요','err'); return; }
+  if(!pw){ toast('비밀번호를 입력하세요','err'); return; }
 
   var p1 = document.getElementById('ngiiPurpose1').value;
   var p2 = document.getElementById('ngiiPurpose2').value;
@@ -751,30 +780,22 @@ function startNgiiDownload(){
   // gdsp:// 커스텀 프로토콜로 로컬 프로그램 호출
   var params = {
     action: 'download',
-    codes: codes.join(','),
+    code: codes[0],
     purpose1: p1,
     purpose2: p2
   };
   var uri = 'gdsp://download?' + Object.keys(params).map(function(k){ return k+'='+encodeURIComponent(params[k]); }).join('&');
 
-  // 프로그램 실행 시도
-  var started = false;
   var iframe = document.createElement('iframe');
   iframe.style.display = 'none';
   iframe.src = uri;
   document.body.appendChild(iframe);
 
-  // 2초 후 실행 안 됐으면 설치 안내
   setTimeout(function(){
     document.body.removeChild(iframe);
-    if(!started){
-      if(confirm('G-DSP 다운로더가 설치되어 있지 않습니다.\n다운로드 페이지로 이동하시겠습니까?')){
-        window.open('http://168.107.15.68:5050/download/gdsp_downloader.exe','_blank');
-      }
-    }
-  }, 2000);
+  }, 3000);
 
-  toast('다운로더 실행 중...','ok');
+  toast('다운로더 실행 요청 — 프로그램이 설치되지 않았다면 아래에서 설치하세요','ok');
 }
 
 /* ===================== 지번검색 (카카오 REST) ===================== */
@@ -820,8 +841,10 @@ function dtmSelectAddr(i){
   var item = box._list[i];
   if(!item) return;
   box.style.display='none';
-  document.getElementById('dtmSelAddr').textContent = item.addr;
-  document.getElementById('dtmSelCoord').textContent = item.lat.toFixed(6)+', '+item.lng.toFixed(6);
+  var addrEl = document.getElementById('dtmSelAddr');
+  if(addrEl) addrEl.textContent = item.addr;
+  var coordEl = document.getElementById('dtmSelCoord');
+  if(coordEl) coordEl.textContent = item.lat.toFixed(6)+', '+item.lng.toFixed(6);
   calcTiles(item.lat, item.lng);
   // 카카오 지도 이동
   if(_kMap){
