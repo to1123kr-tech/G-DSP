@@ -623,7 +623,14 @@ function loadVwFrame(lng, lat) {
     + '<script>'
     + 'var map=new vw.Map();'
     + 'map.setOption({mapId:"vmap",initPosition:new vw.CameraPosition(new vw.CoordZ('+lng+','+lat+',500),new vw.Direction(0,-90,0)),logo:false,navigation:true});'
-    + 'map.start();'+'window.addEventListener(\"message\", function(e){'
+    + 'map.start();'+
+'map.getCanvas().addEventListener("contextmenu", function(e){'+
+'  e.preventDefault();'+
+'  var x = e.clientX;'+
+'  var y = e.clientY;'+
+'  window.parent.postMessage({type:"vwRightClick",x:x,y:y},"*");'+
+'});'+
+''+'window.addEventListener(\"message\", function(e){'
 + '  if(e.data && e.data.type === \"move\"){'
 + '    map.setCenter(new vw.Coord(e.data.lng, e.data.lat));'
 + '  }'
@@ -936,6 +943,14 @@ window.addEventListener('message', function(ev){
     onMapClick(ev.data.lng, ev.data.lat);
   }
 });
+window.addEventListener('message', function(ev){
+  if (ev.data && ev.data.type === 'vwRightClick') {
+    ctxLng = currentLng;
+    ctxLat = currentLat;
+    showCtxMenu(ev.data.x, ev.data.y);
+  }
+});
+
 
 function cmSelect() {
   currentPnu=popupPnu; currentJibun=popupJibun; currentLng=ctxLng; currentLat=ctxLat;
