@@ -4,13 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>G-DSP 통합지도</title>
-<script>
-// VWorld 키 — 있으면 동기 삽입 (popup_download와 동일 방식)
-(function(){
-  var k = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
-  if(k) document.write('<sc'+'ript src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+k+'">\x3C/script>');
-})();
-</script>
+<!-- VWorld는 iframe 내부에서 로드 -->
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -355,10 +349,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
   <div id="mapWrap">
     <div id="kakaoMapDiv"></div>
     <div id="vworldMapDiv">
-      <div id="vwLoadingOverlay" style="position:absolute;inset:0;z-index:9999;background:#1a1f2e;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px">
-        <div style="width:32px;height:32px;border:3px solid rgba(255,255,255,.2);border-top-color:#4fc3f7;border-radius:50%;animation:vwSpin .8s linear infinite"></div>
-        <span style="color:#aab;font-size:12px">VWorld 지도 로딩중...</span>
-      </div>
+      <iframe id="vwFrame" style="width:100%;height:100%;border:none"></iframe>
     </div>
     <canvas id="measureCanvas"></canvas>
 
@@ -619,48 +610,26 @@ function switchEngine(engine, btn) {
 
 function initVwMap() {
   if (!VWORLD_KEY) { toast('VWorld API 키 없음 — 설정에서 입력하세요', 'err'); return; }
-  if (typeof vw === 'undefined' || !vw.CameraPosition) {
-    toast('VWorld 스크립트 미로드 — 새로고침 필요', 'err');
-    return;
-  }
-  if (vwMap) { vwMapInited = true; return; }
-  try {
-    var opts = { mapId:'vworldMapDiv', initPosition:new vw.CameraPosition(new vw.CoordZ(currentLng,currentLat,500),new vw.Direction(0,-90,0)), logo:false, navigation:true };
-    vwMap = new vw.Map(); vwMap.setOption(opts); vwMap.start();
-    vwMapInited = true;
+  vwMapInited = true;
+  loadVwFrame(currentLng, currentLat);
+}
 
-    // VWorld 좌클릭
-    vwMap.onClick.addEventListener(function(wp,ep,carto){
-      if(!carto) return;
-      onMapClick(carto.longitudeDD,carto.latitudeDD);
-    });
-
-    // VWorld 우클릭 — 마지막 onClick 좌표 저장 후 활용
-    var _lastVwCarto = null;
-    vwMap.onClick.addEventListener(function(wp,ep,carto){ _lastVwCarto = carto; });
-
-    // canvas 요소에 직접 contextmenu 바인딩
-    setTimeout(function(){
-      var canvases = document.querySelectorAll('#vworldMapDiv canvas');
-      var target = canvases.length ? canvases[canvases.length-1] : document.getElementById('vworldMapDiv');
-      target.addEventListener('contextmenu', function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        // 현재 좌표 사용
-        ctxLng = currentLng; ctxLat = currentLat;
-        showCtxMenu(e.clientX, e.clientY);
-      }, true);
-    }, 2500);
-
-    // 줌인 완료될 때까지 오버레이로 가림
-    setTimeout(function(){
-      var ov = document.getElementById('vwLoadingOverlay');
-      if(ov) ov.style.display = 'none';
-    }, 2000);
-  } catch(e) {
-    console.error('VWorld 초기화 오류:', e);
-    toast('VWorld 초기화 실패: ' + e.message, 'err');
-  }
+function loadVwFrame(lng, lat) {
+  var fr = document.getElementById('vwFrame');
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
+    + '<script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=' + VWORLD_KEY + '"><\/script>'
+    + '</head><body style="margin:0;overflow:hidden">'
+    + '<div id="vmap" style="width:100%;height:100vh"></div>'
+    + '<script>'
+    + 'var map=new vw.Map();'
+    + 'map.setOption({mapId:"vmap",initPosition:new vw.CameraPosition(new vw.CoordZ('+lng+','+lat+',500),new vw.Direction(0,-90,0)),logo:false,navigation:true});'
+    + 'map.start();'
+    + 'map.onClick.addEventListener(function(wp,ep,carto){'
+    + '  if(!carto)return;'
+    + '  window.parent.postMessage({type:"vwClick",lng:carto.longitudeDD,lat:carto.latitudeDD},"*");'
+    + '});'
+    + '<\/script></body></html>';
+  fr.srcdoc = html;
 }
 
 // ── 지도 유형 ──
@@ -842,7 +811,7 @@ function applyResult(doc) {
     currentPnu=pnu; currentJibun=jibun;
     moveMap(lng, lat);
     // VWorld 모드일 때 확실하게 이동
-    if (currentEngine === 'vworld' && vwMap) {
+    if (currentEngine === 'vworld' && VWORLD_KEY) {
       setTimeout(function(){ moveVwMap(lng, lat); }, 300);
     }
     setSelBar(jibun);
@@ -877,28 +846,7 @@ function moveMarker(lng, lat) {
 }
 function moveVwMap(lng, lat) {
   if (!VWORLD_KEY) return;
-  if (typeof vw === 'undefined') return;
-  // VWorld 3.0은 start() 후 카메라 이동 API가 없으므로 재생성
-  try {
-    // 전역 viewer 프로퍼티 삭제 (Cannot redefine property 방지)
-    try { delete window.viewer; } catch(ed){}
-    try { Object.defineProperty(window, 'viewer', {value:undefined, writable:true, configurable:true}); } catch(ed2){}
-    // 기존 지도 제거
-    var vDiv = document.getElementById('vworldMapDiv');
-    var children = vDiv.children;
-    for (var i = children.length - 1; i >= 0; i--) {
-      if (children[i].id !== 'vwLoadingOverlay') vDiv.removeChild(children[i]);
-    }
-    // 새 맵 생성
-    var opts = { mapId:'vworldMapDiv', initPosition:new vw.CameraPosition(new vw.CoordZ(lng,lat,500),new vw.Direction(0,-90,0)), logo:false, navigation:true };
-    vwMap = new vw.Map(); vwMap.setOption(opts); vwMap.start();
-    vwMap.onClick.addEventListener(function(wp,ep,carto){
-      if(!carto) return;
-      onMapClick(carto.longitudeDD,carto.latitudeDD);
-    });
-  } catch(e) {
-    console.error('VWorld 재생성 실패:', e);
-  }
+  loadVwFrame(lng, lat);
 }
 function setSelBar(jibun) {
   var bar = document.getElementById('selBar');
@@ -931,11 +879,18 @@ document.addEventListener('click', function(e) {
 
 // VWorld 모드 우클릭 — mapWrap 전체에서 처리
 document.getElementById('mapWrap').addEventListener('contextmenu', function(e){
-  if (currentEngine !== 'vworld') return; // 카카오는 자체 rightclick 사용
+  if (currentEngine !== 'vworld') return;
   e.preventDefault();
   ctxLng = currentLng; ctxLat = currentLat;
   showCtxMenu(e.clientX, e.clientY);
 }, true);
+
+// VWorld iframe에서 클릭 이벤트 수신
+window.addEventListener('message', function(ev){
+  if (ev.data && ev.data.type === 'vwClick') {
+    onMapClick(ev.data.lng, ev.data.lat);
+  }
+});
 
 function cmSelect() {
   currentPnu=popupPnu; currentJibun=popupJibun; currentLng=ctxLng; currentLat=ctxLat;
