@@ -623,7 +623,12 @@ function loadVwFrame(lng, lat) {
     + '<script>'
     + 'var map=new vw.Map();'
     + 'map.setOption({mapId:"vmap",initPosition:new vw.CameraPosition(new vw.CoordZ('+lng+','+lat+',500),new vw.Direction(0,-90,0)),logo:false,navigation:true});'
-    + 'map.start();'
+    + 'map.start();'+'window.addEventListener(\"message\", function(e){'
++ '  if(e.data && e.data.type === \"move\"){'
++ '    map.setCenter(new vw.Coord(e.data.lng, e.data.lat));'
++ '  }'
++ '});'
++ ''
     + 'map.onClick.addEventListener(function(wp,ep,carto){'
     + '  if(!carto)return;'
     + '  window.parent.postMessage({type:"vwClick",lng:carto.longitudeDD,lat:carto.latitudeDD},"*");'
@@ -879,8 +884,14 @@ function moveMarker(lng, lat) {
   if (kakaoMarker&&kakaoMap) { kakaoMarker.setPosition(new kakao.maps.LatLng(lat,lng)); kakaoMarker.setMap(kakaoMap); }
 }
 function moveVwMap(lng, lat) {
-  if (!VWORLD_KEY) return;
-  loadVwFrame(lng, lat);
+  var fr = document.getElementById('vwFrame');
+  if (fr && fr.contentWindow) {
+    fr.contentWindow.postMessage({
+      type: "move",
+      lng: lng,
+      lat: lat
+    }, "*");
+  }
 }
 function setSelBar(jibun) {
   var bar = document.getElementById('selBar');
