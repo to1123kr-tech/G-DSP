@@ -450,8 +450,7 @@ function initOlMap(){
     _bgLayers[t] = new ol.layer.Tile({
       source: new ol.source.XYZ({
         url: 'https://map.ngii.go.kr/openapi/Gettile/EmapBg/'+_ngiiKey+'/'+types[t]+'/{z}/{x}/{y}.png',
-        maxZoom: 18,
-        crossOrigin: 'anonymous'
+        maxZoom: 18
       }),
       visible: (t === 'graphic')
     });
