@@ -107,6 +107,25 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
 
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.4)}
 </style>
+
+<script>
+var _gridVisible = true;
+var _gridOverlays = [];
+function clearGrid(){
+  if(!_gridOverlays) return;
+  _gridOverlays.forEach(function(o){ try{ o.setMap(null);}catch(e){} });
+  _gridOverlays = [];
+}
+function toggleGrid(){
+  _gridVisible = !_gridVisible;
+  if(!_gridVisible){
+    clearGrid();
+  }else{
+    drawGrid();
+  }
+}
+</script>
+
 </head>
 <body>
 <div class="wrap">
@@ -144,6 +163,8 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
     <!-- 카카오 지도 + 도각격자 -->
     <div style="position:relative;flex-shrink:0;height:58%">
       <div id="kakaoMap" style="width:100%;height:100%"></div>
+<button onclick="toggleGrid()" style="position:absolute;bottom:10px;right:10px;z-index:1000;height:32px;padding:0 12px;border-radius:8px;background:#fff;border:1px solid #ccc;font-size:11px;font-weight:700;cursor:pointer">도각 ON/OFF</button>
+<div style="display:none"></div>
       <!-- 지번검색 바 -->
       <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:420px">
         <input id="dtmAddr" type="text" placeholder="지번 또는 도로명 검색…" onkeydown="if(event.key==='Enter')dtmSearch()"
@@ -290,19 +311,19 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
         <div class="issue-grid">
           <a class="issue-card" href="https://www.eais.go.kr/" target="_blank">
             <div class="issue-ico" style="background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
-            <div><div class="issue-name">건축물대장</div><div class="issue-url">eais.go.kr</div></div>
+            <div><div class="issue-name">건축물대장</div><div class="issue-url">eais.go.kr</div>
           </a>
           <a class="issue-card" href="https://www.eum.go.kr/" target="_blank">
             <div class="issue-ico" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg></div>
-            <div><div class="issue-name">토지이용확인원</div><div class="issue-url">eum.go.kr</div></div>
+            <div><div class="issue-name">토지이용확인원</div><div class="issue-url">eum.go.kr</div>
           </a>
           <a class="issue-card" href="https://www.iros.go.kr/" target="_blank">
             <div class="issue-ico" style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg></div>
-            <div><div class="issue-name">인터넷등기소</div><div class="issue-url">iros.go.kr</div></div>
+            <div><div class="issue-name">인터넷등기소</div><div class="issue-url">iros.go.kr</div>
           </a>
           <a class="issue-card" href="https://plus.gov.kr/" target="_blank">
             <div class="issue-ico" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
-            <div><div class="issue-name">정부24</div><div class="issue-url">gov.kr</div></div>
+            <div><div class="issue-name">정부24</div><div class="issue-url">gov.kr</div>
           </a>
         </div>
       </div>
@@ -331,7 +352,7 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
       </div>
       <div class="sec">
         <div class="sec-t">지번 목록</div>
-        <div id="regList"><div style="text-align:center;color:var(--txt3);font-size:12px;padding:14px 0">추가된 지번이 없습니다</div></div>
+        <div id="regList"><div style="text-align:center;color:var(--txt3);font-size:12px;padding:14px 0">추가된 지번이 없습니다</div>
       </div>
     </div>
   </div>
@@ -348,27 +369,27 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
         <div class="issue-grid">
           <a class="issue-card" href="https://www.eais.go.kr/" target="_blank">
             <div class="issue-ico" style="background:rgba(5,150,105,.1);border:1px solid rgba(5,150,105,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
-            <div><div class="issue-name">건축물대장</div><div class="issue-url">eais.go.kr</div></div>
+            <div><div class="issue-name">건축물대장</div><div class="issue-url">eais.go.kr</div>
           </a>
           <a class="issue-card" href="https://www.eum.go.kr/" target="_blank">
             <div class="issue-ico" style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg></div>
-            <div><div class="issue-name">토지이용확인원</div><div class="issue-url">eum.go.kr</div></div>
+            <div><div class="issue-name">토지이용확인원</div><div class="issue-url">eum.go.kr</div>
           </a>
           <a class="issue-card" href="https://www.iros.go.kr/" target="_blank">
             <div class="issue-ico" style="background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/></svg></div>
-            <div><div class="issue-name">인터넷등기소</div><div class="issue-url">iros.go.kr</div></div>
+            <div><div class="issue-name">인터넷등기소</div><div class="issue-url">iros.go.kr</div>
           </a>
           <a class="issue-card" href="https://plus.gov.kr/" target="_blank">
             <div class="issue-ico" style="background:rgba(8,145,178,.1);border:1px solid rgba(8,145,178,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
-            <div><div class="issue-name">정부24</div><div class="issue-url">gov.kr</div></div>
+            <div><div class="issue-name">정부24</div><div class="issue-url">gov.kr</div>
           </a>
           <a class="issue-card" href="https://luris.molit.go.kr/" target="_blank">
             <div class="issue-ico" style="background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.2)"><svg viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg></div>
-            <div><div class="issue-name">토지이용규제</div><div class="issue-url">luris.molit.go.kr</div></div>
+            <div><div class="issue-name">토지이용규제</div><div class="issue-url">luris.molit.go.kr</div>
           </a>
           <a class="issue-card" href="https://www.hscity.go.kr/" target="_blank">
             <div class="issue-ico" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.15)"><svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
-            <div><div class="issue-name">화성시청</div><div class="issue-url">hscity.go.kr</div></div>
+            <div><div class="issue-name">화성시청</div><div class="issue-url">hscity.go.kr</div>
           </a>
         </div>
       </div>
@@ -472,7 +493,7 @@ function initKakaoMap(){
   });
 }
 
-function setGridScale(s){
+function setGridScale(s){ clearGrid();
   _gridScale = s;
   // 버튼 스타일
   document.getElementById('scaleBtn5000').style.border = (s===5000) ? '2px solid var(--blue)' : '1px solid var(--line2)';
@@ -483,73 +504,79 @@ function setGridScale(s){
   toast('1:'+s.toLocaleString()+' 도각', 'ok');
 }
 
-function drawGrid(){ if(!gridVisible) return;
+
+function drawGrid(){
   if(!_kMap) return;
-  // 기존 격자 제거
-  _gridOverlays.forEach(function(o){ o.setMap(null); });
-  _gridOverlays = [];
+  if(!_gridVisible){ clearGrid(); return; }
+
+  // always clear before drawing (prevents 5000/1000 stacking)
+  clearGrid();
 
   var bounds = _kMap.getBounds();
   var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
   var minLat = sw.getLat(), maxLat = ne.getLat();
   var minLng = sw.getLng(), maxLng = ne.getLng();
 
-  // 도각 간격
-  // 1:5000 = 1:50000(위도20분×경도30분)을 4×4=16분할 → 위도5분, 경도7.5분
-  // 1:1000 = 1:5000을 5×5=25분할 → 위도1분, 경도1.5분
+  // correct sizes
   var dLat, dLng;
   if(_gridScale === 5000){
-    dLat = 1.5/60; dLng = 2.25/60;   // 7.5분
+    dLat = 1.5/60;   // 1.5'
+    dLng = 2.25/60;  // 2.25'
   } else {
-    dLat = 0.3/60; dLng = 0.45/60;   // 1.5분
+    dLat = 0.3/60;   // 0.3'
+    dLng = 0.45/60;  // 0.45'
   }
 
-  // 격자 시작 좌표
   var startLat = Math.floor(minLat / dLat) * dLat;
   var startLng = Math.floor(minLng / dLng) * dLng;
 
-  // 줌 레벨에 따라 라벨 표시 여부 (카카오 level: 낮을수록 확대)
   var level = _kMap.getLevel();
-  var showLabel = (_gridScale === 5000 && level <= 12) || (_gridScale === 1000 && level <= 9);
+  var showLabel = true; // always show
 
-  // 격자선 그리기
+  // draw horizontal
   for(var lat = startLat; lat <= maxLat + dLat; lat += dLat){
     var line = new kakao.maps.Polyline({
       path: [new kakao.maps.LatLng(lat, minLng - dLng), new kakao.maps.LatLng(lat, maxLng + dLng)],
-      strokeWeight: (_gridScale===5000)?2:1, strokeColor: '#ff3b30', strokeOpacity: 0.6, strokeStyle: 'solid'
+      strokeWeight: (_gridScale===5000)?2:1,
+      strokeColor: '#ff3b30',
+      strokeOpacity: 0.6,
+      strokeStyle: 'solid'
     });
     line.setMap(_kMap);
     _gridOverlays.push(line);
   }
+
+  // draw vertical
   for(var lng2 = startLng; lng2 <= maxLng + dLng; lng2 += dLng){
     var line2 = new kakao.maps.Polyline({
       path: [new kakao.maps.LatLng(minLat - dLat, lng2), new kakao.maps.LatLng(maxLat + dLat, lng2)],
-      strokeWeight: (_gridScale===5000)?2:1, strokeColor: '#ff3b30', strokeOpacity: 0.6, strokeStyle: 'solid'
+      strokeWeight: (_gridScale===5000)?2:1,
+      strokeColor: '#ff3b30',
+      strokeOpacity: 0.6,
+      strokeStyle: 'solid'
     });
     line2.setMap(_kMap);
     _gridOverlays.push(line2);
   }
 
-  // 도각번호 라벨 (격자 너무 많으면 생략)
-  var gridCount = ((maxLat - startLat)/dLat) * ((maxLng - startLng)/dLng);
-  if(showLabel && gridCount < 500){
-    for(var la = startLat; la <= maxLat; la += dLat){
-      for(var lo = startLng; lo <= maxLng; lo += dLng){
-        var centerLat = la + dLat/2;
-        var centerLng = lo + dLng/2;
-        var code = (_gridScale === 5000) ? calcNgiiCode(centerLat, centerLng) : calcNgiiCode1000(centerLat, centerLng);
-        var content = '<div style="background:rgba(0,0,0,0.7);border:1px solid rgba(255,59,48,0.6);border-radius:3px;padding:2px 6px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,0.5)">'+code+'</div>';
-        var overlay = new kakao.maps.CustomOverlay({
-          position: new kakao.maps.LatLng(centerLat, centerLng),
-          content: content,
-          yAnchor: 0.5, xAnchor: 0.5
-        });
-        overlay.setMap(_kMap);
-        _gridOverlays.push(overlay);
-      }
+  // labels
+  for(var la = startLat; la <= maxLat; la += dLat){
+    for(var lo = startLng; lo <= maxLng; lo += dLng){
+      var centerLat = la + dLat/2;
+      var centerLng = lo + dLng/2;
+      var code = (_gridScale === 5000) ? calcNgiiCode(centerLat, centerLng) : calcNgiiCode1000(centerLat, centerLng);
+      var content = '<div style="background:rgba(0,0,0,0.7);border:1px solid rgba(255,59,48,0.6);border-radius:3px;padding:2px 6px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;pointer-events:none">'+code+'</div>';
+      var overlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(centerLat, centerLng),
+        content: content,
+        yAnchor: 0.5, xAnchor: 0.5
+      });
+      overlay.setMap(_kMap);
+      _gridOverlays.push(overlay);
     }
   }
 }
+
 
 function calcNgiiCode1000(lat, lng){
   // 1:1000 — 1:5000 도각 내부를 5×5=25분할
@@ -934,20 +961,5 @@ window.addEventListener('DOMContentLoaded', function(){
   });
 });
 </script>
-
-<script>
-var gridVisible = true;
-
-function toggleGrid(){
-  gridVisible = !gridVisible;
-  if(!gridVisible){
-    _gridOverlays.forEach(o=>o.setMap(null));
-    _gridOverlays = [];
-  }else{
-    drawGrid();
-  }
-}
-</script>
-
 </body>
 </html>
