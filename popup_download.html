@@ -449,7 +449,8 @@ function initKakaoMap(){
     var container = document.getElementById('kakaoMap');
     _kMap = new kakao.maps.Map(container, {
       center: new kakao.maps.LatLng(37.2, 126.83),
-      level: 7
+      level: 7,
+      mapTypeId: kakao.maps.MapTypeId.HYBRID
     });
     _kMapLoaded = true;
 
@@ -493,33 +494,31 @@ function drawGrid(){
   var minLat = sw.getLat(), maxLat = ne.getLat();
   var minLng = sw.getLng(), maxLng = ne.getLng();
 
-  // 도각 간격 (분 단위 → 도 단위)
+  // 도각 간격
+  // 1:5000 = 1:50000(위도20분×경도30분)을 4×4=16분할 → 위도5분, 경도7.5분
+  // 1:1000 = 1:5000을 5×5=25분할 → 위도1분, 경도1.5분
   var dLat, dLng;
   if(_gridScale === 5000){
-    dLat = 1.5/60;  // 1.5분
-    dLng = 2.25/60; // 2.25분 (실제 1:5000 분할: 1:50000 내 5분×7.5분)
-    // 정확한 1:5000: 위도 5분, 경도 7.5분 → 1:50000 내 4×4=16장
-    dLat = 5.0/60;
-    dLng = 7.5/60;
+    dLat = 5.0/60;   // 5분
+    dLng = 7.5/60;   // 7.5분
   } else {
-    // 1:1000 — 1:5000을 다시 5×5=25분할
-    dLat = 1.0/60;
-    dLng = 1.5/60;
+    dLat = 1.0/60;   // 1분
+    dLng = 1.5/60;   // 1.5분
   }
 
   // 격자 시작 좌표
   var startLat = Math.floor(minLat / dLat) * dLat;
   var startLng = Math.floor(minLng / dLng) * dLng;
 
-  // 줌 레벨에 따라 라벨 표시 여부
+  // 줌 레벨에 따라 라벨 표시 여부 (카카오 level: 낮을수록 확대)
   var level = _kMap.getLevel();
-  var showLabel = (_gridScale === 5000 && level <= 10) || (_gridScale === 1000 && level <= 7);
+  var showLabel = (_gridScale === 5000 && level <= 12) || (_gridScale === 1000 && level <= 9);
 
   // 격자선 그리기
   for(var lat = startLat; lat <= maxLat + dLat; lat += dLat){
     var line = new kakao.maps.Polyline({
       path: [new kakao.maps.LatLng(lat, minLng - dLng), new kakao.maps.LatLng(lat, maxLng + dLng)],
-      strokeWeight: 1, strokeColor: '#2563eb', strokeOpacity: 0.4, strokeStyle: 'solid'
+      strokeWeight: (_gridScale===5000)?2:1, strokeColor: '#ff3b30', strokeOpacity: 0.6, strokeStyle: 'solid'
     });
     line.setMap(_kMap);
     _gridOverlays.push(line);
@@ -527,20 +526,21 @@ function drawGrid(){
   for(var lng2 = startLng; lng2 <= maxLng + dLng; lng2 += dLng){
     var line2 = new kakao.maps.Polyline({
       path: [new kakao.maps.LatLng(minLat - dLat, lng2), new kakao.maps.LatLng(maxLat + dLat, lng2)],
-      strokeWeight: 1, strokeColor: '#2563eb', strokeOpacity: 0.4, strokeStyle: 'solid'
+      strokeWeight: (_gridScale===5000)?2:1, strokeColor: '#ff3b30', strokeOpacity: 0.6, strokeStyle: 'solid'
     });
     line2.setMap(_kMap);
     _gridOverlays.push(line2);
   }
 
-  // 도각번호 라벨
-  if(showLabel){
+  // 도각번호 라벨 (격자 너무 많으면 생략)
+  var gridCount = ((maxLat - startLat)/dLat) * ((maxLng - startLng)/dLng);
+  if(showLabel && gridCount < 500){
     for(var la = startLat; la <= maxLat; la += dLat){
       for(var lo = startLng; lo <= maxLng; lo += dLng){
         var centerLat = la + dLat/2;
         var centerLng = lo + dLng/2;
         var code = (_gridScale === 5000) ? calcNgiiCode(centerLat, centerLng) : calcNgiiCode1000(centerLat, centerLng);
-        var content = '<div style="background:rgba(255,255,255,0.85);border:1px solid rgba(37,99,235,0.3);border-radius:3px;padding:1px 4px;font-size:10px;font-weight:700;color:#1d4ed8;white-space:nowrap;pointer-events:none">'+code+'</div>';
+        var content = '<div style="background:rgba(0,0,0,0.7);border:1px solid rgba(255,59,48,0.6);border-radius:3px;padding:2px 6px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,0.5)">'+code+'</div>';
         var overlay = new kakao.maps.CustomOverlay({
           position: new kakao.maps.LatLng(centerLat, centerLng),
           content: content,
