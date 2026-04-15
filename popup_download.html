@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>G-DSP — 다운로드 · 발급</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.5.2/ol.css"/>
+<script src="https://cdn.jsdelivr.net/npm/ol@7.5.2/dist/ol.js"></script>
 <script>
 // VWorld 키 미리 확인 — 있으면 스크립트를 head에 동기 삽입
 (function(){
@@ -132,26 +134,27 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
 
   <!-- 수치지형도 -->
   <div class="tab-view on" id="view-dtm">
-    <!-- VWorld 지도 (전체 높이의 60%) -->
+    <!-- 바로e맵 OpenLayers 지도 -->
     <div style="position:relative;flex-shrink:0;height:58%">
-      <div id="vmap" style="width:100%;height:100%"></div>
+      <div id="olmap" style="width:100%;height:100%"></div>
       <!-- 지번검색 바 (지도 위 overlay) -->
       <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:420px">
         <input id="dtmAddr" type="text" placeholder="지번 또는 도로명 검색…" onkeydown="if(event.key==='Enter')dtmSearch()"
           style="flex:1;height:34px;padding:0 12px;background:#fff;border:1px solid var(--line2);border-radius:8px;font-size:12px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.15)">
         <button onclick="dtmSearch()" style="height:34px;padding:0 14px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">검색</button>
       </div>
-      <!-- 지적도 토글 -->
-      <div style="position:absolute;top:10px;right:10px;z-index:1000">
-        <button id="jideokToggleBtn" onclick="toggleJideokLayer()" style="height:32px;padding:0 12px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:11px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">🗺 지적도 ON</button>
+      <!-- 배경지도 전환 -->
+      <div style="position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:4px">
+        <button id="bgBtnGraphic" onclick="switchBg('graphic')" style="height:32px;padding:0 10px;border-radius:8px;background:#fff;border:2px solid var(--blue);font-size:11px;font-weight:700;color:var(--blue);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">🗺 일반</button>
+        <button id="bgBtnSatellite" onclick="switchBg('satellite')" style="height:32px;padding:0 10px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:11px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">🛰 위성</button>
+        <button id="bgBtnHybrid" onclick="switchBg('hybrid')" style="height:32px;padding:0 10px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:11px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">📐 하이브리드</button>
       </div>
       <!-- 검색결과 드롭다운 -->
       <div id="dtmSrchResult" style="position:absolute;top:50px;left:10px;z-index:1001;width:calc(100% - 20px);max-width:420px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none;max-height:180px;overflow-y:auto"></div>
-      <!-- VWorld 로딩 안내 -->
-      <div id="vmapOverlay" style="position:absolute;inset:0;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:500">
+      <!-- 바로e맵 키 없을 때 안내 -->
+      <div id="olmapOverlay" style="position:absolute;inset:0;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:500">
         <svg style="width:40px;height:40px;opacity:.2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-        <p style="font-size:12px;color:var(--txt3);text-align:center">VWorld API 키를 설정에서 입력하면<br>지도가 표시됩니다</p>
-        <button onclick="promptVworldKey()" style="height:32px;padding:0 16px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer">🔑 API 키 입력</button>
+        <p style="font-size:12px;color:var(--txt3);text-align:center">바로e맵 인증키를 설정에서 입력하면<br>국토정보플랫폼 지도가 표시됩니다</p>
       </div>
     </div>
 
@@ -390,7 +393,7 @@ function switchTab(t){
   document.querySelectorAll('.tab-view').forEach(function(v){ v.classList.remove('on'); });
   document.getElementById('tab-'+t).classList.add('on');
   document.getElementById('view-'+t).classList.add('on');
-  if(t==='dtm') initVmap();
+  if(t==='dtm') initOlMap();
   if(t==='jideok') initVmap2();
 }
 
@@ -423,62 +426,91 @@ function toggleTheme(){
   }
 })();
 
-/* ===================== VWorld 지도 1 (수치지형도 탭) ===================== */
-var _map1 = null, _map1loaded = false, _jideokOn = true;
+/* ===================== 바로e맵 OpenLayers 지도 (수치지형도 탭) ===================== */
+var _olMap = null, _olMapLoaded = false;
+var _ngiiKey = localStorage.getItem('gdsp_ngii_apikey') || '';
+var _bgLayers = {};
+var _currentBg = 'graphic';
+var _clickMarkerLayer = null;
 
-function initVmap(){
-  if(_map1loaded || !_vwKey) return;
-  if(typeof vw === 'undefined'){
-    toast('VWorld 스크립트 로드 안됨 — 페이지 새로고침 필요', 'err');
-    // 키 저장 후 새로고침 안내
-    document.getElementById('vmapOverlay').innerHTML =
-      '<p style="font-size:12px;color:var(--txt2);text-align:center;padding:0 20px">키가 저장됐습니다.<br>페이지를 <b>새로고침(F5)</b>하면 지도가 표시됩니다.</p>'
-      +'<button onclick="location.reload()" style="height:32px;padding:0 16px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;margin-top:4px">🔄 새로고침</button>';
-    return;
-  }
-  document.getElementById('vmapOverlay').style.display='none';
-  var opts = {
-    mapId: 'vmap',
-    initPosition: new vw.CameraPosition(
-      new vw.CoordZ(126.83, 37.2, 3000),
-      new vw.Direction(0,-90,0)
-    ),
-    logo: false, navigation: true
+function initOlMap(){
+  if(_olMapLoaded) return;
+  if(!_ngiiKey){ return; }
+  document.getElementById('olmapOverlay').style.display='none';
+
+  // 바로e맵 WMTS 타일 레이어들 (EPSG:3857)
+  // 일반지도(GRAPHIC), 위성지도(PHOTO), 하이브리드(HYBRID_GRAPHIC)
+  var types = {
+    graphic: 'EPSG3857_GRAPHIC',
+    satellite: 'EPSG3857_PHOTO',
+    hybrid: 'EPSG3857_GRAPHIC_HYBRID'
   };
-  _map1 = new vw.Map();
-  _map1.setOption(opts);
-  _map1.start();
-  _map1loaded = true;
-  addJideokWMS();
-  _map1.onClick.addEventListener(function(wp, ep, carto){
-    if(!carto) return;
-    var lat = carto.latitudeDD, lng = carto.longitudeDD;
+
+  for(var t in types){
+    _bgLayers[t] = new ol.layer.Tile({
+      source: new ol.source.XYZ({
+        url: 'https://map.ngii.go.kr/openapi/Gettile/EmapBg/'+_ngiiKey+'/'+types[t]+'/{z}/{x}/{y}.png',
+        maxZoom: 18,
+        crossOrigin: 'anonymous'
+      }),
+      visible: (t === 'graphic')
+    });
+  }
+
+  // 클릭 마커 레이어
+  _clickMarkerLayer = new ol.layer.Vector({
+    source: new ol.source.Vector(),
+    style: new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 8,
+        fill: new ol.style.Fill({color: 'rgba(37,99,235,0.3)'}),
+        stroke: new ol.style.Stroke({color: '#2563eb', width: 2})
+      })
+    })
+  });
+
+  _olMap = new ol.Map({
+    target: 'olmap',
+    layers: [_bgLayers.graphic, _bgLayers.satellite, _bgLayers.hybrid, _clickMarkerLayer],
+    view: new ol.View({
+      center: ol.proj.fromLonLat([126.83, 37.2]),
+      zoom: 14,
+      maxZoom: 18
+    }),
+    controls: ol.control.defaults.defaults().extend([
+      new ol.control.ScaleLine()
+    ])
+  });
+  _olMapLoaded = true;
+
+  // 클릭 → 좌표 표시 + 도각번호 계산
+  _olMap.on('click', function(evt){
+    var lonlat = ol.proj.toLonLat(evt.coordinate);
+    var lng = lonlat[0], lat = lonlat[1];
     document.getElementById('dtmSelCoord').textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
     calcTiles(lat, lng);
+    // 마커
+    _clickMarkerLayer.getSource().clear();
+    _clickMarkerLayer.getSource().addFeature(
+      new ol.Feature({ geometry: new ol.geom.Point(evt.coordinate) })
+    );
   });
 }
 
-function addJideokWMS(){
-  if(!_map1 || !_vwKey) return;
-  var wmsLayer = new vw.Layers();
-  var wmsSource = new vw.source.TileWMS();
-  wmsSource.setUrl('https://api.vworld.kr/req/wms?Key='+_vwKey+'&');
-  wmsSource.setParams('tilesize=256');
-  wmsSource.setLayers('lt_c_landinfobasemap');
-  wmsSource.setStyles('lt_c_landinfobasemap');
-  wmsSource.setFormat('image/png');
-  var wmsTile = new vw.layer.Tile(wmsSource);
-  wmsLayer.add(wmsTile);
-  _jideokOn = true;
-  document.getElementById('jideokToggleBtn').textContent = '🗺 지적도 ON';
-}
-
-function toggleJideokLayer(){
-  if(!_map1){ toast('지도를 먼저 로드하세요', 'err'); return; }
-  // 토글 — 레이어 제어는 vw.Map 방식으로
-  _jideokOn = !_jideokOn;
-  document.getElementById('jideokToggleBtn').textContent = _jideokOn ? '🗺 지적도 ON' : '🗺 지적도 OFF';
-  toast(_jideokOn ? '지적도 레이어 켜짐' : '지적도 레이어 꺼짐');
+function switchBg(type){
+  _currentBg = type;
+  for(var t in _bgLayers){
+    _bgLayers[t].setVisible(t === type);
+  }
+  // 버튼 스타일
+  ['graphic','satellite','hybrid'].forEach(function(t){
+    var btn = document.getElementById('bgBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+    if(btn){
+      btn.style.border = (t === type) ? '2px solid var(--blue)' : '1px solid var(--line2)';
+      btn.style.color = (t === type) ? 'var(--blue)' : 'var(--txt2)';
+    }
+  });
+  toast(type === 'graphic' ? '일반지도' : type === 'satellite' ? '위성지도' : '하이브리드', 'ok');
 }
 
 /* ===================== 지번검색 (카카오 REST) ===================== */
@@ -527,9 +559,20 @@ function dtmSelectAddr(i){
   document.getElementById('dtmSelAddr').textContent = item.addr;
   document.getElementById('dtmSelCoord').textContent = item.lat.toFixed(6)+', '+item.lng.toFixed(6);
   calcTiles(item.lat, item.lng);
-  // 지도 이동
-  if(_map1){
-    _map1.moveTo(new vw.CoordZ(item.lng, item.lat, 500));
+  // 지도 이동 (OpenLayers)
+  if(_olMap){
+    _olMap.getView().animate({
+      center: ol.proj.fromLonLat([item.lng, item.lat]),
+      zoom: 17,
+      duration: 500
+    });
+    // 마커
+    if(_clickMarkerLayer){
+      _clickMarkerLayer.getSource().clear();
+      _clickMarkerLayer.getSource().addFeature(
+        new ol.Feature({ geometry: new ol.geom.Point(ol.proj.fromLonLat([item.lng, item.lat])) })
+      );
+    }
   }
   toast(item.addr+' 선택됨','ok');
 }
@@ -828,7 +871,7 @@ function makeRegExcel(){ if(!regItems.length){ toast('목록에 지번을 먼저
 
 /* ===================== 초기화 ===================== */
 window.addEventListener('DOMContentLoaded', function(){
-  if(_vwKey) initVmap();
+  if(_ngiiKey) initOlMap();
   // jQuery (WFS ajax용) 동적 로드
   if(typeof $ === 'undefined'){
     var jq = document.createElement('script');
