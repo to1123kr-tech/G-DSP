@@ -109,19 +109,37 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
 </style>
 
 <script>
-var _gridVisible = true;
+var _gridVisible = false;
 var _gridOverlays = [];
+var _gridScale = null; // null=꺼짐, 5000 or 1000
 function clearGrid(){
   if(!_gridOverlays) return;
   _gridOverlays.forEach(function(o){ try{ o.setMap(null);}catch(e){} });
   _gridOverlays = [];
 }
-function toggleGrid(){
-  _gridVisible = !_gridVisible;
-  if(!_gridVisible){
-    clearGrid();
-  }else{
+function setGridScale(s){
+  clearGrid();
+  if(_gridScale === s){
+    // 같은 버튼 다시 누르면 끄기
+    _gridScale = null;
+    _gridVisible = false;
+  } else {
+    _gridScale = s;
+    _gridVisible = true;
     drawGrid();
+  }
+  updateScaleBtns();
+}
+function updateScaleBtns(){
+  var b5 = document.getElementById('scaleBtn5000');
+  var b1 = document.getElementById('scaleBtn1000');
+  if(b5){
+    b5.style.border = (_gridScale===5000) ? '2px solid var(--blue)' : '1px solid var(--line2)';
+    b5.style.color = (_gridScale===5000) ? 'var(--blue)' : 'var(--txt2)';
+  }
+  if(b1){
+    b1.style.border = (_gridScale===1000) ? '2px solid var(--blue)' : '1px solid var(--line2)';
+    b1.style.color = (_gridScale===1000) ? 'var(--blue)' : 'var(--txt2)';
   }
 }
 </script>
@@ -163,7 +181,7 @@ function toggleGrid(){
     <!-- 카카오 지도 + 도각격자 -->
     <div style="position:relative;flex-shrink:0;height:58%">
       <div id="kakaoMap" style="width:100%;height:100%"></div>
-<button onclick="toggleGrid()" style="position:absolute;bottom:10px;right:10px;z-index:1000;height:32px;padding:0 12px;border-radius:8px;background:#fff;border:1px solid #ccc;font-size:11px;font-weight:700;cursor:pointer">도각 ON/OFF</button>
+
 <div style="display:none"></div>
       <!-- 지번검색 바 -->
       <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:420px">
@@ -173,7 +191,7 @@ function toggleGrid(){
       </div>
       <!-- 도각 축척 선택 -->
       <div style="position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:4px">
-        <button id="scaleBtn5000" onclick="setGridScale(5000)" style="height:32px;padding:0 12px;border-radius:8px;background:#fff;border:2px solid var(--blue);font-size:11px;font-weight:700;color:var(--blue);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:5,000</button>
+        <button id="scaleBtn5000" onclick="setGridScale(5000)" style="height:32px;padding:0 12px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:11px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:5,000</button>
         <button id="scaleBtn1000" onclick="setGridScale(1000)" style="height:32px;padding:0 12px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:11px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:1,000</button>
       </div>
       <!-- 검색결과 드롭다운 -->
@@ -456,7 +474,6 @@ function toggleTheme(){
 /* ===================== 카카오 지도 + 도각격자 (수치지형도 탭) ===================== */
 var _kMap = null, _kMapLoaded = false;
 var _gridScale = 5000; // 1:5000 or 1:1000
-var _gridOverlays = []; // 격자선+라벨
 var _clickMarker = null;
 
 function initKakaoMap(){
@@ -489,51 +506,55 @@ function initKakaoMap(){
       _clickMarker.setMap(_kMap);
     });
 
-    drawGrid();
+    // 격자는 버튼 눌러야 표시됨 (초기에는 꺼짐)
   });
 }
 
-function setGridScale(s){ clearGrid();
-  _gridScale = s;
-  // 버튼 스타일
-  document.getElementById('scaleBtn5000').style.border = (s===5000) ? '2px solid var(--blue)' : '1px solid var(--line2)';
-  document.getElementById('scaleBtn5000').style.color = (s===5000) ? 'var(--blue)' : 'var(--txt2)';
-  document.getElementById('scaleBtn1000').style.border = (s===1000) ? '2px solid var(--blue)' : '1px solid var(--line2)';
-  document.getElementById('scaleBtn1000').style.color = (s===1000) ? 'var(--blue)' : 'var(--txt2)';
-  drawGrid();
-  toast('1:'+s.toLocaleString()+' 도각', 'ok');
-}
+/* setGridScale은 head에서 정의됨 */
 
 
 function drawGrid(){
   if(!_kMap) return;
-  if(!_gridVisible){ clearGrid(); return; }
+  if(!_gridVisible || !_gridScale){ clearGrid(); return; }
 
-  // always clear before drawing (prevents 5000/1000 stacking)
   clearGrid();
+
+  // 카카오 level: 낮을수록 확대됨
+  // 너무 축소(넓은 영역)되면 격자가 너무 많아지므로 자동 숨김
+  var level = _kMap.getLevel();
+  var maxLevel = (_gridScale === 5000) ? 10 : 7;
+  if(level > maxLevel){
+    // 너무 축소됨 — 격자 안 그림
+    return;
+  }
 
   var bounds = _kMap.getBounds();
   var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
   var minLat = sw.getLat(), maxLat = ne.getLat();
   var minLng = sw.getLng(), maxLng = ne.getLng();
 
-  // correct sizes
+  // 도각 간격
+  // 1:50000 = 위도15분 × 경도15분 (1도를 4등분)
+  // 1:5000 = 1:50000을 10×10=100분할 → 위도1.5분 × 경도1.5분
+  // 1:1000 = 1:5000을 5×5=25분할 → 위도0.3분 × 경도0.3분
   var dLat, dLng;
   if(_gridScale === 5000){
-    dLat = 1.5/60;   // 1.5'
-    dLng = 2.25/60;  // 2.25'
+    dLat = 1.5/60;   // 1.5분
+    dLng = 1.5/60;   // 1.5분
   } else {
-    dLat = 0.3/60;   // 0.3'
-    dLng = 0.45/60;  // 0.45'
+    dLat = 0.3/60;   // 0.3분
+    dLng = 0.3/60;   // 0.3분
   }
 
   var startLat = Math.floor(minLat / dLat) * dLat;
   var startLng = Math.floor(minLng / dLng) * dLng;
 
-  var level = _kMap.getLevel();
-  var showLabel = true; // always show
+  // 격자 수 계산 — 200개 넘으면 그리지 않음 (성능)
+  var rows = Math.ceil((maxLat - startLat) / dLat) + 1;
+  var cols = Math.ceil((maxLng - startLng) / dLng) + 1;
+  if(rows * cols > 200) return;
 
-  // draw horizontal
+  // 격자선 그리기
   for(var lat = startLat; lat <= maxLat + dLat; lat += dLat){
     var line = new kakao.maps.Polyline({
       path: [new kakao.maps.LatLng(lat, minLng - dLng), new kakao.maps.LatLng(lat, maxLng + dLng)],
@@ -579,17 +600,41 @@ function drawGrid(){
 
 
 function calcNgiiCode1000(lat, lng){
-  // 1:1000 — 1:5000 도각 내부를 5×5=25분할
-  var code5k = calcNgiiCode(lat, lng);
-  var dLat5k = 5.0/60, dLng5k = 7.5/60;
-  var baseLat = Math.floor(lat / dLat5k) * dLat5k;
-  var baseLng = Math.floor(lng / dLng5k) * dLng5k;
-  var subLat = Math.floor((lat - baseLat) / (1.0/60));
-  var subLng = Math.floor((lng - baseLng) / (1.5/60));
-  if(subLat > 4) subLat = 4;
-  if(subLng > 4) subLng = 4;
-  var subNum = subLat * 5 + subLng + 1;
-  return code5k + '-' + String(subNum).padStart(2,'0');
+  // 1:1000 = 9자리: [1:50000 5자리] + [AA 2자리] + [BB 2자리]
+  // 1:50000 전체를 50행×50열로 나눔
+  // AA = (전체행//10)*5 + (전체열//10) + 1
+  // BB = (전체행%10)*10 + (전체열%10) + 1  (100→00)
+
+  var latDeg = Math.floor(lat);
+  var lngDeg = Math.floor(lng);
+  var lngCode = lngDeg - 120;
+  var latMin = (lat - latDeg) * 60;
+  var lngMin = (lng - lngDeg) * 60;
+
+  // 1:50000 행열
+  var latIdx50 = Math.floor(latMin / 15); if(latIdx50>3) latIdx50=3;
+  var lngIdx50 = Math.floor(lngMin / 15); if(lngIdx50>3) lngIdx50=3;
+  var row50 = 3 - latIdx50;
+  var col50 = lngIdx50;
+  var seq50 = row50 * 4 + col50 + 1;
+  var code50 = String(latDeg) + String(lngCode) + String(seq50).padStart(2,'0');
+
+  // 1:50000 남서 모서리
+  var base50Lat = latDeg + latIdx50 * 15/60;
+  var base50Lng = lngDeg + lngIdx50 * 15/60;
+
+  // 0.3분 단위로 전체 50행×50열 인덱스
+  var totalR = Math.floor((lat - base50Lat) * 60 / 0.3);  // 0~49 남→북
+  var totalC = Math.floor((lng - base50Lng) * 60 / 0.3);   // 0~49 서→동
+  if(totalR > 49) totalR = 49;
+  if(totalC > 49) totalC = 49;
+  totalR = 49 - totalR;  // 북→남
+
+  var aa = Math.floor(totalR / 10) * 5 + Math.floor(totalC / 10) + 1;
+  var bb = (totalR % 10) * 10 + (totalC % 10) + 1;
+  if(bb === 100) bb = 0;
+
+  return code50 + String(aa).padStart(2,'0') + String(bb).padStart(2,'0');
 }
 
 /* ===================== 지번검색 (카카오 REST) ===================== */
@@ -653,11 +698,9 @@ function dtmSelectAddr(i){
 
 /* ===================== 도각번호 계산 (1:5000) ===================== */
 function calcTiles(lat, lng){
-  // 1:5000 도각: 위도 1.5', 경도 2.25' 간격
-  // 도각번호 = 위도인덱스(4자리) + 경도인덱스(4자리)  — 실제 NLIPmap 방식
-  // 간단 계산: 중심좌표 기준 ±1도각 (인접 포함 9장)
+  // 1:5000 도각: 위도 1.5', 경도 1.5' 간격
   var tiles = [];
-  var dLat = 1.5/60, dLng = 2.25/60;
+  var dLat = 1.5/60, dLng = 1.5/60;
 
   // 기준 인덱스
   var latIdx = Math.floor(lat / dLat);
@@ -685,20 +728,43 @@ function calcTiles(lat, lng){
 }
 
 function calcNgiiCode(lat, lng){
-  // 국토정보플랫폼 1:5000 수치지형도 도각 코드 계산
-  // 1:50000 도각 기준 (위도 20', 경도 30') → 내부 1:5000 분할 (4×4 = 16장)
-  var base50Lat = Math.floor(lat * 60 / 20);
-  var base50Lng = Math.floor(lng * 60 / 30);
+  // === 1:50000 도엽번호 (5자리) ===
+  // 경위도 1도를 4×4=16등분 → 15분×15분
+  // 코드: [위도2자리][경도1자리(126→6)][구획2자리(01~16)]
+  // 구획: 좌상→우하, 행(북→남)×열(서→동)
+  var latDeg = Math.floor(lat);
+  var lngDeg = Math.floor(lng);
+  var lngCode = lngDeg - 120;  // 126→6, 127→7
 
-  // 1:50000 코드 (예: 3652)
-  var code50 = String(base50Lat).padStart(2,'0') + String(base50Lng).padStart(2,'0');
+  var latMin = (lat - latDeg) * 60;
+  var lngMin = (lng - lngDeg) * 60;
+  var latIdx = Math.floor(latMin / 15);  // 0~3 (남→북)
+  var lngIdx = Math.floor(lngMin / 15);  // 0~3 (서→동)
+  if(latIdx > 3) latIdx = 3;
+  if(lngIdx > 3) lngIdx = 3;
 
-  // 1:5000 내부 분할번호 (1~16)
-  var subLat = Math.floor(((lat * 60) % 20) / 5);   // 0~3
-  var subLng = Math.floor(((lng * 60) % 30) / 7.5); // 0~3
-  var subNum = subLat * 4 + subLng + 1;              // 1~16
+  var row50 = 3 - latIdx;  // 북→남 순서
+  var col50 = lngIdx;
+  var seq50 = row50 * 4 + col50 + 1;  // 1~16
 
-  return code50 + String(subNum).padStart(2,'0');
+  var code50 = String(latDeg) + String(lngCode) + String(seq50).padStart(2,'0');
+
+  // === 1:5000 도엽번호 (8자리) ===
+  // 1:50000을 10×10=100분할 → 1.5분×1.5분
+  // 번호: 001~100, 좌상→우하
+  var base50Lat = latDeg + (3 - row50) * 15/60;
+  var base50Lng = lngDeg + col50 * 15/60;
+  var subLatMin = (lat - base50Lat) * 60;
+  var subLngMin = (lng - base50Lng) * 60;
+  var subRow = Math.floor(subLatMin / 1.5);  // 0~9 (남→북)
+  var subCol = Math.floor(subLngMin / 1.5);  // 0~9 (서→동)
+  if(subRow > 9) subRow = 9;
+  if(subCol > 9) subCol = 9;
+
+  var r5 = 9 - subRow;  // 북→남
+  var seq5k = r5 * 10 + subCol + 1;  // 1~100
+
+  return code50 + String(seq5k).padStart(3,'0');
 }
 
 function copyTiles(){
