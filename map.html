@@ -9,14 +9,15 @@
 var _vwScriptLoaded = false;
 function loadVwScript(key, cb) {
   if (_vwScriptLoaded) { if(cb) cb(); return; }
+  if (!key) { if(cb) cb(); return; }
   var s = document.createElement('script');
   s.src = 'https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=' + key;
-  s.onload = function(){ _vwScriptLoaded = true; if(cb) cb(); };
-  s.onerror = function(){ console.error('VWorld 스크립트 로드 실패'); };
+  s.onload = function(){ _vwScriptLoaded = true; console.log('VWorld 스크립트 로드 완료'); if(cb) cb(); };
+  s.onerror = function(){ console.error('VWorld 스크립트 로드 실패'); if(cb) cb(); };
   document.head.appendChild(s);
 }
 (function(){
-  var k = localStorage.getItem('gdsp_vworld') || '';
+  var k = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
   if(k) loadVwScript(k);
 })();
 </script>
@@ -506,7 +507,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 <script>
 var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
 var KAKAO_KEY = 'c670e0bc85874ef6267220f09882b379'; // REST API 키
-var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || '';
+var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
 var BLDG_KEY = localStorage.getItem('gdsp_building') || '';
 
 // ★ 오라클 서버에서 VWorld 키 자동 로드
@@ -519,6 +520,7 @@ var BLDG_KEY = localStorage.getItem('gdsp_building') || '';
           VWORLD_KEY=d.key;
           localStorage.setItem('gdsp_vworld',d.key);
           console.log('VWorld 키 로드 완료');
+          loadVwScript(d.key); // 키 받으면 바로 스크립트도 로드
         }
       })
       .catch(function(){ console.log('VWorld 키 로드 실패 - 서버 확인 필요'); });
