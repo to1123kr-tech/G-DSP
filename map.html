@@ -403,6 +403,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
   <div class="ctxitem" onclick="openTab('plan')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>토지이용계획확인서
   </div>
+  <div class="ctxitem" onclick="openTab('bldReg')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h4"/></svg>건축물대장
+  </div>
   <div class="ctxitem" onclick="addMemoAtCtx()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>📝 메모 추가
   </div>
@@ -625,7 +628,22 @@ function initVwMap() {
     var opts = { mapId:'vworldMapDiv', initPosition:new vw.CameraPosition(new vw.CoordZ(currentLng,currentLat,500),new vw.Direction(0,-90,0)), logo:false, navigation:true };
     vwMap = new vw.Map(); vwMap.setOption(opts); vwMap.start();
     vwMapInited = true;
-    vwMap.onClick.addEventListener(function(wp,ep,carto){ if(!carto) return; onMapClick(carto.longitudeDD,carto.latitudeDD); });
+    vwMap.onClick.addEventListener(function(wp,ep,carto){
+      if(!carto) return;
+      onMapClick(carto.longitudeDD,carto.latitudeDD);
+    });
+    // VWorld 우클릭 — contextmenu에서 화면 중심 좌표 사용
+    document.getElementById('vworldMapDiv').addEventListener('contextmenu', function(e){
+      e.preventDefault();
+      // vwMap에서 현재 보이는 중심 좌표 가져오기
+      try {
+        var cp = vwMap.getCameraPosition();
+        ctxLng = cp.longitude; ctxLat = cp.latitude;
+      } catch(err){
+        ctxLng = currentLng; ctxLat = currentLat;
+      }
+      showCtxMenu(e.clientX, e.clientY);
+    });
     // 줌인 완료될 때까지 오버레이로 가림
     setTimeout(function(){
       var ov = document.getElementById('vwLoadingOverlay');
@@ -739,24 +757,48 @@ function doSearch() {
   var hasCity = /시$|군$|구$|도$/.test(q.split(' ')[0]);
   var query = hasCity ? q : '화성시 ' + q;
   setStatus('검색중...', false);
+  // 1차: 주소 검색
   fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(query) + '&size=5', {
     headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
     var docs = d.documents || [];
-    if (!docs.length) {
-      return fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(q) + '&size=5', {
-        headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
-      }).then(function(r2){ return r2.json(); }).then(function(d2){
-        var docs2 = d2.documents || [];
-        if (!docs2.length) throw new Error('not found');
+    if (docs.length) {
+      if (docs.length === 1) applyResult(docs[0]);
+      else showDrop(docs);
+      return;
+    }
+    // 화성시 빼고 재시도
+    return fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(q) + '&size=5', {
+      headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
+    }).then(function(r2){ return r2.json(); }).then(function(d2){
+      var docs2 = d2.documents || [];
+      if (docs2.length) {
         if (docs2.length === 1) applyResult(docs2[0]);
         else showDrop(docs2);
+        return;
+      }
+      // 2차: 키워드(장소/명칭) 검색
+      return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(query) + '&size=5', {
+        headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
+      }).then(function(r3){ return r3.json(); }).then(function(d3){
+        var docs3 = d3.documents || [];
+        if (!docs3.length) {
+          // 화성시 빼고 키워드 재시도
+          return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(q) + '&size=5', {
+            headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
+          }).then(function(r4){ return r4.json(); }).then(function(d4){
+            var docs4 = d4.documents || [];
+            if (!docs4.length) throw new Error('not found');
+            if (docs4.length === 1) applyResult(docs4[0]);
+            else showDrop(docs4);
+          });
+        }
+        if (docs3.length === 1) applyResult(docs3[0]);
+        else showDrop(docs3);
       });
-    }
-    if (docs.length === 1) applyResult(docs[0]);
-    else showDrop(docs);
+    });
   })
   .catch(function(){ toast('검색 결과 없음', 'err'); setStatus('대기중', true); });
 }
