@@ -611,10 +611,20 @@ function initVwMap() {
     toast('VWorld 스크립트 미로드 — 새로고침 필요', 'err');
     return;
   }
-  vwMapInited = true;
-  var opts = { mapId:'vworldMapDiv', initPosition:new vw.CameraPosition(new vw.CoordZ(currentLng,currentLat,3000),new vw.Direction(0,-90,0)), logo:false, navigation:true };
-  vwMap = new vw.Map(); vwMap.setOption(opts); vwMap.start();
-  vwMap.onClick.addEventListener(function(wp,ep,carto){ if(!carto) return; onMapClick(carto.longitudeDD,carto.latitudeDD); });
+  if (vwMap) { vwMapInited = true; return; } // 이미 생성됨
+  // ★ div를 먼저 보이게 해야 VWorld 내부 viewer 초기화가 정상 동작
+  var vDiv = document.getElementById('vworldMapDiv');
+  vDiv.style.display = '';
+  vDiv.style.zIndex = '3';
+  try {
+    var opts = { mapId:'vworldMapDiv', initPosition:new vw.CameraPosition(new vw.CoordZ(currentLng,currentLat,3000),new vw.Direction(0,-90,0)), logo:false, navigation:true };
+    vwMap = new vw.Map(); vwMap.setOption(opts); vwMap.start();
+    vwMapInited = true;
+    vwMap.onClick.addEventListener(function(wp,ep,carto){ if(!carto) return; onMapClick(carto.longitudeDD,carto.latitudeDD); });
+  } catch(e) {
+    console.error('VWorld 초기화 오류:', e);
+    toast('VWorld 초기화 실패: ' + e.message, 'err');
+  }
 }
 
 // ── 지도 유형 ──
