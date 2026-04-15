@@ -5,9 +5,19 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>G-DSP 통합지도</title>
 <script>
+// VWorld 스크립트 동적 로드 (document.write 차단 대응)
+var _vwScriptLoaded = false;
+function loadVwScript(key, cb) {
+  if (_vwScriptLoaded) { if(cb) cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=' + key;
+  s.onload = function(){ _vwScriptLoaded = true; if(cb) cb(); };
+  s.onerror = function(){ console.error('VWorld 스크립트 로드 실패'); };
+  document.head.appendChild(s);
+}
 (function(){
   var k = localStorage.getItem('gdsp_vworld') || '';
-  if(k) document.write('<sc'+'ript src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+k+'">\x3C/script>');
+  if(k) loadVwScript(k);
 })();
 </script>
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
@@ -617,7 +627,12 @@ function initVwMap() {
     vwMap = new vw.Map(); vwMap.setOption(opts); vwMap.start();
     vwMap.onClick.addEventListener(function(wp,ep,carto){ if(!carto) return; onMapClick(carto.longitudeDD,carto.latitudeDD); });
   }
-  _try(15);
+  // 스크립트 미로드 시 동적 로드 후 재시도
+  if (typeof vw === 'undefined' && typeof loadVwScript === 'function') {
+    loadVwScript(VWORLD_KEY, function(){ _try(15); });
+  } else {
+    _try(15);
+  }
 }
 
 // ── 지도 유형 ──
