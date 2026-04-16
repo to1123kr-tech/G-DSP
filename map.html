@@ -942,7 +942,7 @@ function highlightParcel(pnu) {
     +'&typename=lt_c_lsmd_cont_ldreg&output=application/json'
     +'&filter='+encodeURIComponent('<Filter><PropertyIsEqualTo><PropertyName>pnu</PropertyName><Literal>'+pnu+'</Literal></PropertyIsEqualTo></Filter>')
     +'&key='+VWORLD_KEY;
-  fetch(PROXY+'/api/proxy-get?url='+encodeURIComponent(url))
+  fetch(PROXY+'/api/proxy?url='+encodeURIComponent(url))
     .then(function(r){return r.json();})
     .then(function(d){
       var features=d&&d.features;
