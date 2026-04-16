@@ -799,14 +799,7 @@ function startNgiiDownload(){
   };
   var uri = 'gdsp://download?' + Object.keys(params).map(function(k){ return k+'='+encodeURIComponent(params[k]); }).join('&');
 
-  var iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  iframe.src = uri;
-  document.body.appendChild(iframe);
-
-  setTimeout(function(){
-    document.body.removeChild(iframe);
-  }, 3000);
+  window.location.href = uri;
 
   toast('다운로더 실행 요청 — 프로그램이 설치되지 않았다면 아래에서 설치하세요','ok');
 }
