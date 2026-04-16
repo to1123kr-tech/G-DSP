@@ -30,7 +30,7 @@ function initMap() {
   map.setOption({
     mapId: 'vmap',
     initPosition: new vw.CameraPosition(
-      new vw.CoordZ(lng, lat, 500),
+      new vw.CoordZ(lng, lat, 800),
       new vw.Direction(0, -90, 0)
     ),
     logo: false,
@@ -40,7 +40,7 @@ function initMap() {
 
   // 카메라 높이 제한 — 너무 확대되면 지적도가 사라지므로 최소 150m 유지
   try {
-    map.getPolicy().setMinimumDistance(150);
+    map.getPolicy().setMinimumDistance(300);
     map.getPolicy().setMaximumDistance(50000);
   } catch(e) {}
 
