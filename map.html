@@ -856,14 +856,9 @@ function moveMarker(lng, lat) {
   if (kakaoMarker&&kakaoMap) { kakaoMarker.setPosition(new kakao.maps.LatLng(lat,lng)); kakaoMarker.setMap(kakaoMap); }
 }
 function moveVwMap(lng, lat) {
-  var fr = document.getElementById('vwFrame');
-  if (fr && fr.contentWindow) {
-    fr.contentWindow.postMessage({
-      type: "move",
-      lng: lng,
-      lat: lat
-    }, "*");
-  }
+  if (!VWORLD_KEY) return;
+  // VWorld 3.0은 카메라 이동 API가 없으므로 iframe 재로드
+  loadVwFrame(lng, lat);
 }
 function setSelBar(jibun) {
   var bar = document.getElementById('selBar');
