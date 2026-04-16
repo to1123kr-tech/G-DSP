@@ -71,6 +71,7 @@ function initMap() {
 
   // 클릭 → 부모에게 전달
   map.onClick.addEventListener(function(wp, ep, carto) {
+    window.parent.postMessage({type: 'vwMapClicked'}, '*');
     if (!carto) return;
     window.parent.postMessage({
       type: 'vwClick',
@@ -123,13 +124,14 @@ window.addEventListener('message', function(e) {
 
   // 선택된 필지 하이라이트 (경계 빨간선)
   if (e.data.type === 'highlightParcel') {
+    console.log('highlightParcel 호출됨, coords 개수:', e.data.coords ? e.data.coords.length : 0);
     try {
       // 기존 하이라이트 제거
       if (_parcelGeom) {
-        try { map.getMap().removeObject(_parcelGeom); } catch(ex){}
+        try { _parcelGeom.destroy(); } catch(ex){}
         _parcelGeom = null;
       }
-      var coords = e.data.coords; // [[lng,lat],[lng,lat],...]
+      var coords = e.data.coords;
       if (!coords || !coords.length) return;
       var ar = [];
       for (var i = 0; i < coords.length; i++) {
@@ -143,6 +145,7 @@ window.addEventListener('message', function(e) {
       try { poly.setOutLineWidth(3); } catch(ex1){}
       poly.create();
       _parcelGeom = poly;
+      console.log('필지 하이라이트 생성 성공');
     } catch(err) {
       console.error('필지 하이라이트 오류:', err);
     }
