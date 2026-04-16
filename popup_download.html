@@ -550,7 +550,7 @@ function initKakaoMap(){
       var lng = mouseEvent.latLng.getLng();
       var coordEl = document.getElementById('dtmSelCoord');
       if(coordEl) coordEl.textContent = lat.toFixed(6)+', '+lng.toFixed(6);
-      calcTiles(lat, lng);
+      // calcTiles disabled
       // 마커
       if(_clickMarker) _clickMarker.setMap(null);
       _clickMarker = new kakao.maps.Marker({ position: mouseEvent.latLng });
@@ -851,7 +851,7 @@ function dtmSelectAddr(i){
   if(addrEl) addrEl.textContent = item.addr;
   var coordEl = document.getElementById('dtmSelCoord');
   if(coordEl) coordEl.textContent = item.lat.toFixed(6)+', '+item.lng.toFixed(6);
-  calcTiles(item.lat, item.lng);
+  // calcTiles disabled
   // 카카오 지도 이동
   if(_kMap){
     var moveLatLng = new kakao.maps.LatLng(item.lat, item.lng);
