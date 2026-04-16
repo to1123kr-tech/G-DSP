@@ -80,14 +80,41 @@ function initMap() {
     }, '*');
   });
 
-  // 우클릭
+  // 우클릭 — 클릭한 위치의 실제 좌표 추출
   setTimeout(function() {
     try {
-      document.querySelector('canvas').addEventListener('contextmenu', function(e) {
+      var canvas = document.querySelector('canvas');
+      canvas.addEventListener('contextmenu', function(e) {
         e.preventDefault();
-        window.parent.postMessage({type: 'vwRightClick', x: e.clientX, y: e.clientY}, '*');
+        var rect = canvas.getBoundingClientRect();
+        var px = e.clientX - rect.left;
+        var py = e.clientY - rect.top;
+        var lng = null, lat = null;
+        // VWorld 3.0: pickPosition으로 screen → world 변환
+        try {
+          var pos = map.pickPosition(px, py);
+          if (pos && pos.longitudeDD !== undefined) {
+            lng = pos.longitudeDD;
+            lat = pos.latitudeDD;
+          } else if (pos && pos.x !== undefined) {
+            // cartographic 형태로 반환될 경우
+            lng = pos.x; lat = pos.y;
+          }
+        } catch(ex1) { console.log('pickPosition 실패:', ex1); }
+        // 대안: getCameraPosition (현재 카메라 타겟)
+        if (lng === null) {
+          try {
+            var cp = map.getCameraPosition();
+            if (cp && cp.position) { lng = cp.position.x; lat = cp.position.y; }
+          } catch(ex2) {}
+        }
+        window.parent.postMessage({
+          type: 'vwRightClick',
+          x: e.clientX, y: e.clientY,
+          lng: lng, lat: lat
+        }, '*');
       });
-    } catch(ex) {}
+    } catch(ex) { console.log('우클릭 바인딩 실패:', ex); }
   }, 2000);
 
   // 부모에 로드 완료 알림
