@@ -895,6 +895,11 @@ window.addEventListener('message', function(ev){
   if (ev.data && ev.data.type === 'vwClick') {
     onMapClick(ev.data.lng, ev.data.lat);
   }
+  if (ev.data && ev.data.type === 'vwMapClicked') {
+    // iframe 클릭 시 우클릭 메뉴 닫기
+    var menu = document.getElementById('ctxMenu');
+    if (menu) menu.style.display='none';
+  }
 });
 window.addEventListener('message', function(ev){
   if (ev.data && ev.data.type === 'vwRightClick') {
@@ -909,6 +914,11 @@ function cmSelect() {
   currentPnu=popupPnu; currentJibun=popupJibun; currentLng=ctxLng; currentLat=ctxLat;
   moveMarker(ctxLng,ctxLat); setSelBar(popupJibun); toast('✓ '+popupJibun+' 선택됨','ok');
   highlightParcel(currentPnu);
+  closeCtxMenu();
+}
+
+function closeCtxMenu() {
+  document.getElementById('ctxMenu').style.display='none';
 }
 
 // ── 필지 경계 하이라이트 ──
@@ -931,8 +941,8 @@ function highlightParcel(pnu) {
     })
     .catch(function(e){ console.log('필지 경계 조회 실패:', e); });
 }
-function openTab(tab) { if(!popupPnu){toast('필지를 선택하세요','err');return;} showPopup(popupPnu,popupJibun,tab); }
-function cmCopyCoord() { var txt=ctxLat.toFixed(6)+', '+ctxLng.toFixed(6); navigator.clipboard&&navigator.clipboard.writeText(txt); toast('좌표 복사됨'); }
+function openTab(tab) { if(!popupPnu){toast('필지를 선택하세요','err');return;} showPopup(popupPnu,popupJibun,tab); closeCtxMenu(); }
+function cmCopyCoord() { var txt=ctxLat.toFixed(6)+', '+ctxLng.toFixed(6); navigator.clipboard&&navigator.clipboard.writeText(txt); toast('좌표 복사됨'); closeCtxMenu(); }
 
 // ── 팝업 ──
 function showPopup(pnu, jibun, tab) {
@@ -1116,7 +1126,7 @@ function toggleMemoMode() {
   document.getElementById('btnMemo').classList.toggle('on', memoMode);
   toast(memoMode?'📍 지도를 클릭해 메모 추가':'메모 모드 종료');
 }
-function addMemoAtCtx() { openMemoModal(ctxLng, ctxLat); }
+function addMemoAtCtx() { openMemoModal(ctxLng, ctxLat); closeCtxMenu(); }
 function openMemoModal(lng, lat) {
   pendingMemoLng=lng; pendingMemoLat=lat;
   document.getElementById('memoPos').textContent=lat.toFixed(5)+', '+lng.toFixed(5);
