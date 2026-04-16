@@ -75,18 +75,14 @@ window.addEventListener('message', function(e) {
   // 지적도 토글
   if (e.data.type === 'toggleJijuk') {
     if (e.data.on && !jijukAdded) {
-      // 경계선 레이어 (lp_pa_cbnd_bonbun) — 지번 없이 선만
       var wl = new vw.Layers();
       var ws = new vw.source.TileWMS();
       ws.setUrl('https://api.vworld.kr/req/wms?Key=' + _apiKey + '&');
-      ws.setParams('tilesize=256');
-      ws.setLayers('lp_pa_cbnd_bonbun');
-      ws.setStyles('lp_pa_cbnd_bonbun');
+      ws.setParams('tilesize=512');
+      ws.setLayers('lt_c_landinfobasemap');
+      ws.setStyles('lt_c_landinfobasemap');
       ws.setFormat('image/png');
       _jijukLayer = new vw.layer.Tile(ws);
-      try {
-        _jijukLayer.setOpacity(0.9);
-      } catch(e1){}
       wl.add(_jijukLayer);
       jijukAdded = true;
     } else if (!e.data.on && _jijukLayer) {
