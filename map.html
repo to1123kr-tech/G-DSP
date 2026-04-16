@@ -930,22 +930,35 @@ function closeCtxMenu() {
 // ── 필지 경계 하이라이트 ──
 function highlightParcel(pnu) {
   if (!pnu || !VWORLD_KEY) return;
-  var url='https://api.vworld.kr/req/wfs?service=WFS&version=1.1.0&request=GetFeature'
-    +'&typename=lt_c_lsmd_cont_ldreg&output=application/json'
-    +'&filter=<Filter><PropertyIsEqualTo><PropertyName>pnu</PropertyName><Literal>'+pnu+'</Literal></PropertyIsEqualTo></Filter>'
-    +'&key='+VWORLD_KEY;
-  fetch(PROXY+'/api/proxy-get?url='+encodeURIComponent(url))
-    .then(function(r){return r.json();})
-    .then(function(d){
-      var features=d&&d.features;
-      if(!features||!features.length) return;
-      var coords=features[0].geometry.coordinates[0];
+  // VWorld WFS JSONP 호출 (프록시 불필요)
+  var cbName = 'vwParcelCb_' + Date.now();
+  window[cbName] = function(data) {
+    try {
+      var features = data && data.features;
+      if (!features || !features.length) {
+        console.log('필지 경계 없음');
+        delete window[cbName];
+        return;
+      }
+      var coords = features[0].geometry.coordinates[0];
       var fr = document.getElementById('vwFrame');
       if (fr && fr.contentWindow) {
         fr.contentWindow.postMessage({type:'highlightParcel', coords:coords}, '*');
       }
-    })
-    .catch(function(e){ console.log('필지 경계 조회 실패:', e); });
+    } catch(e) { console.log('필지 경계 파싱 오류:', e); }
+    delete window[cbName];
+    var s = document.getElementById('wfsScript_'+cbName);
+    if (s) s.remove();
+  };
+  var url='https://api.vworld.kr/req/wfs?service=WFS&version=1.1.0&request=GetFeature'
+    +'&typename=lt_c_lsmd_cont_ldreg&output=application/json'
+    +'&filter='+encodeURIComponent('<Filter><PropertyIsEqualTo><PropertyName>pnu</PropertyName><Literal>'+pnu+'</Literal></PropertyIsEqualTo></Filter>')
+    +'&key='+VWORLD_KEY+'&format_options=callback:'+cbName;
+  var s = document.createElement('script');
+  s.id = 'wfsScript_'+cbName;
+  s.src = url;
+  s.onerror = function(){ console.log('WFS 호출 실패'); delete window[cbName]; s.remove(); };
+  document.body.appendChild(s);
 }
 function openTab(tab) { if(!popupPnu){toast('필지를 선택하세요','err');return;} showPopup(popupPnu,popupJibun,tab); closeCtxMenu(); }
 function cmCopyCoord() { var txt=ctxLat.toFixed(6)+', '+ctxLng.toFixed(6); navigator.clipboard&&navigator.clipboard.writeText(txt); toast('좌표 복사됨'); closeCtxMenu(); }
@@ -1176,33 +1189,41 @@ function downloadCadDxf() {
   if(!currentPnu){toast('필지를 먼저 선택하세요','err');return;}
   if(!VWORLD_KEY){toast('VWorld API 키 없음','err');return;}
   var pnu=currentPnu;
-  var sigunguCd=pnu.substring(0,5),bjdongCd=pnu.substring(5,10),platGbCd=pnu.substring(10,11);
-  var bun=parseInt(pnu.substring(11,15))||0, ji=parseInt(pnu.substring(15,19))||0;
+  toast('지적도 DXF 준비중...');
+  var cbName = 'vwDxfCb_' + Date.now();
+  window[cbName] = function(d) {
+    try {
+      var features=d&&d.features;
+      if(!features||!features.length){toast('지적 데이터 없음','err');}
+      else {
+        var coords=features[0].geometry.coordinates[0];
+        var dxf='0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n';
+        dxf+='0\nLWPOLYLINE\n8\n지적선\n90\n'+coords.length+'\n70\n1\n';
+        coords.forEach(function(c){ dxf+='10\n'+c[0]+'\n20\n'+c[1]+'\n'; });
+        dxf+='0\nTEXT\n8\n지번\n10\n'+coords[0][0]+'\n20\n'+coords[0][1]+'\n40\n5\n1\n'+currentJibun+'\n';
+        dxf+='0\nTEXT\n8\n워터마크\n10\n'+coords[0][0]+'\n20\n'+(coords[0][1]-10)+'\n40\n3\n1\nG-DSP 참고용 공식지적도아님\n';
+        dxf+='0\nENDSEC\n0\nEOF\n';
+        var blob=new Blob([dxf],{type:'text/plain'});
+        var a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download=currentJibun.replace(/\s/g,'_')+'_지적도.dxf';
+        a.click();
+        toast('지적도 DXF 다운로드 완료','ok');
+      }
+    } catch(e) { toast('DXF 생성 실패: '+e.message,'err'); }
+    delete window[cbName];
+    var sc = document.getElementById('dxfScript_'+cbName);
+    if (sc) sc.remove();
+  };
   var url='https://api.vworld.kr/req/wfs?service=WFS&version=1.1.0&request=GetFeature'
     +'&typename=lt_c_lsmd_cont_ldreg&output=application/json'
-    +'&filter=<Filter><PropertyIsEqualTo><PropertyName>pnu</PropertyName><Literal>'+pnu+'</Literal></PropertyIsEqualTo></Filter>'
-    +'&key='+VWORLD_KEY;
-  toast('지적도 DXF 준비중...');
-  fetch(PROXY+'/api/proxy-get?url='+encodeURIComponent(url))
-    .then(function(r){return r.json();})
-    .then(function(d){
-      var features=d&&d.features;
-      if(!features||!features.length){toast('지적 데이터 없음','err');return;}
-      var coords=features[0].geometry.coordinates[0];
-      var dxf='0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n';
-      dxf+='0\nLWPOLYLINE\n8\n지적선\n90\n'+coords.length+'\n70\n1\n';
-      coords.forEach(function(c){ dxf+='10\n'+c[0]+'\n20\n'+c[1]+'\n'; });
-      dxf+='0\nTEXT\n8\n지번\n10\n'+coords[0][0]+'\n20\n'+coords[0][1]+'\n40\n5\n1\n'+currentJibun+'\n';
-      dxf+='0\nTEXT\n8\n워터마크\n10\n'+coords[0][0]+'\n20\n'+(coords[0][1]-10)+'\n40\n3\n1\nG-DSP 참고용 공식지적도아님\n';
-      dxf+='0\nENDSEC\n0\nEOF\n';
-      var blob=new Blob([dxf],{type:'text/plain'});
-      var a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download=currentJibun.replace(/\s/g,'_')+'_지적도.dxf';
-      a.click();
-      toast('지적도 DXF 다운로드 완료','ok');
-    })
-    .catch(function(){toast('DXF 다운로드 실패','err');});
+    +'&filter='+encodeURIComponent('<Filter><PropertyIsEqualTo><PropertyName>pnu</PropertyName><Literal>'+pnu+'</Literal></PropertyIsEqualTo></Filter>')
+    +'&key='+VWORLD_KEY+'&format_options=callback:'+cbName;
+  var sc2 = document.createElement('script');
+  sc2.id = 'dxfScript_'+cbName;
+  sc2.src = url;
+  sc2.onerror = function(){ toast('DXF 다운로드 실패','err'); delete window[cbName]; sc2.remove(); };
+  document.body.appendChild(sc2);
 }
 
 function downloadMapImage(type) {
