@@ -614,58 +614,14 @@ function initVwMap() {
 
 function loadVwFrame(lng, lat) {
   var fr = document.getElementById('vwFrame');
-  var sc = [
-    '<!DOCTYPE html><html><head><meta charset="UTF-8"/>',
-    '<scr'+'ipt src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+VWORLD_KEY+'"></scr'+'ipt>',
-    '</head><body style="margin:0;overflow:hidden">',
-    '<div id="vmap" style="width:100%;height:100vh"></div>',
-    '<scr'+'ipt>',
-    'var map=new vw.Map();',
-    'map.setOption({mapId:"vmap",initPosition:new vw.CameraPosition(new vw.CoordZ('+lng+','+lat+',500),new vw.Direction(0,-90,0)),logo:false,navigation:true});',
-    'map.start();',
-    // 지적도 WMS 레이어 (popup_download와 동일 방식)
-    'var jijukLayer=null, jijukOn=false;',
-    'function addJijuk(){',
-    '  if(jijukLayer)return;',
-    '  var wl=new vw.Layers();',
-    '  var ws=new vw.source.TileWMS();',
-    '  ws.setUrl("https://api.vworld.kr/req/wms?Key='+VWORLD_KEY+'&");',
-    '  ws.setParams("tilesize=256");',
-    '  ws.setLayers("lt_c_landinfobasemap");',
-    '  ws.setStyles("lt_c_landinfobasemap");',
-    '  ws.setFormat("image/png");',
-    '  jijukLayer=new vw.layer.Tile(ws);',
-    '  wl.add(jijukLayer);',
-    '  jijukOn=true;',
-    '}',
-    // 부모에서 메시지로 레이어 토글
-    'window.addEventListener("message",function(e){',
-    '  if(!e.data)return;',
-    '  if(e.data.type==="toggleJijuk"){',
-    '    if(e.data.on){ addJijuk(); }',
-    '    else if(jijukLayer){ try{jijukLayer.setVisible(false);}catch(ex){} jijukOn=false; }',
-    '  }',
-    '});',
-    // 클릭
-    'map.onClick.addEventListener(function(wp,ep,carto){',
-    '  if(!carto)return;',
-    '  window.parent.postMessage({type:"vwClick",lng:carto.longitudeDD,lat:carto.latitudeDD},"*");',
-    '});',
-    // 우클릭
-    'try{',
-    '  document.querySelector("canvas").addEventListener("contextmenu",function(e){',
-    '    e.preventDefault();',
-    '    window.parent.postMessage({type:"vwRightClick",x:e.clientX,y:e.clientY},"*");',
-    '  });',
-    '}catch(ex){}',
-    '</scr'+'ipt></body></html>'
-  ];
-  fr.srcdoc = sc.join('\n');
+  // 실제 HTML 파일 URL로 로드 (srcdoc 대신 — CORS 해결)
+  var baseUrl = PROXY + '/vw_map.html';
+  fr.src = baseUrl + '?lng=' + lng + '&lat=' + lat + '&key=' + VWORLD_KEY;
   // iframe 로드 후 지적선 체크 상태 반영
   fr.onload = function() {
     var chk = document.getElementById('chkCad');
     if (chk && chk.checked && fr.contentWindow) {
-      setTimeout(function(){ fr.contentWindow.postMessage({type:'toggleJijuk', on:true}, '*'); }, 1500);
+      setTimeout(function(){ fr.contentWindow.postMessage({type:'toggleJijuk', on:true}, '*'); }, 2000);
     }
   };
 }
