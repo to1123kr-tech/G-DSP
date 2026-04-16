@@ -7,8 +7,6 @@
 <!-- VWorld는 iframe 내부에서 로드 -->
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -105,7 +103,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 #mapWrap{flex:1;position:relative;overflow:hidden}
 #kakaoMapDiv{position:absolute;inset:0;z-index:2}
 #vworldMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
-#osmMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
 @keyframes vwSpin{to{transform:rotate(360deg)}}
 
 /* 워터마크 - 항상 표시, 지울 수 없음 */
@@ -249,10 +246,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
     <!-- 지도 엔진 -->
     <div class="lsec">
       <div class="ltitle">지도 엔진</div>
-      <div class="mgrid three" style="margin-bottom:6px">
+      <div class="mgrid two" style="margin-bottom:6px">
         <button class="mbtn kk on" id="btnKakao" onclick="switchEngine('kakao',this)">🗺 카카오</button>
         <button class="mbtn" id="btnVworld" onclick="switchEngine('vworld',this)">🌏 VWorld</button>
-        <button class="mbtn" id="btnOsm" onclick="switchEngine('osm',this)">🌐 OSM</button>
       </div>
       <div class="ltitle" style="margin-top:6px">지도 유형</div>
       <div class="mgrid three">
@@ -355,7 +351,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
     <div id="vworldMapDiv">
       <iframe id="vwFrame" style="width:100%;height:100%;border:none"></iframe>
     </div>
-    <div id="osmMapDiv"></div>
     <canvas id="measureCanvas"></canvas>
 
     <!-- 워터마크 (항상 표시, 삭제 불가) -->
@@ -523,7 +518,7 @@ var BLDG_KEY = localStorage.getItem('gdsp_building') || '';
 
 var kakaoMap = null, kakaoGeocoder = null, kakaoMarker = null;
 var vwMap = null, vwMapInited = false;
-var osmMap = null;
+
 var currentEngine = 'kakao';
 var currentPnu = '', currentJibun = '';
 var currentLng = 126.83, currentLat = 37.20;
@@ -593,15 +588,13 @@ function initKakao() {
 
 // ── 지도 엔진 전환 ──
 function switchEngine(engine, btn) {
-  document.querySelectorAll('#btnKakao,#btnVworld,#btnOsm').forEach(function(b){ b.classList.remove('on'); });
+  document.querySelectorAll('#btnKakao,#btnVworld').forEach(function(b){ b.classList.remove('on'); });
   btn.classList.add('on');
   currentEngine = engine;
   var kDiv = document.getElementById('kakaoMapDiv');
   var vDiv = document.getElementById('vworldMapDiv');
-  var oDiv = document.getElementById('osmMapDiv');
   kDiv.style.zIndex='1'; kDiv.style.visibility='hidden';
   vDiv.style.zIndex='1'; vDiv.style.visibility='hidden';
-  oDiv.style.zIndex='1'; oDiv.style.visibility='hidden';
   if (engine === 'kakao') {
     kDiv.style.zIndex='3'; kDiv.style.visibility='visible';
     if (kakaoMap) kakao.maps.event.trigger(kakaoMap, 'resize');
@@ -609,13 +602,8 @@ function switchEngine(engine, btn) {
     vDiv.style.visibility='visible'; vDiv.style.zIndex='3';
     if (!vwMapInited) initVwMap();
     else moveVwMap(currentLng, currentLat);
-  } else if (engine === 'osm') {
-    oDiv.style.visibility='visible'; oDiv.style.zIndex='3';
-    if (!osmMap) initOsmMap();
-    else { osmMap.setView([currentLat, currentLng], osmMap.getZoom()); osmMap.invalidateSize(); }
   }
-  var names = {kakao:'카카오 지도', vworld:'VWorld 지도', osm:'OSM 지도'};
-  toast(names[engine] || engine);
+  toast(engine === 'kakao' ? '카카오 지도' : 'VWorld 지도');
 }
 
 function initVwMap() {
@@ -650,24 +638,6 @@ function loadVwFrame(lng, lat) {
   fr.srcdoc = sc.join('\n');
 }
 
-
-// ── OSM 지도 (CyclOSM — 등고선 포함) ──
-function initOsmMap() {
-  osmMap = L.map('osmMapDiv', { zoomControl: true }).setView([currentLat, currentLng], 17);
-  L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &mdash; Tiles: <a href="https://www.cyclosm.org">CyclOSM</a>',
-    maxZoom: 20,
-    subdomains: 'abc'
-  }).addTo(osmMap);
-  osmMap.on('click', function(e) {
-    onMapClick(e.latlng.lng, e.latlng.lat);
-  });
-  osmMap.on('contextmenu', function(e) {
-    ctxLng = e.latlng.lng; ctxLat = e.latlng.lat;
-    showCtxMenu(e.originalEvent.clientX, e.originalEvent.clientY);
-  });
-  setTimeout(function(){ osmMap.invalidateSize(); }, 300);
-}
 
 // ── 지도 유형 ──
 function setMapType(type, btn) {
@@ -873,7 +843,6 @@ function onMapClick(lng, lat) {
 function moveMap(lng, lat) {
   if (kakaoMap) { kakaoMap.setCenter(new kakao.maps.LatLng(lat,lng)); kakaoMap.setLevel(3); moveMarker(lng,lat); }
   if (vwMapInited) moveVwMap(lng,lat);
-  if (osmMap) osmMap.setView([lat, lng], 17);
 }
 function moveMarker(lng, lat) {
   if (kakaoMarker&&kakaoMap) { kakaoMarker.setPosition(new kakao.maps.LatLng(lat,lng)); kakaoMarker.setMap(kakaoMap); }
