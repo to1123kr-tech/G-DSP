@@ -623,10 +623,35 @@ function loadVwFrame(lng, lat) {
     'var map=new vw.Map();',
     'map.setOption({mapId:"vmap",initPosition:new vw.CameraPosition(new vw.CoordZ('+lng+','+lat+',500),new vw.Direction(0,-90,0)),logo:false,navigation:true});',
     'map.start();',
+    // 지적도 WMS 레이어 (popup_download와 동일 방식)
+    'var jijukLayer=null, jijukOn=false;',
+    'function addJijuk(){',
+    '  if(jijukLayer)return;',
+    '  var wl=new vw.Layers();',
+    '  var ws=new vw.source.TileWMS();',
+    '  ws.setUrl("https://api.vworld.kr/req/wms?Key='+VWORLD_KEY+'&");',
+    '  ws.setParams("tilesize=256");',
+    '  ws.setLayers("lt_c_landinfobasemap");',
+    '  ws.setStyles("lt_c_landinfobasemap");',
+    '  ws.setFormat("image/png");',
+    '  jijukLayer=new vw.layer.Tile(ws);',
+    '  wl.add(jijukLayer);',
+    '  jijukOn=true;',
+    '}',
+    // 부모에서 메시지로 레이어 토글
+    'window.addEventListener("message",function(e){',
+    '  if(!e.data)return;',
+    '  if(e.data.type==="toggleJijuk"){',
+    '    if(e.data.on){ addJijuk(); }',
+    '    else if(jijukLayer){ try{jijukLayer.setVisible(false);}catch(ex){} jijukOn=false; }',
+    '  }',
+    '});',
+    // 클릭
     'map.onClick.addEventListener(function(wp,ep,carto){',
     '  if(!carto)return;',
     '  window.parent.postMessage({type:"vwClick",lng:carto.longitudeDD,lat:carto.latitudeDD},"*");',
     '});',
+    // 우클릭
     'try{',
     '  document.querySelector("canvas").addEventListener("contextmenu",function(e){',
     '    e.preventDefault();',
@@ -636,6 +661,13 @@ function loadVwFrame(lng, lat) {
     '</scr'+'ipt></body></html>'
   ];
   fr.srcdoc = sc.join('\n');
+  // iframe 로드 후 지적선 체크 상태 반영
+  fr.onload = function() {
+    var chk = document.getElementById('chkCad');
+    if (chk && chk.checked && fr.contentWindow) {
+      setTimeout(function(){ fr.contentWindow.postMessage({type:'toggleJijuk', on:true}, '*'); }, 1500);
+    }
+  };
 }
 
 
@@ -688,15 +720,17 @@ function _removeWmsTileset(key) {
 }
 
 function toggleCadastral(on) {
-  if (!kakaoMap) return;
   if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
-  if (on) {
-    _addWmsTileset('CAD', 'lt_c_landinfobasemap');
-    toast('지적선+지번 ON');
-  } else {
-    _removeWmsTileset('CAD');
-    toast('지적선+지번 OFF');
+  // VWorld iframe에 지적도 토글 메시지 전송
+  var fr = document.getElementById('vwFrame');
+  if (fr && fr.contentWindow) {
+    fr.contentWindow.postMessage({type:'toggleJijuk', on:on}, '*');
   }
+  // VWorld 모드가 아니면 VWorld로 전환
+  if (on && currentEngine !== 'vworld') {
+    switchEngine('vworld', document.getElementById('btnVworld'));
+  }
+  toast(on ? '지적선+지번 ON' : '지적선+지번 OFF');
 }
 
 function toggleWmsLayer(type, on) {
