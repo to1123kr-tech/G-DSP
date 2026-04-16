@@ -38,6 +38,12 @@ function initMap() {
   });
   map.start();
 
+  // 카메라 높이 제한 — 너무 확대되면 지적도가 사라지므로 최소 150m 유지
+  try {
+    map.getPolicy().setMinimumDistance(150);
+    map.getPolicy().setMaximumDistance(50000);
+  } catch(e) {}
+
   // 클릭 → 부모에게 전달
   map.onClick.addEventListener(function(wp, ep, carto) {
     if (!carto) return;
@@ -77,6 +83,10 @@ window.addEventListener('message', function(e) {
       ws.setStyles('lt_c_landinfobasemap');
       ws.setFormat('image/png');
       _jijukLayer = new vw.layer.Tile(ws);
+      try {
+        _jijukLayer.setMinZoom(0);
+        _jijukLayer.setMaxZoom(22);
+      } catch(e1){}
       wl.add(_jijukLayer);
       jijukAdded = true;
     } else if (!e.data.on && _jijukLayer) {
