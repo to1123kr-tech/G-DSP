@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/>
+<style>*{margin:0;padding:0}html,body,#vmap{width:100%;height:100%;overflow:hidden}</style>
+</head><body>
+<div id="vmap"></div>
+<script>
+// URL 파라미터에서 좌표, 키 읽기
+var params = new URLSearchParams(location.search);
+var lng = parseFloat(params.get('lng')) || 126.83;
+var lat = parseFloat(params.get('lat')) || 37.20;
+var apiKey = params.get('key') || '';
+
+// VWorld 스크립트 동적 로드
+var s = document.createElement('script');
+s.src = 'https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=' + apiKey;
+s.onload = function() { initMap(); };
+document.head.appendChild(s);
+
+var map, jijukAdded = false;
+
+function initMap() {
+  map = new vw.Map();
+  map.setOption({
+    mapId: 'vmap',
+    initPosition: new vw.CameraPosition(
+      new vw.CoordZ(lng, lat, 500),
+      new vw.Direction(0, -90, 0)
+    ),
+    logo: false,
+    navigation: true
+  });
+  map.start();
+
+  // 클릭 → 부모에게 전달
+  map.onClick.addEventListener(function(wp, ep, carto) {
+    if (!carto) return;
+    window.parent.postMessage({
+      type: 'vwClick',
+      lng: carto.longitudeDD,
+      lat: carto.latitudeDD
+    }, '*');
+  });
+
+  // 우클릭
+  setTimeout(function() {
+    try {
+      document.querySelector('canvas').addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        window.parent.postMessage({type: 'vwRightClick', x: e.clientX, y: e.clientY}, '*');
+      });
+    } catch(ex) {}
+  }, 2000);
+}
+
+// 부모에서 메시지 수신
+window.addEventListener('message', function(e) {
+  if (!e.data || !map) return;
+
+  // 지적도 토글
+  if (e.data.type === 'toggleJijuk') {
+    if (e.data.on && !jijukAdded) {
+      var wl = new vw.Layers();
+      var ws = new vw.source.TileWMS();
+      ws.setUrl('https://api.vworld.kr/req/wms?Key=' + apiKey + '&');
+      ws.setParams('tilesize=256');
+      ws.setLayers('lt_c_landinfobasemap');
+      ws.setStyles('lt_c_landinfobasemap');
+      ws.setFormat('image/png');
+      wl.add(new vw.layer.Tile(ws));
+      jijukAdded = true;
+    }
+  }
+
+  // 용도지역 토글
+  if (e.data.type === 'toggleLayer') {
+    var layerName = e.data.layer;
+    if (e.data.on) {
+      var wl2 = new vw.Layers();
+      var ws2 = new vw.source.TileWMS();
+      ws2.setUrl('https://api.vworld.kr/req/wms?Key=' + apiKey + '&');
+      ws2.setParams('tilesize=256');
+      ws2.setLayers(layerName);
+      ws2.setStyles(layerName);
+      ws2.setFormat('image/png');
+      wl2.add(new vw.layer.Tile(ws2));
+    }
+  }
+});
+</script>
+</body></html>
