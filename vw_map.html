@@ -42,6 +42,33 @@ var lng = parseFloat(_params.get('lng')) || 126.83;
 var lat = parseFloat(_params.get('lat')) || 37.20;
 var map, jijukAdded = false, _jijukLayer = null, _parcelGeom = null;
 
+// 필지 경계 그리기 (Polygon)
+function drawParcelHighlight(coords) {
+  if (!map || !coords || !coords.length) return;
+  try {
+    // 기존 하이라이트 제거
+    if (_parcelGeom) {
+      try { _parcelGeom.destroy(); } catch(ex){}
+      _parcelGeom = null;
+    }
+    var ar = [];
+    for (var i = 0; i < coords.length; i++) {
+      ar.push(new vw.Coord(coords[i][0], coords[i][1]));
+    }
+    var col = new vw.Collection(ar);
+    var poly = new vw.geom.Polygon(col);
+    poly.setId('selParcel_' + Date.now());
+    poly.setFillColor(new vw.Color(255, 60, 60, 80));
+    poly.setOutLineColor(new vw.Color(255, 30, 30, 255));
+    try { poly.setOutLineWidth(3); } catch(ex1){}
+    poly.create();
+    _parcelGeom = poly;
+    console.log('필지 하이라이트 생성 성공');
+  } catch(err) {
+    console.error('필지 하이라이트 오류:', err);
+  }
+}
+
 window.addEventListener('load', function() {
   if (typeof vw === 'undefined') {
     document.body.innerHTML = '<div style="padding:20px;color:red;font-family:sans-serif">VWorld 스크립트 로드 실패 — API 키를 확인하세요.</div>';
@@ -149,33 +176,28 @@ window.addEventListener('message', function(e) {
     }
   }
 
-  // 선택된 필지 하이라이트 (경계 빨간선)
+  // 선택된 필지 하이라이트 — PNU만 받아서 자체 WFS 호출
+  if (e.data.type === 'highlightParcelByPnu') {
+    console.log('highlightParcelByPnu 호출됨, pnu:', e.data.pnu);
+    var pnu = e.data.pnu;
+    if (!pnu) return;
+    var url = 'https://api.vworld.kr/req/wfs?service=WFS&version=1.1.0&request=GetFeature'
+      + '&typename=lt_c_lsmd_cont_ldreg&output=application/json'
+      + '&filter=' + encodeURIComponent('<Filter><PropertyIsEqualTo><PropertyName>pnu</PropertyName><Literal>'+pnu+'</Literal></PropertyIsEqualTo></Filter>')
+      + '&key=' + _apiKey;
+    fetch(url).then(function(r){ return r.json(); }).then(function(d) {
+      var features = d && d.features;
+      if (!features || !features.length) { console.log('필지 경계 없음'); return; }
+      var coords = features[0].geometry.coordinates[0];
+      drawParcelHighlight(coords);
+      // DXF용으로 부모에도 전달
+      window.parent.postMessage({type:'parcelCoords', pnu:pnu, coords:coords}, '*');
+    }).catch(function(err) { console.log('WFS 실패:', err); });
+  }
+
+  // 직접 좌표로 하이라이트 (부모에서 coords 전달 시)
   if (e.data.type === 'highlightParcel') {
-    console.log('highlightParcel 호출됨, coords 개수:', e.data.coords ? e.data.coords.length : 0);
-    try {
-      // 기존 하이라이트 제거
-      if (_parcelGeom) {
-        try { _parcelGeom.destroy(); } catch(ex){}
-        _parcelGeom = null;
-      }
-      var coords = e.data.coords;
-      if (!coords || !coords.length) return;
-      var ar = [];
-      for (var i = 0; i < coords.length; i++) {
-        ar.push(new vw.Coord(coords[i][0], coords[i][1]));
-      }
-      var col = new vw.Collection(ar);
-      var poly = new vw.geom.Polygon(col);
-      poly.setId('selParcel_' + Date.now());
-      poly.setFillColor(new vw.Color(255, 60, 60, 80));
-      poly.setOutLineColor(new vw.Color(255, 30, 30, 255));
-      try { poly.setOutLineWidth(3); } catch(ex1){}
-      poly.create();
-      _parcelGeom = poly;
-      console.log('필지 하이라이트 생성 성공');
-    } catch(err) {
-      console.error('필지 하이라이트 오류:', err);
-    }
+    drawParcelHighlight(e.data.coords);
   }
 
   // 하이라이트 제거
