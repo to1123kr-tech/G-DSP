@@ -1,22 +1,29 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"/>
 <style>*{margin:0;padding:0}html,body,#vmap{width:100%;height:100%;overflow:hidden}</style>
+<script>
+// URL 파라미터에서 키 먼저 읽기
+var _params = new URLSearchParams(location.search);
+var _apiKey = _params.get('key') || '';
+// VWorld 스크립트를 document.write로 동기 로드 (vw.source.TileWMS 등이 정상 로드됨)
+if (_apiKey) {
+  document.write('<sc'+'ript src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+_apiKey+'"><\/sc'+'ript>');
+}
+</script>
 </head><body>
 <div id="vmap"></div>
 <script>
-// URL 파라미터에서 좌표, 키 읽기
-var params = new URLSearchParams(location.search);
-var lng = parseFloat(params.get('lng')) || 126.83;
-var lat = parseFloat(params.get('lat')) || 37.20;
-var apiKey = params.get('key') || '';
+var lng = parseFloat(_params.get('lng')) || 126.83;
+var lat = parseFloat(_params.get('lat')) || 37.20;
+var map, jijukAdded = false, _jijukLayer = null;
 
-// VWorld 스크립트 동적 로드
-var s = document.createElement('script');
-s.src = 'https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=' + apiKey;
-s.onload = function() { initMap(); };
-document.head.appendChild(s);
-
-var map, jijukAdded = false;
+window.addEventListener('load', function() {
+  if (typeof vw === 'undefined') {
+    document.body.innerHTML = '<div style="padding:20px;color:red;font-family:sans-serif">VWorld 스크립트 로드 실패 — API 키를 확인하세요.</div>';
+    return;
+  }
+  initMap();
+});
 
 function initMap() {
   map = new vw.Map();
@@ -50,6 +57,9 @@ function initMap() {
       });
     } catch(ex) {}
   }, 2000);
+
+  // 부모에 로드 완료 알림
+  window.parent.postMessage({type: 'vwReady'}, '*');
 }
 
 // 부모에서 메시지 수신
@@ -61,28 +71,16 @@ window.addEventListener('message', function(e) {
     if (e.data.on && !jijukAdded) {
       var wl = new vw.Layers();
       var ws = new vw.source.TileWMS();
-      ws.setUrl('https://api.vworld.kr/req/wms?Key=' + apiKey + '&');
+      ws.setUrl('https://api.vworld.kr/req/wms?Key=' + _apiKey + '&');
       ws.setParams('tilesize=256');
       ws.setLayers('lt_c_landinfobasemap');
       ws.setStyles('lt_c_landinfobasemap');
       ws.setFormat('image/png');
-      wl.add(new vw.layer.Tile(ws));
+      _jijukLayer = new vw.layer.Tile(ws);
+      wl.add(_jijukLayer);
       jijukAdded = true;
-    }
-  }
-
-  // 용도지역 토글
-  if (e.data.type === 'toggleLayer') {
-    var layerName = e.data.layer;
-    if (e.data.on) {
-      var wl2 = new vw.Layers();
-      var ws2 = new vw.source.TileWMS();
-      ws2.setUrl('https://api.vworld.kr/req/wms?Key=' + apiKey + '&');
-      ws2.setParams('tilesize=256');
-      ws2.setLayers(layerName);
-      ws2.setStyles(layerName);
-      ws2.setFormat('image/png');
-      wl2.add(new vw.layer.Tile(ws2));
+    } else if (!e.data.on && _jijukLayer) {
+      try { _jijukLayer.setVisible(false); } catch(ex){}
     }
   }
 });
