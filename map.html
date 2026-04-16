@@ -101,8 +101,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 
 /* 지도 영역 */
 #mapWrap{flex:1;position:relative;overflow:hidden}
-#kakaoMapDiv{position:absolute;inset:0;z-index:2}
-#vworldMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
+#kakaoMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
+#vworldMapDiv{position:absolute;inset:0;z-index:3;visibility:visible}
 @keyframes vwSpin{to{transform:rotate(360deg)}}
 
 /* 워터마크 - 항상 표시, 지울 수 없음 */
@@ -243,21 +243,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 
   <!-- 왼쪽 패널 -->
   <div id="leftPanel">
-
-    <!-- 지도 엔진 -->
-    <div class="lsec">
-      <div class="ltitle">지도 엔진</div>
-      <div class="mgrid two" style="margin-bottom:6px">
-        <button class="mbtn kk on" id="btnKakao" onclick="switchEngine('kakao',this)">🗺 카카오</button>
-        <button class="mbtn" id="btnVworld" onclick="switchEngine('vworld',this)">🌏 VWorld</button>
-      </div>
-      <div class="ltitle" style="margin-top:6px">지도 유형</div>
-      <div class="mgrid three">
-        <button class="mbtn" id="btnNormal" onclick="setMapType('normal',this)">일반</button>
-        <button class="mbtn" id="btnSat" onclick="setMapType('satellite',this)">위성</button>
-        <button class="mbtn on" id="btnHybrid" onclick="setMapType('hybrid',this)">위성+라벨</button>
-      </div>
-    </div>
 
     <!-- 레이어 -->
     <div class="lsec">
@@ -588,6 +573,9 @@ function initKakao() {
   // 저장된 메모 마커 복원
   memos.forEach(function(m){ addMemoMarkerToMap(m); });
   setStatus('준비됨', true);
+  // VWorld 자동 시작
+  currentEngine = 'vworld';
+  if (VWORLD_KEY) initVwMap();
 }
 
 // ── 지도 엔진 전환 ──
@@ -685,10 +673,6 @@ function toggleCadastral(on) {
   var fr = document.getElementById('vwFrame');
   if (fr && fr.contentWindow) {
     fr.contentWindow.postMessage({type:'toggleJijuk', on:on}, '*');
-  }
-  // VWorld 모드가 아니면 VWorld로 전환
-  if (on && currentEngine !== 'vworld') {
-    switchEngine('vworld', document.getElementById('btnVworld'));
   }
   toast(on ? '지적선+지번 ON' : '지적선+지번 OFF');
 }
