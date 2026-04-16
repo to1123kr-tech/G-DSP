@@ -861,13 +861,17 @@ function setSelBar(jibun) {
 
 // ── 우클릭 메뉴 ──
 function showCtxMenu(x, y) {
+  // 이전 선택값 초기화
+  popupPnu = ''; popupJibun = '';
   kakaoGeocoder && kakaoGeocoder.coord2Address(ctxLng, ctxLat, function(result, status) {
     var addr = '이 위치';
     if (status===kakao.maps.services.Status.OK&&result[0]&&result[0].address) {
       addr = result[0].address.address_name || addr;
       var a = result[0].address;
-      popupPnu = a.b_code+'0'+String(parseInt(a.main_address_no)||0).padStart(4,'0')+String(parseInt(a.sub_address_no)||0).padStart(4,'0');
-      popupJibun = addr;
+      if (a.b_code) {
+        popupPnu = a.b_code+'0'+String(parseInt(a.main_address_no)||0).padStart(4,'0')+String(parseInt(a.sub_address_no)||0).padStart(4,'0');
+        popupJibun = addr;
+      }
     }
     document.getElementById('ctxAddr').textContent = addr.length>28?addr.substring(0,28)+'...':addr;
   });
@@ -929,14 +933,28 @@ function closeCtxMenu() {
   document.getElementById('ctxMenu').style.display='none';
 }
 
-// ── 필지 경계 하이라이트 (iframe에서 WFS 호출) ──
+// ── 필지 경계 하이라이트 (Oracle 서버 프록시 경유) ──
 var _parcelCoordsCache = {};
 function highlightParcel(pnu) {
   if (!pnu || !VWORLD_KEY) return;
-  var fr = document.getElementById('vwFrame');
-  if (fr && fr.contentWindow) {
-    fr.contentWindow.postMessage({type:'highlightParcelByPnu', pnu:pnu}, '*');
-  }
+  if (pnu.indexOf('undefined') >= 0) { console.log('PNU 오류:', pnu); return; }
+  var url='https://api.vworld.kr/req/wfs?service=WFS&version=1.1.0&request=GetFeature'
+    +'&typename=lt_c_lsmd_cont_ldreg&output=application/json'
+    +'&filter='+encodeURIComponent('<Filter><PropertyIsEqualTo><PropertyName>pnu</PropertyName><Literal>'+pnu+'</Literal></PropertyIsEqualTo></Filter>')
+    +'&key='+VWORLD_KEY;
+  fetch(PROXY+'/api/proxy-get?url='+encodeURIComponent(url))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var features=d&&d.features;
+      if(!features||!features.length) { console.log('필지 경계 없음'); return; }
+      var coords=features[0].geometry.coordinates[0];
+      _parcelCoordsCache[pnu] = coords;
+      var fr = document.getElementById('vwFrame');
+      if (fr && fr.contentWindow) {
+        fr.contentWindow.postMessage({type:'highlightParcel', coords:coords}, '*');
+      }
+    })
+    .catch(function(e){ console.log('필지 경계 조회 실패:', e); });
 }
 function openTab(tab) { if(!popupPnu){toast('필지를 선택하세요','err');return;} showPopup(popupPnu,popupJibun,tab); closeCtxMenu(); }
 function cmCopyCoord() { var txt=ctxLat.toFixed(6)+', '+ctxLng.toFixed(6); navigator.clipboard&&navigator.clipboard.writeText(txt); toast('좌표 복사됨'); closeCtxMenu(); }
