@@ -229,6 +229,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
   <div id="statusDot"></div>
   <div id="statusTxt">대기중</div>
   <div class="tr">
+    <button class="tbtn" onclick="toggleOffsetPopup()" title="지적도 위치 보정">🎯 보정</button>
     <button class="tbtn" onclick="doPrint()">🖨️ 인쇄</button>
     <button class="tbtn" onclick="history.back()">← 뒤로</button>
   </div>
@@ -276,36 +277,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
       <div class="lrow">
         <div class="llabel">표고점</div>
         <label class="tog"><input type="checkbox" id="chkElev" onchange="toggleWmsLayer('elev',this.checked)"><span class="tslider"></span></label>
-      </div>
-    </div>
-
-    <!-- 지적도 보정 (화살표 방식) -->
-    <div class="lsec">
-      <div class="ltitle">지적도 위치 보정</div>
-      <div class="off-step">
-        <span style="font-size:10px;color:var(--txt3)">이동단위</span>
-        <select id="offStep">
-          <option value="0.5">0.5m</option>
-          <option value="1" selected>1m</option>
-          <option value="2">2m</option>
-          <option value="5">5m</option>
-        </select>
-      </div>
-      <div class="arrow-pad">
-        <div></div>
-        <button class="apad-btn" onclick="moveOffset(0,1)" title="북쪽">↑</button>
-        <div></div>
-        <button class="apad-btn" onclick="moveOffset(-1,0)" title="서쪽">←</button>
-        <div class="apad-btn apad-center" id="offDisplay">0,0</div>
-        <button class="apad-btn" onclick="moveOffset(1,0)" title="동쪽">→</button>
-        <div></div>
-        <button class="apad-btn" onclick="moveOffset(0,-1)" title="남쪽">↓</button>
-        <div></div>
-      </div>
-      <div class="off-vals" id="offVals">X: 0m / Y: 0m</div>
-      <div style="display:flex;gap:3px;margin-top:4px">
-        <button class="offbtn apply" onclick="applyOffset()">적용</button>
-        <button class="offbtn" onclick="resetOffset()">초기화</button>
       </div>
     </div>
 
@@ -377,6 +348,39 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 </div>
 
 <!-- 우클릭 메뉴 -->
+<!-- 지적도 위치 보정 팝업 -->
+<div id="offsetPopup" style="display:none;position:fixed;top:56px;right:16px;z-index:300;background:var(--bg2);border:1px solid var(--line2);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.5);padding:14px;width:220px;font-size:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div style="font-weight:700;color:var(--txt1)">🎯 지적도 위치 보정</div>
+    <span onclick="toggleOffsetPopup()" style="cursor:pointer;color:var(--txt3);padding:0 4px">✕</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+    <span style="font-size:10px;color:var(--txt3)">이동단위</span>
+    <select id="offStep" style="flex:1;background:var(--bg3);color:var(--txt1);border:1px solid var(--line);border-radius:4px;padding:3px;font-size:11px">
+      <option value="0.5">0.5m</option>
+      <option value="1" selected>1m</option>
+      <option value="2">2m</option>
+      <option value="5">5m</option>
+    </select>
+  </div>
+  <div class="arrow-pad">
+    <div></div>
+    <button class="apad-btn" onclick="moveOffset(0,1)" title="북쪽">↑</button>
+    <div></div>
+    <button class="apad-btn" onclick="moveOffset(-1,0)" title="서쪽">←</button>
+    <div class="apad-btn apad-center" id="offDisplay">0,0</div>
+    <button class="apad-btn" onclick="moveOffset(1,0)" title="동쪽">→</button>
+    <div></div>
+    <button class="apad-btn" onclick="moveOffset(0,-1)" title="남쪽">↓</button>
+    <div></div>
+  </div>
+  <div class="off-vals" id="offVals" style="text-align:center;margin:6px 0;color:var(--txt2)">X: 0m / Y: 0m</div>
+  <div style="display:flex;gap:4px">
+    <button class="offbtn apply" onclick="applyOffset()" style="flex:1">적용</button>
+    <button class="offbtn" onclick="resetOffset()" style="flex:1">초기화</button>
+  </div>
+</div>
+
 <div id="ctxMenu">
   <div class="ctxhdr" id="ctxAddr">이 위치</div>
   <div class="ctxitem" onclick="cmSelect()">
@@ -707,6 +711,11 @@ function toggleWmsLayer(type, on) {
 
 
 // ── 오프셋 보정 (화살표) ──
+function toggleOffsetPopup() {
+  var p = document.getElementById('offsetPopup');
+  p.style.display = (p.style.display === 'none' || !p.style.display) ? 'block' : 'none';
+}
+
 function moveOffset(dx, dy) {
   var step = parseFloat(document.getElementById('offStep').value) || 1;
   offX += dx * step;
