@@ -903,8 +903,14 @@ window.addEventListener('message', function(ev){
 });
 window.addEventListener('message', function(ev){
   if (ev.data && ev.data.type === 'vwRightClick') {
-    ctxLng = currentLng;
-    ctxLat = currentLat;
+    // iframe에서 계산한 실제 클릭 좌표 사용
+    if (ev.data.lng !== null && ev.data.lat !== null && ev.data.lng !== undefined) {
+      ctxLng = ev.data.lng;
+      ctxLat = ev.data.lat;
+    } else {
+      ctxLng = currentLng;
+      ctxLat = currentLat;
+    }
     showCtxMenu(ev.data.x, ev.data.y);
   }
 });
