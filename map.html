@@ -541,9 +541,6 @@ var wmsOverlays = {};
 window.addEventListener('load', function(){
   initKakao();
   renderMemoList();
-  // 기본 위성+라벨
-  document.getElementById('btnHybrid').classList.add('on');
-  document.getElementById('btnNormal').classList.remove('on');
 });
 
 function initKakao() {
@@ -581,7 +578,7 @@ function initKakao() {
 // ── 지도 엔진 전환 ──
 function switchEngine(engine, btn) {
   document.querySelectorAll('#btnKakao,#btnVworld').forEach(function(b){ b.classList.remove('on'); });
-  btn.classList.add('on');
+  if (btn) btn.classList.add('on');
   currentEngine = engine;
   var kDiv = document.getElementById('kakaoMapDiv');
   var vDiv = document.getElementById('vworldMapDiv');
@@ -821,6 +818,8 @@ function applyResult(doc) {
     setSelBar(jibun);
     setStatus('연동됨', true);
     toast('✓ '+jibun, 'ok');
+    // 검색 위치가 VWorld 재로드되므로 딜레이 후 하이라이트
+    if (pnu) setTimeout(function(){ highlightParcel(pnu); }, 4500);
   });
 }
 
@@ -837,6 +836,7 @@ function onMapClick(lng, lat) {
     moveMarker(lng, lat);
     setSelBar(currentJibun);
     setStatus('연동됨', true);
+    highlightParcel(pnu);
   });
 }
 
@@ -908,6 +908,28 @@ window.addEventListener('message', function(ev){
 function cmSelect() {
   currentPnu=popupPnu; currentJibun=popupJibun; currentLng=ctxLng; currentLat=ctxLat;
   moveMarker(ctxLng,ctxLat); setSelBar(popupJibun); toast('✓ '+popupJibun+' 선택됨','ok');
+  highlightParcel(currentPnu);
+}
+
+// ── 필지 경계 하이라이트 ──
+function highlightParcel(pnu) {
+  if (!pnu || !VWORLD_KEY) return;
+  var url='https://api.vworld.kr/req/wfs?service=WFS&version=1.1.0&request=GetFeature'
+    +'&typename=lt_c_lsmd_cont_ldreg&output=application/json'
+    +'&filter=<Filter><PropertyIsEqualTo><PropertyName>pnu</PropertyName><Literal>'+pnu+'</Literal></PropertyIsEqualTo></Filter>'
+    +'&key='+VWORLD_KEY;
+  fetch(PROXY+'/api/proxy-get?url='+encodeURIComponent(url))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var features=d&&d.features;
+      if(!features||!features.length) return;
+      var coords=features[0].geometry.coordinates[0];
+      var fr = document.getElementById('vwFrame');
+      if (fr && fr.contentWindow) {
+        fr.contentWindow.postMessage({type:'highlightParcel', coords:coords}, '*');
+      }
+    })
+    .catch(function(e){ console.log('필지 경계 조회 실패:', e); });
 }
 function openTab(tab) { if(!popupPnu){toast('필지를 선택하세요','err');return;} showPopup(popupPnu,popupJibun,tab); }
 function cmCopyCoord() { var txt=ctxLat.toFixed(6)+', '+ctxLng.toFixed(6); navigator.clipboard&&navigator.clipboard.writeText(txt); toast('좌표 복사됨'); }
