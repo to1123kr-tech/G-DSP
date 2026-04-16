@@ -7,6 +7,8 @@
 <!-- VWorld는 iframe 내부에서 로드 -->
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -103,6 +105,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 #mapWrap{flex:1;position:relative;overflow:hidden}
 #kakaoMapDiv{position:absolute;inset:0;z-index:2}
 #vworldMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
+#osmMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
 @keyframes vwSpin{to{transform:rotate(360deg)}}
 
 /* 워터마크 - 항상 표시, 지울 수 없음 */
@@ -246,9 +249,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
     <!-- 지도 엔진 -->
     <div class="lsec">
       <div class="ltitle">지도 엔진</div>
-      <div class="mgrid two" style="margin-bottom:6px">
+      <div class="mgrid three" style="margin-bottom:6px">
         <button class="mbtn kk on" id="btnKakao" onclick="switchEngine('kakao',this)">🗺 카카오</button>
         <button class="mbtn" id="btnVworld" onclick="switchEngine('vworld',this)">🌏 VWorld</button>
+        <button class="mbtn" id="btnOsm" onclick="switchEngine('osm',this)">🌐 OSM</button>
       </div>
       <div class="ltitle" style="margin-top:6px">지도 유형</div>
       <div class="mgrid three">
@@ -351,6 +355,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
     <div id="vworldMapDiv">
       <iframe id="vwFrame" style="width:100%;height:100%;border:none"></iframe>
     </div>
+    <div id="osmMapDiv"></div>
     <canvas id="measureCanvas"></canvas>
 
     <!-- 워터마크 (항상 표시, 삭제 불가) -->
@@ -518,6 +523,7 @@ var BLDG_KEY = localStorage.getItem('gdsp_building') || '';
 
 var kakaoMap = null, kakaoGeocoder = null, kakaoMarker = null;
 var vwMap = null, vwMapInited = false;
+var osmMap = null;
 var currentEngine = 'kakao';
 var currentPnu = '', currentJibun = '';
 var currentLng = 126.83, currentLat = 37.20;
@@ -587,25 +593,29 @@ function initKakao() {
 
 // ── 지도 엔진 전환 ──
 function switchEngine(engine, btn) {
-  document.querySelectorAll('#btnKakao,#btnVworld').forEach(function(b){ b.classList.remove('on'); });
+  document.querySelectorAll('#btnKakao,#btnVworld,#btnOsm').forEach(function(b){ b.classList.remove('on'); });
   btn.classList.add('on');
   currentEngine = engine;
   var kDiv = document.getElementById('kakaoMapDiv');
   var vDiv = document.getElementById('vworldMapDiv');
+  var oDiv = document.getElementById('osmMapDiv');
+  kDiv.style.zIndex='1'; kDiv.style.visibility='hidden';
+  vDiv.style.zIndex='1'; vDiv.style.visibility='hidden';
+  oDiv.style.zIndex='1'; oDiv.style.visibility='hidden';
   if (engine === 'kakao') {
-    kDiv.style.zIndex = '3'; kDiv.style.visibility = 'visible';
-    vDiv.style.zIndex = '1'; vDiv.style.visibility = 'hidden';
+    kDiv.style.zIndex='3'; kDiv.style.visibility='visible';
     if (kakaoMap) kakao.maps.event.trigger(kakaoMap, 'resize');
-  } else {
-    vDiv.style.visibility = 'visible'; vDiv.style.zIndex = '3';
-    kDiv.style.zIndex = '1';
-    if (!vwMapInited) {
-      initVwMap();
-    } else if (vwMap) {
-      moveVwMap(currentLng, currentLat);
-    }
+  } else if (engine === 'vworld') {
+    vDiv.style.visibility='visible'; vDiv.style.zIndex='3';
+    if (!vwMapInited) initVwMap();
+    else moveVwMap(currentLng, currentLat);
+  } else if (engine === 'osm') {
+    oDiv.style.visibility='visible'; oDiv.style.zIndex='3';
+    if (!osmMap) initOsmMap();
+    else { osmMap.setView([currentLat, currentLng], osmMap.getZoom()); osmMap.invalidateSize(); }
   }
-  toast(engine === 'kakao' ? '카카오 지도' : 'VWorld 지도');
+  var names = {kakao:'카카오 지도', vworld:'VWorld 지도', osm:'OSM 지도'};
+  toast(names[engine] || engine);
 }
 
 function initVwMap() {
@@ -616,32 +626,47 @@ function initVwMap() {
 
 function loadVwFrame(lng, lat) {
   var fr = document.getElementById('vwFrame');
-  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
-    + '<script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=' + VWORLD_KEY + '"><\/script>'
-    + '</head><body style="margin:0;overflow:hidden">'
-    + '<div id="vmap" style="width:100%;height:100vh"></div>'
-    + '<script>'
-    + 'var map=new vw.Map();'
-    + 'map.setOption({mapId:"vmap",initPosition:new vw.CameraPosition(new vw.CoordZ('+lng+','+lat+',500),new vw.Direction(0,-90,0)),logo:false,navigation:true});'
-    + 'map.start();'+
-'map.getCanvas().addEventListener("contextmenu", function(e){'+
-'  e.preventDefault();'+
-'  var x = e.clientX;'+
-'  var y = e.clientY;'+
-'  window.parent.postMessage({type:"vwRightClick",x:x,y:y},"*");'+
-'});'+
-''+'window.addEventListener(\"message\", function(e){'
-+ '  if(e.data && e.data.type === \"move\"){'
-+ '    map.setCenter(new vw.Coord(e.data.lng, e.data.lat));'
-+ '  }'
-+ '});'
-+ ''
-    + 'map.onClick.addEventListener(function(wp,ep,carto){'
-    + '  if(!carto)return;'
-    + '  window.parent.postMessage({type:"vwClick",lng:carto.longitudeDD,lat:carto.latitudeDD},"*");'
-    + '});'
-    + '<\/script></body></html>';
-  fr.srcdoc = html;
+  var sc = [
+    '<!DOCTYPE html><html><head><meta charset="UTF-8"/>',
+    '<scr'+'ipt src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+VWORLD_KEY+'"></scr'+'ipt>',
+    '</head><body style="margin:0;overflow:hidden">',
+    '<div id="vmap" style="width:100%;height:100vh"></div>',
+    '<scr'+'ipt>',
+    'var map=new vw.Map();',
+    'map.setOption({mapId:"vmap",initPosition:new vw.CameraPosition(new vw.CoordZ('+lng+','+lat+',500),new vw.Direction(0,-90,0)),logo:false,navigation:true});',
+    'map.start();',
+    'map.onClick.addEventListener(function(wp,ep,carto){',
+    '  if(!carto)return;',
+    '  window.parent.postMessage({type:"vwClick",lng:carto.longitudeDD,lat:carto.latitudeDD},"*");',
+    '});',
+    'try{',
+    '  document.querySelector("canvas").addEventListener("contextmenu",function(e){',
+    '    e.preventDefault();',
+    '    window.parent.postMessage({type:"vwRightClick",x:e.clientX,y:e.clientY},"*");',
+    '  });',
+    '}catch(ex){}',
+    '</scr'+'ipt></body></html>'
+  ];
+  fr.srcdoc = sc.join('\n');
+}
+
+
+// ── OSM 지도 (CyclOSM — 등고선 포함) ──
+function initOsmMap() {
+  osmMap = L.map('osmMapDiv', { zoomControl: true }).setView([currentLat, currentLng], 17);
+  L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &mdash; Tiles: <a href="https://www.cyclosm.org">CyclOSM</a>',
+    maxZoom: 20,
+    subdomains: 'abc'
+  }).addTo(osmMap);
+  osmMap.on('click', function(e) {
+    onMapClick(e.latlng.lng, e.latlng.lat);
+  });
+  osmMap.on('contextmenu', function(e) {
+    ctxLng = e.latlng.lng; ctxLat = e.latlng.lat;
+    showCtxMenu(e.originalEvent.clientX, e.originalEvent.clientY);
+  });
+  setTimeout(function(){ osmMap.invalidateSize(); }, 300);
 }
 
 // ── 지도 유형 ──
@@ -657,89 +682,51 @@ function setMapType(type, btn) {
 // ── 레이어 ──
 function toggleCadastral(on) {
   if (!kakaoMap) return;
-  if (on) {
-    if (!VWORLD_KEY) {
-      // VWorld 키 없으면 카카오 기본 지적도 사용
-      kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-      toast('지적선+지번 ON (카카오)');
-      return;
-    }
-    // VWorld WMS 지적도 (더 정확)
-    var tilesrc = new kakao.maps.ImageMapType({
-      getTileUrl: function(x, y, z) {
-        var n = Math.pow(2, z);
-        var lng1 = (x/n)*360 - 180;
-        var lng2 = ((x+1)/n)*360 - 180;
-        var lat1r = Math.atan(Math.sinh(Math.PI*(1-2*y/n)));
-        var lat2r = Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)));
-        var lat1 = lat1r*180/Math.PI, lat2 = lat2r*180/Math.PI;
-        var bbox = [Math.min(lat1,lat2),lng1,Math.max(lat1,lat2),lng2].join(',');
-        return 'https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
-          +'&layers=lt_c_landinfobasemap&styles=lt_c_landinfobasemap&crs=EPSG:4326'
-          +'&bbox='+bbox+'&width=256&height=256&format=image/png&transparent=true'
-          +'&Key='+VWORLD_KEY;
-      },
-      tileSize: new kakao.maps.Size(256,256),
-      opacity: 0.85
-    });
-    wmsOverlays['cad'] = tilesrc;
-    kakaoMap.addOverlayMapTypeId(tilesrc);
-    toast('지적선+지번 ON');
-  } else {
-    if (wmsOverlays['cad']) {
-      kakaoMap.removeOverlayMapTypeId(wmsOverlays['cad']);
-      delete wmsOverlays['cad'];
-    } else {
-      kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-    }
-    toast('지적선+지번 OFF');
-  }
+  if (on) kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+  else kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+  toast(on ? '지적선+지번 ON' : '지적선+지번 OFF');
 }
 
 function toggleWmsLayer(type, on) {
   if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
   if (!kakaoMap) return;
-  var layerMap = {
-    yd: 'lt_c_ud',
-    contour: 'dem_contour',
-    elev: 'dem_high'
-  };
+  var layerMap = { yd: 'lt_c_ud', contour: 'dem_contour', elev: 'dem_high' };
   var layerName = layerMap[type];
   if (!layerName) return;
+  var names = { yd: '용도지역', contour: '등고선', elev: '표고점' };
   if (on) {
-    var wmsUrl = 'https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
-      + '&layers=' + layerName + '&styles=&crs=EPSG:4326'
-      + '&bbox={BBOX}&width=256&height=256&format=image/png&transparent=true'
-      + '&Key=' + VWORLD_KEY;
-    // 카카오 커스텀 타일
-    var tilesrc = new kakao.maps.ImageMapType({
-      getTileUrl: function(x, y, z) {
-        var n = Math.pow(2, z);
-        var lng1 = (x/n)*360 - 180;
-        var lng2 = ((x+1)/n)*360 - 180;
-        var lat1r = Math.atan(Math.sinh(Math.PI*(1-2*y/n)));
-        var lat2r = Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)));
-        var lat1 = lat1r*180/Math.PI, lat2 = lat2r*180/Math.PI;
-        var bbox = [Math.min(lat1,lat2),lng1,Math.max(lat1,lat2),lng2].join(',');
-        return 'https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
-          +'&layers='+layerName+'&styles=&crs=EPSG:4326'
-          +'&bbox='+bbox+'&width=256&height=256&format=image/png&transparent=true'
-          +'&Key='+VWORLD_KEY;
-      },
-      tileSize: new kakao.maps.Size(256,256),
-      opacity: 0.7
-    });
-    wmsOverlays[type] = tilesrc;
-    kakaoMap.addOverlayMapTypeId(tilesrc);
-    toast(type === 'yd' ? '용도지역 ON' : type === 'contour' ? '등고선 ON' : '표고점 ON');
+    // kakao.maps.Tileset 방식
+    var getTile = function(x, y, z) {
+      var n = Math.pow(2, z);
+      var lng1 = (x/n)*360 - 180;
+      var lng2 = ((x+1)/n)*360 - 180;
+      var lat1r = Math.atan(Math.sinh(Math.PI*(1-2*y/n)));
+      var lat2r = Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)));
+      var lat1 = lat1r*180/Math.PI, lat2 = lat2r*180/Math.PI;
+      var bbox = [Math.min(lat1,lat2),lng1,Math.max(lat1,lat2),lng2].join(',');
+      var img = document.createElement('img');
+      img.src = 'https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
+        +'&layers='+layerName+'&styles=&crs=EPSG:4326'
+        +'&bbox='+bbox+'&width=256&height=256&format=image/png&transparent=true'
+        +'&Key='+VWORLD_KEY;
+      img.style.width = '256px';
+      img.style.height = '256px';
+      img.style.opacity = '0.7';
+      return img;
+    };
+    var tileset = new kakao.maps.Tileset(256, 256, getTile);
+    wmsOverlays[type] = tileset;
+    kakaoMap.addOverlayMapTypeId(tileset);
+    toast(names[type] + ' ON');
   } else {
     if (wmsOverlays[type]) {
       kakaoMap.removeOverlayMapTypeId(wmsOverlays[type]);
       delete wmsOverlays[type];
     }
-    toast(type === 'yd' ? '용도지역 OFF' : type === 'contour' ? '등고선 OFF' : '표고점 OFF');
+    toast(names[type] + ' OFF');
   }
 }
+
 
 // ── 오프셋 보정 (화살표) ──
 function moveOffset(dx, dy) {
@@ -885,7 +872,8 @@ function onMapClick(lng, lat) {
 // ── 지도 이동 ──
 function moveMap(lng, lat) {
   if (kakaoMap) { kakaoMap.setCenter(new kakao.maps.LatLng(lat,lng)); kakaoMap.setLevel(3); moveMarker(lng,lat); }
-  if (vwMapInited&&vwMap) moveVwMap(lng,lat);
+  if (vwMapInited) moveVwMap(lng,lat);
+  if (osmMap) osmMap.setView([lat, lng], 17);
 }
 function moveMarker(lng, lat) {
   if (kakaoMarker&&kakaoMap) { kakaoMarker.setPosition(new kakao.maps.LatLng(lat,lng)); kakaoMarker.setMap(kakaoMap); }
