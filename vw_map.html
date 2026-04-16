@@ -40,7 +40,7 @@ if (_apiKey) {
 <script>
 var lng = parseFloat(_params.get('lng')) || 126.83;
 var lat = parseFloat(_params.get('lat')) || 37.20;
-var map, jijukAdded = false, _jijukLayer = null;
+var map, jijukAdded = false, _jijukLayer = null, _parcelGeom = null;
 
 window.addEventListener('load', function() {
   if (typeof vw === 'undefined') {
@@ -118,6 +118,41 @@ window.addEventListener('message', function(e) {
       jijukAdded = true;
     } else if (!e.data.on && _jijukLayer) {
       try { _jijukLayer.setVisible(false); } catch(ex){}
+    }
+  }
+
+  // 선택된 필지 하이라이트 (경계 빨간선)
+  if (e.data.type === 'highlightParcel') {
+    try {
+      // 기존 하이라이트 제거
+      if (_parcelGeom) {
+        try { map.getMap().removeObject(_parcelGeom); } catch(ex){}
+        _parcelGeom = null;
+      }
+      var coords = e.data.coords; // [[lng,lat],[lng,lat],...]
+      if (!coords || !coords.length) return;
+      var ar = [];
+      for (var i = 0; i < coords.length; i++) {
+        ar.push(new vw.Coord(coords[i][0], coords[i][1]));
+      }
+      var col = new vw.Collection(ar);
+      var poly = new vw.geom.Polygon(col);
+      poly.setId('selParcel_' + Date.now());
+      poly.setFillColor(new vw.Color(255, 60, 60, 80));
+      poly.setOutLineColor(new vw.Color(255, 30, 30, 255));
+      try { poly.setOutLineWidth(3); } catch(ex1){}
+      poly.create();
+      _parcelGeom = poly;
+    } catch(err) {
+      console.error('필지 하이라이트 오류:', err);
+    }
+  }
+
+  // 하이라이트 제거
+  if (e.data.type === 'clearHighlight') {
+    if (_parcelGeom) {
+      try { _parcelGeom.destroy(); } catch(ex){}
+      _parcelGeom = null;
     }
   }
 });
