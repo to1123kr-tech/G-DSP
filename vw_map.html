@@ -104,10 +104,12 @@ function initMap() {
         console.log('VWorld onClick fired:', carto);
         window.parent.postMessage({type: 'vwMapClicked'}, '*');
         if (!carto) return;
+        // longitudeDD/latitudeDD가 있으면 사용, 없으면 라디안→도 변환
+        var lng = (carto.longitudeDD !== undefined) ? carto.longitudeDD : (carto.longitude * 180 / Math.PI);
+        var lat = (carto.latitudeDD !== undefined) ? carto.latitudeDD : (carto.latitude * 180 / Math.PI);
         window.parent.postMessage({
           type: 'vwClick',
-          lng: carto.longitudeDD,
-          lat: carto.latitudeDD
+          lng: lng, lat: lat
         }, '*');
       });
       console.log('onClick 등록 완료');
