@@ -906,15 +906,14 @@ window.addEventListener('message', function(ev){
 });
 window.addEventListener('message', function(ev){
   if (ev.data && ev.data.type === 'vwRightClick') {
-    // iframe에서 계산한 실제 클릭 좌표 사용
-    if (ev.data.lng !== null && ev.data.lat !== null && ev.data.lng !== undefined) {
-      ctxLng = ev.data.lng;
-      ctxLat = ev.data.lat;
-    } else {
-      ctxLng = currentLng;
-      ctxLat = currentLat;
-    }
-    showCtxMenu(ev.data.x, ev.data.y);
+    // iframe 오프셋 계산
+    var fr = document.getElementById('vwFrame');
+    var rect = fr ? fr.getBoundingClientRect() : {left:0, top:0};
+    // 현재 좌표 기준으로 PNU 생성 (좌클릭이 안 되는 경우 대비)
+    // 부모 window에서는 currentLng/currentLat을 사용
+    ctxLng = currentLng;
+    ctxLat = currentLat;
+    showCtxMenu(ev.data.x + rect.left, ev.data.y + rect.top);
   }
 });
 
