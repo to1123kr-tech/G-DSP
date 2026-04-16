@@ -897,6 +897,8 @@ document.getElementById('mapWrap').addEventListener('contextmenu', function(e){
 // VWorld iframe에서 클릭 이벤트 수신
 window.addEventListener('message', function(ev){
   if (ev.data && ev.data.type === 'vwClick') {
+    currentLng = ev.data.lng;
+    currentLat = ev.data.lat;
     onMapClick(ev.data.lng, ev.data.lat);
   }
   if (ev.data && ev.data.type === 'vwMapClicked') {
@@ -915,8 +917,10 @@ window.addEventListener('message', function(ev){
     var rect = fr ? fr.getBoundingClientRect() : {left:0, top:0};
     // 현재 좌표 기준으로 PNU 생성 (좌클릭이 안 되는 경우 대비)
     // 부모 window에서는 currentLng/currentLat을 사용
-    ctxLng = currentLng;
-    ctxLat = currentLat;
+    ctxLng = ev.data.lng;
+    ctxLat = ev.data.lat;
+    currentLng = ctxLng;
+    currentLat = ctxLat;
     showCtxMenu(ev.data.x + rect.left, ev.data.y + rect.top);
   }
 });
@@ -925,7 +929,7 @@ window.addEventListener('message', function(ev){
 function cmSelect() {
   currentPnu=popupPnu; currentJibun=popupJibun; currentLng=ctxLng; currentLat=ctxLat;
   moveMarker(ctxLng,ctxLat); setSelBar(popupJibun); toast('✓ '+popupJibun+' 선택됨','ok');
-  highlightParcel(currentPnu);
+  setTimeout(function(){ highlightParcel(currentPnu); },200);
   closeCtxMenu();
 }
 
@@ -1191,7 +1195,7 @@ function downloadCadDxf() {
   }
   // 캐시에 없으면 하이라이트 요청 후 잠시 대기
   toast('지적도 DXF 준비중...');
-  highlightParcel(currentPnu);
+  setTimeout(function(){ highlightParcel(currentPnu); },200);
   var tries = 0;
   var waiter = setInterval(function(){
     tries++;
