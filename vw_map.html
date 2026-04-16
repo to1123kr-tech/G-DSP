@@ -1,6 +1,27 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"/>
-<style>*{margin:0;padding:0}html,body,#vmap{width:100%;height:100%;overflow:hidden}</style>
+<style>
+*{margin:0;padding:0}
+html,body,#vmap{width:100%;height:100%;overflow:hidden}
+#loadingCover{
+  position:fixed;inset:0;z-index:99999;
+  background:#1a1f2e;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;
+  transition:opacity 0.4s;
+  font-family:-apple-system,'Segoe UI',sans-serif;
+}
+#loadingCover.hide{opacity:0;pointer-events:none}
+.spinner{
+  width:40px;height:40px;
+  border:3px solid rgba(255,255,255,.2);
+  border-top-color:#4fc3f7;
+  border-radius:50%;
+  animation:spin 0.8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lbl{color:#aab;font-size:13px}
+</style>
 <script>
 // URL 파라미터에서 키 먼저 읽기
 var _params = new URLSearchParams(location.search);
@@ -12,6 +33,10 @@ if (_apiKey) {
 </script>
 </head><body>
 <div id="vmap"></div>
+<div id="loadingCover">
+  <div class="spinner"></div>
+  <div class="lbl">VWorld 지도 준비중...</div>
+</div>
 <script>
 var lng = parseFloat(_params.get('lng')) || 126.83;
 var lat = parseFloat(_params.get('lat')) || 37.20;
@@ -66,6 +91,12 @@ function initMap() {
 
   // 부모에 로드 완료 알림
   window.parent.postMessage({type: 'vwReady'}, '*');
+
+  // 줌인 완료 후 로딩 커버 숨기기 (전국지도 장면 가림)
+  setTimeout(function() {
+    var cover = document.getElementById('loadingCover');
+    if (cover) cover.classList.add('hide');
+  }, 3500);
 }
 
 // 부모에서 메시지 수신
