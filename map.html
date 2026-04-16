@@ -650,11 +650,53 @@ function setMapType(type, btn) {
 }
 
 // ── 레이어 ──
+function _wmsUrl(layerName, bbox) {
+  return 'https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
+    +'&layers='+layerName+'&styles=&crs=EPSG:4326'
+    +'&bbox='+bbox+'&width=256&height=256&format=image/png&transparent=true'
+    +'&Key='+VWORLD_KEY;
+}
+function _tileXYZtoBBox(x, y, z) {
+  var n = Math.pow(2, z);
+  var lng1 = (x/n)*360 - 180;
+  var lng2 = ((x+1)/n)*360 - 180;
+  var lat1r = Math.atan(Math.sinh(Math.PI*(1-2*y/n)));
+  var lat2r = Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)));
+  var lat1 = lat1r*180/Math.PI, lat2 = lat2r*180/Math.PI;
+  return [Math.min(lat1,lat2),lng1,Math.max(lat1,lat2),lng2].join(',');
+}
+
+// VWorld WMS를 카카오 위에 올리는 공통 함수
+var _wmsRegistered = {};
+function _addWmsTileset(key, layerName) {
+  if (!_wmsRegistered[key]) {
+    var urlFunc = function(x, y, z) {
+      return _wmsUrl(layerName, _tileXYZtoBBox(x, y, z));
+    };
+    var ts = new kakao.maps.Tileset({
+      width: 256, height: 256,
+      urlFunc: urlFunc,
+      dark: false, minZoom: 0, maxZoom: 21
+    });
+    kakao.maps.Tileset.add('VW_'+key, ts);
+    _wmsRegistered[key] = true;
+  }
+  kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId['VW_'+key]);
+}
+function _removeWmsTileset(key) {
+  try { kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId['VW_'+key]); } catch(e){}
+}
+
 function toggleCadastral(on) {
   if (!kakaoMap) return;
-  if (on) kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-  else kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-  toast(on ? '지적선+지번 ON' : '지적선+지번 OFF');
+  if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
+  if (on) {
+    _addWmsTileset('CAD', 'lt_c_landinfobasemap');
+    toast('지적선+지번 ON');
+  } else {
+    _removeWmsTileset('CAD');
+    toast('지적선+지번 OFF');
+  }
 }
 
 function toggleWmsLayer(type, on) {
@@ -665,34 +707,10 @@ function toggleWmsLayer(type, on) {
   if (!layerName) return;
   var names = { yd: '용도지역', contour: '등고선', elev: '표고점' };
   if (on) {
-    // kakao.maps.Tileset 방식
-    var getTile = function(x, y, z) {
-      var n = Math.pow(2, z);
-      var lng1 = (x/n)*360 - 180;
-      var lng2 = ((x+1)/n)*360 - 180;
-      var lat1r = Math.atan(Math.sinh(Math.PI*(1-2*y/n)));
-      var lat2r = Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)));
-      var lat1 = lat1r*180/Math.PI, lat2 = lat2r*180/Math.PI;
-      var bbox = [Math.min(lat1,lat2),lng1,Math.max(lat1,lat2),lng2].join(',');
-      var img = document.createElement('img');
-      img.src = 'https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
-        +'&layers='+layerName+'&styles=&crs=EPSG:4326'
-        +'&bbox='+bbox+'&width=256&height=256&format=image/png&transparent=true'
-        +'&Key='+VWORLD_KEY;
-      img.style.width = '256px';
-      img.style.height = '256px';
-      img.style.opacity = '0.7';
-      return img;
-    };
-    var tileset = new kakao.maps.Tileset(256, 256, getTile);
-    wmsOverlays[type] = tileset;
-    kakaoMap.addOverlayMapTypeId(tileset);
+    _addWmsTileset(type.toUpperCase(), layerName);
     toast(names[type] + ' ON');
   } else {
-    if (wmsOverlays[type]) {
-      kakaoMap.removeOverlayMapTypeId(wmsOverlays[type]);
-      delete wmsOverlays[type];
-    }
+    _removeWmsTileset(type.toUpperCase());
     toast(names[type] + ' OFF');
   }
 }
