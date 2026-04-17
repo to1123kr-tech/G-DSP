@@ -14,15 +14,10 @@
   document.write('<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey='+jsKey+'&autoload=false">\x3C/script>');
 })();
 </script>
-<script>
-// VWorld 키 미리 확인 — 있으면 스크립트를 head에 동기 삽입
-(function(){
-  var k = localStorage.getItem('gdsp_vworld_key') || '';
-  if(k){
-    document.write('<script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+k+'">\x3C/script>');
-  }
-})();
-</script>
+<!-- OpenLayers (지적도 탭 VWorld 지도용) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.5.2/ol.css">
+<script src="https://cdn.jsdelivr.net/npm/ol@7.5.2/dist/ol.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <style>
 :root{
   --bg:#f5f7fa;--bg2:#eef1f6;--bg3:#e6eaf2;
@@ -306,9 +301,9 @@ function updateScaleBtns(){
 
   <!-- 지적도 -->
   <div class="tab-view" id="view-jideok">
-    <!-- VWorld 지도 (지적도 WFS 조회용) -->
+    <!-- VWorld OpenLayers 지도 -->
     <div style="position:relative;flex-shrink:0;height:58%">
-      <div id="vmap2" style="width:100%;height:100%"></div>
+      <div id="olMap2" style="width:100%;height:100%;background:#e6eaf2"></div>
       <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:420px">
         <input id="jdAddr" type="text" placeholder="지번 또는 도로명 검색…" onkeydown="if(event.key==='Enter')jdSearch()"
           style="flex:1;height:34px;padding:0 12px;background:#fff;border:1px solid var(--line2);border-radius:8px;font-size:12px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.15)">
@@ -316,10 +311,10 @@ function updateScaleBtns(){
       </div>
       <!-- 검색결과 드롭다운 -->
       <div id="jdSrchResult" style="position:absolute;top:50px;left:10px;z-index:1001;width:calc(100% - 20px);max-width:420px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none;max-height:180px;overflow-y:auto"></div>
-      <div id="vmap2Overlay" style="position:absolute;inset:0;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:500">
-        <svg style="width:40px;height:40px;opacity:.2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
-        <p style="font-size:12px;color:var(--txt3);text-align:center">VWorld API 키가 있으면<br>지적도를 바로 조회할 수 있습니다</p>
-        <button onclick="promptVworldKey()" style="height:32px;padding:0 16px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer">🔑 API 키 입력</button>
+      <!-- 상태 안내 (키 로드 전) -->
+      <div id="olMap2Overlay" style="position:absolute;inset:0;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:500">
+        <svg style="width:40px;height:40px;opacity:.3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+        <p id="olMap2Msg" style="font-size:12px;color:var(--txt3);text-align:center">지도 로딩 중…</p>
       </div>
     </div>
     <!-- 하단: 필지 정보 -->
@@ -339,18 +334,6 @@ function updateScaleBtns(){
         </div>
       </div>
     </div>
-    <!-- WFS form (hidden) -->
-    <form id="wfsForm" style="display:none">
-      <input type="hidden" name="key" id="wfsKey" value="">
-      <input type="hidden" name="domain" value="">
-      <input type="hidden" name="SERVICE" value="WFS">
-      <input type="hidden" name="version" value="1.1.0">
-      <input type="hidden" name="request" value="GetFeature">
-      <input type="hidden" name="TYPENAME" value="lt_c_landinfobasemap">
-      <input type="hidden" name="OUTPUT" value="text/javascript">
-      <input type="hidden" name="SRSNAME" value="EPSG:4326">
-      <input type="hidden" name="BBOX" value="">
-    </form>
   </div>
 
   <!-- 건축물대장 -->
@@ -508,7 +491,11 @@ function switchTab(t){
   document.getElementById('tab-'+t).classList.add('on');
   document.getElementById('view-'+t).classList.add('on');
   if(t==='dtm') initKakaoMap();
-  if(t==='jideok') initVmap2();
+  if(t==='jideok'){
+    initVmap2();
+    // 탭이 숨김 상태에서 지도가 초기화되면 크기 계산이 0이 되므로 전환 직후 보정
+    setTimeout(function(){ if(_olMap2) _olMap2.updateSize(); }, 50);
+  }
 }
 
 function promptVworldKey(){
@@ -1036,78 +1023,147 @@ function copyTiles(){
   });
 }
 
-/* ===================== VWorld 지도 2 (지적도 탭) ===================== */
-var _map2 = null, _map2loaded = false;
+/* ===================== 지적도 탭 (OpenLayers + VWorld, map.html 방식) ===================== */
+var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+var _olMap2 = null, _map2loaded = false;
+var _olHlSource2 = null;
+var _jdLng = 126.83, _jdLat = 37.20;
+
+// VWorld 키 서버 자동 로드 (map.html과 동일 구조)
+(function loadVworldKey(){
+  if(!_vwKey){
+    fetch(PROXY + '/api/vworld/key')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d && d.key){
+          _vwKey = d.key;
+          localStorage.setItem('gdsp_vworld_key', _vwKey);
+          console.log('[지적도] VWorld 키 로드 완료');
+        }
+      })
+      .catch(function(){ console.log('[지적도] VWorld 키 로드 실패'); });
+  }
+})();
 
 function initVmap2(){
-  if(_map2loaded || !_vwKey) return;
-  // vw 객체가 이미 로드됐으면 바로 사용, 아니면 스크립트 재로드 불가(중복)
-  if(typeof vw !== 'undefined'){
-    _doInitMap2();
-  } else if(!_map1loaded){
-    // 아직 스크립트 안 로드됨 — initVmap 먼저
-    initVmap();
-    setTimeout(initVmap2, 2000);
+  if(_map2loaded) return;
+  if(typeof ol === 'undefined'){
+    setTimeout(initVmap2, 500);
+    return;
   }
+  _doInitMap2();
 }
 
 function _doInitMap2(){
   if(_map2loaded) return;
-  document.getElementById('vmap2Overlay').style.display='none';
-  var opts = {
-    mapId:'vmap2',
-    initPosition: new vw.CameraPosition(
-      new vw.CoordZ(126.83, 37.2, 3000),
-      new vw.Direction(0,-90,0)
-    ),
-    logo:false, navigation:true
-  };
-  _map2 = new vw.Map();
-  _map2.setOption(opts);
-  _map2.start();
+
+  // 위성 배경 (Oracle 프록시)
+  var vwSatLayer = new ol.layer.Tile({
+    source: new ol.source.XYZ({
+      url: PROXY + '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg',
+      maxZoom: 19
+    })
+  });
+
+  // 지적도 WMS (Oracle 프록시)
+  window._olCadLayer2 = new ol.layer.Tile({
+    source: new ol.source.TileWMS({
+      url: PROXY + '/api/vw-wms',
+      params: { 'LAYERS':'lt_c_landinfobasemap', 'STYLES':'lt_c_landinfobasemap', 'FORMAT':'image/png', 'TRANSPARENT':true, 'TILED':true },
+      serverType:'mapserver'
+    }),
+    visible: true,
+    opacity: 0.9
+  });
+
+  // 필지 하이라이트 벡터
+  _olHlSource2 = new ol.source.Vector();
+  var hlLayer = new ol.layer.Vector({
+    source: _olHlSource2,
+    style: new ol.style.Style({
+      stroke: new ol.style.Stroke({ color:'rgba(255,30,30,1)', width:3 }),
+      fill: new ol.style.Fill({ color:'rgba(255,60,60,0.25)' })
+    })
+  });
+
+  _olMap2 = new ol.Map({
+    target: 'olMap2',
+    layers: [vwSatLayer, window._olCadLayer2, hlLayer],
+    view: new ol.View({
+      center: ol.proj.fromLonLat([_jdLng, _jdLat]),
+      zoom: 17,
+      maxZoom: 21,
+      minZoom: 6
+    }),
+    controls: []
+  });
+
+  // 클릭 → WFS 필지 조회
+  _olMap2.on('click', function(evt){
+    var coord = ol.proj.toLonLat(evt.coordinate);
+    wfsClick(coord[0], coord[1]);
+  });
+
   _map2loaded = true;
-
-  // 지적도 WMS
-  var wmsLayer = new vw.Layers();
-  var wmsSource = new vw.source.TileWMS();
-  wmsSource.setUrl('https://api.vworld.kr/req/wms?Key='+_vwKey+'&');
-  wmsSource.setParams('tilesize=256');
-  wmsSource.setLayers('lt_c_landinfobasemap');
-  wmsSource.setStyles('lt_c_landinfobasemap');
-  wmsSource.setFormat('image/png');
-  wmsLayer.add(new vw.layer.Tile(wmsSource));
-
-  // 클릭 → WFS 조회
-  document.getElementById('wfsKey').value = _vwKey;
-  _map2.onClick.addEventListener(wfsClick);
+  var ov = document.getElementById('olMap2Overlay');
+  if(ov) ov.style.display = 'none';
+  setTimeout(function(){ if(_olMap2) _olMap2.updateSize(); }, 100);
+  toast('지적도 지도 준비됨','ok');
 }
 
-function wfsClick(wp, ep, carto){
-  if(!carto) return;
-  var lat = carto.latitudeDD, lng = carto.longitudeDD;
-  var pos = _map2.getCurrentPosition().position;
-  var z = pos.z;
+// 지도 이동
+function moveVmap2(lng, lat){
+  _jdLng = lng; _jdLat = lat;
+  if(_olMap2){
+    _olMap2.getView().animate({
+      center: ol.proj.fromLonLat([lng, lat]),
+      zoom: 18,
+      duration: 400
+    });
+  }
+}
+
+// 클릭 → VWorld WFS 필지 조회
+function wfsClick(lng, lat){
+  if(!_vwKey){ toast('VWorld 키 로드 중…','err'); return; }
+  var z = _olMap2 ? _olMap2.getView().getZoom() : 17;
   var m = 1/(111000/z*1.48*50);
   var h = 1/(111000/z*1.85*50);
   var bbox = (lng-m)+','+(lat-h)+','+(lng+m)+','+(lat+h);
-  document.querySelector('#wfsForm [name=BBOX]').value = bbox;
 
   $.ajax({
     type:'get',
     url:'https://api.vworld.kr/req/wfs',
-    data: $('#wfsForm').serialize(),
+    data:{
+      key:_vwKey, domain:'', SERVICE:'WFS', version:'1.1.0',
+      request:'GetFeature', TYPENAME:'lt_c_landinfobasemap',
+      OUTPUT:'text/javascript', SRSNAME:'EPSG:4326', BBOX:bbox
+    },
     dataType:'jsonp',
-    async:false,
     jsonpCallback:'parseWfsResponse',
     success: function(data){
-      if(!data || data.totalFeatures===0){ toast('필지 조회 결과 없음','err'); return; }
-      var p = data.features[0].properties;
+      if(!data || !data.features || data.features.length===0){
+        toast('필지 조회 결과 없음','err'); return;
+      }
+      var f = data.features[0];
+      var p = f.properties;
       var addr = (p.sido_nm||'') + ' ' + (p.sgg_nm||'') + ' ' + (p.emd_nm||'')
                + (p.ri_nm ? ' '+p.ri_nm : '') + ' ' + (p.jibun||'').replace(/\s+$/,'');
       document.getElementById('jd-addr').textContent = addr;
       document.getElementById('jd-jmok').textContent = p.jimok_nm || p.jimok || '—';
       document.getElementById('jd-area').textContent = p.bchk ? p.bchk+'㎡' : (p.area ? p.area+'㎡' : '—');
       document.getElementById('jd-pnu').textContent = p.pnu || '—';
+
+      // 하이라이트
+      if(_olHlSource2 && f.geometry){
+        _olHlSource2.clear();
+        try{
+          var geom = new ol.format.GeoJSON().readGeometry(f.geometry, {
+            dataProjection:'EPSG:4326', featureProjection:'EPSG:3857'
+          });
+          _olHlSource2.addFeature(new ol.Feature({ geometry: geom }));
+        }catch(e){ console.log('하이라이트 실패', e); }
+      }
       toast('필지 조회됨','ok');
     },
     error: function(){ toast('WFS 조회 실패','err'); }
@@ -1178,42 +1234,10 @@ function jdSelectAddr(i){
   var item = box._list[i];
   if(!item) return;
   box.style.display='none';
-  // 지도 이동
-  if(_map2){
-    _map2.moveTo(new vw.CoordZ(item.lng, item.lat, 500));
-  }
+  // 지도 이동 후 WFS 자동 조회
+  moveVmap2(item.lng, item.lat);
   toast(item.addr+' 이동','ok');
-  // 클릭과 동일 — WFS 자동 조회 (좌표 기반)
-  setTimeout(function(){
-    if(!_map2) return;
-    var lat = item.lat, lng = item.lng;
-    var pos = _map2.getCurrentPosition().position;
-    var z = pos.z || 500;
-    var m = 1/(111000/z*1.48*50);
-    var h = 1/(111000/z*1.85*50);
-    var bbox = (lng-m)+','+(lat-h)+','+(lng+m)+','+(lat+h);
-    document.querySelector('#wfsForm [name=BBOX]').value = bbox;
-    $.ajax({
-      type:'get',
-      url:'https://api.vworld.kr/req/wfs',
-      data: $('#wfsForm').serialize(),
-      dataType:'jsonp',
-      async:false,
-      jsonpCallback:'parseWfsResponse',
-      success: function(data){
-        if(!data || data.totalFeatures===0){ toast('필지 조회 결과 없음','err'); return; }
-        var p = data.features[0].properties;
-        var addr = (p.sido_nm||'') + ' ' + (p.sgg_nm||'') + ' ' + (p.emd_nm||'')
-                 + (p.ri_nm ? ' '+p.ri_nm : '') + ' ' + (p.jibun||'').replace(/\s+$/,'');
-        document.getElementById('jd-addr').textContent = addr;
-        document.getElementById('jd-jmok').textContent = p.jimok_nm || p.jimok || '—';
-        document.getElementById('jd-area').textContent = p.bchk ? p.bchk+'㎡' : (p.area ? p.area+'㎡' : '—');
-        document.getElementById('jd-pnu').textContent = p.pnu || '—';
-        toast('필지 조회됨','ok');
-      },
-      error: function(){ toast('WFS 조회 실패','err'); }
-    });
-  }, 800);
+  setTimeout(function(){ wfsClick(item.lng, item.lat); }, 500);
 }
 
 /* ===================== 건축물대장 ===================== */
