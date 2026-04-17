@@ -1291,68 +1291,85 @@ function renderMemoList() {
 function downloadCadDxf() {
   if(!currentPnu){toast('필지를 먼저 선택하세요','err');return;}
   if(!VWORLD_KEY){toast('VWorld API 키 없음','err');return;}
-  var coords = _parcelCoordsCache[currentPnu];
-  if (coords) {
-    _writeDxfFromCoords(coords);
-    return;
-  }
-  // 캐시에 없으면 하이라이트 요청 후 잠시 대기
-  toast('지적도 DXF 준비중...');
-  setTimeout(function(){ highlightParcel(currentPnu); },200);
-  var tries = 0;
-  var waiter = setInterval(function(){
-    tries++;
-    var c = _parcelCoordsCache[currentPnu];
-    if (c) {
-      clearInterval(waiter);
-      _writeDxfFromCoords(c);
-    } else if (tries > 20) {
-      clearInterval(waiter);
-      toast('지적 데이터 없음','err');
-    }
-  }, 300);
+  toast('주변 필지 수집 중...');
+  // 주변 필지 포함 조회 (박스 검색)
+  fetch(PROXY+'/api/wfs-area?lng='+currentLng+'&lat='+currentLat+'&size=100')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var features = d && d.features;
+      if (!features || !features.length) { toast('지적 데이터 없음','err'); return; }
+      _writeDxfFromFeatures(features);
+    })
+    .catch(function(e){ toast('DXF 생성 실패','err'); console.error(e); });
 }
 
-function _writeDxfFromCoords(coords) {
+function _writeDxfFromFeatures(features) {
   try {
-    // WGS84 → Web Mercator 변환 (미터 단위 좌표)
-    var mercCoords = coords.map(function(c){
+    function toMerc(c){
       var x = c[0] * 20037508.34 / 180;
       var y = Math.log(Math.tan((90 + c[1]) * Math.PI / 360)) / (Math.PI / 180);
       y = y * 20037508.34 / 180;
       return [x, y];
-    });
-    // 한글을 유니코드 이스케이프로 (AutoCAD 호환)
+    }
     function toCad(s) {
-      return s.replace(/[\u0080-\uffff]/g, function(ch){
+      return String(s).replace(/[\u0080-\uffff]/g, function(ch){
         return '\\U+' + ('0000' + ch.charCodeAt(0).toString(16).toUpperCase()).slice(-4);
       });
     }
-    var jibunTxt = toCad(currentJibun || '지번');
-    var wmTxt = toCad('G-DSP 참고용 공식지적도 아님');
     var layerPar = toCad('지적선');
     var layerJib = toCad('지번');
     var layerWm = toCad('워터마크');
+    var wmTxt = toCad('G-DSP 참고용 공식지적도 아님');
 
     var dxf='0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n6\n0\nENDSEC\n';
     dxf+='0\nSECTION\n2\nENTITIES\n';
-    // 지적선 (폴리라인)
-    dxf+='0\nLWPOLYLINE\n8\n'+layerPar+'\n90\n'+mercCoords.length+'\n70\n1\n';
-    mercCoords.forEach(function(c){ dxf+='10\n'+c[0].toFixed(3)+'\n20\n'+c[1].toFixed(3)+'\n'; });
-    // 지번 텍스트
-    var cx = mercCoords.reduce(function(s,c){return s+c[0];},0)/mercCoords.length;
-    var cy = mercCoords.reduce(function(s,c){return s+c[1];},0)/mercCoords.length;
-    dxf+='0\nTEXT\n8\n'+layerJib+'\n10\n'+cx.toFixed(3)+'\n20\n'+cy.toFixed(3)+'\n40\n3\n1\n'+jibunTxt+'\n';
-    // 워터마크
-    dxf+='0\nTEXT\n8\n'+layerWm+'\n10\n'+cx.toFixed(3)+'\n20\n'+(cy-8).toFixed(3)+'\n40\n2\n1\n'+wmTxt+'\n';
+
+    var allCx = 0, allCy = 0, count = 0;
+    features.forEach(function(f){
+      var geom = f.geometry;
+      var rings;
+      if (geom.type === 'MultiPolygon') {
+        rings = geom.coordinates.map(function(p){return p[0];}); // 각 폴리곤의 외곽
+      } else if (geom.type === 'Polygon') {
+        rings = [geom.coordinates[0]];
+      } else return;
+      // 지번 텍스트
+      var jibun = (f.properties && (f.properties.jibun || f.properties.addr)) || '';
+      rings.forEach(function(ring){
+        var mercRing = ring.map(toMerc);
+        dxf+='0\nLWPOLYLINE\n8\n'+layerPar+'\n90\n'+mercRing.length+'\n70\n1\n';
+        mercRing.forEach(function(c){ dxf+='10\n'+c[0].toFixed(3)+'\n20\n'+c[1].toFixed(3)+'\n'; });
+        // 중심 계산
+        var cx = mercRing.reduce(function(s,c){return s+c[0];},0)/mercRing.length;
+        var cy = mercRing.reduce(function(s,c){return s+c[1];},0)/mercRing.length;
+        if (jibun) {
+          dxf+='0\nTEXT\n8\n'+layerJib+'\n10\n'+cx.toFixed(3)+'\n20\n'+cy.toFixed(3)+'\n40\n2\n1\n'+toCad(jibun)+'\n';
+        }
+        allCx += cx; allCy += cy; count++;
+      });
+    });
+
+    // 전체 중앙에 워터마크
+    if (count > 0) {
+      var mcx = allCx/count, mcy = allCy/count;
+      dxf+='0\nTEXT\n8\n'+layerWm+'\n10\n'+mcx.toFixed(3)+'\n20\n'+(mcy-50).toFixed(3)+'\n40\n3\n1\n'+wmTxt+'\n';
+    }
     dxf+='0\nENDSEC\n0\nEOF\n';
     var blob=new Blob([dxf],{type:'text/plain;charset=utf-8'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download=(currentJibun||'지적도').replace(/\s/g,'_')+'_지적도.dxf';
+    a.download=(currentJibun||'지적도').replace(/\s/g,'_')+'_지적도('+features.length+'필지).dxf';
     a.click();
-    toast('지적도 DXF 다운로드 완료','ok');
+    toast('지적도 DXF 다운로드 완료 ('+features.length+'필지)','ok');
   } catch(e) { toast('DXF 생성 실패','err'); console.error(e); }
+}
+
+function _writeDxfFromCoords(coords) {
+  // 단일 필지 fallback (legacy)
+  _writeDxfFromFeatures([{
+    geometry: { type: 'Polygon', coordinates: [coords] },
+    properties: { jibun: currentJibun }
+  }]);
 }
 
 function downloadMapImage(type) {
