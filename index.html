@@ -5859,37 +5859,49 @@
       kakaoMarker.setMap(kakaoMap);
       kakao.maps.event.addListener(kakaoMap, 'click', function (e) {
         var lat = e.latLng.getLat(), lng = e.latLng.getLng();
-        // 마커 이동
         kakaoMarker.setPosition(e.latLng);
         setText('mapD', '조회중...');
-        // SDK geocoder로 주소 조회 (REST API 키 불필요)
+        // 1단계: 주소 가져오기
         kakaoGeocoder.coord2Address(lng, lat, function(result, status) {
-          if (status !== kakao.maps.services.Status.OK || !result[0] || !result[0].address) {
+          var jibun = '';
+          var mainNo = '0', subNo = '0';
+          if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
+            var addr = result[0].address;
+            jibun = addr.address_name || '';
+            mainNo = addr.main_address_no || '0';
+            subNo = addr.sub_address_no || '0';
+          }
+          if (!jibun) {
             setText('mapD', '위도: ' + lat.toFixed(5) + ' / 경도: ' + lng.toFixed(5));
             return;
           }
-          var addr = result[0].address;
-          var jibun = addr.address_name || '';
-          if (!addr.b_code) {
-            setText('mapD', '📍 ' + jibun);
-            toast('📍 ' + jibun);
-            return;
-          }
-          var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
-          currentPnu = pnu; currentJibun = jibun; armed = true;
-          // UI 업데이트
           setText('mapD', '📍 ' + jibun);
           setText('mapT', jibun);
-          setText('ndInfoJibun', jibun);
-          setText('ndRcJibun', jibun);
-          setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
-          var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
-          var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
-          var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
-          // 토지+건축물 정보 API 호출
-          ndCallLandApi(pnu, lng, lat);
-          ndCallBldApi(pnu);
-          toast('✓ ' + jibun, 'ok');
+          // 2단계: 법정동코드 가져오기 (coord2RegionCode — b_code 확실)
+          kakaoGeocoder.coord2RegionCode(lng, lat, function(regionResult, regionStatus) {
+            if (regionStatus !== kakao.maps.services.Status.OK || !regionResult) return;
+            var bCode = '';
+            for (var i = 0; i < regionResult.length; i++) {
+              if (regionResult[i].region_type === 'B') {
+                bCode = regionResult[i].code;
+                break;
+              }
+            }
+            if (!bCode) return;
+            var pnu = bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+            currentPnu = pnu; currentJibun = jibun; armed = true;
+            // UI 업데이트
+            setText('ndInfoJibun', jibun);
+            setText('ndRcJibun', jibun);
+            setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
+            var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
+            var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
+            var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
+            // 토지+건축물 정보 API 호출
+            ndCallLandApi(pnu, lng, lat);
+            ndCallBldApi(pnu);
+            toast('✓ ' + jibun, 'ok');
+          });
         });
       });
       setText('mapT', '카카오 지도');
