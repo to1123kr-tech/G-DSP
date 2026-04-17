@@ -601,18 +601,18 @@ function initVwMap() {
   if (!VWORLD_KEY) { toast('VWorld API 키 없음 — 설정에서 입력하세요', 'err'); return; }
   vwMapInited = true;
 
-  // VWorld 위성 배경 타일
+  // VWorld 위성 배경 타일 (서버 프록시 경유)
   var vwSatLayer = new ol.layer.Tile({
     source: new ol.source.XYZ({
-      url: 'https://api.vworld.kr/req/wmts/1.0.0/' + VWORLD_KEY + '/Satellite/{z}/{y}/{x}.jpeg',
+      url: PROXY + '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg',
       maxZoom: 19
     })
   });
 
-  // 지적도 WMS 레이어 (기본 ON)
+  // 지적도 WMS 레이어 (기본 ON, 서버 프록시 경유)
   window._olCadLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
-      url: 'https://api.vworld.kr/req/wms?Key=' + VWORLD_KEY + '&',
+      url: PROXY + '/api/vw-wms',
       params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true },
       serverType: 'mapserver'
     }),
@@ -1036,11 +1036,8 @@ var _parcelCoordsCache = {};
 function highlightParcel(pnu) {
   if (!pnu || !VWORLD_KEY) return;
   if (pnu.indexOf('undefined') >= 0) { console.log('PNU 오류:', pnu); return; }
-  var url='https://api.vworld.kr/req/wfs?service=WFS&version=1.1.0&request=GetFeature'
-    +'&typename=lt_c_lsmd_cont_ldreg&output=application/json'
-    +'&filter='+encodeURIComponent('<Filter><PropertyIsEqualTo><PropertyName>pnu</PropertyName><Literal>'+pnu+'</Literal></PropertyIsEqualTo></Filter>')
-    +'&key='+VWORLD_KEY;
-  fetch(PROXY+'/api/proxy?url='+encodeURIComponent(url))
+  // 서버 프록시로 WFS 호출 (서버에서 PNU 변환 처리)
+  fetch(PROXY+'/api/wfs?pnu='+pnu)
     .then(function(r){return r.json();})
     .then(function(d){
       var features=d&&d.features;
