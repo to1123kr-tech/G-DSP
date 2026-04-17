@@ -5890,6 +5890,18 @@
           var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
           var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
           var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
+          // 기존 정보 초기화 (로딩중 표시)
+          setText('ndInfoYd', '조회중...'); setText('ndInfoJimok', '...'); setText('ndInfoGonsi', '...');
+          setText('ndInfoArea', '...'); setText('ndInfoBcr', '...'); setText('ndInfoFar', '...');
+          setText('ndInfoUse', '...'); setText('ndInfoFloor', '...'); setText('ndInfoBldArea', '...');
+          setText('ndInfoTotArea', '...'); setText('ndInfoYear', '...');
+          setText('ndRcYd', '...'); setText('ndRcJm', '...'); setText('ndRcGonsi', '...');
+          setText('ndRcBcr', '...'); setText('ndRcFar', '...'); setText('ndRcUse', '...');
+          setText('gYongdo', '...'); setText('gJimok', '...'); setText('gGonsi', '...');
+          setText('gBcr', '...'); setText('gFar', '...');
+          setText('rcYd', '...'); setText('rcJm', '...'); setText('rcGonsi', '...');
+          setText('rcBcr', '...'); setText('rcFar', '...'); setText('rcUse', '...');
+          setText('bUse', '...'); setText('bFloor', '...'); setText('bArea', '...'); setText('bYear', '...');
           // 토지+건축물 정보 API 호출
           ndCallLandApi(pnu, lng, lat);
           ndCallBldApi(pnu);
