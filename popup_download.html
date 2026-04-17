@@ -5,19 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>G-DSP — 다운로드 · 발급</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.5.2/ol.css">
+<script src="https://cdn.jsdelivr.net/npm/ol@7.5.2/dist/ol.js"></script>
 <script>
-// 카카오 지도 SDK 동적 로드
+// 카카오 지도 SDK (services 라이브러리 포함 - 좌표→주소 변환용)
 (function(){
-  // 1) localStorage에 JS키 저장되어 있으면 사용
-  // 2) 없으면 index.html과 동일한 키 사용 (같은 앱이므로)
   var jsKey = localStorage.getItem('gdsp_kakao_js') || '0f432d6e8470eed32f947e3c7db146b9';
   document.write('<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey='+jsKey+'&libraries=services&autoload=false">\x3C/script>');
 })();
 </script>
-<!-- OpenLayers (지적도 탭 VWorld 지도용) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.5.2/ol.css">
-<script src="https://cdn.jsdelivr.net/npm/ol@7.5.2/dist/ol.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <style>
 :root{
   --bg:#f5f7fa;--bg2:#eef1f6;--bg3:#e6eaf2;
@@ -203,9 +199,12 @@ function updateScaleBtns(){
         <div class="sec" style="margin:0;padding:14px">
           <div class="sec-t" style="margin-bottom:8px">📍 도각번호</div>
           <div id="tileBox" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;min-height:26px">
-            <span style="font-size:11px;color:var(--txt3)">지도 클릭 시 자동 입력</span>
+            <span style="font-size:11px;color:var(--txt3)">지도 클릭 또는 아래 직접 입력</span>
           </div>
-          <input class="inp" id="ngiiCodeInput" type="text" placeholder="도각번호 직접 입력 (예: 37616024)" style="height:34px;font-size:12px;width:100%;margin-bottom:8px">
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input class="inp" id="ngiiCodeInput" type="text" placeholder="도각번호 직접 입력 (예: 37616024)" style="height:34px;font-size:12px;flex:1" onkeydown="if(event.key==='Enter')addManualCode()">
+            <button class="btn-primary" style="height:34px;font-size:11px;padding:0 14px;white-space:nowrap" onclick="addManualCode()">추가</button>
+          </div>
           <button class="btn-outline" style="width:100%;height:32px;font-size:11px" onclick="copyTiles()">📋 도각번호 복사</button>
         </div>
 
@@ -248,15 +247,6 @@ function updateScaleBtns(){
           <button class="btn-primary" id="ngiiDlBtn" style="flex:1;height:44px;font-size:14px;font-weight:900" onclick="startNgiiDownload()">⬇ 다운로드</button>
         </div>
 
-        <!-- 상태 메시지 -->
-        <div id="ngiiStatusBox" style="display:none;padding:10px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;font-size:11px;color:var(--txt2);line-height:1.7">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-            <span id="ngiiStatusIcon" style="font-size:14px">⏳</span>
-            <b id="ngiiStatusTitle" style="color:var(--blue2)">대기 중</b>
-          </div>
-          <div id="ngiiStatusDetail" style="font-size:10px;color:var(--txt3);padding-left:20px"></div>
-        </div>
-
         <!-- 프로그램 설치 -->
         <div style="margin-top:6px;padding:10px 12px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:8px" id="programSection">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -284,8 +274,6 @@ function updateScaleBtns(){
           <div style="font-size:12px;font-weight:900;color:var(--red);margin-bottom:8px">⚠ 이용 안내 (필독)</div>
           <div style="font-size:11px;color:var(--txt2);line-height:1.9">
             📄 서버 보호를 위해 <b>1장씩만</b> 다운로드됩니다<br>
-            🔒 <b>개인정보(아이디·비밀번호)는 서버에 저장되지 않습니다</b><br>
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;브라우저 로컬에만 저장되며, 로그인에만 사용됩니다<br>
             🚫 다운로드된 수치지형도는<br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b style="color:var(--red)">상업적 판매 · 재배포 금지</b><br>
             ⚖ 「공간정보의 구축 및 관리 등에 관한 법률」<br>
@@ -301,24 +289,24 @@ function updateScaleBtns(){
 
   <!-- 지적도 -->
   <div class="tab-view" id="view-jideok">
-    <!-- VWorld OpenLayers 지도 -->
-    <div style="position:relative;flex-shrink:0;height:58%">
-      <div id="olMap2" style="width:100%;height:100%;background:#e6eaf2"></div>
+    <!-- OpenLayers 지도 (지적도 WMS 오버레이) -->
+    <div style="position:relative;flex-shrink:0;height:52%">
+      <div id="vmap2" style="width:100%;height:100%;background:#e8eef4"></div>
       <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:420px">
         <input id="jdAddr" type="text" placeholder="지번 또는 도로명 검색…" onkeydown="if(event.key==='Enter')jdSearch()"
           style="flex:1;height:34px;padding:0 12px;background:#fff;border:1px solid var(--line2);border-radius:8px;font-size:12px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.15)">
         <button onclick="jdSearch()" style="height:34px;padding:0 14px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">검색</button>
       </div>
-      <!-- 검색결과 드롭다운 -->
       <div id="jdSrchResult" style="position:absolute;top:50px;left:10px;z-index:1001;width:calc(100% - 20px);max-width:420px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none;max-height:180px;overflow-y:auto"></div>
-      <!-- 상태 안내 (키 로드 전) -->
-      <div id="olMap2Overlay" style="position:absolute;inset:0;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:500">
-        <svg style="width:40px;height:40px;opacity:.3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
-        <p id="olMap2Msg" style="font-size:12px;color:var(--txt3);text-align:center">지도 로딩 중…</p>
+      <!-- 지도 범례 -->
+      <div style="position:absolute;bottom:10px;right:10px;z-index:1000;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.1);line-height:1.6">
+        <div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:rgba(251,191,36,.5);border:1.5px solid #d97706;display:inline-block"></span>선택 필지</div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:rgba(37,99,235,.1);border:1.5px dashed #2563eb;display:inline-block"></span>반경 영역</div>
       </div>
     </div>
-    <!-- 하단: 필지 정보 -->
+    <!-- 하단: 필지 정보 + 반경 DXF -->
     <div style="flex:1;overflow-y:auto;padding:12px 16px">
+      <!-- 필지 정보 -->
       <div class="sec" style="margin-bottom:10px">
         <div class="sec-t" style="margin-bottom:10px">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
@@ -333,7 +321,87 @@ function updateScaleBtns(){
           <button class="btn-outline" style="flex:1" onclick="sendJdToParent()">↩ 메인으로 전송</button>
         </div>
       </div>
+
+      <!-- 반경 DXF 다운로드 -->
+      <div class="sec" style="margin-bottom:10px">
+        <div class="sec-t" style="margin-bottom:10px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+          반경 DXF 다운로드
+        </div>
+        <p style="font-size:11px;color:var(--txt3);margin-bottom:8px;line-height:1.55">
+          필지 클릭 후 반경 내 지적선·건물·도로 등을 <b style="color:var(--blue2)">EPSG:5186 (한국 CAD 표준)</b> 좌표계 DXF로 다운로드. 경계에 걸친 큰 필지도 구멍 없이 포함돼요.
+        </p>
+
+        <!-- 반경 선택 -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:11px;color:var(--txt2);font-weight:700;margin-bottom:6px">반경</div>
+          <div style="display:flex;gap:5px" id="radiusBtnGroup">
+            <button class="rad-btn" data-r="200" onclick="setRadius(200)">200m</button>
+            <button class="rad-btn on" data-r="500" onclick="setRadius(500)">500m</button>
+            <button class="rad-btn" data-r="1000" onclick="setRadius(1000)">1km</button>
+            <button class="rad-btn" data-r="1500" onclick="setRadius(1500)">1.5km</button>
+          </div>
+        </div>
+
+        <!-- 레이어 체크박스 -->
+        <div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="font-size:11px;color:var(--txt2);font-weight:700">포함 레이어</div>
+            <div style="display:flex;gap:4px">
+              <button class="hbtn" onclick="toggleAllLayers(true)" style="height:22px;padding:0 8px;font-size:10px">전체</button>
+              <button class="hbtn" onclick="toggleAllLayers(false)" style="height:22px;padding:0 8px;font-size:10px">해제</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+            <label class="tile-row" style="cursor:pointer">
+              <input type="checkbox" class="lyr-chk" value="cadastra" checked>
+              <span style="color:#dc2626">■</span> 지적선 <span style="color:var(--txt3);font-size:10px">(필수)</span>
+            </label>
+            <label class="tile-row" style="cursor:pointer">
+              <input type="checkbox" class="lyr-chk" value="building" checked>
+              <span style="color:#2563eb">■</span> 건물
+            </label>
+            <label class="tile-row" style="cursor:pointer">
+              <input type="checkbox" class="lyr-chk" value="road" checked>
+              <span style="color:#334155">■</span> 도로
+            </label>
+            <label class="tile-row" style="cursor:pointer">
+              <input type="checkbox" class="lyr-chk" value="zoning" checked>
+              <span style="color:#059669">■</span> 용도지역
+            </label>
+            <label class="tile-row" style="cursor:pointer">
+              <input type="checkbox" class="lyr-chk" value="greenbelt">
+              <span style="color:#b45309">■</span> 개발제한구역
+            </label>
+            <label class="tile-row" style="cursor:pointer">
+              <input type="checkbox" class="lyr-chk" value="farmland">
+              <span style="color:#7c3aed">■</span> 농업진흥지역
+            </label>
+            <label class="tile-row" style="cursor:pointer;grid-column:span 2">
+              <input type="checkbox" class="lyr-chk" value="hazard">
+              <span style="color:#ea580c">■</span> 재해위험지구
+            </label>
+          </div>
+        </div>
+
+        <!-- 다운로드 버튼 -->
+        <button id="dxfDlBtn" class="btn-primary" style="width:100%;height:44px;font-size:13px" onclick="downloadCircleDxf()">
+          📐 반경 DXF 다운로드
+        </button>
+        <div id="dxfStatus" style="margin-top:8px;font-size:11px;color:var(--txt3);text-align:center;min-height:16px"></div>
+      </div>
+
+      <!-- 이용 안내 -->
+      <div style="padding:10px 12px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:8px;font-size:11px;color:var(--txt2);line-height:1.6">
+        <b style="color:var(--blue2)">이용 안내</b><br>
+        • 좌표계: <b>EPSG:5186</b> (중부원점 TM, 한국 CAD 표준)<br>
+        • 단위: <b>미터(m)</b>, X=동서(easting), Y=남북(northing)<br>
+        • 구멍 방지: 반경의 60% 버퍼 자동 확장 조회<br>
+        • 데이터 출처: <b>VWorld 공간정보 오픈플랫폼</b>
+      </div>
     </div>
+    <!-- WFS form (legacy, 제거 예정) -->
+    <form id="wfsForm" style="display:none"></form>
   </div>
 
   <!-- 건축물대장 -->
@@ -491,28 +559,11 @@ function switchTab(t){
   document.getElementById('tab-'+t).classList.add('on');
   document.getElementById('view-'+t).classList.add('on');
   if(t==='dtm') initKakaoMap();
-  if(t==='jideok'){
-    initVmap2();
-    // 탭이 숨김 상태에서 지도가 초기화되면 크기 계산이 0이 되므로 전환 직후 보정
-    setTimeout(function(){ if(_olMap2) _olMap2.updateSize(); }, 50);
-  }
+  if(t==='jideok') initVmap2();
 }
 
 function promptVworldKey(){
-  var k = prompt('VWorld API 키를 입력하세요:','');
-  if(k && k.trim()){
-    _vwKey = k.trim();
-    localStorage.setItem('gdsp_vworld_key', _vwKey);
-    // 스크립트가 이미 로드됐으면 바로 초기화, 아니면 새로고침
-    if(typeof vw !== 'undefined'){
-      initVmap();
-      initVmap2();
-    } else {
-      if(confirm('키가 저장됐습니다. 지도를 표시하려면 새로고침이 필요합니다. 지금 새로고침할까요?')){
-        location.reload();
-      }
-    }
-  }
+  toast('VWorld API는 서버 프록시로 자동 연동됨 (별도 키 불필요)','ok');
 }
 
 function toggleTheme(){
@@ -772,51 +823,14 @@ function loadNgiiDlConfig(){
   if(first==='0'){ var e=document.getElementById('ngiiFirstRun'); if(e) e.checked=false; }
 }
 
-function setNgiiStatus(icon, title, detail, color){
-  var box = document.getElementById('ngiiStatusBox');
-  var ic = document.getElementById('ngiiStatusIcon');
-  var tt = document.getElementById('ngiiStatusTitle');
-  var dt = document.getElementById('ngiiStatusDetail');
-  if(!box) return;
-  box.style.display = 'block';
-  ic.textContent = icon || '⏳';
-  tt.textContent = title || '';
-  tt.style.color = color || 'var(--blue2)';
-  dt.innerHTML = detail || '';
-  if(color === 'var(--red)'){
-    box.style.background = 'rgba(239,68,68,.06)';
-    box.style.borderColor = 'rgba(239,68,68,.25)';
-  } else if(color === 'var(--green)' || icon === '✅'){
-    box.style.background = 'rgba(34,197,94,.06)';
-    box.style.borderColor = 'rgba(34,197,94,.25)';
-  } else {
-    box.style.background = 'rgba(37,99,235,.06)';
-    box.style.borderColor = 'rgba(37,99,235,.2)';
-  }
-}
-
 function startNgiiDownload(){
-  // 도각번호 수집 (tileBox = 지도 클릭 결과, ngiiCodeInput = 직접 입력)
+  // 도각번호 수집 (tileBox + 직접입력)
   var codes = [];
   document.querySelectorAll('#tileBox span').forEach(function(s){
     var c = s.textContent.replace('⧉','').trim();
     if(c && /^\d+$/.test(c)) codes.push(c);
   });
-  // 직접 입력값 우선 (입력창에 값이 있으면 그것을 사용)
-  var manualCode = (document.getElementById('ngiiCodeInput').value||'').trim();
-  if(manualCode){
-    if(!/^\d{7,10}$/.test(manualCode)){
-      setNgiiStatus('❌','도각번호 형식 오류','7~10자리 숫자를 입력하세요','var(--red)');
-      toast('올바른 도각번호를 입력하세요 (7~10자리 숫자)','err');
-      return;
-    }
-    codes = [manualCode];
-  }
-  if(!codes.length){
-    setNgiiStatus('❌','도각번호 없음','지도를 클릭하거나 도각번호를 직접 입력하세요','var(--red)');
-    toast('도각번호를 먼저 선택하세요 (지도 클릭 또는 직접 입력)','err');
-    return;
-  }
+  if(!codes.length){ toast('도각번호를 먼저 선택하세요 (지도 클릭 또는 직접 입력)','err'); return; }
   if(codes.length > 1){
     toast('서버 부하 방지를 위해 1장씩만 다운로드 가능합니다. 첫 번째 도각만 다운로드합니다.');
     codes = [codes[0]];
@@ -824,24 +838,12 @@ function startNgiiDownload(){
 
   var id = document.getElementById('ngiiDlId').value.trim();
   var pw = document.getElementById('ngiiDlPw').value;
-  if(!id){
-    setNgiiStatus('❌','아이디 없음','국토정보플랫폼 아이디를 입력하세요','var(--red)');
-    toast('아이디를 입력하세요','err'); return;
-  }
-  if(!pw){
-    setNgiiStatus('❌','비밀번호 없음','국토정보플랫폼 비밀번호를 입력하세요','var(--red)');
-    toast('비밀번호를 입력하세요','err'); return;
-  }
+  if(!id){ toast('아이디를 입력하세요','err'); return; }
+  if(!pw){ toast('비밀번호를 입력하세요','err'); return; }
 
   var p1 = document.getElementById('ngiiPurpose1').value;
   var p2 = document.getElementById('ngiiPurpose2').value;
-  if(!p1 || !p2){
-    setNgiiStatus('❌','사용 용도 미선택','용도 대분류·소분류를 모두 선택하세요','var(--red)');
-    toast('사용 용도를 선택하세요','err'); return;
-  }
-
-  // 첫 실행 모드 = 브라우저 보임(visible=1) / 해제 = 백그라운드(visible=0)
-  var visible = document.getElementById('ngiiFirstRun').checked ? '1' : '0';
+  if(!p1 || !p2){ toast('사용 용도를 선택하세요','err'); return; }
 
   // gdsp:// 커스텀 프로토콜로 로컬 프로그램 호출 (아이디/비번 포함)
   var params = {
@@ -850,36 +852,13 @@ function startNgiiDownload(){
     id: id,
     pw: btoa(unescape(encodeURIComponent(pw))),
     purpose1: p1,
-    purpose2: p2,
-    visible: visible
+    purpose2: p2
   };
   var uri = 'gdsp://download?' + Object.keys(params).map(function(k){ return k+'='+encodeURIComponent(params[k]); }).join('&');
 
-  // 상태 표시
-  setNgiiStatus('🚀','다운로더 실행 요청',
-    '도각번호 <b>'+codes[0]+'</b> — '+(visible==='1'?'<b>브라우저 표시 모드</b>':'<b>백그라운드 모드</b>')+'<br>'
-    +'• 프로그램이 설치돼 있으면 자동 실행됩니다<br>'
-    +'• 설치 안내 팝업이 뜨면 <b>"열기"</b> 또는 <b>"허용"</b>을 눌러주세요<br>'
-    +'• 5초 이상 반응 없으면 아래 프로그램을 먼저 설치하세요');
-
   window.location.href = uri;
 
-  // 사용자가 프로그램 설치 안 했을 때 안내 (브라우저가 프로토콜 처리 못하면 그냥 조용히 실패하므로 타임아웃 안내)
-  setTimeout(function(){
-    var box = document.getElementById('ngiiStatusBox');
-    if(box && box.style.display !== 'none'){
-      // 버튼 추가
-      var dt = document.getElementById('ngiiStatusDetail');
-      if(dt && dt.innerHTML.indexOf('재시도') === -1){
-        dt.innerHTML += '<div style="margin-top:6px;display:flex;gap:4px">'
-          +'<button onclick="startNgiiDownload()" style="flex:1;height:26px;font-size:10px;border:1px solid var(--blue);background:var(--blue);color:#fff;border-radius:5px;cursor:pointer">🔄 재시도</button>'
-          +'<button onclick="document.getElementById(\'ngiiStatusBox\').style.display=\'none\'" style="flex:1;height:26px;font-size:10px;border:1px solid var(--line);background:transparent;color:var(--txt3);border-radius:5px;cursor:pointer">닫기</button>'
-          +'</div>';
-      }
-    }
-  }, 3000);
-
-  toast('다운로더 실행 요청됨','ok');
+  toast('다운로더 실행 요청 — 프로그램이 설치되지 않았다면 아래에서 설치하세요','ok');
 }
 
 /* ===================== 지번검색 (카카오 REST) ===================== */
@@ -1023,222 +1002,398 @@ function copyTiles(){
   });
 }
 
-/* ===================== 지적도 탭 (OpenLayers + VWorld, map.html 방식) ===================== */
-var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
-var _olMap2 = null, _map2loaded = false;
-var _olHlSource2 = null;
-var _jdLng = 126.83, _jdLat = 37.20;
-
-// VWorld 키 서버 자동 로드 (map.html과 동일 구조)
-(function loadVworldKey(){
-  if(!_vwKey){
-    fetch(PROXY + '/api/vworld/key')
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        if(d && d.key){
-          _vwKey = d.key;
-          localStorage.setItem('gdsp_vworld_key', _vwKey);
-          console.log('[지적도] VWorld 키 로드 완료');
-        }
-      })
-      .catch(function(){ console.log('[지적도] VWorld 키 로드 실패'); });
-  }
-})();
+/* ===================== OpenLayers 지도 (지적도 탭) ===================== */
+var _olMap2 = null, _olMap2loaded = false;
+var _parcelSource = null;   // 선택 필지 피처 레이어
+var _radiusSource = null;   // 반경 원 레이어
+var _selectedParcel = null; // {pnu, jibun, addr, lng, lat}
+var _currentRadius = 500;   // 기본 반경 500m
 
 function initVmap2(){
-  if(_map2loaded) return;
+  if(_olMap2loaded) return;
   if(typeof ol === 'undefined'){
     setTimeout(initVmap2, 500);
     return;
   }
-  // 카카오 SDK를 먼저 초기화 (services.Geocoder 사용 위해)
-  if(typeof kakao !== 'undefined' && kakao.maps && !kakao.maps.services && typeof kakao.maps.load === 'function'){
-    kakao.maps.load(function(){
-      console.log('[지적도] 카카오 services 로드 완료');
-      _doInitMap2();
-    });
-    return;
-  }
-  _doInitMap2();
-}
 
-function _doInitMap2(){
-  if(_map2loaded) return;
+  var PROXY = 'http://168.107.15.68:5050';
 
-  // 위성 배경 (Oracle 프록시)
-  var vwSatLayer = new ol.layer.Tile({
+  // 기본 레이어 - OSM 대체: VWorld 위성 타일 (Oracle 프록시 경유)
+  var bgLayer = new ol.layer.Tile({
     source: new ol.source.XYZ({
       url: PROXY + '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg',
+      crossOrigin: 'anonymous',
       maxZoom: 19
-    })
+    }),
+    preload: 2
   });
 
-  // 지적도 WMS (Oracle 프록시)
-  window._olCadLayer2 = new ol.layer.Tile({
+  // 지적선 WMS 오버레이 (지번/경계)
+  var cadWmsLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: PROXY + '/api/vw-wms',
-      params: { 'LAYERS':'lt_c_landinfobasemap', 'STYLES':'lt_c_landinfobasemap', 'FORMAT':'image/png', 'TRANSPARENT':true, 'TILED':true },
-      serverType:'mapserver'
+      params: {
+        'LAYERS': 'lt_c_landinfobasemap',
+        'STYLES': 'lt_c_landinfobasemap',
+        'FORMAT': 'image/png',
+        'TRANSPARENT': true,
+        'VERSION': '1.1.1'
+      },
+      serverType: 'geoserver',
+      crossOrigin: 'anonymous'
     }),
-    visible: true,
     opacity: 0.9
   });
 
-  // 필지 하이라이트 벡터
-  _olHlSource2 = new ol.source.Vector();
-  var hlLayer = new ol.layer.Vector({
-    source: _olHlSource2,
+  // 선택 필지 벡터 레이어 (노란 채우기)
+  _parcelSource = new ol.source.Vector();
+  var parcelLayer = new ol.layer.Vector({
+    source: _parcelSource,
     style: new ol.style.Style({
-      stroke: new ol.style.Stroke({ color:'rgba(255,30,30,1)', width:3 }),
-      fill: new ol.style.Fill({ color:'rgba(255,60,60,0.25)' })
+      fill: new ol.style.Fill({ color: 'rgba(251,191,36,0.45)' }),
+      stroke: new ol.style.Stroke({ color: '#d97706', width: 2.5 })
     })
+  });
+
+  // 반경 원 벡터 레이어 (파란 점선 + 중심점)
+  _radiusSource = new ol.source.Vector();
+  var radiusLayer = new ol.layer.Vector({
+    source: _radiusSource,
+    style: function(feature){
+      var type = feature.get('type');
+      if(type === 'radius'){
+        return new ol.style.Style({
+          stroke: new ol.style.Stroke({ color: '#2563eb', width: 2.5, lineDash: [8,4] }),
+          fill: new ol.style.Fill({ color: 'rgba(37,99,235,0.08)' })
+        });
+      }
+      if(type === 'center'){
+        return new ol.style.Style({
+          image: new ol.style.Circle({
+            radius: 6,
+            fill: new ol.style.Fill({ color: '#dc2626' }),
+            stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+          })
+        });
+      }
+      if(type === 'label'){
+        return new ol.style.Style({
+          text: new ol.style.Text({
+            text: feature.get('text') || '',
+            font: 'bold 12px "Noto Sans KR",sans-serif',
+            fill: new ol.style.Fill({ color: '#fff' }),
+            backgroundFill: new ol.style.Fill({ color: '#2563eb' }),
+            padding: [4, 8, 4, 8],
+            offsetY: 0
+          })
+        });
+      }
+    }
   });
 
   _olMap2 = new ol.Map({
-    target: 'olMap2',
-    layers: [vwSatLayer, window._olCadLayer2, hlLayer],
+    target: 'vmap2',
+    layers: [bgLayer, cadWmsLayer, parcelLayer, radiusLayer],
     view: new ol.View({
-      center: ol.proj.fromLonLat([_jdLng, _jdLat]),
-      zoom: 17,
-      maxZoom: 21,
-      minZoom: 6
+      center: ol.proj.fromLonLat([126.83, 37.2]),
+      zoom: 16,
+      maxZoom: 19
     }),
-    controls: []
+    controls: ol.control.defaults.defaults({ attribution: false })
   });
 
-  // 클릭 → WFS 필지 조회
+  // 클릭 → 카카오 geocoder로 PNU 생성 → 서버 조회
   _olMap2.on('click', function(evt){
-    var coord = ol.proj.toLonLat(evt.coordinate);
-    wfsClick(coord[0], coord[1]);
+    var lonlat = ol.proj.toLonLat(evt.coordinate);
+    onMapClickParcel(lonlat[0], lonlat[1]);
   });
 
-  _map2loaded = true;
-  var ov = document.getElementById('olMap2Overlay');
-  if(ov) ov.style.display = 'none';
-  setTimeout(function(){ if(_olMap2) _olMap2.updateSize(); }, 100);
-  toast('지적도 지도 준비됨','ok');
+  _olMap2loaded = true;
 }
 
-// 지도 이동
-function moveVmap2(lng, lat){
-  _jdLng = lng; _jdLat = lat;
-  if(_olMap2){
-    _olMap2.getView().animate({
-      center: ol.proj.fromLonLat([lng, lat]),
-      zoom: 18,
-      duration: 400
-    });
+// 지도 클릭 시 필지 조회
+function onMapClickParcel(lng, lat){
+  if(typeof kakao === 'undefined' || !kakao.maps || !kakao.maps.services){
+    toast('카카오 API 로딩 중...', 'err');
+    return;
   }
-}
 
-// 클릭 → 카카오 geocoder로 주소·PNU 생성 → Oracle 프록시 WFS로 필지 조회 (map.html 동일 방식)
-function wfsClick(lng, lat){
-  if(!_kakaoKey){ toast('카카오 키 없음 — 지번 조회 불가','err'); return; }
-  console.log('[지적도] 클릭 좌표:', lng, lat);
+  setDxfStatus('필지 조회 중...');
 
-  // 카카오 SDK가 있으면 SDK geocoder 사용, 없으면 REST API로 대체
-  if(typeof kakao !== 'undefined' && kakao.maps && kakao.maps.services){
-    var geocoder = new kakao.maps.services.Geocoder();
-    geocoder.coord2Address(lng, lat, function(result, status){
-      if(status !== kakao.maps.services.Status.OK || !result[0] || !result[0].address){
-        toast('주소 조회 실패','err'); return;
+  // 1. 좌표 → 행정주소 (PNU 생성용)
+  var geocoder = new kakao.maps.services.Geocoder();
+  geocoder.coord2RegionCode(lng, lat, function(result, status){
+    if(status !== kakao.maps.services.Status.OK || !result.length){
+      setDxfStatus('주소 조회 실패');
+      toast('주소 조회 실패', 'err');
+      return;
+    }
+
+    // 법정동 코드 (B 타입)
+    var bType = result.find(function(r){ return r.region_type === 'B'; });
+    if(!bType){
+      setDxfStatus('법정동 코드 없음');
+      return;
+    }
+
+    var bcode = bType.code;  // 10자리 법정동 코드
+
+    // 2. 좌표 → 지번주소
+    geocoder.coord2Address(lng, lat, function(addrResult, addrStatus){
+      if(addrStatus !== kakao.maps.services.Status.OK || !addrResult.length){
+        setDxfStatus('지번 조회 실패');
+        return;
       }
-      var addr = result[0].address;
-      var jibun = addr.address_name || '';
-      var mainNo = addr.main_address_no || '0';
-      var subNo = addr.sub_address_no || '0';
-      geocoder.coord2RegionCode(lng, lat, function(regRes, regStatus){
-        if(regStatus !== kakao.maps.services.Status.OK || !regRes){ toast('법정동 조회 실패','err'); return; }
-        var bCode = '';
-        for(var i=0;i<regRes.length;i++){ if(regRes[i].region_type==='B'){ bCode=regRes[i].code; break; } }
-        if(!bCode){ toast('법정동코드 없음','err'); return; }
-        var platGb = (jibun.indexOf('산')>=0 && jibun.indexOf('산')<jibun.lastIndexOf(' ')+4) ? '2' : '1';
-        var pnu = bCode.length >= 10
-          ? bCode + platGb + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0')
-          : bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
-        _fetchParcel(pnu, jibun, lng, lat);
-      });
-    });
-  } else {
-    // 카카오 SDK 로드 실패 시 REST로 대체
-    fetch('https://dapi.kakao.com/v2/local/geo/coord2address.json?x='+lng+'&y='+lat,{
-      headers:{'Authorization':'KakaoAK '+_kakaoKey}
-    }).then(function(r){return r.json();}).then(function(d){
-      var doc = d.documents && d.documents[0];
-      if(!doc || !doc.address){ toast('주소 조회 실패','err'); return; }
-      var jibun = doc.address.address_name || '';
-      var mainNo = doc.address.main_address_no || '0';
-      var subNo = doc.address.sub_address_no || '0';
-      return fetch('https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x='+lng+'&y='+lat,{
-        headers:{'Authorization':'KakaoAK '+_kakaoKey}
-      }).then(function(r){return r.json();}).then(function(d2){
-        var docs2 = d2.documents||[];
-        var bCode = '';
-        for(var i=0;i<docs2.length;i++){ if(docs2[i].region_type==='B'){ bCode=docs2[i].code; break; } }
-        if(!bCode){ toast('법정동코드 없음','err'); return; }
-        var platGb = (jibun.indexOf('산')>=0 && jibun.indexOf('산')<jibun.lastIndexOf(' ')+4) ? '2' : '1';
-        var pnu = bCode.length >= 10
-          ? bCode + platGb + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0')
-          : bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
-        _fetchParcel(pnu, jibun, lng, lat);
-      });
-    }).catch(function(e){ console.log('[지적도] 주소조회 오류:', e); toast('주소 조회 실패','err'); });
-  }
-}
 
-// Oracle 프록시 WFS로 필지 경계 조회 + 하이라이트 + 정보 표시
-function _fetchParcel(pnu, jibun, lng, lat){
-  console.log('[지적도] PNU:', pnu, '지번:', jibun);
-  fetch(PROXY + '/api/wfs?pnu=' + pnu + '&lng=' + lng + '&lat=' + lat)
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var features = d && d.features;
-      if(!features || !features.length){ toast('필지 경계 없음','err'); return; }
-      var f = features[0];
-      var p = f.properties || {};
+      var addr = addrResult[0].address;
+      if(!addr){ setDxfStatus('지번 주소 없음'); return; }
 
-      // 정보 표시
-      var addr = (p.sido_nm||'') + ' ' + (p.sgg_nm||'') + ' ' + (p.emd_nm||'')
-               + (p.ri_nm ? ' '+p.ri_nm : '') + ' ' + (p.jibun||jibun||'').replace(/\s+$/,'');
-      document.getElementById('jd-addr').textContent = addr.trim() || jibun || '—';
-      document.getElementById('jd-jmok').textContent = p.jimok_nm || p.jimok || '—';
-      document.getElementById('jd-area').textContent = p.bchk ? p.bchk+'㎡' : (p.area ? p.area+'㎡' : '—');
-      document.getElementById('jd-pnu').textContent = p.pnu || pnu;
+      var jibunStr = addr.address_name || '';
+      var mainBun = addr.main_address_no || '0';
+      var subBun = addr.sub_address_no || '0';
+      var mtYn = addr.mountain_yn === 'Y' ? '2' : '1';
 
-      // 하이라이트
-      if(_olHlSource2){
-        _olHlSource2.clear();
-        try{
+      var pnu = bcode + mtYn + String(mainBun).padStart(4,'0') + String(subBun).padStart(4,'0');
+
+      // 3. 서버에 WFS 조회
+      fetch('http://168.107.15.68:5050/api/wfs?pnu='+pnu+'&lng='+lng+'&lat='+lat)
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          var features = (data && data.features) || [];
+          if(!features.length){
+            setDxfStatus('VWorld 필지 없음');
+            toast('필지 정보를 못 찾았어요', 'err');
+            return;
+          }
+          var f = features[0];
+          var p = f.properties || {};
           var geom = f.geometry;
-          var coords;
-          if(geom.type === 'MultiPolygon') coords = geom.coordinates[0][0];
-          else if(geom.type === 'Polygon') coords = geom.coordinates[0];
-          else { console.log('지원 안 하는 타입:', geom.type); return; }
-          var olCoords = coords.map(function(c){ return ol.proj.fromLonLat(c); });
-          var polygon = new ol.geom.Polygon([olCoords]);
-          _olHlSource2.addFeature(new ol.Feature({ geometry: polygon }));
-        }catch(e){ console.log('하이라이트 오류:', e); }
-      }
-      toast('✓ '+(jibun||pnu),'ok');
-    })
-    .catch(function(e){ console.log('[지적도] WFS 오류:', e); toast('필지 조회 실패','err'); });
+
+          // 선택 필지 정보 저장
+          _selectedParcel = {
+            pnu: p.pnu || pnu,
+            jibun: p.jibun || jibunStr.split(' ').pop() || '',
+            addr: jibunStr,
+            lng: lng, lat: lat
+          };
+
+          // 정보 패널 업데이트
+          document.getElementById('jd-addr').textContent = jibunStr;
+          document.getElementById('jd-jmok').textContent = p.jimok_nm || p.jimok || '—';
+          document.getElementById('jd-area').textContent = p.bchk ? p.bchk + '㎡' : (p.area ? p.area + '㎡' : '—');
+          document.getElementById('jd-pnu').textContent = p.pnu || pnu;
+
+          // 지도에 필지 하이라이트
+          highlightParcel(geom);
+
+          // 필지 중심점 계산 → 반경 원 표시
+          var center = computeCentroid(geom) || [lng, lat];
+          showRadiusCircle(center[0], center[1], _currentRadius);
+
+          setDxfStatus('필지 선택됨. 반경/레이어를 확인 후 다운로드하세요');
+          toast('필지: ' + (_selectedParcel.jibun || '선택됨'), 'ok');
+        })
+        .catch(function(e){
+          console.error(e);
+          setDxfStatus('조회 실패');
+          toast('서버 조회 실패', 'err');
+        });
+    });
+  });
 }
 
+// GeoJSON geometry → OpenLayers feature 하이라이트
+function highlightParcel(geom){
+  _parcelSource.clear();
+  if(!geom) return;
+  try{
+    var reader = new ol.format.GeoJSON();
+    var feat = reader.readFeature({
+      type: 'Feature',
+      geometry: geom
+    }, {
+      dataProjection: 'EPSG:4326',
+      featureProjection: 'EPSG:3857'
+    });
+    _parcelSource.addFeature(feat);
+  }catch(e){ console.error('필지 하이라이트 실패', e); }
+}
+
+// GeoJSON geometry → 중심점 (위경도)
+function computeCentroid(geom){
+  if(!geom) return null;
+  try{
+    var coords;
+    if(geom.type === 'Polygon'){
+      coords = geom.coordinates[0];
+    } else if(geom.type === 'MultiPolygon'){
+      coords = geom.coordinates[0][0];
+    } else return null;
+    var sx = 0, sy = 0, n = 0;
+    for(var i = 0; i < coords.length; i++){
+      sx += coords[i][0]; sy += coords[i][1]; n++;
+    }
+    return n ? [sx/n, sy/n] : null;
+  }catch(e){ return null; }
+}
+
+// 반경 원 표시 (중심점 + 원 + 반경 라벨)
+function showRadiusCircle(lng, lat, radiusM){
+  _radiusSource.clear();
+  var centerMerc = ol.proj.fromLonLat([lng, lat]);
+
+  // 반경 원 (다각형 근사 — 위경도 기반으로 정확한 원 그리기)
+  var circleCoords = [];
+  var segments = 64;
+  var latFactor = 111000;
+  var lngFactor = 111000 * Math.cos(lat * Math.PI / 180);
+  for(var i = 0; i <= segments; i++){
+    var a = (i / segments) * 2 * Math.PI;
+    var dx = (radiusM * Math.cos(a)) / lngFactor;
+    var dy = (radiusM * Math.sin(a)) / latFactor;
+    var pt = ol.proj.fromLonLat([lng + dx, lat + dy]);
+    circleCoords.push(pt);
+  }
+  var circleGeom = new ol.geom.Polygon([circleCoords]);
+  _radiusSource.addFeature(new ol.Feature({ geometry: circleGeom, type: 'radius' }));
+
+  // 중심점
+  _radiusSource.addFeature(new ol.Feature({
+    geometry: new ol.geom.Point(centerMerc),
+    type: 'center'
+  }));
+
+  // 반경 라벨
+  var labelDx = (radiusM * 0.55) / lngFactor;
+  _radiusSource.addFeature(new ol.Feature({
+    geometry: new ol.geom.Point(ol.proj.fromLonLat([lng + labelDx, lat])),
+    type: 'label',
+    text: '반경 ' + (radiusM >= 1000 ? (radiusM/1000)+'km' : radiusM+'m')
+  }));
+
+  // 지도 뷰를 반경 전체가 보이도록 조정
+  try{
+    var extent = circleGeom.getExtent();
+    if(extent && _olMap2){
+      _olMap2.getView().fit(extent, { padding: [50,50,50,50], duration: 400, maxZoom: 17 });
+    }
+  }catch(e){}
+}
+
+// 반경 변경 버튼
+function setRadius(r){
+  _currentRadius = r;
+  document.querySelectorAll('#radiusBtnGroup .rad-btn').forEach(function(btn){
+    btn.classList.toggle('on', parseInt(btn.dataset.r) === r);
+  });
+  if(_selectedParcel){
+    showRadiusCircle(_selectedParcel.lng, _selectedParcel.lat, r);
+  }
+}
+
+// 레이어 전체 선택/해제
+function toggleAllLayers(on){
+  document.querySelectorAll('.lyr-chk').forEach(function(c){
+    if(c.value === 'cadastra') return;  // 지적선은 필수
+    c.checked = on;
+  });
+}
+
+// 상태 메시지
+function setDxfStatus(msg){
+  var el = document.getElementById('dxfStatus');
+  if(el) el.textContent = msg || '';
+}
+
+// ===== 반경 DXF 다운로드 =====
+function downloadCircleDxf(){
+  if(!_selectedParcel){
+    toast('먼저 필지를 클릭하세요', 'err');
+    return;
+  }
+
+  var layers = [];
+  document.querySelectorAll('.lyr-chk:checked').forEach(function(c){
+    layers.push(c.value);
+  });
+  if(!layers.length){
+    toast('최소 한 개의 레이어를 선택하세요', 'err');
+    return;
+  }
+
+  // 지적선 자동 포함
+  if(layers.indexOf('cadastra') === -1) layers.unshift('cadastra');
+
+  var btn = document.getElementById('dxfDlBtn');
+  btn.disabled = true;
+  btn.style.opacity = 0.6;
+  btn.textContent = '⏳ DXF 생성 중...';
+  setDxfStatus('서버에서 지적도 데이터 수집 중... (5~15초)');
+
+  var body = {
+    lng: _selectedParcel.lng,
+    lat: _selectedParcel.lat,
+    radius: _currentRadius,
+    layers: layers,
+    jibun: _selectedParcel.jibun || ''
+  };
+
+  fetch('http://168.107.15.68:5050/api/wfs-dxf-circle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r){
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var cnt = r.headers.get('X-Feature-Count') || '?';
+    return r.blob().then(function(blob){ return { blob: blob, cnt: cnt }; });
+  })
+  .then(function(ret){
+    var url = URL.createObjectURL(ret.blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var safeJibun = (_selectedParcel.jibun || 'parcel').replace(/\s+/g,'_');
+    a.download = 'gdsp_' + safeJibun + '_r' + _currentRadius + 'm.dxf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+
+    setDxfStatus('✓ 다운로드 완료 · 피처 ' + ret.cnt + '개');
+    toast('DXF 다운로드 완료 (' + ret.cnt + '개 피처)', 'ok');
+  })
+  .catch(function(e){
+    console.error(e);
+    setDxfStatus('다운로드 실패: ' + e.message);
+    toast('DXF 생성 실패', 'err');
+  })
+  .finally(function(){
+    btn.disabled = false;
+    btn.style.opacity = 1;
+    btn.textContent = '📐 반경 DXF 다운로드';
+  });
+}
+
+// ===== 필지 정보 복사/전송 =====
 function copyJdInfo(){
   var addr = document.getElementById('jd-addr').textContent;
   var jmok = document.getElementById('jd-jmok').textContent;
   var area = document.getElementById('jd-area').textContent;
+  var pnu = document.getElementById('jd-pnu').textContent;
   if(addr==='—'){ toast('먼저 필지를 클릭하세요','err'); return; }
-  var txt = '주소: '+addr+'\n지목: '+jmok+'\n면적: '+area;
+  var txt = '주소: '+addr+'\n지목: '+jmok+'\n면적: '+area+'\nPNU: '+pnu;
   navigator.clipboard.writeText(txt).then(function(){ toast('필지정보 복사됨','ok'); });
 }
 
 function sendJdToParent(){
+  if(!_selectedParcel){ toast('먼저 필지를 클릭하세요','err'); return; }
   try{
     if(window.opener && window.opener.onJdFromPopup){
       window.opener.onJdFromPopup({
-        addr: document.getElementById('jd-addr').textContent,
-        pnu: document.getElementById('jd-pnu').textContent
+        addr: _selectedParcel.addr,
+        pnu: _selectedParcel.pnu,
+        lng: _selectedParcel.lng,
+        lat: _selectedParcel.lat
       });
       toast('메인으로 전송됨','ok');
     } else { toast('메인창 연동 없음','err'); }
@@ -1288,10 +1443,19 @@ function jdSelectAddr(i){
   var item = box._list[i];
   if(!item) return;
   box.style.display='none';
-  // 지도 이동 후 WFS 자동 조회
-  moveVmap2(item.lng, item.lat);
+  // 지도 이동
+  if(_olMap2){
+    _olMap2.getView().animate({
+      center: ol.proj.fromLonLat([item.lng, item.lat]),
+      zoom: 17,
+      duration: 400
+    });
+  }
   toast(item.addr+' 이동','ok');
-  setTimeout(function(){ wfsClick(item.lng, item.lat); }, 500);
+  // 자동 클릭 시뮬레이션
+  setTimeout(function(){
+    onMapClickParcel(item.lng, item.lat);
+  }, 500);
 }
 
 /* ===================== 건축물대장 ===================== */
