@@ -251,7 +251,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
       <div class="ltitle">레이어</div>
       <div class="lrow">
         <div class="llabel">지적선 + 지번</div>
-        <label class="tog"><input type="checkbox" id="chkCad" onchange="toggleCadastral(this.checked)"><span class="tslider"></span></label>
+        <label class="tog"><input type="checkbox" id="chkCad" checked onchange="toggleCadastral(this.checked)"><span class="tslider"></span></label>
       </div>
       <div class="lrow">
         <div class="llabel">용도지역</div>
@@ -609,25 +609,15 @@ function initVwMap() {
     })
   });
 
-  // VWorld 하이브리드(라벨) 타일
-  var vwHybridLayer = new ol.layer.Tile({
-    source: new ol.source.XYZ({
-      url: 'https://api.vworld.kr/req/wmts/1.0.0/' + VWORLD_KEY + '/Hybrid/{z}/{y}/{x}.png',
-      maxZoom: 19
-    })
-  });
-
-  // 지적도 WMS 레이어 (기본 OFF)
+  // 지적도 WMS 레이어 (기본 ON)
   window._olCadLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms?Key=' + VWORLD_KEY + '&',
-      params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'WIDTH': 1024, 'HEIGHT': 1024 },
-      serverType: 'mapserver',
-      tileGrid: ol.tilegrid.createXYZ({ tileSize: 1024, maxZoom: 19 })
+      params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true },
+      serverType: 'mapserver'
     }),
-    visible: false,
-    opacity: 0.85,
-    maxZoom: 19
+    visible: true,
+    opacity: 0.85
   });
 
   // 선택 필지 하이라이트 벡터 레이어
@@ -642,11 +632,11 @@ function initVwMap() {
 
   window._olMap = new ol.Map({
     target: 'olMap',
-    layers: [vwSatLayer, vwHybridLayer, window._olCadLayer, window._olHighlightLayer],
+    layers: [vwSatLayer, window._olCadLayer, window._olHighlightLayer],
     view: new ol.View({
       center: ol.proj.fromLonLat([currentLng, currentLat]),
       zoom: 17,
-      maxZoom: 20,
+      maxZoom: 21,
       minZoom: 6
     }),
     controls: []
