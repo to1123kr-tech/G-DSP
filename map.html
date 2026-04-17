@@ -630,9 +630,20 @@ function initVwMap() {
     })
   });
 
+  // NGII 바로e맵 (등고선/표고점 포함)
+  var NGII_KEY = localStorage.getItem('gdsp_ngii') || '';
+  window._olContourLayer = new ol.layer.Tile({
+    source: new ol.source.XYZ({
+      url: NGII_KEY ? 'https://map.ngii.go.kr/openapi/Gettile.do?apikey=' + NGII_KEY + '&layer=korean_map&style=korean&tilematrixset=korean&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image/png&TileMatrix=L{z}&TileCol={x}&TileRow={y}' : '',
+      maxZoom: 18
+    }),
+    visible: false,
+    opacity: 0.7
+  });
+
   window._olMap = new ol.Map({
     target: 'olMap',
-    layers: [vwSatLayer, window._olCadLayer, window._olHighlightLayer],
+    layers: [vwSatLayer, window._olContourLayer, window._olCadLayer, window._olHighlightLayer],
     view: new ol.View({
       center: ol.proj.fromLonLat([currentLng, currentLat]),
       zoom: 17,
@@ -769,18 +780,44 @@ function toggleCadastral(on) {
 }
 
 function toggleWmsLayer(type, on) {
+  if (type === 'contour' || type === 'elev') {
+    // NGII 바로e맵 (등고선/표고점 포함)
+    var NGII_KEY = localStorage.getItem('gdsp_ngii') || '';
+    if (!NGII_KEY) { toast('국토정보플랫폼 키 필요 (설정)', 'err'); return; }
+    if (window._olContourLayer) {
+      window._olContourLayer.setVisible(on);
+    }
+    toast((type === 'contour' ? '등고선' : '표고점') + (on ? ' ON' : ' OFF'));
+    return;
+  }
+  // 용도지역 등 VWorld WMS
   if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
-  if (!kakaoMap) return;
-  var layerMap = { yd: 'lt_c_ud', contour: 'dem_contour', elev: 'dem_high' };
+  var layerMap = { yd: 'lt_c_uq111' };
   var layerName = layerMap[type];
   if (!layerName) return;
-  var names = { yd: '용도지역', contour: '등고선', elev: '표고점' };
+  // 동적 WMS 레이어 추가/제거
+  if (!window._olDynWmsLayers) window._olDynWmsLayers = {};
   if (on) {
-    _addWmsTileset(type.toUpperCase(), layerName);
-    toast(names[type] + ' ON');
+    if (window._olDynWmsLayers[type]) {
+      window._olDynWmsLayers[type].setVisible(true);
+    } else {
+      var lyr = new ol.layer.Tile({
+        source: new ol.source.TileWMS({
+          url: PROXY + '/api/vw-wms',
+          params: { 'LAYERS': layerName, 'STYLES': layerName, 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true },
+          serverType: 'mapserver'
+        }),
+        opacity: 0.6
+      });
+      window._olMap.addLayer(lyr);
+      window._olDynWmsLayers[type] = lyr;
+    }
+    toast({yd:'용도지역'}[type] + ' ON');
   } else {
-    _removeWmsTileset(type.toUpperCase());
-    toast(names[type] + ' OFF');
+    if (window._olDynWmsLayers[type]) {
+      window._olDynWmsLayers[type].setVisible(false);
+    }
+    toast({yd:'용도지역'}[type] + ' OFF');
   }
 }
 
