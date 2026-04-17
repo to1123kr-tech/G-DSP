@@ -11,7 +11,7 @@
   // 1) localStorage에 JS키 저장되어 있으면 사용
   // 2) 없으면 index.html과 동일한 키 사용 (같은 앱이므로)
   var jsKey = localStorage.getItem('gdsp_kakao_js') || '0f432d6e8470eed32f947e3c7db146b9';
-  document.write('<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey='+jsKey+'&autoload=false">\x3C/script>');
+  document.write('<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey='+jsKey+'&libraries=services&autoload=false">\x3C/script>');
 })();
 </script>
 <!-- OpenLayers (지적도 탭 VWorld 지도용) -->
@@ -1051,6 +1051,14 @@ function initVmap2(){
     setTimeout(initVmap2, 500);
     return;
   }
+  // 카카오 SDK를 먼저 초기화 (services.Geocoder 사용 위해)
+  if(typeof kakao !== 'undefined' && kakao.maps && !kakao.maps.services && typeof kakao.maps.load === 'function'){
+    kakao.maps.load(function(){
+      console.log('[지적도] 카카오 services 로드 완료');
+      _doInitMap2();
+    });
+    return;
+  }
   _doInitMap2();
 }
 
@@ -1123,51 +1131,97 @@ function moveVmap2(lng, lat){
   }
 }
 
-// 클릭 → VWorld WFS 필지 조회
+// 클릭 → 카카오 geocoder로 주소·PNU 생성 → Oracle 프록시 WFS로 필지 조회 (map.html 동일 방식)
 function wfsClick(lng, lat){
-  if(!_vwKey){ toast('VWorld 키 로드 중…','err'); return; }
-  var z = _olMap2 ? _olMap2.getView().getZoom() : 17;
-  var m = 1/(111000/z*1.48*50);
-  var h = 1/(111000/z*1.85*50);
-  var bbox = (lng-m)+','+(lat-h)+','+(lng+m)+','+(lat+h);
+  if(!_kakaoKey){ toast('카카오 키 없음 — 지번 조회 불가','err'); return; }
+  console.log('[지적도] 클릭 좌표:', lng, lat);
 
-  $.ajax({
-    type:'get',
-    url:'https://api.vworld.kr/req/wfs',
-    data:{
-      key:_vwKey, domain:'', SERVICE:'WFS', version:'1.1.0',
-      request:'GetFeature', TYPENAME:'lt_c_landinfobasemap',
-      OUTPUT:'text/javascript', SRSNAME:'EPSG:4326', BBOX:bbox
-    },
-    dataType:'jsonp',
-    jsonpCallback:'parseWfsResponse',
-    success: function(data){
-      if(!data || !data.features || data.features.length===0){
-        toast('필지 조회 결과 없음','err'); return;
+  // 카카오 SDK가 있으면 SDK geocoder 사용, 없으면 REST API로 대체
+  if(typeof kakao !== 'undefined' && kakao.maps && kakao.maps.services){
+    var geocoder = new kakao.maps.services.Geocoder();
+    geocoder.coord2Address(lng, lat, function(result, status){
+      if(status !== kakao.maps.services.Status.OK || !result[0] || !result[0].address){
+        toast('주소 조회 실패','err'); return;
       }
-      var f = data.features[0];
-      var p = f.properties;
+      var addr = result[0].address;
+      var jibun = addr.address_name || '';
+      var mainNo = addr.main_address_no || '0';
+      var subNo = addr.sub_address_no || '0';
+      geocoder.coord2RegionCode(lng, lat, function(regRes, regStatus){
+        if(regStatus !== kakao.maps.services.Status.OK || !regRes){ toast('법정동 조회 실패','err'); return; }
+        var bCode = '';
+        for(var i=0;i<regRes.length;i++){ if(regRes[i].region_type==='B'){ bCode=regRes[i].code; break; } }
+        if(!bCode){ toast('법정동코드 없음','err'); return; }
+        var platGb = (jibun.indexOf('산')>=0 && jibun.indexOf('산')<jibun.lastIndexOf(' ')+4) ? '2' : '1';
+        var pnu = bCode.length >= 10
+          ? bCode + platGb + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0')
+          : bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+        _fetchParcel(pnu, jibun, lng, lat);
+      });
+    });
+  } else {
+    // 카카오 SDK 로드 실패 시 REST로 대체
+    fetch('https://dapi.kakao.com/v2/local/geo/coord2address.json?x='+lng+'&y='+lat,{
+      headers:{'Authorization':'KakaoAK '+_kakaoKey}
+    }).then(function(r){return r.json();}).then(function(d){
+      var doc = d.documents && d.documents[0];
+      if(!doc || !doc.address){ toast('주소 조회 실패','err'); return; }
+      var jibun = doc.address.address_name || '';
+      var mainNo = doc.address.main_address_no || '0';
+      var subNo = doc.address.sub_address_no || '0';
+      return fetch('https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x='+lng+'&y='+lat,{
+        headers:{'Authorization':'KakaoAK '+_kakaoKey}
+      }).then(function(r){return r.json();}).then(function(d2){
+        var docs2 = d2.documents||[];
+        var bCode = '';
+        for(var i=0;i<docs2.length;i++){ if(docs2[i].region_type==='B'){ bCode=docs2[i].code; break; } }
+        if(!bCode){ toast('법정동코드 없음','err'); return; }
+        var platGb = (jibun.indexOf('산')>=0 && jibun.indexOf('산')<jibun.lastIndexOf(' ')+4) ? '2' : '1';
+        var pnu = bCode.length >= 10
+          ? bCode + platGb + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0')
+          : bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+        _fetchParcel(pnu, jibun, lng, lat);
+      });
+    }).catch(function(e){ console.log('[지적도] 주소조회 오류:', e); toast('주소 조회 실패','err'); });
+  }
+}
+
+// Oracle 프록시 WFS로 필지 경계 조회 + 하이라이트 + 정보 표시
+function _fetchParcel(pnu, jibun, lng, lat){
+  console.log('[지적도] PNU:', pnu, '지번:', jibun);
+  fetch(PROXY + '/api/wfs?pnu=' + pnu + '&lng=' + lng + '&lat=' + lat)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var features = d && d.features;
+      if(!features || !features.length){ toast('필지 경계 없음','err'); return; }
+      var f = features[0];
+      var p = f.properties || {};
+
+      // 정보 표시
       var addr = (p.sido_nm||'') + ' ' + (p.sgg_nm||'') + ' ' + (p.emd_nm||'')
-               + (p.ri_nm ? ' '+p.ri_nm : '') + ' ' + (p.jibun||'').replace(/\s+$/,'');
-      document.getElementById('jd-addr').textContent = addr;
+               + (p.ri_nm ? ' '+p.ri_nm : '') + ' ' + (p.jibun||jibun||'').replace(/\s+$/,'');
+      document.getElementById('jd-addr').textContent = addr.trim() || jibun || '—';
       document.getElementById('jd-jmok').textContent = p.jimok_nm || p.jimok || '—';
       document.getElementById('jd-area').textContent = p.bchk ? p.bchk+'㎡' : (p.area ? p.area+'㎡' : '—');
-      document.getElementById('jd-pnu').textContent = p.pnu || '—';
+      document.getElementById('jd-pnu').textContent = p.pnu || pnu;
 
       // 하이라이트
-      if(_olHlSource2 && f.geometry){
+      if(_olHlSource2){
         _olHlSource2.clear();
         try{
-          var geom = new ol.format.GeoJSON().readGeometry(f.geometry, {
-            dataProjection:'EPSG:4326', featureProjection:'EPSG:3857'
-          });
-          _olHlSource2.addFeature(new ol.Feature({ geometry: geom }));
-        }catch(e){ console.log('하이라이트 실패', e); }
+          var geom = f.geometry;
+          var coords;
+          if(geom.type === 'MultiPolygon') coords = geom.coordinates[0][0];
+          else if(geom.type === 'Polygon') coords = geom.coordinates[0];
+          else { console.log('지원 안 하는 타입:', geom.type); return; }
+          var olCoords = coords.map(function(c){ return ol.proj.fromLonLat(c); });
+          var polygon = new ol.geom.Polygon([olCoords]);
+          _olHlSource2.addFeature(new ol.Feature({ geometry: polygon }));
+        }catch(e){ console.log('하이라이트 오류:', e); }
       }
-      toast('필지 조회됨','ok');
-    },
-    error: function(){ toast('WFS 조회 실패','err'); }
-  });
+      toast('✓ '+(jibun||pnu),'ok');
+    })
+    .catch(function(e){ console.log('[지적도] WFS 오류:', e); toast('필지 조회 실패','err'); });
 }
 
 function copyJdInfo(){
