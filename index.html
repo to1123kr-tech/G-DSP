@@ -5861,52 +5861,9 @@
         var lat = e.latLng.getLat(), lng = e.latLng.getLng();
         // 마커 이동
         kakaoMarker.setPosition(e.latLng);
-        // 주소 조회 → 필지 선택 + 토지정보
-        kakaoGeocoder.coord2Address(lng, lat, function(result, status) {
-          if (status !== kakao.maps.services.Status.OK || !result[0]) {
-            setText('mapD', '위도: ' + lat.toFixed(5) + ' / 경도: ' + lng.toFixed(5));
-            return;
-          }
-          var addr = result[0].address;
-          if (!addr || !addr.address_name) {
-            setText('mapD', '위도: ' + lat.toFixed(5) + ' / 경도: ' + lng.toFixed(5));
-            return;
-          }
-          var jibun = addr.address_name;
-          setText('mapD', '📍 ' + jibun);
-          setText('mapT', jibun);
-          if (!addr.b_code) {
-            toast('📍 ' + jibun + ' (토지정보 없음)');
-            return;
-          }
-          var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
-          currentPnu = pnu; currentJibun = jibun; armed = true;
-          window._selectedPnu = pnu;
-          window._selectedJibun = jibun;
-          // 토지정보 패널 업데이트
-          setText('ndInfoJibun', jibun);
-          setText('ndRcJibun', jibun);
-          setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
-          var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
-          var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
-          var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
-          // 기존 정보 초기화 (로딩중 표시)
-          setText('ndInfoYd', '조회중...'); setText('ndInfoJimok', '...'); setText('ndInfoGonsi', '...');
-          setText('ndInfoArea', '...'); setText('ndInfoBcr', '...'); setText('ndInfoFar', '...');
-          setText('ndInfoUse', '...'); setText('ndInfoFloor', '...'); setText('ndInfoBldArea', '...');
-          setText('ndInfoTotArea', '...'); setText('ndInfoYear', '...');
-          setText('ndRcYd', '...'); setText('ndRcJm', '...'); setText('ndRcGonsi', '...');
-          setText('ndRcBcr', '...'); setText('ndRcFar', '...'); setText('ndRcUse', '...');
-          setText('gYongdo', '...'); setText('gJimok', '...'); setText('gGonsi', '...');
-          setText('gBcr', '...'); setText('gFar', '...');
-          setText('rcYd', '...'); setText('rcJm', '...'); setText('rcGonsi', '...');
-          setText('rcBcr', '...'); setText('rcFar', '...'); setText('rcUse', '...');
-          setText('bUse', '...'); setText('bFloor', '...'); setText('bArea', '...'); setText('bYear', '...');
-          // 토지+건축물 정보 API 호출
-          ndCallLandApi(pnu, lng, lat);
-          ndCallBldApi(pnu);
-          toast('✓ ' + jibun, 'ok');
-        });
+        setText('mapD', '조회중...');
+        // ndOnMapClick 호출 (카카오 REST API 사용 — 정확한 PNU 생성)
+        ndOnMapClick(lng, lat);
       });
       setText('mapT', '카카오 지도');
       setText('mapD', '지번 검색 후 자동 연동');
@@ -7753,6 +7710,9 @@
           var _pos = new kakao.maps.LatLng(lat, lng);
           if(ndMarker){ ndMarker.setPosition(_pos); ndMarker.setMap(ndMap); }
         }
+        // 메인 카카오맵 UI 업데이트
+        setText('mapD', '📍 ' + jibun);
+        setText('mapT', jibun);
         setText('ndInfoJibun', jibun);
         setText('ndRcJibun', jibun);
         setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
