@@ -136,11 +136,22 @@ function initMap() {
   // 부모에 로드 완료 알림
   window.parent.postMessage({type: 'vwReady'}, '*');
 
-  // 줌인 완료 후 로딩 커버 숨기기
-  setTimeout(function() {
+  // 지도 타일 로드 완료 감지 → 로딩 커버 숨기기
+  var _coverHidden = false;
+  function hideCover() {
+    if (_coverHidden) return;
+    _coverHidden = true;
     var cover = document.getElementById('loadingCover');
     if (cover) cover.classList.add('hide');
-  }, 3500);
+  }
+  // 최소 2초 후부터 체크, 최대 8초면 강제 숨김
+  setTimeout(function() {
+    // 캔버스가 그려졌으면 로드 완료
+    var cv = document.querySelector('canvas');
+    if (cv) hideCover();
+    else setTimeout(hideCover, 2000);
+  }, 2000);
+  setTimeout(hideCover, 8000); // 최대 8초 대기
 }
 
 // 부모에서 메시지 수신
