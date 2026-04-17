@@ -1042,7 +1042,15 @@ function highlightParcel(pnu) {
     .then(function(d){
       var features=d&&d.features;
       if(!features||!features.length) { console.log('필지 경계 없음'); return; }
-      var coords=features[0].geometry.coordinates[0];
+      var geom = features[0].geometry;
+      var coords;
+      if (geom.type === 'MultiPolygon') {
+        coords = geom.coordinates[0][0]; // 첫 폴리곤의 외곽선
+      } else if (geom.type === 'Polygon') {
+        coords = geom.coordinates[0];
+      } else {
+        console.log('지원 안 하는 타입:', geom.type); return;
+      }
       _parcelCoordsCache[pnu] = coords;
       // OpenLayers 폴리곤 하이라이트
       if (window._olHighlightSource) {
