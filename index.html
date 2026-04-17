@@ -7732,37 +7732,57 @@
 
     // 지도 클릭 → 역지오코딩 → 토지정보 조회
     function ndOnMapClick(lng, lat) {
-      var kakaoKey = localStorage.getItem('gdsp_kakao') || '';
-      if (!kakaoKey) return;
-      fetch('https://dapi.kakao.com/v2/local/geo/coord2address.json?x=' + lng + '&y=' + lat + '&input_coord=WGS84', {
-        headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
-      })
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        var addr = d && d.documents && d.documents[0] && d.documents[0].address;
-        if (!addr) return;
-        var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
-        var jibun = addr.address_name || '';
-        currentPnu = pnu; currentJibun = jibun; armed = true;
-        // 카카오맵 마커만 이동 (줌 레벨 유지)
-        if(ndMap){ 
-          var _pos = new kakao.maps.LatLng(lat, lng);
-          if(ndMarker){ ndMarker.setPosition(_pos); ndMarker.setMap(ndMap); }
+      // ndGeocoder 또는 kakaoGeocoder 사용 (REST API 키 불필요)
+      var gc = ndGeocoder || kakaoGeocoder;
+      if (!gc) {
+        // geocoder가 없으면 새로 생성
+        if (window.kakao && kakao.maps && kakao.maps.services) {
+          gc = new kakao.maps.services.Geocoder();
+          ndGeocoder = gc;
+        } else return;
+      }
+      // 마커 이동
+      if(ndMap && ndMarker){
+        var _pos = new kakao.maps.LatLng(lat, lng);
+        ndMarker.setPosition(_pos); ndMarker.setMap(ndMap);
+      }
+      // 1단계: 주소 가져오기
+      gc.coord2Address(lng, lat, function(result, status) {
+        var jibun = '', mainNo = '0', subNo = '0';
+        if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
+          var addr = result[0].address;
+          jibun = addr.address_name || '';
+          mainNo = addr.main_address_no || '0';
+          subNo = addr.sub_address_no || '0';
         }
-        // 메인 카카오맵 UI 업데이트
-        setText('mapD', '📍 ' + jibun);
-        setText('mapT', jibun);
-        setText('ndInfoJibun', jibun);
-        setText('ndRcJibun', jibun);
-        setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
-        var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
-        document.getElementById('ndResultRow').classList.add('on');
-        document.getElementById('ndRcLabel').textContent = jibun;
-        setTimeout(function(){ ndCallLandApi(pnu, lng, lat); }, 300);
-        ndCallBldApi(pnu);
-        toast('✓ ' + jibun, 'ok');
-      })
-      .catch(function(){});
+        if (!jibun) return;
+        // 2단계: 법정동코드 가져오기
+        gc.coord2RegionCode(lng, lat, function(regionResult, regionStatus) {
+          if (regionStatus !== kakao.maps.services.Status.OK || !regionResult) return;
+          var bCode = '';
+          for (var i = 0; i < regionResult.length; i++) {
+            if (regionResult[i].region_type === 'B') {
+              bCode = regionResult[i].code;
+              break;
+            }
+          }
+          if (!bCode) return;
+          var pnu = bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+          currentPnu = pnu; currentJibun = jibun; armed = true;
+          // UI 업데이트
+          setText('mapD', '📍 ' + jibun);
+          setText('mapT', jibun);
+          setText('ndInfoJibun', jibun);
+          setText('ndRcJibun', jibun);
+          setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
+          var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
+          var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
+          var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
+          ndCallLandApi(pnu, lng, lat);
+          ndCallBldApi(pnu);
+          toast('✓ ' + jibun, 'ok');
+        });
+      });
     }
 
     // 토지이용 정보 - Oracle 서버 /api/landinfo 경유 (ned API)
