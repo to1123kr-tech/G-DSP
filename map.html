@@ -4,7 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>G-DSP 통합지도</title>
-<!-- VWorld는 iframe 내부에서 로드 -->
+<!-- VWorld 2D (OpenLayers) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.5.2/ol.css">
+<script src="https://cdn.jsdelivr.net/npm/ol@7.5.2/dist/ol.js"></script>
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -305,7 +307,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
   <div id="mapWrap">
     <div id="kakaoMapDiv"></div>
     <div id="vworldMapDiv">
-      <iframe id="vwFrame" style="width:100%;height:100%;border:none"></iframe>
+      <div id="olMap" style="width:100%;height:100%"></div>
     </div>
     <canvas id="measureCanvas"></canvas>
 
@@ -598,21 +600,123 @@ function switchEngine(engine, btn) {
 function initVwMap() {
   if (!VWORLD_KEY) { toast('VWorld API 키 없음 — 설정에서 입력하세요', 'err'); return; }
   vwMapInited = true;
-  loadVwFrame(currentLng, currentLat);
+
+  // VWorld 위성 배경 타일
+  var vwSatLayer = new ol.layer.Tile({
+    source: new ol.source.XYZ({
+      url: 'https://api.vworld.kr/req/wmts/1.0.0/' + VWORLD_KEY + '/Satellite/{z}/{y}/{x}.jpeg',
+      maxZoom: 19
+    })
+  });
+
+  // VWorld 하이브리드(라벨) 타일
+  var vwHybridLayer = new ol.layer.Tile({
+    source: new ol.source.XYZ({
+      url: 'https://api.vworld.kr/req/wmts/1.0.0/' + VWORLD_KEY + '/Hybrid/{z}/{y}/{x}.png',
+      maxZoom: 19
+    })
+  });
+
+  // 지적도 WMS 레이어 (기본 OFF)
+  window._olCadLayer = new ol.layer.Tile({
+    source: new ol.source.TileWMS({
+      url: 'https://api.vworld.kr/req/wms?Key=' + VWORLD_KEY + '&',
+      params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true },
+      serverType: 'mapserver'
+    }),
+    visible: false,
+    opacity: 0.85
+  });
+
+  // 선택 필지 하이라이트 벡터 레이어
+  window._olHighlightSource = new ol.source.Vector();
+  window._olHighlightLayer = new ol.layer.Vector({
+    source: window._olHighlightSource,
+    style: new ol.style.Style({
+      stroke: new ol.style.Stroke({ color: 'rgba(255,30,30,1)', width: 3 }),
+      fill: new ol.style.Fill({ color: 'rgba(255,60,60,0.25)' })
+    })
+  });
+
+  window._olMap = new ol.Map({
+    target: 'olMap',
+    layers: [vwSatLayer, vwHybridLayer, window._olCadLayer, window._olHighlightLayer],
+    view: new ol.View({
+      center: ol.proj.fromLonLat([currentLng, currentLat]),
+      zoom: 17,
+      maxZoom: 20,
+      minZoom: 6
+    }),
+    controls: ol.control.defaults({ zoom: false, rotate: false, attribution: false })
+  });
+
+  // 좌클릭 → 필지 선택
+  window._olMap.on('click', function(evt) {
+    var coord = ol.proj.toLonLat(evt.coordinate);
+    var lng = coord[0], lat = coord[1];
+    currentLng = lng; currentLat = lat;
+    onMapClick(lng, lat);
+  });
+
+  // 우클릭 → 메뉴
+  window._olMap.getViewport().addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    var coord = window._olMap.getEventCoordinate(e);
+    var lonlat = ol.proj.toLonLat(coord);
+    ctxLng = lonlat[0]; ctxLat = lonlat[1];
+    // 우클릭 좌표로 주소 조회
+    if (kakaoGeocoder) {
+      kakaoGeocoder.coord2Address(ctxLng, ctxLat, function(result, status) {
+        if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
+          var a = result[0].address;
+          popupJibun = a.address_name || '';
+          if (a.b_code) {
+            popupPnu = a.b_code + '0' + String(parseInt(a.main_address_no)||0).padStart(4,'0') + String(parseInt(a.sub_address_no)||0).padStart(4,'0');
+          } else {
+            popupPnu = '';
+          }
+          document.getElementById('ctxAddr').textContent = popupJibun.length > 28 ? popupJibun.substring(0,28)+'...' : popupJibun;
+        }
+      });
+    }
+    showCtxMenu(e.clientX, e.clientY);
+  });
+
+  setStatus('준비됨', true);
+  toast('VWorld 2D 지도 준비됨', 'ok');
 }
 
-function loadVwFrame(lng, lat) {
-  var fr = document.getElementById('vwFrame');
-  // 실제 HTML 파일 URL로 로드 (srcdoc 대신 — CORS 해결)
-  var baseUrl = PROXY + '/vw_map.html';
-  fr.src = baseUrl + '?lng=' + lng + '&lat=' + lat + '&key=' + VWORLD_KEY;
-  // iframe 로드 후 지적선 체크 상태 반영
-  fr.onload = function() {
-    var chk = document.getElementById('chkCad');
-    if (chk && chk.checked && fr.contentWindow) {
-      setTimeout(function(){ fr.contentWindow.postMessage({type:'toggleJijuk', on:true}, '*'); }, 2000);
-    }
-  };
+function moveVwMap(lng, lat) {
+  if (!window._olMap) return;
+  window._olMap.getView().animate({
+    center: ol.proj.fromLonLat([lng, lat]),
+    duration: 500
+  });
+}
+
+function zoomIn() {
+  if (window._olMap) {
+    var view = window._olMap.getView();
+    view.animate({ zoom: view.getZoom() + 1, duration: 200 });
+  }
+}
+function zoomOut() {
+  if (window._olMap) {
+    var view = window._olMap.getView();
+    view.animate({ zoom: view.getZoom() - 1, duration: 200 });
+  }
+}
+function resetCenter() {
+  if (window._olMap) {
+    window._olMap.getView().animate({ center: ol.proj.fromLonLat([126.8317, 37.2055]), zoom: 17, duration: 500 });
+  }
+}
+function locateMe() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      moveVwMap(pos.coords.longitude, pos.coords.latitude);
+    });
+  }
 }
 
 
@@ -666,10 +770,8 @@ function _removeWmsTileset(key) {
 
 function toggleCadastral(on) {
   if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
-  // VWorld iframe에 지적도 토글 메시지 전송
-  var fr = document.getElementById('vwFrame');
-  if (fr && fr.contentWindow) {
-    fr.contentWindow.postMessage({type:'toggleJijuk', on:on}, '*');
+  if (window._olCadLayer) {
+    window._olCadLayer.setVisible(on);
   }
   toast(on ? '지적선+지번 ON' : '지적선+지번 OFF');
 }
@@ -894,37 +996,6 @@ document.getElementById('mapWrap').addEventListener('contextmenu', function(e){
   showCtxMenu(e.clientX, e.clientY);
 }, true);
 
-// VWorld iframe에서 클릭 이벤트 수신
-window.addEventListener('message', function(ev){
-  if (ev.data && ev.data.type === 'vwClick') {
-    currentLng = ev.data.lng;
-    currentLat = ev.data.lat;
-    onMapClick(ev.data.lng, ev.data.lat);
-  }
-  if (ev.data && ev.data.type === 'vwMapClicked') {
-    var menu = document.getElementById('ctxMenu');
-    if (menu) menu.style.display='none';
-  }
-  // 필지 경계 좌표 수신 시 캐시 (DXF 다운에 사용)
-  if (ev.data && ev.data.type === 'parcelCoords') {
-    _parcelCoordsCache[ev.data.pnu] = ev.data.coords;
-  }
-});
-window.addEventListener('message', function(ev){
-  if (ev.data && ev.data.type === 'vwRightClick') {
-    // iframe 오프셋 계산
-    var fr = document.getElementById('vwFrame');
-    var rect = fr ? fr.getBoundingClientRect() : {left:0, top:0};
-    // 현재 좌표 기준으로 PNU 생성 (좌클릭이 안 되는 경우 대비)
-    // 부모 window에서는 currentLng/currentLat을 사용
-    ctxLng = ev.data.lng;
-    ctxLat = ev.data.lat;
-    currentLng = ctxLng;
-    currentLat = ctxLat;
-    showCtxMenu(ev.data.x + rect.left, ev.data.y + rect.top);
-  }
-});
-
 
 function cmSelect() {
   currentPnu=popupPnu; currentJibun=popupJibun; currentLng=ctxLng; currentLat=ctxLat;
@@ -953,9 +1024,13 @@ function highlightParcel(pnu) {
       if(!features||!features.length) { console.log('필지 경계 없음'); return; }
       var coords=features[0].geometry.coordinates[0];
       _parcelCoordsCache[pnu] = coords;
-      var fr = document.getElementById('vwFrame');
-      if (fr && fr.contentWindow) {
-        fr.contentWindow.postMessage({type:'highlightParcel', coords:coords}, '*');
+      // OpenLayers 폴리곤 하이라이트
+      if (window._olHighlightSource) {
+        window._olHighlightSource.clear();
+        var olCoords = coords.map(function(c){ return ol.proj.fromLonLat(c); });
+        var polygon = new ol.geom.Polygon([olCoords]);
+        var feature = new ol.Feature({ geometry: polygon });
+        window._olHighlightSource.addFeature(feature);
       }
     })
     .catch(function(e){ console.log('필지 경계 조회 실패:', e); });
