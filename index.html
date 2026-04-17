@@ -5861,7 +5861,7 @@
         var lat = e.latLng.getLat(), lng = e.latLng.getLng();
         // 마커 이동
         kakaoMarker.setPosition(e.latLng);
-        // 주소 조회 → 필지 선택
+        // 주소 조회 → 필지 선택 + 토지정보
         kakaoGeocoder.coord2Address(lng, lat, function(result, status) {
           if (status !== kakao.maps.services.Status.OK || !result[0]) {
             setText('mapD', '위도: ' + lat.toFixed(5) + ' / 경도: ' + lng.toFixed(5));
@@ -5871,14 +5871,24 @@
           if (addr && addr.address_name) {
             setText('mapD', '📍 ' + addr.address_name);
             setText('mapT', addr.address_name);
-            // PNU 생성
             if (addr.b_code) {
               var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
-              // 전역 변수에 저장 (다른 기능에서 사용)
               window._selectedPnu = pnu;
               window._selectedJibun = addr.address_name;
               window._selectedLng = lng;
               window._selectedLat = lat;
+              // 토지정보 패널 업데이트
+              currentPnu = pnu; currentJibun = addr.address_name; armed = true;
+              setText('ndInfoJibun', addr.address_name);
+              setText('ndRcJibun', addr.address_name);
+              setText('gJibun', addr.address_name); setText('bJibun', addr.address_name); setText('bldJibun', addr.address_name);
+              var ri = document.getElementById('regJibun'); if (ri) ri.value = addr.address_name;
+              var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
+              var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = addr.address_name;
+              // 토지정보 API 호출
+              setTimeout(function(){ if(typeof ndCallLandApi==='function') ndCallLandApi(pnu, lng, lat); }, 300);
+              if(typeof ndCallBldApi==='function') ndCallBldApi(pnu);
+              toast('✓ ' + addr.address_name, 'ok');
             }
           } else {
             setText('mapD', '위도: ' + lat.toFixed(5) + ' / 경도: ' + lng.toFixed(5));
@@ -7725,11 +7735,9 @@
         var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
         var jibun = addr.address_name || '';
         currentPnu = pnu; currentJibun = jibun; armed = true;
-        // 카카오맵 이동
+        // 카카오맵 마커만 이동 (줌 레벨 유지)
         if(ndMap){ 
           var _pos = new kakao.maps.LatLng(lat, lng);
-          ndMap.setCenter(_pos);
-          ndMap.setLevel(3);
           if(ndMarker){ ndMarker.setPosition(_pos); ndMarker.setMap(ndMap); }
         }
         setText('ndInfoJibun', jibun);
