@@ -257,13 +257,24 @@ function updateScaleBtns(){
         </div>
 
         <!-- 프로그램 설치 -->
-        <div style="margin-top:6px;padding:10px 12px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:8px">
-          <div style="font-size:11px;color:var(--txt2);margin-bottom:6px">💻 처음 사용 시 프로그램 설치 필요 (1회)</div>
-          <a href="http://168.107.15.68:5050/gdsp_downloader.zip" download style="display:block;text-align:center;padding:8px;background:var(--blue);color:#fff;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none">📦 프로그램 다운로드 (gdsp_downloader.zip)</a>
-          <div style="font-size:9px;color:var(--txt3);margin-top:6px;line-height:1.6">
-            1. 다운로드 후 압축 풀기<br>
-            2. gdsp_downloader.exe 한 번 실행<br>
-            3. 이후 위 ⬇다운로드 버튼만 누르면 자동
+        <div style="margin-top:6px;padding:10px 12px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:8px" id="programSection">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="font-size:11px;color:var(--txt2)">💻 처음 사용 시 프로그램 설치 필요 (1회)</div>
+            <label style="font-size:10px;color:var(--txt3);display:flex;align-items:center;gap:4px;cursor:pointer">
+              <input type="checkbox" id="hideProgramGuide" onchange="toggleProgramGuide(this.checked)" style="margin:0">
+              안내 숨기기
+            </label>
+          </div>
+          <div id="programGuideContent">
+            <a href="http://168.107.15.68:5050/gdsp_downloader.zip" download style="display:block;text-align:center;padding:8px;background:var(--blue);color:#fff;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none">📦 프로그램 다운로드 (gdsp_downloader.zip)</a>
+            <div style="font-size:9px;color:var(--txt3);margin-top:6px;line-height:1.6">
+              1. 다운로드 후 압축 풀기<br>
+              2. gdsp_downloader.exe 한 번 실행<br>
+              3. 이후 위 ⬇다운로드 버튼만 누르면 자동
+            </div>
+          </div>
+          <div id="programGuideHidden" style="display:none;font-size:10px;color:var(--txt3);text-align:center;padding:4px">
+            ✓ 백그라운드 모드 (안내 숨김)
           </div>
         </div>
 
@@ -1178,10 +1189,30 @@ function renderRegList(){
 }
 function makeRegExcel(){ if(!regItems.length){ toast('목록에 지번을 먼저 추가하세요','err'); return; } toast('SheetJS 연동 예정'); }
 
+/* ===================== 첫실행 안내 토글 ===================== */
+function toggleProgramGuide(hide){
+  var content = document.getElementById('programGuideContent');
+  var hidden = document.getElementById('programGuideHidden');
+  if(hide){
+    content.style.display = 'none';
+    hidden.style.display = 'block';
+    localStorage.setItem('gdsp_hide_program_guide', '1');
+  } else {
+    content.style.display = 'block';
+    hidden.style.display = 'none';
+    localStorage.removeItem('gdsp_hide_program_guide');
+  }
+}
+
 /* ===================== 초기화 ===================== */
 window.addEventListener('DOMContentLoaded', function(){
   initKakaoMap();
   loadNgiiDlConfig();
+  // 첫실행 안내 숨김 상태 복원
+  if(localStorage.getItem('gdsp_hide_program_guide') === '1'){
+    var chk = document.getElementById('hideProgramGuide');
+    if(chk){ chk.checked = true; toggleProgramGuide(true); }
+  }
   // jQuery (WFS ajax용) 동적 로드
   if(typeof $ === 'undefined'){
     var jq = document.createElement('script');
