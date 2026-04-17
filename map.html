@@ -621,11 +621,13 @@ function initVwMap() {
   window._olCadLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms?Key=' + VWORLD_KEY + '&',
-      params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true },
-      serverType: 'mapserver'
+      params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'WIDTH': 1024, 'HEIGHT': 1024 },
+      serverType: 'mapserver',
+      tileGrid: ol.tilegrid.createXYZ({ tileSize: 1024, maxZoom: 19 })
     }),
     visible: false,
-    opacity: 0.85
+    opacity: 0.85,
+    maxZoom: 19
   });
 
   // 선택 필지 하이라이트 벡터 레이어
