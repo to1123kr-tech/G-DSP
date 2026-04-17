@@ -942,7 +942,10 @@ function onMapClick(lng, lat) {
         }
       }
       if (!bCode) return;
-      var pnu = bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+      var platGb = (jibun.indexOf('산') >= 0 && jibun.indexOf('산') < jibun.lastIndexOf(' ') + 4) ? '2' : '1';
+      var pnu = bCode.length >= 10
+        ? bCode + platGb + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0')
+        : bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
       currentPnu = pnu; currentJibun = jibun;
       setSelBar(currentJibun);
       setStatus('연동됨', true);
@@ -988,7 +991,10 @@ function showCtxMenu(x, y) {
           if (rr[i].region_type === 'B') { bCode = rr[i].code; break; }
         }
         if (bCode) {
-          popupPnu = bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+          var platGb2 = (addrName.indexOf('산') >= 0) ? '2' : '1';
+          popupPnu = bCode.length >= 10
+            ? bCode + platGb2 + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0')
+            : bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
           popupJibun = addrName;
         }
       });
