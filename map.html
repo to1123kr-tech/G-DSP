@@ -1037,7 +1037,7 @@ function highlightParcel(pnu) {
   if (!pnu || !VWORLD_KEY) return;
   if (pnu.indexOf('undefined') >= 0) { console.log('PNU 오류:', pnu); return; }
   // 서버 프록시로 WFS 호출 (서버에서 PNU 변환 처리)
-  fetch(PROXY+'/api/wfs?pnu='+pnu)
+  fetch(PROXY+'/api/wfs?pnu='+pnu+'&lng='+currentLng+'&lat='+currentLat)
     .then(function(r){return r.json();})
     .then(function(d){
       var features=d&&d.features;
