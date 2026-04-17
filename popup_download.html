@@ -208,12 +208,9 @@ function updateScaleBtns(){
         <div class="sec" style="margin:0;padding:14px">
           <div class="sec-t" style="margin-bottom:8px">📍 도각번호</div>
           <div id="tileBox" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;min-height:26px">
-            <span style="font-size:11px;color:var(--txt3)">지도 클릭 또는 아래 직접 입력</span>
+            <span style="font-size:11px;color:var(--txt3)">지도 클릭 시 자동 입력</span>
           </div>
-          <div style="display:flex;gap:6px;margin-bottom:8px">
-            <input class="inp" id="ngiiCodeInput" type="text" placeholder="도각번호 직접 입력 (예: 37616024)" style="height:34px;font-size:12px;flex:1" onkeydown="if(event.key==='Enter')addManualCode()">
-            <button class="btn-primary" style="height:34px;font-size:11px;padding:0 14px;white-space:nowrap" onclick="addManualCode()">추가</button>
-          </div>
+          <input class="inp" id="ngiiCodeInput" type="text" placeholder="도각번호 직접 입력 (예: 37616024)" style="height:34px;font-size:12px;width:100%;margin-bottom:8px">
           <button class="btn-outline" style="width:100%;height:32px;font-size:11px" onclick="copyTiles()">📋 도각번호 복사</button>
         </div>
 
@@ -256,6 +253,15 @@ function updateScaleBtns(){
           <button class="btn-primary" id="ngiiDlBtn" style="flex:1;height:44px;font-size:14px;font-weight:900" onclick="startNgiiDownload()">⬇ 다운로드</button>
         </div>
 
+        <!-- 상태 메시지 -->
+        <div id="ngiiStatusBox" style="display:none;padding:10px 12px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;font-size:11px;color:var(--txt2);line-height:1.7">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span id="ngiiStatusIcon" style="font-size:14px">⏳</span>
+            <b id="ngiiStatusTitle" style="color:var(--blue2)">대기 중</b>
+          </div>
+          <div id="ngiiStatusDetail" style="font-size:10px;color:var(--txt3);padding-left:20px"></div>
+        </div>
+
         <!-- 프로그램 설치 -->
         <div style="margin-top:6px;padding:10px 12px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:8px" id="programSection">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -283,6 +289,8 @@ function updateScaleBtns(){
           <div style="font-size:12px;font-weight:900;color:var(--red);margin-bottom:8px">⚠ 이용 안내 (필독)</div>
           <div style="font-size:11px;color:var(--txt2);line-height:1.9">
             📄 서버 보호를 위해 <b>1장씩만</b> 다운로드됩니다<br>
+            🔒 <b>개인정보(아이디·비밀번호)는 서버에 저장되지 않습니다</b><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;브라우저 로컬에만 저장되며, 로그인에만 사용됩니다<br>
             🚫 다운로드된 수치지형도는<br>
             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b style="color:var(--red)">상업적 판매 · 재배포 금지</b><br>
             ⚖ 「공간정보의 구축 및 관리 등에 관한 법률」<br>
@@ -777,14 +785,51 @@ function loadNgiiDlConfig(){
   if(first==='0'){ var e=document.getElementById('ngiiFirstRun'); if(e) e.checked=false; }
 }
 
+function setNgiiStatus(icon, title, detail, color){
+  var box = document.getElementById('ngiiStatusBox');
+  var ic = document.getElementById('ngiiStatusIcon');
+  var tt = document.getElementById('ngiiStatusTitle');
+  var dt = document.getElementById('ngiiStatusDetail');
+  if(!box) return;
+  box.style.display = 'block';
+  ic.textContent = icon || '⏳';
+  tt.textContent = title || '';
+  tt.style.color = color || 'var(--blue2)';
+  dt.innerHTML = detail || '';
+  if(color === 'var(--red)'){
+    box.style.background = 'rgba(239,68,68,.06)';
+    box.style.borderColor = 'rgba(239,68,68,.25)';
+  } else if(color === 'var(--green)' || icon === '✅'){
+    box.style.background = 'rgba(34,197,94,.06)';
+    box.style.borderColor = 'rgba(34,197,94,.25)';
+  } else {
+    box.style.background = 'rgba(37,99,235,.06)';
+    box.style.borderColor = 'rgba(37,99,235,.2)';
+  }
+}
+
 function startNgiiDownload(){
-  // 도각번호 수집 (tileBox + 직접입력)
+  // 도각번호 수집 (tileBox = 지도 클릭 결과, ngiiCodeInput = 직접 입력)
   var codes = [];
   document.querySelectorAll('#tileBox span').forEach(function(s){
     var c = s.textContent.replace('⧉','').trim();
     if(c && /^\d+$/.test(c)) codes.push(c);
   });
-  if(!codes.length){ toast('도각번호를 먼저 선택하세요 (지도 클릭 또는 직접 입력)','err'); return; }
+  // 직접 입력값 우선 (입력창에 값이 있으면 그것을 사용)
+  var manualCode = (document.getElementById('ngiiCodeInput').value||'').trim();
+  if(manualCode){
+    if(!/^\d{7,10}$/.test(manualCode)){
+      setNgiiStatus('❌','도각번호 형식 오류','7~10자리 숫자를 입력하세요','var(--red)');
+      toast('올바른 도각번호를 입력하세요 (7~10자리 숫자)','err');
+      return;
+    }
+    codes = [manualCode];
+  }
+  if(!codes.length){
+    setNgiiStatus('❌','도각번호 없음','지도를 클릭하거나 도각번호를 직접 입력하세요','var(--red)');
+    toast('도각번호를 먼저 선택하세요 (지도 클릭 또는 직접 입력)','err');
+    return;
+  }
   if(codes.length > 1){
     toast('서버 부하 방지를 위해 1장씩만 다운로드 가능합니다. 첫 번째 도각만 다운로드합니다.');
     codes = [codes[0]];
@@ -792,12 +837,21 @@ function startNgiiDownload(){
 
   var id = document.getElementById('ngiiDlId').value.trim();
   var pw = document.getElementById('ngiiDlPw').value;
-  if(!id){ toast('아이디를 입력하세요','err'); return; }
-  if(!pw){ toast('비밀번호를 입력하세요','err'); return; }
+  if(!id){
+    setNgiiStatus('❌','아이디 없음','국토정보플랫폼 아이디를 입력하세요','var(--red)');
+    toast('아이디를 입력하세요','err'); return;
+  }
+  if(!pw){
+    setNgiiStatus('❌','비밀번호 없음','국토정보플랫폼 비밀번호를 입력하세요','var(--red)');
+    toast('비밀번호를 입력하세요','err'); return;
+  }
 
   var p1 = document.getElementById('ngiiPurpose1').value;
   var p2 = document.getElementById('ngiiPurpose2').value;
-  if(!p1 || !p2){ toast('사용 용도를 선택하세요','err'); return; }
+  if(!p1 || !p2){
+    setNgiiStatus('❌','사용 용도 미선택','용도 대분류·소분류를 모두 선택하세요','var(--red)');
+    toast('사용 용도를 선택하세요','err'); return;
+  }
 
   // 첫 실행 모드 = 브라우저 보임(visible=1) / 해제 = 백그라운드(visible=0)
   var visible = document.getElementById('ngiiFirstRun').checked ? '1' : '0';
@@ -814,9 +868,31 @@ function startNgiiDownload(){
   };
   var uri = 'gdsp://download?' + Object.keys(params).map(function(k){ return k+'='+encodeURIComponent(params[k]); }).join('&');
 
+  // 상태 표시
+  setNgiiStatus('🚀','다운로더 실행 요청',
+    '도각번호 <b>'+codes[0]+'</b> — '+(visible==='1'?'<b>브라우저 표시 모드</b>':'<b>백그라운드 모드</b>')+'<br>'
+    +'• 프로그램이 설치돼 있으면 자동 실행됩니다<br>'
+    +'• 설치 안내 팝업이 뜨면 <b>"열기"</b> 또는 <b>"허용"</b>을 눌러주세요<br>'
+    +'• 5초 이상 반응 없으면 아래 프로그램을 먼저 설치하세요');
+
   window.location.href = uri;
 
-  toast('다운로더 실행 요청 — 프로그램이 설치되지 않았다면 아래에서 설치하세요','ok');
+  // 사용자가 프로그램 설치 안 했을 때 안내 (브라우저가 프로토콜 처리 못하면 그냥 조용히 실패하므로 타임아웃 안내)
+  setTimeout(function(){
+    var box = document.getElementById('ngiiStatusBox');
+    if(box && box.style.display !== 'none'){
+      // 버튼 추가
+      var dt = document.getElementById('ngiiStatusDetail');
+      if(dt && dt.innerHTML.indexOf('재시도') === -1){
+        dt.innerHTML += '<div style="margin-top:6px;display:flex;gap:4px">'
+          +'<button onclick="startNgiiDownload()" style="flex:1;height:26px;font-size:10px;border:1px solid var(--blue);background:var(--blue);color:#fff;border-radius:5px;cursor:pointer">🔄 재시도</button>'
+          +'<button onclick="document.getElementById(\'ngiiStatusBox\').style.display=\'none\'" style="flex:1;height:26px;font-size:10px;border:1px solid var(--line);background:transparent;color:var(--txt3);border-radius:5px;cursor:pointer">닫기</button>'
+          +'</div>';
+      }
+    }
+  }, 3000);
+
+  toast('다운로더 실행 요청됨','ok');
 }
 
 /* ===================== 지번검색 (카카오 REST) ===================== */
