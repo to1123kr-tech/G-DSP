@@ -5859,7 +5859,31 @@
       kakaoMarker.setMap(kakaoMap);
       kakao.maps.event.addListener(kakaoMap, 'click', function (e) {
         var lat = e.latLng.getLat(), lng = e.latLng.getLng();
-        setText('mapD', '위도: ' + lat.toFixed(5) + ' / 경도: ' + lng.toFixed(5));
+        // 마커 이동
+        kakaoMarker.setPosition(e.latLng);
+        // 주소 조회 → 필지 선택
+        kakaoGeocoder.coord2Address(lng, lat, function(result, status) {
+          if (status !== kakao.maps.services.Status.OK || !result[0]) {
+            setText('mapD', '위도: ' + lat.toFixed(5) + ' / 경도: ' + lng.toFixed(5));
+            return;
+          }
+          var addr = result[0].address;
+          if (addr && addr.address_name) {
+            setText('mapD', '📍 ' + addr.address_name);
+            setText('mapT', addr.address_name);
+            // PNU 생성
+            if (addr.b_code) {
+              var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+              // 전역 변수에 저장 (다른 기능에서 사용)
+              window._selectedPnu = pnu;
+              window._selectedJibun = addr.address_name;
+              window._selectedLng = lng;
+              window._selectedLat = lat;
+            }
+          } else {
+            setText('mapD', '위도: ' + lat.toFixed(5) + ' / 경도: ' + lng.toFixed(5));
+          }
+        });
       });
       setText('mapT', '카카오 지도');
       setText('mapD', '지번 검색 후 자동 연동');
