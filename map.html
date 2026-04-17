@@ -630,11 +630,10 @@ function initVwMap() {
     })
   });
 
-  // NGII 바로e맵 (등고선/표고점 포함)
-  var NGII_KEY = localStorage.getItem('gdsp_ngii') || '';
+  // NGII 바로e맵 (등고선/표고점 포함) - 서버 프록시 경유
   window._olContourLayer = new ol.layer.Tile({
     source: new ol.source.XYZ({
-      url: NGII_KEY ? 'https://map.ngii.go.kr/openapi/Gettile.do?apikey=' + NGII_KEY + '&layer=korean_map&style=korean&tilematrixset=korean&Service=WMTS&Request=GetTile&Version=1.0.0&Format=image/png&TileMatrix=L{z}&TileCol={x}&TileRow={y}' : '',
+      url: PROXY + '/api/ngii-tile/{z}/{x}/{y}',
       maxZoom: 18
     }),
     visible: false,
@@ -1386,11 +1385,6 @@ function _writeDxfFromFeatures(features) {
       });
     });
 
-    // 전체 중앙에 워터마크
-    if (count > 0) {
-      var mcx = allCx/count, mcy = allCy/count;
-      dxf+='0\nTEXT\n8\n'+layerWm+'\n10\n'+mcx.toFixed(3)+'\n20\n'+(mcy-50).toFixed(3)+'\n40\n3\n1\n'+wmTxt+'\n';
-    }
     dxf+='0\nENDSEC\n0\nEOF\n';
     var blob=new Blob([dxf],{type:'text/plain;charset=utf-8'});
     var a=document.createElement('a');
