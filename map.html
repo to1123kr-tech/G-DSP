@@ -494,13 +494,17 @@ var BLDG_KEY = localStorage.getItem('gdsp_building') || '';
 // ★ 오라클 서버에서 VWorld 키 자동 로드
 (function(){
   if(!VWORLD_KEY){
-    fetch(PROXY+'/api/vworld-key')
+    fetch(PROXY+'/api/vworld/key')
       .then(function(r){ return r.json(); })
       .then(function(d){
         if(d&&d.key){
           VWORLD_KEY=d.key;
           localStorage.setItem('gdsp_vworld',d.key);
-          console.log('VWorld 키 로드 완료 — 새로고침하면 VWorld 사용 가능');
+          console.log('VWorld 키 로드 완료');
+          // 키 로드 후 지도 초기화
+          if (!vwMapInited && typeof initVwMap === 'function') {
+            setTimeout(initVwMap, 100);
+          }
         }
       })
       .catch(function(){ console.log('VWorld 키 로드 실패 - 서버 확인 필요'); });
