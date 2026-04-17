@@ -921,16 +921,34 @@ function applyResult(doc) {
 function onMapClick(lng, lat) {
   currentLng=lng; currentLat=lat;
   if (!kakaoGeocoder) return;
+  // 1단계: 주소 가져오기
   kakaoGeocoder.coord2Address(lng, lat, function(result, status) {
-    if (status!==kakao.maps.services.Status.OK||!result[0]) return;
-    var addr = result[0].address;
-    if (!addr||!addr.b_code) return;
-    var pnu = addr.b_code+'0'+String(parseInt(addr.main_address_no)||0).padStart(4,'0')+String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
-    currentPnu=pnu; currentJibun=addr.address_name||'';
-    moveMarker(lng, lat);
-    setSelBar(currentJibun);
-    setStatus('연동됨', true);
-    highlightParcel(pnu);
+    var jibun = '', mainNo = '0', subNo = '0';
+    if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
+      var addr = result[0].address;
+      jibun = addr.address_name || '';
+      mainNo = addr.main_address_no || '0';
+      subNo = addr.sub_address_no || '0';
+    }
+    if (!jibun) return;
+    // 2단계: 법정동코드 가져오기
+    kakaoGeocoder.coord2RegionCode(lng, lat, function(regionResult, regionStatus) {
+      if (regionStatus !== kakao.maps.services.Status.OK || !regionResult) return;
+      var bCode = '';
+      for (var i = 0; i < regionResult.length; i++) {
+        if (regionResult[i].region_type === 'B') {
+          bCode = regionResult[i].code;
+          break;
+        }
+      }
+      if (!bCode) return;
+      var pnu = bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+      currentPnu = pnu; currentJibun = jibun;
+      setSelBar(currentJibun);
+      setStatus('연동됨', true);
+      toast('✓ ' + jibun, 'ok');
+      highlightParcel(pnu);
+    });
   });
 }
 
@@ -950,20 +968,32 @@ function setSelBar(jibun) {
 
 // ── 우클릭 메뉴 ──
 function showCtxMenu(x, y) {
-  // 이전 선택값 초기화
   popupPnu = ''; popupJibun = '';
-  kakaoGeocoder && kakaoGeocoder.coord2Address(ctxLng, ctxLat, function(result, status) {
-    var addr = '이 위치';
-    if (status===kakao.maps.services.Status.OK&&result[0]&&result[0].address) {
-      addr = result[0].address.address_name || addr;
-      var a = result[0].address;
-      if (a.b_code) {
-        popupPnu = a.b_code+'0'+String(parseInt(a.main_address_no)||0).padStart(4,'0')+String(parseInt(a.sub_address_no)||0).padStart(4,'0');
-        popupJibun = addr;
+  if (kakaoGeocoder) {
+    kakaoGeocoder.coord2Address(ctxLng, ctxLat, function(result, status) {
+      var addrName = '이 위치';
+      var mainNo = '0', subNo = '0';
+      if (status===kakao.maps.services.Status.OK&&result[0]&&result[0].address) {
+        var a = result[0].address;
+        addrName = a.address_name || addrName;
+        mainNo = a.main_address_no || '0';
+        subNo = a.sub_address_no || '0';
       }
-    }
-    document.getElementById('ctxAddr').textContent = addr.length>28?addr.substring(0,28)+'...':addr;
-  });
+      document.getElementById('ctxAddr').textContent = addrName.length>28?addrName.substring(0,28)+'...':addrName;
+      // 법정동코드 가져오기
+      kakaoGeocoder.coord2RegionCode(ctxLng, ctxLat, function(rr, rs) {
+        if (rs !== kakao.maps.services.Status.OK || !rr) return;
+        var bCode = '';
+        for (var i = 0; i < rr.length; i++) {
+          if (rr[i].region_type === 'B') { bCode = rr[i].code; break; }
+        }
+        if (bCode) {
+          popupPnu = bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+          popupJibun = addrName;
+        }
+      });
+    });
+  }
   var menu = document.getElementById('ctxMenu');
   menu.style.display='block'; menu.style.left=x+'px'; menu.style.top=y+'px';
   var rect = menu.getBoundingClientRect();
