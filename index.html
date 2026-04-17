@@ -5868,31 +5868,32 @@
             return;
           }
           var addr = result[0].address;
-          if (addr && addr.address_name) {
-            setText('mapD', '📍 ' + addr.address_name);
-            setText('mapT', addr.address_name);
-            if (addr.b_code) {
-              var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
-              window._selectedPnu = pnu;
-              window._selectedJibun = addr.address_name;
-              window._selectedLng = lng;
-              window._selectedLat = lat;
-              // 토지정보 패널 업데이트
-              currentPnu = pnu; currentJibun = addr.address_name; armed = true;
-              setText('ndInfoJibun', addr.address_name);
-              setText('ndRcJibun', addr.address_name);
-              setText('gJibun', addr.address_name); setText('bJibun', addr.address_name); setText('bldJibun', addr.address_name);
-              var ri = document.getElementById('regJibun'); if (ri) ri.value = addr.address_name;
-              var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
-              var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = addr.address_name;
-              // 토지정보 API 호출
-              setTimeout(function(){ if(typeof ndCallLandApi==='function') ndCallLandApi(pnu, lng, lat); }, 300);
-              if(typeof ndCallBldApi==='function') ndCallBldApi(pnu);
-              toast('✓ ' + addr.address_name, 'ok');
-            }
-          } else {
+          if (!addr || !addr.address_name) {
             setText('mapD', '위도: ' + lat.toFixed(5) + ' / 경도: ' + lng.toFixed(5));
+            return;
           }
+          var jibun = addr.address_name;
+          setText('mapD', '📍 ' + jibun);
+          setText('mapT', jibun);
+          if (!addr.b_code) {
+            toast('📍 ' + jibun + ' (토지정보 없음)');
+            return;
+          }
+          var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+          currentPnu = pnu; currentJibun = jibun; armed = true;
+          window._selectedPnu = pnu;
+          window._selectedJibun = jibun;
+          // 토지정보 패널 업데이트
+          setText('ndInfoJibun', jibun);
+          setText('ndRcJibun', jibun);
+          setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
+          var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
+          var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
+          var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
+          // 토지+건축물 정보 API 호출
+          ndCallLandApi(pnu, lng, lat);
+          ndCallBldApi(pnu);
+          toast('✓ ' + jibun, 'ok');
         });
       });
       setText('mapT', '카카오 지도');
