@@ -1315,13 +1315,38 @@ function downloadCadDxf() {
 
 function _writeDxfFromCoords(coords) {
   try {
-    var dxf='0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n';
-    dxf+='0\nLWPOLYLINE\n8\n지적선\n90\n'+coords.length+'\n70\n1\n';
-    coords.forEach(function(c){ dxf+='10\n'+c[0]+'\n20\n'+c[1]+'\n'; });
-    dxf+='0\nTEXT\n8\n지번\n10\n'+coords[0][0]+'\n20\n'+coords[0][1]+'\n40\n5\n1\n'+currentJibun+'\n';
-    dxf+='0\nTEXT\n8\n워터마크\n10\n'+coords[0][0]+'\n20\n'+(coords[0][1]-10)+'\n40\n3\n1\nG-DSP 참고용 공식지적도아님\n';
+    // WGS84 → Web Mercator 변환 (미터 단위 좌표)
+    var mercCoords = coords.map(function(c){
+      var x = c[0] * 20037508.34 / 180;
+      var y = Math.log(Math.tan((90 + c[1]) * Math.PI / 360)) / (Math.PI / 180);
+      y = y * 20037508.34 / 180;
+      return [x, y];
+    });
+    // 한글을 유니코드 이스케이프로 (AutoCAD 호환)
+    function toCad(s) {
+      return s.replace(/[\u0080-\uffff]/g, function(ch){
+        return '\\U+' + ('0000' + ch.charCodeAt(0).toString(16).toUpperCase()).slice(-4);
+      });
+    }
+    var jibunTxt = toCad(currentJibun || '지번');
+    var wmTxt = toCad('G-DSP 참고용 공식지적도 아님');
+    var layerPar = toCad('지적선');
+    var layerJib = toCad('지번');
+    var layerWm = toCad('워터마크');
+
+    var dxf='0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n6\n0\nENDSEC\n';
+    dxf+='0\nSECTION\n2\nENTITIES\n';
+    // 지적선 (폴리라인)
+    dxf+='0\nLWPOLYLINE\n8\n'+layerPar+'\n90\n'+mercCoords.length+'\n70\n1\n';
+    mercCoords.forEach(function(c){ dxf+='10\n'+c[0].toFixed(3)+'\n20\n'+c[1].toFixed(3)+'\n'; });
+    // 지번 텍스트
+    var cx = mercCoords.reduce(function(s,c){return s+c[0];},0)/mercCoords.length;
+    var cy = mercCoords.reduce(function(s,c){return s+c[1];},0)/mercCoords.length;
+    dxf+='0\nTEXT\n8\n'+layerJib+'\n10\n'+cx.toFixed(3)+'\n20\n'+cy.toFixed(3)+'\n40\n3\n1\n'+jibunTxt+'\n';
+    // 워터마크
+    dxf+='0\nTEXT\n8\n'+layerWm+'\n10\n'+cx.toFixed(3)+'\n20\n'+(cy-8).toFixed(3)+'\n40\n2\n1\n'+wmTxt+'\n';
     dxf+='0\nENDSEC\n0\nEOF\n';
-    var blob=new Blob([dxf],{type:'text/plain'});
+    var blob=new Blob([dxf],{type:'text/plain;charset=utf-8'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
     a.download=(currentJibun||'지적도').replace(/\s/g,'_')+'_지적도.dxf';
