@@ -5862,8 +5862,35 @@
         // 마커 이동
         kakaoMarker.setPosition(e.latLng);
         setText('mapD', '조회중...');
-        // ndOnMapClick 호출 (카카오 REST API 사용 — 정확한 PNU 생성)
-        ndOnMapClick(lng, lat);
+        // SDK geocoder로 주소 조회 (REST API 키 불필요)
+        kakaoGeocoder.coord2Address(lng, lat, function(result, status) {
+          if (status !== kakao.maps.services.Status.OK || !result[0] || !result[0].address) {
+            setText('mapD', '위도: ' + lat.toFixed(5) + ' / 경도: ' + lng.toFixed(5));
+            return;
+          }
+          var addr = result[0].address;
+          var jibun = addr.address_name || '';
+          if (!addr.b_code) {
+            setText('mapD', '📍 ' + jibun);
+            toast('📍 ' + jibun);
+            return;
+          }
+          var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+          currentPnu = pnu; currentJibun = jibun; armed = true;
+          // UI 업데이트
+          setText('mapD', '📍 ' + jibun);
+          setText('mapT', jibun);
+          setText('ndInfoJibun', jibun);
+          setText('ndRcJibun', jibun);
+          setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
+          var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
+          var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
+          var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
+          // 토지+건축물 정보 API 호출
+          ndCallLandApi(pnu, lng, lat);
+          ndCallBldApi(pnu);
+          toast('✓ ' + jibun, 'ok');
+        });
       });
       setText('mapT', '카카오 지도');
       setText('mapD', '지번 검색 후 자동 연동');
