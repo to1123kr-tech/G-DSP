@@ -355,31 +355,27 @@ function updateScaleBtns(){
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
             <label class="tile-row" style="cursor:pointer">
               <input type="checkbox" class="lyr-chk" value="cadastra" checked>
-              <span style="color:#dc2626">■</span> 지적선 <span style="color:var(--txt3);font-size:10px">(필수)</span>
+              <span style="color:#dc2626">■</span> 지적선+지번 <span style="color:var(--txt3);font-size:10px">(필수)</span>
             </label>
             <label class="tile-row" style="cursor:pointer">
               <input type="checkbox" class="lyr-chk" value="building" checked>
-              <span style="color:#2563eb">■</span> 건물
+              <span style="color:#059669">■</span> 건물+용도
             </label>
             <label class="tile-row" style="cursor:pointer">
               <input type="checkbox" class="lyr-chk" value="road" checked>
-              <span style="color:#334155">■</span> 도로
+              <span style="color:#0891b2">■</span> 도로경계
             </label>
             <label class="tile-row" style="cursor:pointer">
-              <input type="checkbox" class="lyr-chk" value="zoning" checked>
-              <span style="color:#059669">■</span> 용도지역
+              <input type="checkbox" class="lyr-chk" value="road_center">
+              <span style="color:#94a3b8">■</span> 도로중심선
             </label>
             <label class="tile-row" style="cursor:pointer">
-              <input type="checkbox" class="lyr-chk" value="greenbelt">
-              <span style="color:#b45309">■</span> 개발제한구역
+              <input type="checkbox" class="lyr-chk" value="zone_use" checked>
+              <span style="color:#0ea5e9">■</span> 용도지역
             </label>
             <label class="tile-row" style="cursor:pointer">
-              <input type="checkbox" class="lyr-chk" value="farmland">
-              <span style="color:#7c3aed">■</span> 농업진흥지역
-            </label>
-            <label class="tile-row" style="cursor:pointer;grid-column:span 2">
-              <input type="checkbox" class="lyr-chk" value="hazard">
-              <span style="color:#ea580c">■</span> 재해위험지구
+              <input type="checkbox" class="lyr-chk" value="district_plan">
+              <span style="color:#d97706">■</span> 지구단위계획
             </label>
           </div>
         </div>
@@ -1331,8 +1327,8 @@ function downloadCircleDxf(){
   setDxfStatus('서버에서 지적도 데이터 수집 중... (5~15초)');
 
   var body = {
-    lng: _selectedParcel.lng,
-    lat: _selectedParcel.lat,
+    center_lng: _selectedParcel.lng,
+    center_lat: _selectedParcel.lat,
     radius: _currentRadius,
     layers: layers,
     jibun: _selectedParcel.jibun || ''
