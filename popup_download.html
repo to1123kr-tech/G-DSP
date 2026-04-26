@@ -7,6 +7,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.5.2/ol.css">
 <script src="https://cdn.jsdelivr.net/npm/ol@7.5.2/dist/ol.js"></script>
+<!-- VWorld 공식 2D 지도 API -->
+<script src="https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=16B90D39-90BB-3197-987A-54983A46F250&domain=168.107.15.68"></script>
+<!-- 카카오 지도 SDK -->
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services&autoload=false"></script>
 <style>
 :root{
@@ -283,7 +286,7 @@ function updateScaleBtns(){
 
   <!-- 지적도 -->
   <div class="tab-view" id="view-jideok">
-    <!-- OpenLayers 지도 (VWorld 위성 + 지적도 + 동적 레이어) -->
+    <!-- VWorld 공식 2D 지도 -->
     <div style="position:relative;flex-shrink:0;height:52%">
       <div id="vmap2" style="width:100%;height:100%;background:#e8eef4"></div>
       <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:420px">
@@ -297,27 +300,20 @@ function updateScaleBtns(){
       <div id="mapLayerPanel" style="position:absolute;top:10px;right:10px;z-index:1000;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:8px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.15);font-size:11px;max-width:160px">
         <div style="font-weight:700;color:var(--txt2);margin-bottom:6px;font-size:11px">📍 지도 레이어</div>
         <label style="display:flex;align-items:center;gap:5px;padding:3px 0;cursor:pointer">
-          <input type="checkbox" id="ml-cad" checked onchange="toggleMapLayer('cad', this.checked)">
-          <span style="color:#dc2626">■</span>지적선
+          <input type="checkbox" id="ml-cad" checked onchange="toggleVwLayer('cad', this.checked)">
+          <span style="color:#dc2626">■</span>지적도
         </label>
         <label style="display:flex;align-items:center;gap:5px;padding:3px 0;cursor:pointer">
-          <input type="checkbox" id="ml-bld" onchange="toggleMapLayer('bld', this.checked)">
-          <span style="color:#059669">■</span>건물
-        </label>
-        <label style="display:flex;align-items:center;gap:5px;padding:3px 0;cursor:pointer">
-          <input type="checkbox" id="ml-road" onchange="toggleMapLayer('road', this.checked)">
-          <span style="color:#0891b2">■</span>도로경계
-        </label>
-        <label style="display:flex;align-items:center;gap:5px;padding:3px 0;cursor:pointer">
-          <input type="checkbox" id="ml-zone" onchange="toggleMapLayer('zone', this.checked)">
+          <input type="checkbox" id="ml-zone" onchange="toggleVwLayer('zone', this.checked)">
           <span style="color:#0ea5e9">■</span>용도지역
         </label>
         <label style="display:flex;align-items:center;gap:5px;padding:3px 0;cursor:pointer">
-          <input type="checkbox" id="ml-dist" onchange="toggleMapLayer('dist', this.checked)">
+          <input type="checkbox" id="ml-dist" onchange="toggleVwLayer('dist', this.checked)">
           <span style="color:#d97706">■</span>지구단위
         </label>
-        <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px">
-          <button onclick="refreshMapLayers()" class="hbtn" style="width:100%;height:24px;font-size:10px;padding:0">🔄 새로고침</button>
+        <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;display:flex;gap:4px">
+          <button onclick="vwSwitchType('Satellite')" class="hbtn" style="flex:1;height:24px;font-size:10px;padding:0">🛰️위성</button>
+          <button onclick="vwSwitchType('Base')" class="hbtn" style="flex:1;height:24px;font-size:10px;padding:0">🗺️일반</button>
         </div>
       </div>
       
@@ -1021,235 +1017,108 @@ function copyTiles(){
   });
 }
 
-/* ===================== OpenLayers 지도 (지적도 탭) ===================== */
+/* ===================== VWorld 공식 2D 지도 (지적도 탭) ===================== */
 var _olMap2 = null, _olMap2loaded = false;
-var _parcelSource = null;   // 선택 필지 피처 레이어
-var _radiusSource = null;   // 반경 원 레이어
-var _selectedParcel = null; // {pnu, jibun, addr, lng, lat}
-var _currentRadius = 500;   // 기본 반경 500m
-
-// 동적 레이어 (켜고 끄기) - VWorld API에서 가져온 데이터를 그림
-var _dynLayers = {};   // {cad: VectorLayer, bld: ..., road: ..., zone: ..., dist: ...}
-var _dynSources = {};  // {cad: VectorSource, ...}
-
-// 레이어별 스타일 정의
-var _layerStyles = {
-  cad: { stroke: '#dc2626', fill: 'rgba(220,38,38,0.05)', width: 1 },
-  bld: { stroke: '#059669', fill: 'rgba(5,150,105,0.15)', width: 1.5 },
-  road: { stroke: '#0891b2', fill: 'rgba(8,145,178,0.10)', width: 1.5 },
-  zone: { stroke: '#0ea5e9', fill: 'rgba(14,165,233,0.08)', width: 2 },
-  dist: { stroke: '#d97706', fill: 'rgba(217,119,6,0.08)', width: 2 }
-};
-
-// 레이어 키 → server.py 레이어명 매핑
-var _layerApiMap = {
-  cad: 'cadastra',
-  bld: 'building',
-  road: 'road',
-  zone: 'zone_use',
-  dist: 'district_plan'
-};
+var _vwLayers = {};        // {cad: WMS layer, zone: ..., dist: ...}
+var _parcelSource = null;
+var _radiusSource = null;
+var _selectedParcel = null;
+var _currentRadius = 500;
 
 function initVmap2(){
   if(_olMap2loaded) return;
-  if(typeof ol === 'undefined'){
+  if(typeof vw === 'undefined'){
     setTimeout(initVmap2, 500);
     return;
   }
 
-  var PROXY = 'http://168.107.15.68:5050';
+  // VWorld 지도 옵션
+  var mapOptions = new vw.MapOptions(
+    vw.BasemapType.GRAPHIC,        // 기본 일반지도
+    "",                            // 컨트롤 (없음)
+    vw.DensityType.NORMAL,
+    vw.DensityType.NORMAL,
+    false,                         // 3D 안 씀
+    new vw.CameraPosition(
+      new vw.CoordZ(127.017, 37.253, 1000),
+      new vw.Direction(0, -90, 0)
+    ),
+    new vw.NavigationMode(vw.NavigationModeType.HYBRID, false)
+  );
 
-  // 기본 레이어 - VWorld 위성 타일 (Oracle 프록시 경유)
-  var bgLayer = new ol.layer.Tile({
-    source: new ol.source.XYZ({
-      url: PROXY + '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg',
-      crossOrigin: 'anonymous',
-      maxZoom: 19
-    }),
-    preload: 2
-  });
+  // 지도 생성
+  _olMap2 = new vw.Map("vmap2", mapOptions);
 
-  // 지적선 WMS 오버레이 (지번/경계)
-  var cadWmsLayer = new ol.layer.Tile({
-    source: new ol.source.TileWMS({
-      url: PROXY + '/api/vw-wms',
-      params: {
-        'LAYERS': 'lt_c_landinfobasemap',
-        'STYLES': 'lt_c_landinfobasemap',
-        'FORMAT': 'image/png',
-        'TRANSPARENT': true,
-        'VERSION': '1.1.1'
-      },
-      serverType: 'geoserver',
-      crossOrigin: 'anonymous'
-    }),
-    opacity: 0.9
-  });
+  // 위성지도로 전환 (기본)
+  _olMap2.setBasemapType(vw.BasemapType.PHOTO);
 
-  // 동적 레이어 5개 생성 (cad, bld, road, zone, dist)
-  ['cad', 'bld', 'road', 'zone', 'dist'].forEach(function(key){
-    var src = new ol.source.Vector();
-    var st = _layerStyles[key];
-    var lyr = new ol.layer.Vector({
-      source: src,
-      visible: false,  // 기본 꺼짐
-      style: new ol.style.Style({
-        fill: new ol.style.Fill({ color: st.fill }),
-        stroke: new ol.style.Stroke({ color: st.stroke, width: st.width })
-      })
-    });
-    _dynSources[key] = src;
-    _dynLayers[key] = lyr;
-  });
+  // 줌 레벨 설정
+  _olMap2.setZoom(15);
 
-  // 지적선은 WMS로 이미 표시되니까 cad는 기본 OFF (대신 ml-cad 체크박스로 제어)
-  _dynLayers.cad.setVisible(false);
+  // VWorld WMS 레이어들 (켜고 끄기 가능)
+  // 지적도 (기본 ON)
+  _vwLayers.cad = new vw.geom.Tile("LT_C_LANDINFOBASEMAP", "지적도");
+  _vwLayers.cad.setOpacity(0.8);
+  _olMap2.addLayer(_vwLayers.cad);
 
-  // 선택 필지 벡터 레이어 (노란 채우기)
-  _parcelSource = new ol.source.Vector();
-  var parcelLayer = new ol.layer.Vector({
-    source: _parcelSource,
-    style: new ol.style.Style({
-      fill: new ol.style.Fill({ color: 'rgba(251,191,36,0.45)' }),
-      stroke: new ol.style.Stroke({ color: '#d97706', width: 2.5 })
-    })
-  });
+  // 용도지역
+  _vwLayers.zone = null;  // 켤 때 생성
+  _vwLayers.dist = null;
 
-  // 반경 원 벡터 레이어 (파란 점선 + 중심점)
-  _radiusSource = new ol.source.Vector();
-  var radiusLayer = new ol.layer.Vector({
-    source: _radiusSource,
-    style: function(feature){
-      var type = feature.get('type');
-      if(type === 'radius'){
-        return new ol.style.Style({
-          stroke: new ol.style.Stroke({ color: '#2563eb', width: 2.5, lineDash: [8,4] }),
-          fill: new ol.style.Fill({ color: 'rgba(37,99,235,0.08)' })
-        });
-      }
-      if(type === 'center'){
-        return new ol.style.Style({
-          image: new ol.style.Circle({
-            radius: 6,
-            fill: new ol.style.Fill({ color: '#dc2626' }),
-            stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
-          })
-        });
-      }
-      if(type === 'label'){
-        return new ol.style.Style({
-          text: new ol.style.Text({
-            text: feature.get('text') || '',
-            font: 'bold 12px "Noto Sans KR",sans-serif',
-            fill: new ol.style.Fill({ color: '#fff' }),
-            backgroundFill: new ol.style.Fill({ color: '#2563eb' }),
-            padding: [4, 8, 4, 8],
-            offsetY: 0
-          })
-        });
-      }
-    }
-  });
-
-  _olMap2 = new ol.Map({
-    target: 'vmap2',
-    layers: [
-      bgLayer, cadWmsLayer,
-      _dynLayers.zone, _dynLayers.dist, _dynLayers.bld, _dynLayers.road, _dynLayers.cad,
-      parcelLayer, radiusLayer
-    ],
-    view: new ol.View({
-      center: ol.proj.fromLonLat([126.83, 37.2]),
-      zoom: 16,
-      maxZoom: 19
-    }),
-    controls: ol.control.defaults.defaults({ attribution: false })
-  });
-
-  // 클릭 → 카카오 geocoder로 PNU 생성 → 서버 조회
-  _olMap2.on('click', function(evt){
-    var lonlat = ol.proj.toLonLat(evt.coordinate);
-    onMapClickParcel(lonlat[0], lonlat[1]);
-  });
-
-  // 지도 이동/줌 시 표시된 레이어 다시 로드
-  _olMap2.on('moveend', function(){
-    refreshMapLayers();
+  // 클릭 이벤트
+  vw.EventListener.add(_olMap2, vw.EventType.LEFT_CLICK, function(windowPosition, ecefPosition, cartographic, featureInfo){
+    if(!cartographic) return;
+    var lng = cartographic.longitudeDD;
+    var lat = cartographic.latitudeDD;
+    onMapClickParcel(lng, lat);
   });
 
   _olMap2loaded = true;
+  console.log('VWorld 지도 초기화 완료');
 }
 
-// 레이어 토글 (체크박스 → ON/OFF)
-function toggleMapLayer(key, on){
-  if(!_dynLayers[key]) return;
-  _dynLayers[key].setVisible(on);
-  if(on){
-    fetchDynLayer(key);
-  } else {
-    _dynSources[key].clear();
+// 레이어 토글
+function toggleVwLayer(key, on){
+  if(!_olMap2) return;
+  
+  if(key === 'cad'){
+    if(on && !_vwLayers.cad){
+      _vwLayers.cad = new vw.geom.Tile("LT_C_LANDINFOBASEMAP", "지적도");
+      _vwLayers.cad.setOpacity(0.8);
+      _olMap2.addLayer(_vwLayers.cad);
+    } else if(!on && _vwLayers.cad){
+      _olMap2.removeLayer(_vwLayers.cad);
+      _vwLayers.cad = null;
+    }
+  } else if(key === 'zone'){
+    if(on && !_vwLayers.zone){
+      _vwLayers.zone = new vw.geom.Tile("LT_C_UQ111", "용도지역");
+      _vwLayers.zone.setOpacity(0.5);
+      _olMap2.addLayer(_vwLayers.zone);
+    } else if(!on && _vwLayers.zone){
+      _olMap2.removeLayer(_vwLayers.zone);
+      _vwLayers.zone = null;
+    }
+  } else if(key === 'dist'){
+    if(on && !_vwLayers.dist){
+      _vwLayers.dist = new vw.geom.Tile("LT_C_UQ121", "지구단위계획");
+      _vwLayers.dist.setOpacity(0.5);
+      _olMap2.addLayer(_vwLayers.dist);
+    } else if(!on && _vwLayers.dist){
+      _olMap2.removeLayer(_vwLayers.dist);
+      _vwLayers.dist = null;
+    }
   }
 }
 
-// 동적 레이어 데이터 로드 (현재 지도 뷰 기준)
-function fetchDynLayer(key){
-  if(!_olMap2 || !_dynSources[key]) return;
-  var apiKey = _layerApiMap[key];
-  if(!apiKey) return;
-  
-  var view = _olMap2.getView();
-  var extent4326 = ol.proj.transformExtent(view.calculateExtent(), 'EPSG:3857', 'EPSG:4326');
-  var center4326 = ol.proj.toLonLat(view.getCenter());
-  
-  // 지도 영역 대각선의 절반을 반경으로
-  var dx = (extent4326[2] - extent4326[0]) * 111000 * Math.cos(center4326[1] * Math.PI / 180);
-  var dy = (extent4326[3] - extent4326[1]) * 111000;
-  var radius = Math.min(Math.sqrt(dx*dx + dy*dy) / 2, 1500);  // 최대 1.5km
-  
-  if(radius < 100) radius = 100;
-
-  fetch('http://168.107.15.68:5050/api/wfs-dxf-circle', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      center_lng: center4326[0],
-      center_lat: center4326[1],
-      radius: radius,
-      layers: [apiKey],
-      format: 'geojson'  // 추후 서버에 GeoJSON 응답 추가 시 사용
-    })
-  })
-  .then(function(r){
-    // GeoJSON 미지원이면 그냥 종료
-    if(!r.ok) return null;
-    var ct = r.headers.get('Content-Type') || '';
-    if(ct.indexOf('json') === -1) return null;
-    return r.json();
-  })
-  .then(function(geojson){
-    if(!geojson || !geojson.features) {
-      // 서버가 GeoJSON 미지원 → DXF만 가능 → 별도 엔드포인트 필요
-      // 현재는 표시만 안 됨 (DXF 다운로드는 OK)
-      return;
-    }
-    _dynSources[key].clear();
-    var format = new ol.format.GeoJSON();
-    var features = format.readFeatures(geojson, {
-      dataProjection: 'EPSG:4326',
-      featureProjection: 'EPSG:3857'
-    });
-    _dynSources[key].addFeatures(features);
-  })
-  .catch(function(e){ console.error('Layer ' + key + ' load error:', e); });
-}
-
-// 모든 표시된 레이어 새로고침
-function refreshMapLayers(){
-  ['cad', 'bld', 'road', 'zone', 'dist'].forEach(function(key){
-    if(_dynLayers[key] && _dynLayers[key].getVisible()){
-      fetchDynLayer(key);
-    }
-  });
+// 위성/일반 전환
+function vwSwitchType(type){
+  if(!_olMap2) return;
+  if(type === 'Satellite'){
+    _olMap2.setBasemapType(vw.BasemapType.PHOTO);
+  } else {
+    _olMap2.setBasemapType(vw.BasemapType.GRAPHIC);
+  }
 }
 
 // 지도 클릭 시 필지 조회
@@ -1345,19 +1214,8 @@ function onMapClickParcel(lng, lat){
 
 // GeoJSON geometry → OpenLayers feature 하이라이트
 function highlightParcel(geom){
-  _parcelSource.clear();
-  if(!geom) return;
-  try{
-    var reader = new ol.format.GeoJSON();
-    var feat = reader.readFeature({
-      type: 'Feature',
-      geometry: geom
-    }, {
-      dataProjection: 'EPSG:4326',
-      featureProjection: 'EPSG:3857'
-    });
-    _parcelSource.addFeature(feat);
-  }catch(e){ console.error('필지 하이라이트 실패', e); }
+  // VWorld 지도에서는 일단 비활성화 (추후 구현)
+  console.log('필지 하이라이트:', geom ? geom.type : 'none');
 }
 
 // GeoJSON geometry → 중심점 (위경도)
@@ -1378,47 +1236,16 @@ function computeCentroid(geom){
   }catch(e){ return null; }
 }
 
-// 반경 원 표시 (중심점 + 원 + 반경 라벨)
+// 반경 원 표시 (VWorld 지도에서 카메라 이동만)
 function showRadiusCircle(lng, lat, radiusM){
-  _radiusSource.clear();
-  var centerMerc = ol.proj.fromLonLat([lng, lat]);
-
-  // 반경 원 (다각형 근사 — 위경도 기반으로 정확한 원 그리기)
-  var circleCoords = [];
-  var segments = 64;
-  var latFactor = 111000;
-  var lngFactor = 111000 * Math.cos(lat * Math.PI / 180);
-  for(var i = 0; i <= segments; i++){
-    var a = (i / segments) * 2 * Math.PI;
-    var dx = (radiusM * Math.cos(a)) / lngFactor;
-    var dy = (radiusM * Math.sin(a)) / latFactor;
-    var pt = ol.proj.fromLonLat([lng + dx, lat + dy]);
-    circleCoords.push(pt);
-  }
-  var circleGeom = new ol.geom.Polygon([circleCoords]);
-  _radiusSource.addFeature(new ol.Feature({ geometry: circleGeom, type: 'radius' }));
-
-  // 중심점
-  _radiusSource.addFeature(new ol.Feature({
-    geometry: new ol.geom.Point(centerMerc),
-    type: 'center'
-  }));
-
-  // 반경 라벨
-  var labelDx = (radiusM * 0.55) / lngFactor;
-  _radiusSource.addFeature(new ol.Feature({
-    geometry: new ol.geom.Point(ol.proj.fromLonLat([lng + labelDx, lat])),
-    type: 'label',
-    text: '반경 ' + (radiusM >= 1000 ? (radiusM/1000)+'km' : radiusM+'m')
-  }));
-
-  // 지도 뷰를 반경 전체가 보이도록 조정
+  if(!_olMap2) return;
   try{
-    var extent = circleGeom.getExtent();
-    if(extent && _olMap2){
-      _olMap2.getView().fit(extent, { padding: [50,50,50,50], duration: 400, maxZoom: 17 });
-    }
-  }catch(e){}
+    // VWorld 지도 카메라를 해당 위치로 이동
+    var cameraHeight = Math.max(500, radiusM * 3);
+    _olMap2.flyTo(new vw.CoordZ(lng, lat, cameraHeight));
+  }catch(e){
+    console.error('카메라 이동 실패:', e);
+  }
 }
 
 // 반경 변경 버튼
