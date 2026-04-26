@@ -1027,98 +1027,64 @@ var _currentRadius = 500;
 
 function initVmap2(){
   if(_olMap2loaded) return;
-  if(typeof vw === 'undefined'){
+  if(typeof vw === 'undefined' || !vw.ol3){
+    console.log('VWorld 로딩 대기 중...');
     setTimeout(initVmap2, 500);
     return;
   }
 
-  // VWorld 지도 옵션
-  var mapOptions = new vw.MapOptions(
-    vw.BasemapType.GRAPHIC,        // 기본 일반지도
-    "",                            // 컨트롤 (없음)
-    vw.DensityType.NORMAL,
-    vw.DensityType.NORMAL,
-    false,                         // 3D 안 씀
-    new vw.CameraPosition(
-      new vw.CoordZ(127.017, 37.253, 1000),
-      new vw.Direction(0, -90, 0)
-    ),
-    new vw.NavigationMode(vw.NavigationModeType.HYBRID, false)
-  );
+  try{
+    // VWorld 지도 옵션 (봉삼네 블로그 스타일)
+    vw.ol3.MapOptions = {
+      basemapType: vw.ol3.BasemapType.PHOTO,           // 위성지도
+      controlDensity: vw.ol3.DensityType.EMPTY,        // 툴바 없음
+      interactionDensity: vw.ol3.DensityType.BASIC,    // 기본 인터액션
+      controlsAutoArrange: true,
+      homePosition: vw.ol3.CameraPosition,
+      initPosition: vw.ol3.CameraPosition
+    };
 
-  // 지도 생성
-  _olMap2 = new vw.Map("vmap2", mapOptions);
+    // 초기 위치 (수원 권선구)
+    vw.ol3.CameraPosition.center = [127.017, 37.253];
+    vw.ol3.CameraPosition.zoom = 16;
 
-  // 위성지도로 전환 (기본)
-  _olMap2.setBasemapType(vw.BasemapType.PHOTO);
+    // 지도 생성
+    _olMap2 = new vw.ol3.Map("vmap2", vw.ol3.MapOptions);
 
-  // 줌 레벨 설정
-  _olMap2.setZoom(15);
+    console.log('VWorld 지도 생성 완료');
 
-  // VWorld WMS 레이어들 (켜고 끄기 가능)
-  // 지적도 (기본 ON)
-  _vwLayers.cad = new vw.geom.Tile("LT_C_LANDINFOBASEMAP", "지적도");
-  _vwLayers.cad.setOpacity(0.8);
-  _olMap2.addLayer(_vwLayers.cad);
+    // 클릭 이벤트
+    if(vw.ol3.EventListener && vw.ol3.EventType){
+      vw.ol3.EventListener.add(_olMap2, vw.ol3.EventType.LEFT_CLICK, function(windowPosition, ecefPosition, cartographic, featureInfo){
+        if(!cartographic) return;
+        var lng = cartographic.longitudeDD || cartographic[0];
+        var lat = cartographic.latitudeDD || cartographic[1];
+        onMapClickParcel(lng, lat);
+      });
+    }
 
-  // 용도지역
-  _vwLayers.zone = null;  // 켤 때 생성
-  _vwLayers.dist = null;
-
-  // 클릭 이벤트
-  vw.EventListener.add(_olMap2, vw.EventType.LEFT_CLICK, function(windowPosition, ecefPosition, cartographic, featureInfo){
-    if(!cartographic) return;
-    var lng = cartographic.longitudeDD;
-    var lat = cartographic.latitudeDD;
-    onMapClickParcel(lng, lat);
-  });
-
-  _olMap2loaded = true;
-  console.log('VWorld 지도 초기화 완료');
+    _olMap2loaded = true;
+  } catch(e){
+    console.error('VWorld 지도 초기화 실패:', e);
+  }
 }
 
-// 레이어 토글
+// 레이어 토글 (현재는 기본 지도만 유지, 추가 레이어는 추후 구현)
 function toggleVwLayer(key, on){
-  if(!_olMap2) return;
-  
-  if(key === 'cad'){
-    if(on && !_vwLayers.cad){
-      _vwLayers.cad = new vw.geom.Tile("LT_C_LANDINFOBASEMAP", "지적도");
-      _vwLayers.cad.setOpacity(0.8);
-      _olMap2.addLayer(_vwLayers.cad);
-    } else if(!on && _vwLayers.cad){
-      _olMap2.removeLayer(_vwLayers.cad);
-      _vwLayers.cad = null;
-    }
-  } else if(key === 'zone'){
-    if(on && !_vwLayers.zone){
-      _vwLayers.zone = new vw.geom.Tile("LT_C_UQ111", "용도지역");
-      _vwLayers.zone.setOpacity(0.5);
-      _olMap2.addLayer(_vwLayers.zone);
-    } else if(!on && _vwLayers.zone){
-      _olMap2.removeLayer(_vwLayers.zone);
-      _vwLayers.zone = null;
-    }
-  } else if(key === 'dist'){
-    if(on && !_vwLayers.dist){
-      _vwLayers.dist = new vw.geom.Tile("LT_C_UQ121", "지구단위계획");
-      _vwLayers.dist.setOpacity(0.5);
-      _olMap2.addLayer(_vwLayers.dist);
-    } else if(!on && _vwLayers.dist){
-      _olMap2.removeLayer(_vwLayers.dist);
-      _vwLayers.dist = null;
-    }
-  }
+  console.log('레이어 토글:', key, on);
+  // VWorld 레이어 추가는 추후 구현
 }
 
 // 위성/일반 전환
 function vwSwitchType(type){
   if(!_olMap2) return;
-  if(type === 'Satellite'){
-    _olMap2.setBasemapType(vw.BasemapType.PHOTO);
-  } else {
-    _olMap2.setBasemapType(vw.BasemapType.GRAPHIC);
-  }
+  try{
+    if(type === 'Satellite'){
+      _olMap2.setBasemapType(vw.ol3.BasemapType.PHOTO);
+    } else {
+      _olMap2.setBasemapType(vw.ol3.BasemapType.GRAPHIC);
+    }
+  } catch(e){ console.error(e); }
 }
 
 // 지도 클릭 시 필지 조회
@@ -1241,8 +1207,9 @@ function showRadiusCircle(lng, lat, radiusM){
   if(!_olMap2) return;
   try{
     // VWorld 지도 카메라를 해당 위치로 이동
-    var cameraHeight = Math.max(500, radiusM * 3);
-    _olMap2.flyTo(new vw.CoordZ(lng, lat, cameraHeight));
+    if(_olMap2.flyTo){
+      _olMap2.flyTo(new vw.ol3.CoordZ(lng, lat, Math.max(500, radiusM * 3)));
+    }
   }catch(e){
     console.error('카메라 이동 실패:', e);
   }
