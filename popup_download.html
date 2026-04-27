@@ -7,10 +7,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.5.2/ol.css">
 <script src="https://cdn.jsdelivr.net/npm/ol@7.5.2/dist/ol.js"></script>
-<!-- VWorld 공식 2D 지도 API -->
-<script src="https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=16B90D39-90BB-3197-987A-54983A46F250&domain=168.107.15.68"></script>
-<!-- 카카오 지도 SDK -->
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services&autoload=false"></script>
+<script>
+// 카카오 지도 SDK (services 라이브러리 포함 - 좌표→주소 변환용)
+(function(){
+  var jsKey = localStorage.getItem('gdsp_kakao_js') || '0f432d6e8470eed32f947e3c7db146b9';
+  document.write('<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey='+jsKey+'&libraries=services&autoload=false">\x3C/script>');
+})();
+</script>
 <style>
 :root{
   --bg:#f5f7fa;--bg2:#eef1f6;--bg3:#e6eaf2;
@@ -286,86 +289,73 @@ function updateScaleBtns(){
 
   <!-- 지적도 -->
   <div class="tab-view" id="view-jideok">
-    <!-- VWorld 공식 2D 지도 -->
-    <div style="position:relative;flex-shrink:0;height:52%">
-      <div id="vmap2" style="width:100%;height:100%;background:#e8eef4"></div>
-      <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:420px">
-        <input id="jdAddr" type="text" placeholder="지번 또는 도로명 검색…" onkeydown="if(event.key==='Enter')jdSearch()"
-          style="flex:1;height:34px;padding:0 12px;background:#fff;border:1px solid var(--line2);border-radius:8px;font-size:12px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.15)">
-        <button onclick="jdSearch()" style="height:34px;padding:0 14px;border-radius:8px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">검색</button>
-      </div>
-      <div id="jdSrchResult" style="position:absolute;top:50px;left:10px;z-index:1001;width:calc(100% - 20px);max-width:420px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none;max-height:180px;overflow-y:auto"></div>
-      
-      <!-- 지도 위 레이어 토글 패널 -->
-      <div id="mapLayerPanel" style="position:absolute;top:10px;right:10px;z-index:1000;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:8px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.15);font-size:11px;max-width:160px">
-        <div style="font-weight:700;color:var(--txt2);margin-bottom:6px;font-size:11px">📍 지도 레이어</div>
-        <label style="display:flex;align-items:center;gap:5px;padding:3px 0;cursor:pointer">
-          <input type="checkbox" id="ml-cad" checked onchange="toggleVwLayer('cad', this.checked)">
-          <span style="color:#dc2626">■</span>지적도
-        </label>
-        <label style="display:flex;align-items:center;gap:5px;padding:3px 0;cursor:pointer">
-          <input type="checkbox" id="ml-zone" onchange="toggleVwLayer('zone', this.checked)">
-          <span style="color:#0ea5e9">■</span>용도지역
-        </label>
-        <label style="display:flex;align-items:center;gap:5px;padding:3px 0;cursor:pointer">
-          <input type="checkbox" id="ml-dist" onchange="toggleVwLayer('dist', this.checked)">
-          <span style="color:#d97706">■</span>지구단위
-        </label>
-        <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;display:flex;gap:4px">
-          <button onclick="vwSwitchType('Satellite')" class="hbtn" style="flex:1;height:24px;font-size:10px;padding:0">🛰️위성</button>
-          <button onclick="vwSwitchType('Base')" class="hbtn" style="flex:1;height:24px;font-size:10px;padding:0">🗺️일반</button>
-        </div>
-      </div>
-      
-      <!-- 지도 범례 -->
-      <div style="position:absolute;bottom:10px;right:10px;z-index:1000;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.1);line-height:1.6">
-        <div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:rgba(251,191,36,.5);border:1.5px solid #d97706;display:inline-block"></span>선택 필지</div>
-        <div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:rgba(37,99,235,.1);border:1.5px dashed #2563eb;display:inline-block"></span>반경 영역</div>
-      </div>
-    </div>
-    <!-- 하단: 필지 정보 + 반경 DXF -->
-    <div style="flex:1;overflow-y:auto;padding:12px 16px">
-      <!-- 필지 정보 -->
-      <div class="sec" style="margin-bottom:10px">
-        <div class="sec-t" style="margin-bottom:10px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
-          선택 필지 정보
-        </div>
-        <div class="info-row"><span class="info-k">주소</span><span class="info-v blue" id="jd-addr">—</span></div>
-        <div class="info-row"><span class="info-k">지목</span><span class="info-v" id="jd-jmok">—</span></div>
-        <div class="info-row"><span class="info-k">면적</span><span class="info-v green" id="jd-area">—</span></div>
-        <div class="info-row"><span class="info-k">PNU</span><span class="info-v" id="jd-pnu" style="font-size:11px">—</span></div>
-        <div style="display:flex;gap:6px;margin-top:10px">
-          <button class="btn-primary" style="flex:1" onclick="copyJdInfo()">📋 필지정보 복사</button>
-          <button class="btn-outline" style="flex:1" onclick="sendJdToParent()">↩ 메인으로 전송</button>
+    <div style="display:flex;flex:1;overflow:hidden">
+
+      <!-- 좌측: VWorld 지도 -->
+      <div style="flex:55;position:relative;min-width:0;display:flex;flex-direction:column">
+        <div style="flex:1;position:relative;min-height:0">
+          <div id="vmap2" style="width:100%;height:100%;background:#e8eef4"></div>
+          <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:340px">
+            <input id="jdAddr" type="text" placeholder="지번 또는 도로명 검색…" onkeydown="if(event.key==='Enter')jdSearch()"
+              style="flex:1;height:32px;padding:0 10px;background:#fff;border:1px solid var(--line2);border-radius:8px;font-size:11px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.15)">
+            <button onclick="jdSearch()" style="height:32px;padding:0 12px;border-radius:8px;background:var(--blue);color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">검색</button>
+          </div>
+          <div id="jdSrchResult" style="position:absolute;top:48px;left:10px;z-index:1001;width:calc(100% - 20px);max-width:340px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none;max-height:160px;overflow-y:auto"></div>
+          <!-- 위성/일반 전환 버튼 -->
+          <div style="position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:4px">
+            <button onclick="vwSwitchType('Satellite')" style="height:30px;padding:0 10px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:10px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">🛰️ 위성</button>
+            <button onclick="vwSwitchType('Base')" style="height:30px;padding:0 10px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:10px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">🗺️ 일반</button>
+          </div>
+          <!-- 지도 범례 -->
+          <div style="position:absolute;bottom:10px;right:10px;z-index:1000;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.1);line-height:1.6">
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:rgba(251,191,36,.5);border:1.5px solid #d97706;display:inline-block"></span>선택 필지</div>
+            <div style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:rgba(37,99,235,.1);border:1.5px dashed #2563eb;display:inline-block"></span>반경 영역</div>
+          </div>
         </div>
       </div>
 
-      <!-- 반경 DXF 다운로드 -->
-      <div class="sec" style="margin-bottom:10px">
-        <div class="sec-t" style="margin-bottom:10px">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
-          반경 DXF 다운로드
-        </div>
-        <p style="font-size:11px;color:var(--txt3);margin-bottom:8px;line-height:1.55">
-          필지 클릭 후 반경 내 지적선·건물·도로 등을 <b style="color:var(--blue2)">EPSG:5186 (한국 CAD 표준)</b> 좌표계 DXF로 다운로드. 경계에 걸친 큰 필지도 구멍 없이 포함돼요.
-        </p>
+      <!-- 우측: 다운로드 패널 -->
+      <div style="flex:45;flex-shrink:0;overflow-y:auto;padding:14px;background:var(--card);border-left:1px solid var(--line);display:flex;flex-direction:column;gap:10px">
 
-        <!-- 반경 선택 -->
-        <div style="margin-bottom:10px">
-          <div style="font-size:11px;color:var(--txt2);font-weight:700;margin-bottom:6px">반경</div>
-          <div style="display:flex;gap:5px" id="radiusBtnGroup">
-            <button class="rad-btn" data-r="200" onclick="setRadius(200)">200m</button>
-            <button class="rad-btn on" data-r="500" onclick="setRadius(500)">500m</button>
-            <button class="rad-btn" data-r="1000" onclick="setRadius(1000)">1km</button>
-            <button class="rad-btn" data-r="1500" onclick="setRadius(1500)">1.5km</button>
+        <!-- 선택 주소 -->
+        <div class="sec" style="margin:0;padding:14px">
+          <div class="sec-t" style="margin-bottom:8px">📍 선택 주소</div>
+          <div id="jd-addr" style="font-size:13px;font-weight:700;color:var(--blue2);min-height:20px;line-height:1.5">지도에서 필지를 클릭하거나 주소를 검색하세요</div>
+          <div style="display:none" id="jd-info-extra">
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:11px;color:var(--txt3);line-height:1.7">
+              <span>지목: <b style="color:var(--txt2)" id="jd-jmok">—</b></span>
+              &nbsp;|&nbsp;
+              <span>면적: <b style="color:var(--green)" id="jd-area">—</b></span>
+            </div>
+            <div style="font-size:10px;color:var(--txt3);margin-top:4px">PNU: <span id="jd-pnu" style="font-family:monospace">—</span></div>
           </div>
         </div>
 
-        <!-- 레이어 체크박스 -->
-        <div style="margin-bottom:12px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div style="font-size:11px;color:var(--txt2);font-weight:700">포함 레이어</div>
+        <!-- 영역 선택 -->
+        <div class="sec" style="margin:0;padding:14px">
+          <div class="sec-t" style="margin-bottom:8px">📐 영역 선택</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2);cursor:pointer">
+              <input type="radio" name="areaMode" value="auto" checked onchange="setAreaMode('auto')" style="accent-color:var(--blue)">
+              <span><b>자동 영역</b> (반경 기준)</span>
+            </label>
+            <div id="radiusGroup" style="margin-left:24px;display:flex;gap:5px">
+              <button class="rad-btn" data-r="200" onclick="setRadius(200)">200m</button>
+              <button class="rad-btn on" data-r="500" onclick="setRadius(500)">500m</button>
+              <button class="rad-btn" data-r="1000" onclick="setRadius(1000)">1km</button>
+              <button class="rad-btn" data-r="1500" onclick="setRadius(1500)">1.5km</button>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2);cursor:pointer;margin-top:4px">
+              <input type="radio" name="areaMode" value="select" onchange="setAreaMode('select')" style="accent-color:var(--blue)">
+              <span><b>직접 선택</b> (드래그로 영역 그리기)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 레이어 선택 -->
+        <div class="sec" style="margin:0;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div class="sec-t" style="margin:0">📋 포함 레이어</div>
             <div style="display:flex;gap:4px">
               <button class="hbtn" onclick="toggleAllLayers(true)" style="height:22px;padding:0 8px;font-size:10px">전체</button>
               <button class="hbtn" onclick="toggleAllLayers(false)" style="height:22px;padding:0 8px;font-size:10px">해제</button>
@@ -400,19 +390,19 @@ function updateScaleBtns(){
         </div>
 
         <!-- 다운로드 버튼 -->
-        <button id="dxfDlBtn" class="btn-primary" style="width:100%;height:44px;font-size:13px" onclick="downloadCircleDxf()">
-          📐 반경 DXF 다운로드
+        <button id="dxfDlBtn" class="btn-primary" style="width:100%;height:48px;font-size:14px;font-weight:900" onclick="downloadCircleDxf()">
+          📐 DXF 다운로드
         </button>
-        <div id="dxfStatus" style="margin-top:8px;font-size:11px;color:var(--txt3);text-align:center;min-height:16px"></div>
-      </div>
+        <div id="dxfStatus" style="font-size:11px;color:var(--txt3);text-align:center;min-height:16px"></div>
 
-      <!-- 이용 안내 -->
-      <div style="padding:10px 12px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:8px;font-size:11px;color:var(--txt2);line-height:1.6">
-        <b style="color:var(--blue2)">이용 안내</b><br>
-        • 좌표계: <b>EPSG:5186</b> (중부원점 TM, 한국 CAD 표준)<br>
-        • 단위: <b>미터(m)</b>, X=동서(easting), Y=남북(northing)<br>
-        • 구멍 방지: 반경의 60% 버퍼 자동 확장 조회<br>
-        • 데이터 출처: <b>VWorld 공간정보 오픈플랫폼</b>
+        <!-- 이용 안내 -->
+        <div style="padding:10px 12px;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.15);border-radius:8px;font-size:11px;color:var(--txt2);line-height:1.6">
+          <b style="color:var(--blue2)">이용 안내</b><br>
+          • 좌표계: <b>EPSG:5186</b> (한국 CAD 표준)<br>
+          • 단위: <b>미터(m)</b><br>
+          • 데이터 출처: <b>VWorld 공간정보 오픈플랫폼</b>
+        </div>
+
       </div>
     </div>
     <!-- WFS form (legacy, 제거 예정) -->
@@ -608,7 +598,7 @@ function initKakaoMap(){
     document.getElementById('kakaoMapOverlay').style.display='none';
     var container = document.getElementById('kakaoMap');
     _kMap = new kakao.maps.Map(container, {
-      center: new kakao.maps.LatLng(37.2, 126.83),
+      center: new kakao.maps.LatLng(37.199, 126.831),
       level: 7,
       mapTypeId: kakao.maps.MapTypeId.HYBRID
     });
@@ -1017,74 +1007,113 @@ function copyTiles(){
   });
 }
 
-/* ===================== VWorld 공식 2D 지도 (지적도 탭) ===================== */
+/* ===================== OpenLayers 지도 (지적도 탭) ===================== */
 var _olMap2 = null, _olMap2loaded = false;
-var _vwLayers = {};        // {cad: WMS layer, zone: ..., dist: ...}
-var _parcelSource = null;
-var _radiusSource = null;
-var _selectedParcel = null;
-var _currentRadius = 500;
+var _parcelSource = null;   // 선택 필지 피처 레이어
+var _radiusSource = null;   // 반경 원 레이어
+var _selectedParcel = null; // {pnu, jibun, addr, lng, lat}
+var _currentRadius = 500;   // 기본 반경 500m
 
 function initVmap2(){
   if(_olMap2loaded) return;
-  if(typeof vw === 'undefined' || !vw.ol3){
-    console.log('VWorld 로딩 대기 중...');
+  if(typeof ol === 'undefined'){
     setTimeout(initVmap2, 500);
     return;
   }
 
-  try{
-    // VWorld 지도 옵션 (봉삼네 블로그 스타일)
-    vw.ol3.MapOptions = {
-      basemapType: vw.ol3.BasemapType.PHOTO,           // 위성지도
-      controlDensity: vw.ol3.DensityType.EMPTY,        // 툴바 없음
-      interactionDensity: vw.ol3.DensityType.BASIC,    // 기본 인터액션
-      controlsAutoArrange: true,
-      homePosition: vw.ol3.CameraPosition,
-      initPosition: vw.ol3.CameraPosition
-    };
+  var PROXY = 'http://168.107.15.68:5050';
 
-    // 초기 위치 (수원 권선구)
-    vw.ol3.CameraPosition.center = [127.017, 37.253];
-    vw.ol3.CameraPosition.zoom = 16;
+  // 기본 레이어 - OSM 대체: VWorld 위성 타일 (Oracle 프록시 경유)
+  var bgLayer = new ol.layer.Tile({
+    source: new ol.source.XYZ({
+      url: PROXY + '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg',
+      crossOrigin: 'anonymous',
+      maxZoom: 19
+    }),
+    preload: 2
+  });
 
-    // 지도 생성
-    _olMap2 = new vw.ol3.Map("vmap2", vw.ol3.MapOptions);
+  // 지적선 WMS 오버레이 (지번/경계)
+  var cadWmsLayer = new ol.layer.Tile({
+    source: new ol.source.TileWMS({
+      url: PROXY + '/api/vw-wms',
+      params: {
+        'LAYERS': 'lt_c_landinfobasemap',
+        'STYLES': 'lt_c_landinfobasemap',
+        'FORMAT': 'image/png',
+        'TRANSPARENT': true,
+        'VERSION': '1.1.1'
+      },
+      serverType: 'geoserver',
+      crossOrigin: 'anonymous'
+    }),
+    opacity: 0.9
+  });
 
-    console.log('VWorld 지도 생성 완료');
+  // 선택 필지 벡터 레이어 (노란 채우기)
+  _parcelSource = new ol.source.Vector();
+  var parcelLayer = new ol.layer.Vector({
+    source: _parcelSource,
+    style: new ol.style.Style({
+      fill: new ol.style.Fill({ color: 'rgba(251,191,36,0.45)' }),
+      stroke: new ol.style.Stroke({ color: '#d97706', width: 2.5 })
+    })
+  });
 
-    // 클릭 이벤트
-    if(vw.ol3.EventListener && vw.ol3.EventType){
-      vw.ol3.EventListener.add(_olMap2, vw.ol3.EventType.LEFT_CLICK, function(windowPosition, ecefPosition, cartographic, featureInfo){
-        if(!cartographic) return;
-        var lng = cartographic.longitudeDD || cartographic[0];
-        var lat = cartographic.latitudeDD || cartographic[1];
-        onMapClickParcel(lng, lat);
-      });
+  // 반경 원 벡터 레이어 (파란 점선 + 중심점)
+  _radiusSource = new ol.source.Vector();
+  var radiusLayer = new ol.layer.Vector({
+    source: _radiusSource,
+    style: function(feature){
+      var type = feature.get('type');
+      if(type === 'radius'){
+        return new ol.style.Style({
+          stroke: new ol.style.Stroke({ color: '#2563eb', width: 2.5, lineDash: [8,4] }),
+          fill: new ol.style.Fill({ color: 'rgba(37,99,235,0.08)' })
+        });
+      }
+      if(type === 'center'){
+        return new ol.style.Style({
+          image: new ol.style.Circle({
+            radius: 6,
+            fill: new ol.style.Fill({ color: '#dc2626' }),
+            stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+          })
+        });
+      }
+      if(type === 'label'){
+        return new ol.style.Style({
+          text: new ol.style.Text({
+            text: feature.get('text') || '',
+            font: 'bold 12px "Noto Sans KR",sans-serif',
+            fill: new ol.style.Fill({ color: '#fff' }),
+            backgroundFill: new ol.style.Fill({ color: '#2563eb' }),
+            padding: [4, 8, 4, 8],
+            offsetY: 0
+          })
+        });
+      }
     }
+  });
 
-    _olMap2loaded = true;
-  } catch(e){
-    console.error('VWorld 지도 초기화 실패:', e);
-  }
-}
+  _olMap2 = new ol.Map({
+    target: 'vmap2',
+    layers: [bgLayer, cadWmsLayer, parcelLayer, radiusLayer],
+    view: new ol.View({
+      center: ol.proj.fromLonLat([126.831, 37.199]),
+      zoom: 16,
+      maxZoom: 19
+    }),
+    controls: ol.control.defaults.defaults({ attribution: false })
+  });
 
-// 레이어 토글 (현재는 기본 지도만 유지, 추가 레이어는 추후 구현)
-function toggleVwLayer(key, on){
-  console.log('레이어 토글:', key, on);
-  // VWorld 레이어 추가는 추후 구현
-}
+  // 클릭 → 카카오 geocoder로 PNU 생성 → 서버 조회
+  _olMap2.on('click', function(evt){
+    var lonlat = ol.proj.toLonLat(evt.coordinate);
+    onMapClickParcel(lonlat[0], lonlat[1]);
+  });
 
-// 위성/일반 전환
-function vwSwitchType(type){
-  if(!_olMap2) return;
-  try{
-    if(type === 'Satellite'){
-      _olMap2.setBasemapType(vw.ol3.BasemapType.PHOTO);
-    } else {
-      _olMap2.setBasemapType(vw.ol3.BasemapType.GRAPHIC);
-    }
-  } catch(e){ console.error(e); }
+  _olMap2loaded = true;
 }
 
 // 지도 클릭 시 필지 조회
@@ -1158,6 +1187,8 @@ function onMapClickParcel(lng, lat){
           document.getElementById('jd-jmok').textContent = p.jimok_nm || p.jimok || '—';
           document.getElementById('jd-area').textContent = p.bchk ? p.bchk + '㎡' : (p.area ? p.area + '㎡' : '—');
           document.getElementById('jd-pnu').textContent = p.pnu || pnu;
+          var extraEl = document.getElementById('jd-info-extra');
+          if(extraEl) extraEl.style.display = 'block';
 
           // 지도에 필지 하이라이트
           highlightParcel(geom);
@@ -1180,8 +1211,19 @@ function onMapClickParcel(lng, lat){
 
 // GeoJSON geometry → OpenLayers feature 하이라이트
 function highlightParcel(geom){
-  // VWorld 지도에서는 일단 비활성화 (추후 구현)
-  console.log('필지 하이라이트:', geom ? geom.type : 'none');
+  _parcelSource.clear();
+  if(!geom) return;
+  try{
+    var reader = new ol.format.GeoJSON();
+    var feat = reader.readFeature({
+      type: 'Feature',
+      geometry: geom
+    }, {
+      dataProjection: 'EPSG:4326',
+      featureProjection: 'EPSG:3857'
+    });
+    _parcelSource.addFeature(feat);
+  }catch(e){ console.error('필지 하이라이트 실패', e); }
 }
 
 // GeoJSON geometry → 중심점 (위경도)
@@ -1202,28 +1244,88 @@ function computeCentroid(geom){
   }catch(e){ return null; }
 }
 
-// 반경 원 표시 (VWorld 지도에서 카메라 이동만)
+// 반경 원 표시 (중심점 + 원 + 반경 라벨)
 function showRadiusCircle(lng, lat, radiusM){
-  if(!_olMap2) return;
-  try{
-    // VWorld 지도 카메라를 해당 위치로 이동
-    if(_olMap2.flyTo){
-      _olMap2.flyTo(new vw.ol3.CoordZ(lng, lat, Math.max(500, radiusM * 3)));
-    }
-  }catch(e){
-    console.error('카메라 이동 실패:', e);
+  _radiusSource.clear();
+  var centerMerc = ol.proj.fromLonLat([lng, lat]);
+
+  // 반경 원 (다각형 근사 — 위경도 기반으로 정확한 원 그리기)
+  var circleCoords = [];
+  var segments = 64;
+  var latFactor = 111000;
+  var lngFactor = 111000 * Math.cos(lat * Math.PI / 180);
+  for(var i = 0; i <= segments; i++){
+    var a = (i / segments) * 2 * Math.PI;
+    var dx = (radiusM * Math.cos(a)) / lngFactor;
+    var dy = (radiusM * Math.sin(a)) / latFactor;
+    var pt = ol.proj.fromLonLat([lng + dx, lat + dy]);
+    circleCoords.push(pt);
   }
+  var circleGeom = new ol.geom.Polygon([circleCoords]);
+  _radiusSource.addFeature(new ol.Feature({ geometry: circleGeom, type: 'radius' }));
+
+  // 중심점
+  _radiusSource.addFeature(new ol.Feature({
+    geometry: new ol.geom.Point(centerMerc),
+    type: 'center'
+  }));
+
+  // 반경 라벨
+  var labelDx = (radiusM * 0.55) / lngFactor;
+  _radiusSource.addFeature(new ol.Feature({
+    geometry: new ol.geom.Point(ol.proj.fromLonLat([lng + labelDx, lat])),
+    type: 'label',
+    text: '반경 ' + (radiusM >= 1000 ? (radiusM/1000)+'km' : radiusM+'m')
+  }));
+
+  // 지도 뷰를 반경 전체가 보이도록 조정
+  try{
+    var extent = circleGeom.getExtent();
+    if(extent && _olMap2){
+      _olMap2.getView().fit(extent, { padding: [50,50,50,50], duration: 400, maxZoom: 17 });
+    }
+  }catch(e){}
 }
 
 // 반경 변경 버튼
 function setRadius(r){
   _currentRadius = r;
-  document.querySelectorAll('#radiusBtnGroup .rad-btn').forEach(function(btn){
+  document.querySelectorAll('#radiusGroup .rad-btn').forEach(function(btn){
     btn.classList.toggle('on', parseInt(btn.dataset.r) === r);
   });
   if(_selectedParcel){
     showRadiusCircle(_selectedParcel.lng, _selectedParcel.lat, r);
   }
+}
+
+// 영역 모드 (자동 반경 / 직접 선택)
+var _areaMode = 'auto';
+function setAreaMode(mode){
+  _areaMode = mode;
+  var radiusGroup = document.getElementById('radiusGroup');
+  if(radiusGroup){
+    radiusGroup.style.opacity = (mode === 'auto') ? '1' : '0.3';
+    radiusGroup.style.pointerEvents = (mode === 'auto') ? 'auto' : 'none';
+  }
+  if(mode === 'select'){
+    setDxfStatus('지도에서 드래그로 영역을 선택하세요 (구현 예정)');
+  } else {
+    setDxfStatus('');
+  }
+}
+
+// 위성/일반 지도 전환 (OpenLayers VWorld 타일)
+function vwSwitchType(type){
+  if(!_olMap2) return;
+  try{
+    var layers = _olMap2.getLayers().getArray();
+    if(layers.length > 0 && layers[0].getSource){
+      var newUrl = (type === 'Satellite')
+        ? 'http://168.107.15.68:5050/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg'
+        : 'http://168.107.15.68:5050/api/vw-tile/Base/{z}/{y}/{x}.jpeg';
+      layers[0].getSource().setUrl(newUrl);
+    }
+  } catch(e){ console.error('전환 실패:', e); }
 }
 
 // 레이어 전체 선택/해제
