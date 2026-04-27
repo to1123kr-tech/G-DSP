@@ -4125,6 +4125,7 @@
                 <div class="nd-irow"><span class="nd-ik">건폐율</span><span class="nd-iv nd-iv-g" id="ndInfoBcr">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">용적률</span><span class="nd-iv nd-iv-g" id="ndInfoFar">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">건축년도</span><span class="nd-iv" id="ndInfoYear">-</span></div>
+                <div class="nd-irow"><span class="nd-ik">소유구분</span><span class="nd-iv" id="ndBldOwner">-</span></div>
                 <button class="nd-bld-btn" onclick="showView('bld')">건축물대장 상세보기</button>
               </div>
             </div>
@@ -4343,6 +4344,10 @@
                 <div class="irow">
                   <div class="ik">건축년도</div>
                   <div class="iv" id="gYear">-</div>
+                </div>
+                <div class="irow">
+                  <div class="ik">소유구분</div>
+                  <div class="iv" id="gBldOwner">-</div>
                 </div>
                 <button class="gbtn-neon" onclick="showView('bld')">건축물대장 상세보기</button>
               </div>
@@ -5717,9 +5722,39 @@
     // ── 인터넷등기소 소유자 조회 ──
     function fetchIrosOwner(jibun) {
       var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
-      setText('ndInfoOwner', '조회중...');
-      // 1단계: 주소로 wk_pin 검색
-      fetch(PROXY + '/api/iros_list', {
+      // 모든 소유구분 칸 즉시 "조회중..." 표시 (이전 데이터 클리어)
+      ['ndInfoOwner', 'bldOwner', 'ndBldOwner', 'gBldOwner'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (el) el.textContent = '조회중...';
+      });
+      
+      // 토지/건물 동시 조회용 함수
+      function _fetchOwner(item, kind) {
+        return fetch(PROXY + '/api/iros/cont', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ realPinList: [{
+            wk_pin: item.wk_pin, real_cls_cd: kind,
+            rd_addr: item.rd_addr || '',
+            rd_addr_prt: item.real_indi_cont,
+            real_indi_cont: item.real_indi_cont,
+            real_indi_cont_detail: item.real_indi_cont_detail || '',
+            rd_addr_detail: item.rd_addr_detail || '',
+            addItem: item.addItem || '',
+            use_cls_cd: '현행',
+            chk_sel: '1', rnum: 1, chk_all: '', rowStatus: 'C'
+          }]})
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var owner = d.dataList && d.dataList[0];
+          if (!owner) return null;
+          return { name: owner.nomprs_name || '-', pin: owner.real_pin || '' };
+        });
+      }
+      
+      // 1단계: 주소로 토지/건물 wk_pin 검색
+      fetch(PROXY + '/api/iros/list', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ websquare_param: {
@@ -5729,30 +5764,37 @@
       })
       .then(function(r){ return r.json(); })
       .then(function(d){
-        var land = (d.dataList || []).find(function(x){ return x.real_cls_cd === '토지'; });
-        if (!land) { setText('ndInfoOwner', '-'); return; }
-        // 2단계: wk_pin으로 소유자 조회
-        return fetch(PROXY + '/api/iros_owner', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ realPinList: [{
-            wk_pin: land.wk_pin, real_cls_cd: '토지',
-            rd_addr: '', rd_addr_prt: land.real_indi_cont,
-            real_indi_cont: land.real_indi_cont,
-            real_indi_cont_detail: land.real_indi_cont_detail || '',
-            rd_addr_detail: '', addItem: '', use_cls_cd: '현행',
-            chk_sel: '1', rnum: 1, chk_all: '', rowStatus: 'C'
-          }]})
-        })
-        .then(function(r2){ return r2.json(); })
-        .then(function(d2){
-          var item = d2.dataList && d2.dataList[0];
-          if (!item) { setText('ndInfoOwner', '-'); return; }
-          var owner = item.nomprs_name || '-';
-          var pin = item.real_pin || '';
-          var el = document.getElementById('ndInfoOwner');
-          if (el) el.innerHTML = owner + (pin ? '<br><span style="font-size:9px;color:var(--txt3)">고유번호: ' + pin + '</span>' : '');
-        });
+        var dataList = d.dataList || [];
+        var land = dataList.find(function(x){ return x.real_cls_cd === '토지'; });
+        var bld  = dataList.find(function(x){ return x.real_cls_cd === '건물'; });
+        
+        // 토지 소유자 (토지이용 패널)
+        if (land) {
+          _fetchOwner(land, '토지').then(function(info){
+            if (!info) { setText('ndInfoOwner', '-'); return; }
+            var el = document.getElementById('ndInfoOwner');
+            if (el) el.innerHTML = info.name + (info.pin ? '<br><span style="font-size:9px;color:var(--txt3)">고유번호: ' + info.pin + '</span>' : '');
+          });
+        } else {
+          setText('ndInfoOwner', '-');
+        }
+        
+        // 건물 소유자 (모든 건축물대장 패널)
+        if (bld) {
+          _fetchOwner(bld, '건물').then(function(info){
+            ['bldOwner', 'ndBldOwner', 'gBldOwner'].forEach(function(id){
+              var el = document.getElementById(id);
+              if (!el) return;
+              if (!info) { el.textContent = '-'; return; }
+              el.innerHTML = info.name + (info.pin ? '<br><span style="font-size:9px;color:var(--txt3)">고유번호: ' + info.pin + '</span>' : '');
+            });
+          });
+        } else {
+          ['bldOwner', 'ndBldOwner', 'gBldOwner'].forEach(function(id){
+            var el = document.getElementById(id);
+            if (el) el.textContent = '-';
+          });
+        }
       })
       .catch(function(){ setText('ndInfoOwner', '-'); });
     }
@@ -5888,7 +5930,7 @@
               }
             }
             if (!bCode) return;
-            var pnu = bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+            var pnu = bCode + '1' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
             currentPnu = pnu; currentJibun = jibun; armed = true;
             // UI 업데이트
             setText('ndInfoJibun', jibun);
@@ -6071,7 +6113,7 @@
               var doc = docs[0];
               var addr = doc.address;
               if (addr && addr.b_code) {
-                var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no) || 0).padStart(4, '0') + String(parseInt(addr.sub_address_no) || 0).padStart(4, '0');
+                var pnu = addr.b_code + (addr.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(addr.main_address_no) || 0).padStart(4, '0') + String(parseInt(addr.sub_address_no) || 0).padStart(4, '0');
                 applySearch(pnu);
               } else {
                 // 도로명만 있는 경우 → 좌표로 역지오코딩
@@ -6082,7 +6124,7 @@
                 .then(function (d2) {
                   var addr2 = d2 && d2.documents && d2.documents[0] && d2.documents[0].address;
                   if (addr2 && addr2.b_code) {
-                    var pnu = addr2.b_code + '0' + String(parseInt(addr2.main_address_no) || 0).padStart(4, '0') + String(parseInt(addr2.sub_address_no) || 0).padStart(4, '0');
+                    var pnu = addr2.b_code + (addr2.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(addr2.main_address_no) || 0).padStart(4, '0') + String(parseInt(addr2.sub_address_no) || 0).padStart(4, '0');
                     searchJibun = addr2.address_name || searchJibun;
                     applySearch(pnu);
                   } else { applySearch(''); }
@@ -6104,7 +6146,7 @@
                   .then(function (d2) {
                     var addr2 = d2 && d2.documents && d2.documents[0] && d2.documents[0].address;
                     if (addr2 && addr2.b_code) {
-                      var pnu = addr2.b_code + '0' + String(parseInt(addr2.main_address_no) || 0).padStart(4, '0') + String(parseInt(addr2.sub_address_no) || 0).padStart(4, '0');
+                      var pnu = addr2.b_code + (addr2.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(addr2.main_address_no) || 0).padStart(4, '0') + String(parseInt(addr2.sub_address_no) || 0).padStart(4, '0');
                       searchJibun = addr2.address_name || searchJibun;
                       applySearch(pnu);
                     } else { applySearch(''); }
@@ -7616,7 +7658,7 @@
       var container = document.getElementById('ndKakaoMap');
       if (!container || ndMapInited) return;
       ndMapInited = true; ndVwMapInited = true;
-      var options = { center: new kakao.maps.LatLng(37.2055, 126.8317), level: 7 };
+      var options = { center: new kakao.maps.LatLng(37.2055, 126.8317), level: 4 };
       ndMap = new kakao.maps.Map(container, options);
       ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW);
       ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
@@ -7769,21 +7811,30 @@
             }
           }
           if (!bCode) return;
-          var pnu = bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
-          currentPnu = pnu; currentJibun = jibun; armed = true;
-          // UI 업데이트
-          setText('mapD', '📍 ' + jibun);
-          setText('mapT', jibun);
-          setText('ndInfoJibun', jibun);
-          setText('ndRcJibun', jibun);
-          setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
-          var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
-          var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
-          var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
-          ndCallLandApi(pnu, lng, lat);
-          ndCallBldApi(pnu);
-          if (jibun) setTimeout(function(){ fetchIrosOwner(jibun); }, 500);
-          toast('✓ ' + jibun, 'ok');
+          // 좌클릭 시 우클릭과 동일하게 검색 함수 사용 (PNU 정확도)
+          var simpleJibun = jibun.split(' ').slice(-2).join(' ');
+          var searchInput = document.getElementById('mainSearch');
+          if (searchInput && typeof hdrSearch === 'function') {
+            searchInput.value = simpleJibun;
+            hdrSearch();
+            toast('✓ ' + jibun, 'ok');
+          } else {
+            // 폴백: 기존 방식
+            var pnu = bCode + '1' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+            currentPnu = pnu; currentJibun = jibun; armed = true;
+            setText('mapD', '📍 ' + jibun);
+            setText('mapT', jibun);
+            setText('ndInfoJibun', jibun);
+            setText('ndRcJibun', jibun);
+            setText('gJibun', jibun); setText('bJibun', jibun); setText('bldJibun', jibun);
+            var ri = document.getElementById('regJibun'); if (ri) ri.value = jibun;
+            var rr = document.getElementById('ndResultRow'); if(rr) rr.classList.add('on');
+            var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
+            ndCallLandApi(pnu, lng, lat);
+            ndCallBldApi(pnu);
+            if (jibun) setTimeout(function(){ fetchIrosOwner(jibun); }, 500);
+            toast('✓ ' + jibun, 'ok');
+          }
         });
       });
     }
@@ -7845,7 +7896,7 @@
     // 토지이용 API 대체 엔드포인트 (fallback)
     function ndCallLandApi2(pnu, apiKey) {
       var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
-      var platGbCd = pnu.substring(10,11);
+      var platGbCd = '0';  // 건축물대장 API는 항상 platGbCd=0
       var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
       var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
       var url = 'https://apis.data.go.kr/1613000/LandUseService/getLandUseInfo'
@@ -7875,7 +7926,7 @@
       var apiKey = localStorage.getItem('gdsp_building') || '';
       if (!apiKey || !pnu || pnu.length < 19) return;
       var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
-      var platGbCd = pnu.substring(10,11);
+      var platGbCd = '0';  // 건축물대장 API는 항상 platGbCd=0
       var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
       var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
       var base = '?serviceKey=' + encodeURIComponent(apiKey)
@@ -7963,7 +8014,7 @@
     // 총괄표제부 API - 건폐율/용적률 보완(레거시 호환)
     function ndCallBldRecapApi(pnu, apiKey, needBcr, needFar) {
       var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
-      var platGbCd = pnu.substring(10,11);
+      var platGbCd = '0';  // 건축물대장 API는 항상 platGbCd=0
       var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
       var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
       var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo'
@@ -8024,7 +8075,7 @@
             var doc = docs2[0];
             var addr = doc.address;
             if (addr && addr.b_code) {
-              var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+              var pnu = addr.b_code + (addr.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
               ndApplySearch(parseFloat(doc.x), parseFloat(doc.y), addr.address_name || q, pnu);
             } else {
               ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, q, kakaoKey);
@@ -8034,7 +8085,7 @@
         var doc = docs[0];
         var addr = doc.address;
         if (addr && addr.b_code) {
-          var pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+          var pnu = addr.b_code + (addr.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
           ndApplySearch(parseFloat(doc.x), parseFloat(doc.y), addr.address_name || searchAddr, pnu);
         } else {
           ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, searchAddr, kakaoKey);
@@ -8066,7 +8117,7 @@
       if (ndMap) {
         var _pos2 = new kakao.maps.LatLng(lat, lng);
         ndMap.setCenter(_pos2);
-        ndMap.setLevel(3);
+        // ndMap.setLevel(3);  // 줌 레벨 유지
         if(ndMarker){ ndMarker.setPosition(_pos2); ndMarker.setMap(ndMap); }
       }
       // 정보 업데이트
