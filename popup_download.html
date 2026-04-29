@@ -434,45 +434,31 @@ function updateScaleBtns(){
         </div>
       </div>
 
-      <!-- 하단: 좌(건축물대장 1페이지) + 우(배치도 2페이지) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <!-- 좌: 건축물대장 미리보기 (1페이지) -->
-        <div class="sec" style="margin-bottom:0">
-          <div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">
-            <span style="display:flex;align-items:center;gap:6px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              건축물대장 미리보기
-            </span>
-            <button class="btn-outline" style="height:24px;padding:0 8px;font-size:11px" onclick="openBldPreview(1)">새창</button>
-          </div>
-          <div id="bldDocBox" onclick="onBldFrameClick(1)" title="클릭하여 새창 열기" style="position:relative;height:560px;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer">
-            <div id="bldDocEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--txt3)">
-              <svg style="width:32px;height:32px;opacity:.25;margin-bottom:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
-              <div style="font-size:12px">조회 후 자동 표시</div>
-            </div>
-            <iframe id="bldDocFrame" style="display:none;width:100%;height:100%;border:0;pointer-events:none" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
-            <div id="bldDocOverlay" style="display:none;position:absolute;inset:0;background:transparent;cursor:pointer" onclick="event.stopPropagation();onBldFrameClick(1)"></div>
+      <!-- 하단: 건축물대장 미리보기 (가로 전체) -->
+      <div class="sec" style="margin-bottom:0">
+        <div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">
+          <span style="display:flex;align-items:center;gap:6px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            건축물대장 미리보기
+          </span>
+          <div style="display:flex;gap:6px">
+            <button class="btn-outline" style="height:30px;padding:0 14px;font-size:12px" onclick="openEaisDrawing()" title="배치도/평면도는 세움터에서 별도 발급">
+              <svg style="width:13px;height:13px;vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+              세움터 배치도
+            </button>
+            <button class="btn-primary" style="height:30px;padding:0 14px;font-size:12px;font-weight:700" onclick="openBldPreview()">
+              <svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/></svg>
+              크게 보기
+            </button>
           </div>
         </div>
-
-        <!-- 우: 배치도 미리보기 (2페이지) -->
-        <div class="sec" style="margin-bottom:0">
-          <div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">
-            <span style="display:flex;align-items:center;gap:6px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-              배치도 미리보기
-            </span>
-            <button class="btn-outline" style="height:24px;padding:0 8px;font-size:11px" onclick="openBldPreview(2)">새창</button>
+        <div id="bldDocBox" style="position:relative;height:700px;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:#fff">
+          <div id="bldDocEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--txt3)">
+            <svg style="width:36px;height:36px;opacity:.25;margin-bottom:8px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
+            <div style="font-size:12px">조회 후 자동 표시</div>
+            <div style="font-size:10px;margin-top:3px">※ 배치도/평면도는 세움터에서 직접 발급</div>
           </div>
-          <div id="bldPlanBox" onclick="onBldFrameClick(2)" title="클릭하여 새창 열기" style="position:relative;height:560px;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer">
-            <div id="bldPlanEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--txt3)">
-              <svg style="width:32px;height:32px;opacity:.25;margin-bottom:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-              <div style="font-size:12px">조회 후 자동 표시</div>
-              <div style="font-size:10px;margin-top:3px">2페이지 (배치도)</div>
-            </div>
-            <iframe id="bldPlanFrame" style="display:none;width:100%;height:100%;border:0;pointer-events:none" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
-            <div id="bldPlanOverlay" style="display:none;position:absolute;inset:0;background:transparent;cursor:pointer" onclick="event.stopPropagation();onBldFrameClick(2)"></div>
-          </div>
+          <iframe id="bldDocFrame" style="display:none;width:100%;height:100%;border:0" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
         </div>
       </div>
     </div>
@@ -1026,7 +1012,10 @@ function initVmap2(){
     return;
   }
 
-  var PROXY = 'http://168.107.15.68:5050';
+  // PROXY: 현재 페이지 프로토콜에 맞춰 동적 결정
+  // - HTTPS 페이지에서 HTTP 리소스 호출하면 Mixed Content로 차단됨
+  // - HTTP 페이지에서는 그대로 HTTP 사용
+  var PROXY = (window.location.protocol === 'https:' ? 'https:' : 'http:') + '//168.107.15.68:5050';
 
   // 기본 레이어 - OSM 대체: VWorld 위성 타일 (Oracle 프록시 경유)
   var bgLayer = new ol.layer.Tile({
@@ -1166,7 +1155,7 @@ function onMapClickParcel(lng, lat){
       var pnu = bcode + mtYn + String(mainBun).padStart(4,'0') + String(subBun).padStart(4,'0');
 
       // 3. 서버에 WFS 조회
-      fetch('http://168.107.15.68:5050/api/wfs?pnu='+pnu+'&lng='+lng+'&lat='+lat)
+      fetch(PROXY + '/api/wfs?pnu='+pnu+'&lng='+lng+'&lat='+lat)
         .then(function(r){ return r.json(); })
         .then(function(data){
           var features = (data && data.response && data.response.result && data.response.result.featureCollection && data.response.result.featureCollection.features) || (data && data.features) || [];
@@ -1325,9 +1314,10 @@ function vwSwitchType(type){
   try{
     var layers = _olMap2.getLayers().getArray();
     if(layers.length > 0 && layers[0].getSource){
+      var proto = (window.location.protocol === 'https:' ? 'https:' : 'http:');
       var newUrl = (type === 'Satellite')
-        ? 'http://168.107.15.68:5050/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg'
-        : 'http://168.107.15.68:5050/api/vw-tile/Base/{z}/{y}/{x}.jpeg';
+        ? proto + '//168.107.15.68:5050/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg'
+        : proto + '//168.107.15.68:5050/api/vw-tile/Base/{z}/{y}/{x}.jpeg';
       layers[0].getSource().setUrl(newUrl);
     }
   } catch(e){ console.error('전환 실패:', e); }
@@ -1380,7 +1370,8 @@ function downloadCircleDxf(){
     jibun: _selectedParcel.jibun || ''
   };
 
-  fetch('http://168.107.15.68:5050/api/wfs-dxf-circle', {
+  var proto2 = (window.location.protocol === 'https:' ? 'https:' : 'http:');
+  fetch(proto2 + '//168.107.15.68:5050/api/wfs-dxf-circle', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -1692,75 +1683,59 @@ function callBldApi(){
     });
 }
 
-// 세움터 미리보기 URL 생성 (PNU + mgmBldrgstPk + 페이지)
-// 세움터 PDF 뷰어용 페이지 파라미터: ?page=N 시도 (내부 GET 파라미터 + #page 둘 다)
-function _getBldPreviewUrl(page){
+// 세움터 미리보기 URL 생성 (PNU + mgmBldrgstPk)
+function _getBldPreviewUrl(){
   var pnu = window._lastBldPnu || '';
   var pk  = window._lastMgmBldrgstPk || '';
   if(!pnu || !pk) return '';
-  var url = 'https://irts.molit.go.kr/usr/estate/cntc/kab/RtecsBildRegstrInfoPreview.do'
-          + '?mgmBldrgstPk='+pk + '&regstrKindCd=2&pnuCode='+pnu;
-  if(page && page > 1){
-    url += '&page='+page + '&pageNo='+page + '#page='+page;
-  }
-  return url;
+  return 'https://irts.molit.go.kr/usr/estate/cntc/kab/RtecsBildRegstrInfoPreview.do'
+       + '?mgmBldrgstPk='+pk + '&regstrKindCd=2&pnuCode='+pnu;
 }
 
-// 좌(1페이지)·우(2페이지) iframe 동시 로드 (조회 완료 후 호출)
+// 좌측 iframe 로드 (조회 완료 후 호출)
 function loadBldPreviewIframe(){
-  var docFrame  = document.getElementById('bldDocFrame');
-  var docEmpty  = document.getElementById('bldDocEmpty');
-  var docOver   = document.getElementById('bldDocOverlay');
-  var planFrame = document.getElementById('bldPlanFrame');
-  var planEmpty = document.getElementById('bldPlanEmpty');
-  var planOver  = document.getElementById('bldPlanOverlay');
+  var docFrame = document.getElementById('bldDocFrame');
+  var docEmpty = document.getElementById('bldDocEmpty');
 
-  var url1 = _getBldPreviewUrl(1);
-  var url2 = _getBldPreviewUrl(2);
-
-  if(!url1){
+  var url = _getBldPreviewUrl();
+  if(!url){
     if(docFrame){ docFrame.style.display='none'; docFrame.src='about:blank'; }
-    if(planFrame){ planFrame.style.display='none'; planFrame.src='about:blank'; }
     if(docEmpty)  docEmpty.style.display='flex';
-    if(planEmpty) planEmpty.style.display='flex';
-    if(docOver)  docOver.style.display='none';
-    if(planOver) planOver.style.display='none';
     return;
   }
 
-  // 좌측 — 1페이지
   if(docFrame){
-    docFrame.src = url1;
+    docFrame.src = url;
     docFrame.style.display = 'block';
   }
   if(docEmpty) docEmpty.style.display = 'none';
-  if(docOver)  docOver.style.display = 'block';   // 클릭 캡처용 오버레이 활성화
-
-  // 우측 — 2페이지 (배치도)
-  if(planFrame){
-    planFrame.src = url2;
-    planFrame.style.display = 'block';
-  }
-  if(planEmpty) planEmpty.style.display = 'none';
-  if(planOver)  planOver.style.display = 'block';
 }
 
-// 박스 클릭 → 새창 열기
-function onBldFrameClick(page){
-  openBldPreview(page);
+// 세움터 배치도 발급 페이지 새창
+function openEaisDrawing(){
+  // 발급유형 선택 페이지 (배치도/평면도 선택)
+  window.open('https://www.eais.go.kr/moct/bci/aaa03/BCIAAA03L02', '_blank',
+    'width=1400,height=900,scrollbars=yes,resizable=yes');
+  toast('세움터 배치도 발급 페이지 열림','ok');
 }
 
-// 새창 열기 (페이지 지정 가능)
-function openBldPreview(page){
-  var url = _getBldPreviewUrl(page);
+// 새창 크게 열기
+function openBldPreview(){
+  var url = _getBldPreviewUrl();
   if(!url){
     toast('먼저 건축물대장을 조회하세요','err');
     return;
   }
-  window.open(url, '_blank', 'width=1100,height=900');
+  // 화면 거의 전체 크기로 열기
+  var w = Math.min(1400, screen.availWidth - 100);
+  var h = Math.min(1000, screen.availHeight - 100);
+  var left = Math.max(0, (screen.availWidth  - w) / 2);
+  var top  = Math.max(0, (screen.availHeight - h) / 2);
+  window.open(url, '_blank',
+    'width='+w+',height='+h+',left='+left+',top='+top+',scrollbars=yes,resizable=yes');
 }
 
-// 새로고침 (둘 다 다시 로드)
+// 새로고침
 function reloadBldPreview(){
   if(!window._lastBldPnu){ toast('먼저 건축물대장을 조회하세요','err'); return; }
   loadBldPreviewIframe();
