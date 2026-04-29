@@ -35,7 +35,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 .tbtn.on{background:var(--neon);border-color:var(--neon);color:#000;font-weight:700}
 #statusDot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
 #statusTxt{font-size:10px;color:var(--txt3)}
-.tr{margin-left:auto;display:flex;align-items:center;gap:6px}
+.tr{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 
 /* 메인 */
 #main{flex:1;display:flex;overflow:hidden;position:relative}
@@ -102,9 +102,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 .scname{font-size:11px;color:var(--txt2)}
 
 /* 지도 영역 */
-#mapWrap{flex:1;position:relative;overflow:hidden}
+#mapWrap{flex:1;position:relative;overflow:hidden;min-width:300px}
 #kakaoMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
 #vworldMapDiv{position:absolute;inset:0;z-index:3;visibility:visible}
+#olMap{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important}
 @keyframes vwSpin{to{transform:rotate(360deg)}}
 
 /* 워터마크 - 항상 표시, 지울 수 없음 */
@@ -221,7 +222,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 
 <!-- 상단바 -->
 <div id="topbar">
-  <div class="logo">G-DSP</div>
+  <div class="logo">G-DSP <span style="font-size:9px;color:var(--gold);font-weight:500;background:rgba(255,209,102,0.15);padding:1px 4px;border-radius:3px;margin-left:2px">v2</span></div>
   <div class="top-div"></div>
   <div id="searchWrap">
     <input id="searchInput" type="text" placeholder="지번 입력 예) 봉담읍 와우리 597" autocomplete="off"/>
@@ -231,6 +232,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
   <div id="statusDot"></div>
   <div id="statusTxt">대기중</div>
   <div class="tr">
+    <button class="tbtn" onclick="captureMap('png')" title="화면을 PNG 이미지로 저장">📷 PNG</button>
+    <button class="tbtn" onclick="captureMap('jpg')" title="화면을 JPG 이미지로 저장">📷 JPG</button>
+    <button class="tbtn" onclick="openHeritageGIS()" title="국가유산청 보존관리지도 새창 열기" style="background:#8b1e3f;color:#fff;border-color:#8b1e3f">🏛️ 국가유산청</button>
     <button class="tbtn" onclick="toggleOffsetPopup()" title="지적도 위치 보정">🎯 보정</button>
     <button class="tbtn" onclick="doPrint()">🖨️ 인쇄</button>
     <button class="tbtn" onclick="history.back()">← 뒤로</button>
@@ -248,15 +252,62 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 
     <!-- 레이어 -->
     <div class="lsec">
-      <div class="ltitle">레이어</div>
+      <div class="ltitle">기본 레이어</div>
       <div class="lrow">
-        <div class="llabel">지적선 + 지번</div>
+        <div class="llabel">🗺 지적선 + 지번</div>
         <label class="tog"><input type="checkbox" id="chkCad" checked onchange="toggleCadastral(this.checked)"><span class="tslider"></span></label>
       </div>
       <div class="lrow">
-        <div class="llabel">용도지역</div>
+        <div class="llabel">🏘 용도지역</div>
         <label class="tog"><input type="checkbox" id="chkYd" onchange="toggleWmsLayer('yd',this.checked)"><span class="tslider"></span></label>
       </div>
+      <div class="lrow">
+        <div class="llabel">📋 지구단위계획</div>
+        <label class="tog"><input type="checkbox" id="chkDistPlan" onchange="toggleWmsLayer('distplan',this.checked)"><span class="tslider"></span></label>
+      </div>
+    </div>
+
+    <!-- 환경등급 -->
+    <div class="lsec">
+      <div class="ltitle">🌳 환경등급 (생태자연도)</div>
+      <div class="lrow">
+        <div class="llabel"><span style="color:#ff4757">●</span> 1등급</div>
+        <label class="tog"><input type="checkbox" id="chkEco1" onchange="toggleWmsLayer('eco1',this.checked)"><span class="tslider"></span></label>
+      </div>
+      <div class="lrow">
+        <div class="llabel"><span style="color:#ff9f43">●</span> 2등급</div>
+        <label class="tog"><input type="checkbox" id="chkEco2" onchange="toggleWmsLayer('eco2',this.checked)"><span class="tslider"></span></label>
+      </div>
+      <div class="lrow">
+        <div class="llabel"><span style="color:#ffd166">●</span> 3등급</div>
+        <label class="tog"><input type="checkbox" id="chkEco3" onchange="toggleWmsLayer('eco3',this.checked)"><span class="tslider"></span></label>
+      </div>
+      <div class="lrow">
+        <div class="llabel"><span style="color:#06d6a0">●</span> 별도관리</div>
+        <label class="tog"><input type="checkbox" id="chkEco4" onchange="toggleWmsLayer('eco4',this.checked)"><span class="tslider"></span></label>
+      </div>
+    </div>
+
+    <!-- 문화재 -->
+    <div class="lsec">
+      <div class="ltitle">🏛 문화재 (허가검토용)</div>
+      <div class="lrow">
+        <div class="llabel"><span style="color:#ff4757">●</span> 보호구역</div>
+        <label class="tog"><input type="checkbox" id="chkHer1" onchange="toggleWmsLayer('her1',this.checked)"><span class="tslider"></span></label>
+      </div>
+      <div class="lrow">
+        <div class="llabel"><span style="color:#ff9f43">●</span> 영향검토구역</div>
+        <label class="tog"><input type="checkbox" id="chkHer2" onchange="toggleWmsLayer('her2',this.checked)"><span class="tslider"></span></label>
+      </div>
+      <div class="lrow">
+        <div class="llabel"><span style="color:#ffd166">●</span> 영향평가구역</div>
+        <label class="tog"><input type="checkbox" id="chkHer3" onchange="toggleWmsLayer('her3',this.checked)"><span class="tslider"></span></label>
+      </div>
+    </div>
+
+    <!-- 지형 -->
+    <div class="lsec">
+      <div class="ltitle">📐 지형정보 (NGII)</div>
       <div class="lrow">
         <div class="llabel">등고선</div>
         <label class="tog"><input type="checkbox" id="chkContour" onchange="toggleWmsLayer('contour',this.checked)"><span class="tslider"></span></label>
@@ -307,7 +358,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
   <div id="mapWrap">
     <div id="kakaoMapDiv"></div>
     <div id="vworldMapDiv">
-      <div id="olMap" style="width:100%;height:100%"></div>
+      <div id="olMap" style="position:absolute;inset:0;width:100%;height:100%"></div>
     </div>
     <canvas id="measureCanvas"></canvas>
 
@@ -486,7 +537,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 <div id="toast"></div>
 
 <script>
-var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+// PROXY 동적 결정 - HTTPS 페이지면 HTTPS, HTTP면 HTTP (Mixed Content 방지)
+var _curProto = (window.location.protocol === 'https:' ? 'https:' : 'http:');
+var _curHost = window.location.hostname;
+// 새 도메인 (nip.io)에서 접속 시 자동으로 HTTPS 사용
+var PROXY = localStorage.getItem('gdsp_crawl_server')
+  || (_curHost.indexOf('nip.io') > -1 ? _curProto + '//' + _curHost : 'http://168.107.15.68:5050');
 var KAKAO_KEY = 'c670e0bc85874ef6267220f09882b379'; // REST API 키
 var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
 var BLDG_KEY = localStorage.getItem('gdsp_building') || '';
@@ -602,7 +658,7 @@ function switchEngine(engine, btn) {
 }
 
 function initVwMap() {
-  if (!VWORLD_KEY) { toast('VWorld API 키 없음 — 설정에서 입력하세요', 'err'); return; }
+  if (!VWORLD_KEY) { toast('VWorld API 키 없음 — 잠시 기다려주세요', 'err'); setTimeout(initVwMap, 1000); return; }
   vwMapInited = true;
 
   // VWorld 위성 배경 타일 (서버 프록시 경유)
@@ -612,6 +668,7 @@ function initVwMap() {
       maxZoom: 19
     })
   });
+  window._olVwSatLayer = vwSatLayer;
 
   // 지적도 WMS 레이어 (기본 ON, 서버 프록시 경유)
   window._olCadLayer = new ol.layer.Tile({
@@ -646,7 +703,12 @@ function initVwMap() {
 
   window._olMap = new ol.Map({
     target: 'olMap',
-    layers: [vwSatLayer, window._olContourLayer, window._olCadLayer, window._olHighlightLayer],
+    layers: [
+      vwSatLayer,                       // 1. VWorld 위성 (배경)
+      window._olContourLayer,           // 2. NGII 등고선
+      window._olCadLayer,               // 3. VWorld 지적/지번
+      window._olHighlightLayer          // 4. 선택 필지 하이라이트
+    ],
     view: new ol.View({
       center: ol.proj.fromLonLat([currentLng, currentLat]),
       zoom: 17,
@@ -690,6 +752,29 @@ function initVwMap() {
 
   setStatus('준비됨', true);
   toast('VWorld 2D 지도 준비됨', 'ok');
+
+  // ★ 지도 크기 강제 리프레시 (viewport 0 문제 해결)
+  setTimeout(function(){
+    if (window._olMap) {
+      window._olMap.updateSize();
+      window._olMap.renderSync();
+    }
+  }, 100);
+  setTimeout(function(){
+    if (window._olMap) {
+      window._olMap.updateSize();
+    }
+  }, 500);
+  setTimeout(function(){
+    if (window._olMap) {
+      window._olMap.updateSize();
+    }
+  }, 1500);
+
+  // 창 크기 변경 시 자동 리사이즈
+  window.addEventListener('resize', function(){
+    if (window._olMap) window._olMap.updateSize();
+  });
 }
 
 function moveVwMap(lng, lat) {
@@ -785,17 +870,36 @@ function toggleCadastral(on) {
 function toggleWmsLayer(type, on) {
   if (type === 'contour' || type === 'elev') {
     // NGII 바로e맵 (등고선/표고점 포함)
-    var NGII_KEY = localStorage.getItem('gdsp_ngii') || '';
-    if (!NGII_KEY) { toast('국토정보플랫폼 키 필요 (설정)', 'err'); return; }
     if (window._olContourLayer) {
       window._olContourLayer.setVisible(on);
     }
     toast((type === 'contour' ? '등고선' : '표고점') + (on ? ' ON' : ' OFF'));
     return;
   }
-  // 용도지역 등 VWorld WMS
+  // VWorld WMS 레이어 매핑
   if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
-  var layerMap = { yd: 'lt_c_uq111' };
+  var layerMap = {
+    yd: 'lt_c_uq111',          // 용도지역
+    distplan: 'lt_c_uq121',    // 지구단위계획
+    eco1: 'lt_c_ue901',        // 환경등급 1등급
+    eco2: 'lt_c_ue902',        // 환경등급 2등급
+    eco3: 'lt_c_ue903',        // 환경등급 3등급
+    eco4: 'lt_c_ue904',        // 별도관리
+    her1: 'lt_c_ud801',        // 문화재 보호구역
+    her2: 'lt_c_ud802',        // 문화재 영향검토구역
+    her3: 'lt_c_ud810'         // 문화재 영향평가구역
+  };
+  var nameMap = {
+    yd: '용도지역',
+    distplan: '지구단위계획',
+    eco1: '환경 1등급',
+    eco2: '환경 2등급',
+    eco3: '환경 3등급',
+    eco4: '별도관리',
+    her1: '문화재 보호구역',
+    her2: '문화재 영향검토',
+    her3: '문화재 영향평가'
+  };
   var layerName = layerMap[type];
   if (!layerName) return;
   // 동적 WMS 레이어 추가/제거
@@ -810,18 +914,87 @@ function toggleWmsLayer(type, on) {
           params: { 'LAYERS': layerName, 'STYLES': layerName, 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true },
           serverType: 'mapserver'
         }),
-        opacity: 0.6
+        opacity: 0.55
       });
       window._olMap.addLayer(lyr);
       window._olDynWmsLayers[type] = lyr;
     }
-    toast({yd:'용도지역'}[type] + ' ON');
+    toast(nameMap[type] + ' ON');
   } else {
     if (window._olDynWmsLayers[type]) {
       window._olDynWmsLayers[type].setVisible(false);
     }
-    toast({yd:'용도지역'}[type] + ' OFF');
+    toast(nameMap[type] + ' OFF');
   }
+}
+
+
+// ── 화면 캡처 (PNG/JPG) ──
+function captureMap(format) {
+  format = format || 'png';
+  var fmt = format === 'jpg' ? 'image/jpeg' : 'image/png';
+  var ext = format === 'jpg' ? 'jpg' : 'png';
+  var quality = format === 'jpg' ? 0.92 : 1.0;
+
+  toast('캡처 중...');
+
+  // 지도 영역만 캡처 (mapWrap)
+  var target = document.getElementById('mapWrap');
+  if (!target) { toast('캡처 대상 없음', 'err'); return; }
+
+  html2canvas(target, {
+    useCORS: true,
+    allowTaint: true,
+    logging: false,
+    backgroundColor: null,
+    scale: 1.5  // 화질 향상
+  }).then(function(canvas) {
+    canvas.toBlob(function(blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      var ts = new Date();
+      var pad = function(n){return String(n).padStart(2,'0');};
+      var fname = 'GDSP_지도_' + ts.getFullYear() + pad(ts.getMonth()+1) + pad(ts.getDate())
+                + '_' + pad(ts.getHours()) + pad(ts.getMinutes()) + pad(ts.getSeconds())
+                + '.' + ext;
+      a.href = url;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      toast('✅ ' + format.toUpperCase() + ' 다운로드 완료');
+    }, fmt, quality);
+  }).catch(function(err) {
+    console.error('캡처 실패:', err);
+    toast('캡처 실패 - 콘솔 확인', 'err');
+  });
+}
+
+
+// ── 국가유산청 보존관리지도 새창 ──
+function openHeritageGIS() {
+  // 현재 선택된 좌표 또는 화면 중심 좌표로 새창 열기
+  var lng = currentLng || 126.83;
+  var lat = currentLat || 37.20;
+
+  // 국가유산청 보존관리지도 (좌표 직접 전달 안 됨, 기본 사이트만 열기)
+  var url = 'https://gis-heritage.go.kr/newMap.do';
+
+  // 좌표 정보를 클립보드에 복사 (사용자가 직접 검색)
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(currentJibun || (lat.toFixed(6) + ', ' + lng.toFixed(6)))
+      .then(function(){
+        toast('📋 주소/좌표 복사됨 → 국가유산청 새창에서 붙여넣기', 'ok');
+      })
+      .catch(function(){
+        toast('🏛️ 국가유산청 보존관리지도 열기', 'ok');
+      });
+  } else {
+    toast('🏛️ 국가유산청 보존관리지도 열기', 'ok');
+  }
+
+  window.open(url, '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
 }
 
 
