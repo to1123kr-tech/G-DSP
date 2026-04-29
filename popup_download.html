@@ -1496,32 +1496,112 @@ function jdSelectAddr(i){
 }
 
 /* ===================== 건축물대장 ===================== */
+// 부모창의 currentPnu/지번 자동 동기화 (popup 열릴 때 + 부모창 변경 시)
+function syncBldFromOpener(){
+  try {
+    if(!window.opener) return false;
+    var op = window.opener;
+    var pnu = op.currentPnu;
+    if(!pnu) return false;
+
+    // 부모창에 이미 결과가 있으면 그대로 가져오기
+    var srcUse   = op.document.getElementById('bUse');
+    var srcFloor = op.document.getElementById('bFloor');
+    var srcBc    = op.document.getElementById('bBcArea');
+    var srcArea  = op.document.getElementById('bArea');
+    var srcYear  = op.document.getElementById('bYear');
+    var srcJibun = op.document.getElementById('bJibun');
+
+    if(srcJibun && srcJibun.textContent && srcJibun.textContent !== '—'){
+      document.getElementById('bJibun').textContent  = srcJibun.textContent;
+    }
+    if(srcUse && srcUse.textContent && srcUse.textContent !== '—'){
+      document.getElementById('bUse').textContent    = srcUse.textContent;
+      document.getElementById('bFloor').textContent  = srcFloor ? srcFloor.textContent : '—';
+      document.getElementById('bBcArea').textContent = srcBc    ? srcBc.textContent    : '—';
+      document.getElementById('bArea').textContent   = srcArea  ? srcArea.textContent  : '—';
+      document.getElementById('bYear').textContent   = srcYear  ? srcYear.textContent  : '—';
+      // 지번 입력칸도 자동 채움
+      var input = document.getElementById('bldJibunInput');
+      if(input && srcJibun && !input.value) input.value = srcJibun.textContent;
+      return true;
+    }
+    return false;
+  } catch(e){
+    console.warn('opener 동기화 실패:', e);
+    return false;
+  }
+}
+
 function callBldApi(){
+  // 1순위: 부모창에서 동기화 시도
+  if(syncBldFromOpener()){
+    toast('부모창에서 가져옴','ok');
+    return;
+  }
+
+  // 2순위: 부모창의 ndCallBldApi 직접 호출
+  try {
+    if(window.opener && window.opener.currentPnu && typeof window.opener.ndCallBldApi === 'function'){
+      toast('조회 중...');
+      window.opener.ndCallBldApi(window.opener.currentPnu);
+      // 1.5초 후 동기화
+      setTimeout(function(){
+        if(syncBldFromOpener()){
+          toast('조회 완료','ok');
+        } else {
+          toast('조회 결과 없음','err');
+        }
+      }, 1500);
+      return;
+    }
+  } catch(e){ console.warn(e); }
+
+  // 3순위: 직접 API 호출 (구방식 - PNU 파싱 추가)
   var jibun = document.getElementById('bldJibunInput').value.trim();
-  if(!jibun){ toast('지번을 입력하세요','err'); return; }
+  if(!jibun){ toast('부모창에서 필지를 먼저 선택하거나 지번을 입력하세요','err'); return; }
   var apiKey = localStorage.getItem('gdsp_building')||'';
   if(!apiKey){ toast('건축물대장 API 키를 설정에서 먼저 입력하세요','err'); return; }
   document.getElementById('bJibun').textContent = jibun;
   toast('조회 중...');
+
+  // PNU가 있으면 사용 (19자리 → sigunguCd 5 + bjdongCd 5 + platGbCd 1 + bun 4 + ji 4)
+  var pnu = (window.opener && window.opener.currentPnu) || '';
+  var sigunguCd='41590', bjdongCd='', platGbCd='0', bun='', ji='';
+  if(pnu && pnu.length === 19){
+    sigunguCd = pnu.substring(0, 5);
+    bjdongCd  = pnu.substring(5, 10);
+    platGbCd  = pnu.substring(10, 11);
+    bun       = pnu.substring(11, 15);
+    ji        = pnu.substring(15, 19);
+  }
+
   var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo'
     +'?serviceKey='+encodeURIComponent(apiKey)
-    +'&sigunguCd=41590&bjdongCd=&platGbCd=0&bun=&ji=&startDate=&endDate=&numOfRows=1&pageNo=1&_type=json';
+    +'&sigunguCd='+sigunguCd+'&bjdongCd='+bjdongCd+'&platGbCd='+platGbCd
+    +'&bun='+bun+'&ji='+ji
+    +'&startDate=&endDate=&numOfRows=10&pageNo=1&_type=json';
   fetch(url)
     .then(function(r){return r.json();})
     .then(function(d){
       var item = d&&d.response&&d.response.body&&d.response.body.items&&d.response.body.items.item;
       if(item){
         var it = Array.isArray(item)?item[0]:item;
-        document.getElementById('bUse').textContent = it.mainPurpsCdNm||'—';
-        document.getElementById('bFloor').textContent = (it.grndFlrCnt||'—')+'층';
+        document.getElementById('bUse').textContent    = it.mainPurpsCdNm||'—';
+        document.getElementById('bFloor').textContent  = (it.grndFlrCnt||'—')+'층';
         document.getElementById('bBcArea').textContent = it.bcArea?it.bcArea+'㎡':'—';
-        document.getElementById('bArea').textContent = it.totArea?it.totArea+'㎡':'—';
-        document.getElementById('bYear').textContent = it.useAprDay?it.useAprDay.substring(0,4)+'년':'—';
+        document.getElementById('bArea').textContent   = it.totArea?it.totArea+'㎡':'—';
+        document.getElementById('bYear').textContent   = it.useAprDay?it.useAprDay.substring(0,4)+'년':'—';
         toast('조회 완료','ok');
       } else { toast('조회 결과 없음','err'); }
     })
     .catch(function(){ toast('조회 실패','err'); });
 }
+
+// 팝업 열릴 때 자동으로 부모창 데이터 가져오기
+window.addEventListener('load', function(){
+  setTimeout(syncBldFromOpener, 300);
+});
 
 /* ===================== 등기부등본 ===================== */
 function searchReg(){
