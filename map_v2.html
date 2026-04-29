@@ -102,9 +102,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 .scname{font-size:11px;color:var(--txt2)}
 
 /* 지도 영역 */
-#mapWrap{flex:1;position:relative;overflow:hidden}
+#mapWrap{flex:1;position:relative;overflow:hidden;min-width:300px}
 #kakaoMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
 #vworldMapDiv{position:absolute;inset:0;z-index:3;visibility:visible}
+#olMap{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important}
 @keyframes vwSpin{to{transform:rotate(360deg)}}
 
 /* 워터마크 - 항상 표시, 지울 수 없음 */
@@ -357,7 +358,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
   <div id="mapWrap">
     <div id="kakaoMapDiv"></div>
     <div id="vworldMapDiv">
-      <div id="olMap" style="width:100%;height:100%"></div>
+      <div id="olMap" style="position:absolute;inset:0;width:100%;height:100%"></div>
     </div>
     <canvas id="measureCanvas"></canvas>
 
@@ -751,6 +752,29 @@ function initVwMap() {
 
   setStatus('준비됨', true);
   toast('VWorld 2D 지도 준비됨', 'ok');
+
+  // ★ 지도 크기 강제 리프레시 (viewport 0 문제 해결)
+  setTimeout(function(){
+    if (window._olMap) {
+      window._olMap.updateSize();
+      window._olMap.renderSync();
+    }
+  }, 100);
+  setTimeout(function(){
+    if (window._olMap) {
+      window._olMap.updateSize();
+    }
+  }, 500);
+  setTimeout(function(){
+    if (window._olMap) {
+      window._olMap.updateSize();
+    }
+  }, 1500);
+
+  // 창 크기 변경 시 자동 리사이즈
+  window.addEventListener('resize', function(){
+    if (window._olMap) window._olMap.updateSize();
+  });
 }
 
 function moveVwMap(lng, lat) {
