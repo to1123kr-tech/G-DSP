@@ -413,7 +413,7 @@ function updateScaleBtns(){
   <div class="tab-view" id="view-bld">
     <div class="body">
       <div style="display:flex;gap:6px;margin-bottom:14px">
-        <input class="inp" id="bldJibunInput" placeholder="지번 입력 (예: 남양읍 남양리 123)">
+        <input class="inp" id="bldJibunInput" placeholder="지번 입력 (예: 남양읍 한가울길 70)" onkeydown="if(event.key==='Enter')callBldApi()">
         <button class="btn-primary" onclick="callBldApi()">조회</button>
         <a class="btn-outline" href="https://www.eais.go.kr/" target="_blank">건축물대장 사이트</a>
       </div>
@@ -431,7 +431,7 @@ function updateScaleBtns(){
           <div class="info-row"><span class="info-k">건축년도</span><span class="info-v" id="bYear">—</span></div>
           <div style="display:flex;gap:5px;margin-top:12px">
             <button class="btn-primary" style="flex:1" onclick="callBldApi()">API 조회</button>
-            <button class="btn-outline" onclick="window.print()">PDF 인쇄</button>
+            <button class="btn-outline" onclick="openBldPreview()">세움터 미리보기</button>
           </div>
         </div>
         <div class="sec" style="margin-bottom:0">
@@ -1496,112 +1496,119 @@ function jdSelectAddr(i){
 }
 
 /* ===================== 건축물대장 ===================== */
-// 부모창의 currentPnu/지번 자동 동기화 (popup 열릴 때 + 부모창 변경 시)
-function syncBldFromOpener(){
-  try {
-    if(!window.opener) return false;
-    var op = window.opener;
-    var pnu = op.currentPnu;
-    if(!pnu) return false;
-
-    // 부모창에 이미 결과가 있으면 그대로 가져오기
-    var srcUse   = op.document.getElementById('bUse');
-    var srcFloor = op.document.getElementById('bFloor');
-    var srcBc    = op.document.getElementById('bBcArea');
-    var srcArea  = op.document.getElementById('bArea');
-    var srcYear  = op.document.getElementById('bYear');
-    var srcJibun = op.document.getElementById('bJibun');
-
-    if(srcJibun && srcJibun.textContent && srcJibun.textContent !== '—'){
-      document.getElementById('bJibun').textContent  = srcJibun.textContent;
+// 카카오 주소 검색으로 PNU 만들기 (지번 → b_code + 본번 + 부번 → PNU 19자리)
+function buildPnuFromKakao(jibun){
+  return new Promise(function(resolve, reject){
+    if(!_kakaoKey){
+      reject('카카오 API 키 없음');
+      return;
     }
-    if(srcUse && srcUse.textContent && srcUse.textContent !== '—'){
-      document.getElementById('bUse').textContent    = srcUse.textContent;
-      document.getElementById('bFloor').textContent  = srcFloor ? srcFloor.textContent : '—';
-      document.getElementById('bBcArea').textContent = srcBc    ? srcBc.textContent    : '—';
-      document.getElementById('bArea').textContent   = srcArea  ? srcArea.textContent  : '—';
-      document.getElementById('bYear').textContent   = srcYear  ? srcYear.textContent  : '—';
-      // 지번 입력칸도 자동 채움
-      var input = document.getElementById('bldJibunInput');
-      if(input && srcJibun && !input.value) input.value = srcJibun.textContent;
-      return true;
-    }
-    return false;
-  } catch(e){
-    console.warn('opener 동기화 실패:', e);
-    return false;
-  }
+    fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(jibun)+'&size=5',{
+      headers:{'Authorization':'KakaoAK '+_kakaoKey}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var docs = d.documents||[];
+      // 지번 주소 우선
+      var found = null;
+      for(var i=0;i<docs.length;i++){
+        if(docs[i].address){ found = docs[i].address; break; }
+      }
+      if(!found){
+        reject('주소 검색 결과 없음');
+        return;
+      }
+      var bcode = found.b_code || '';                  // 10자리 법정동코드
+      var mtnYn = found.mountain_yn === 'Y' ? '2':'1'; // 산여부 (1:일반, 2:산)
+      var bun   = (found.main_address_no||'0').padStart(4,'0');
+      var ji    = (found.sub_address_no ||'0').padStart(4,'0');
+      if(bcode.length !== 10){ reject('법정동코드 오류'); return; }
+
+      var pnu       = bcode + mtnYn + bun + ji;          // PNU 19자리
+      var sigunguCd = bcode.substring(0,5);
+      var bjdongCd  = bcode.substring(5,10);
+      var platGbCd  = mtnYn === '2' ? '1' : '0';         // 건축물대장 API: 1:산, 0:일반
+      resolve({
+        pnu:pnu, sigunguCd:sigunguCd, bjdongCd:bjdongCd,
+        platGbCd:platGbCd, bun:bun, ji:ji,
+        addr: found.address_name,
+        lat: parseFloat(found.y), lng: parseFloat(found.x)
+      });
+    })
+    .catch(function(e){ reject('카카오 검색 실패: '+e); });
+  });
 }
 
 function callBldApi(){
-  // 1순위: 부모창에서 동기화 시도
-  if(syncBldFromOpener()){
-    toast('부모창에서 가져옴','ok');
-    return;
-  }
-
-  // 2순위: 부모창의 ndCallBldApi 직접 호출
-  try {
-    if(window.opener && window.opener.currentPnu && typeof window.opener.ndCallBldApi === 'function'){
-      toast('조회 중...');
-      window.opener.ndCallBldApi(window.opener.currentPnu);
-      // 1.5초 후 동기화
-      setTimeout(function(){
-        if(syncBldFromOpener()){
-          toast('조회 완료','ok');
-        } else {
-          toast('조회 결과 없음','err');
-        }
-      }, 1500);
-      return;
-    }
-  } catch(e){ console.warn(e); }
-
-  // 3순위: 직접 API 호출 (구방식 - PNU 파싱 추가)
   var jibun = document.getElementById('bldJibunInput').value.trim();
-  if(!jibun){ toast('부모창에서 필지를 먼저 선택하거나 지번을 입력하세요','err'); return; }
+  if(!jibun){ toast('지번을 입력하세요 (예: 남양읍 한가울길 70)','err'); return; }
   var apiKey = localStorage.getItem('gdsp_building')||'';
   if(!apiKey){ toast('건축물대장 API 키를 설정에서 먼저 입력하세요','err'); return; }
-  document.getElementById('bJibun').textContent = jibun;
-  toast('조회 중...');
 
-  // PNU가 있으면 사용 (19자리 → sigunguCd 5 + bjdongCd 5 + platGbCd 1 + bun 4 + ji 4)
-  var pnu = (window.opener && window.opener.currentPnu) || '';
-  var sigunguCd='41590', bjdongCd='', platGbCd='0', bun='', ji='';
-  if(pnu && pnu.length === 19){
-    sigunguCd = pnu.substring(0, 5);
-    bjdongCd  = pnu.substring(5, 10);
-    platGbCd  = pnu.substring(10, 11);
-    bun       = pnu.substring(11, 15);
-    ji        = pnu.substring(15, 19);
-  }
+  toast('주소 → PNU 변환 중...');
 
-  var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo'
-    +'?serviceKey='+encodeURIComponent(apiKey)
-    +'&sigunguCd='+sigunguCd+'&bjdongCd='+bjdongCd+'&platGbCd='+platGbCd
-    +'&bun='+bun+'&ji='+ji
-    +'&startDate=&endDate=&numOfRows=10&pageNo=1&_type=json';
-  fetch(url)
-    .then(function(r){return r.json();})
+  // 결과 영역 초기화
+  document.getElementById('bJibun').textContent  = jibun;
+  document.getElementById('bUse').textContent    = '조회중...';
+  document.getElementById('bFloor').textContent  = '—';
+  document.getElementById('bBcArea').textContent = '—';
+  document.getElementById('bArea').textContent   = '—';
+  document.getElementById('bYear').textContent   = '—';
+
+  buildPnuFromKakao(jibun)
+    .then(function(info){
+      document.getElementById('bJibun').textContent = info.addr;
+      // PNU 저장 (세움터 미리보기용)
+      window._lastBldPnu = info.pnu;
+      toast('건축물대장 조회 중...');
+
+      var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo'
+        +'?serviceKey='+encodeURIComponent(apiKey)
+        +'&sigunguCd='+info.sigunguCd
+        +'&bjdongCd='+info.bjdongCd
+        +'&platGbCd='+info.platGbCd
+        +'&bun='+info.bun
+        +'&ji='+info.ji
+        +'&numOfRows=10&pageNo=1&_type=json';
+
+      return fetch(url).then(function(r){return r.json();});
+    })
     .then(function(d){
       var item = d&&d.response&&d.response.body&&d.response.body.items&&d.response.body.items.item;
-      if(item){
-        var it = Array.isArray(item)?item[0]:item;
-        document.getElementById('bUse').textContent    = it.mainPurpsCdNm||'—';
-        document.getElementById('bFloor').textContent  = (it.grndFlrCnt||'—')+'층';
-        document.getElementById('bBcArea').textContent = it.bcArea?it.bcArea+'㎡':'—';
-        document.getElementById('bArea').textContent   = it.totArea?it.totArea+'㎡':'—';
-        document.getElementById('bYear').textContent   = it.useAprDay?it.useAprDay.substring(0,4)+'년':'—';
-        toast('조회 완료','ok');
-      } else { toast('조회 결과 없음','err'); }
+      if(!item){
+        document.getElementById('bUse').textContent = '결과 없음';
+        toast('건축물대장 결과 없음 (해당 필지에 건물이 없을 수 있음)','err');
+        return;
+      }
+      var it = Array.isArray(item) ? item[0] : item;
+      // mgmBldrgstPk 저장 (세움터 미리보기용)
+      window._lastMgmBldrgstPk = it.mgmBldrgstPk || it.platPlc || '';
+
+      document.getElementById('bUse').textContent    = it.mainPurpsCdNm || '—';
+      document.getElementById('bFloor').textContent  = (it.grndFlrCnt||'—') + '층';
+      document.getElementById('bBcArea').textContent = it.bcArea ? it.bcArea+'㎡' : '—';
+      document.getElementById('bArea').textContent   = it.totArea? it.totArea+'㎡': '—';
+      document.getElementById('bYear').textContent   = it.useAprDay ? it.useAprDay.substring(0,4)+'년' : '—';
+      toast('조회 완료 ('+(Array.isArray(item)?item.length+'건':'1건')+')','ok');
+      console.log('[건축물대장] PNU=', window._lastBldPnu, 'mgmBldrgstPk=', window._lastMgmBldrgstPk, 'item=', it);
     })
-    .catch(function(){ toast('조회 실패','err'); });
+    .catch(function(err){
+      console.error('[건축물대장 오류]', err);
+      document.getElementById('bUse').textContent = '오류';
+      toast(typeof err==='string' ? err : '조회 실패','err');
+    });
 }
 
-// 팝업 열릴 때 자동으로 부모창 데이터 가져오기
-window.addEventListener('load', function(){
-  setTimeout(syncBldFromOpener, 300);
-});
+// 세움터 미리보기 새창 열기 (PDF 인쇄 버튼용)
+function openBldPreview(){
+  var pnu = window._lastBldPnu || '';
+  var pk  = window._lastMgmBldrgstPk || '';
+  if(!pnu){ toast('먼저 건축물대장을 조회하세요','err'); return; }
+  if(!pk) { toast('mgmBldrgstPk 없음 — 세움터에서 직접 검색','err'); window.open('https://www.eais.go.kr/','_blank'); return; }
+  var url = 'https://irts.molit.go.kr/usr/estate/cntc/kab/RtecsBildRegstrInfoPreview.do'
+          + '?mgmBldrgstPk='+pk + '&regstrKindCd=1&pnuCode='+pnu;
+  window.open(url, '_blank');
+}
 
 /* ===================== 등기부등본 ===================== */
 function searchReg(){
