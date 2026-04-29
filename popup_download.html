@@ -1555,10 +1555,12 @@ function callBldApi(){
   document.getElementById('bArea').textContent   = '—';
   document.getElementById('bYear').textContent   = '—';
 
+  var _info = null;  // PNU 정보 저장
+
   buildPnuFromKakao(jibun)
     .then(function(info){
+      _info = info;
       document.getElementById('bJibun').textContent = info.addr;
-      // PNU 저장 (세움터 미리보기용)
       window._lastBldPnu = info.pnu;
       toast('건축물대장 조회 중...');
 
@@ -1578,19 +1580,86 @@ function callBldApi(){
       if(!item){
         document.getElementById('bUse').textContent = '결과 없음';
         toast('건축물대장 결과 없음 (해당 필지에 건물이 없을 수 있음)','err');
-        return;
+        return null;
       }
       var it = Array.isArray(item) ? item[0] : item;
-      // mgmBldrgstPk 저장 (세움터 미리보기용)
-      window._lastMgmBldrgstPk = it.mgmBldrgstPk || it.platPlc || '';
+      window._lastMgmBldrgstPk = it.mgmBldrgstPk || '';
 
+      // 표제부 결과 1차 표시
       document.getElementById('bUse').textContent    = it.mainPurpsCdNm || '—';
       document.getElementById('bFloor').textContent  = (it.grndFlrCnt||'—') + '층';
-      document.getElementById('bBcArea').textContent = it.bcArea ? it.bcArea+'㎡' : '—';
-      document.getElementById('bArea').textContent   = it.totArea? it.totArea+'㎡': '—';
+      document.getElementById('bBcArea').textContent = it.bcArea ? Number(it.bcArea).toFixed(2)+'㎡' : '조회중...';
+      document.getElementById('bArea').textContent   = it.totArea? Number(it.totArea).toFixed(2)+'㎡': '—';
       document.getElementById('bYear').textContent   = it.useAprDay ? it.useAprDay.substring(0,4)+'년' : '—';
-      toast('조회 완료 ('+(Array.isArray(item)?item.length+'건':'1건')+')','ok');
-      console.log('[건축물대장] PNU=', window._lastBldPnu, 'mgmBldrgstPk=', window._lastMgmBldrgstPk, 'item=', it);
+      console.log('[표제부]', it);
+
+      // bcArea 있으면 끝
+      if(it.bcArea){
+        toast('조회 완료','ok');
+        return null;
+      }
+
+      // bcArea 없으면 → 총괄표제부 추가 호출
+      var url2 = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo'
+        +'?serviceKey='+encodeURIComponent(apiKey)
+        +'&sigunguCd='+_info.sigunguCd
+        +'&bjdongCd='+_info.bjdongCd
+        +'&platGbCd='+_info.platGbCd
+        +'&bun='+_info.bun
+        +'&ji='+_info.ji
+        +'&numOfRows=10&pageNo=1&_type=json';
+      return fetch(url2).then(function(r){return r.json();});
+    })
+    .then(function(d2){
+      if(!d2) return;
+      var item = d2&&d2.response&&d2.response.body&&d2.response.body.items&&d2.response.body.items.item;
+      if(item){
+        var it = Array.isArray(item) ? item[0] : item;
+        console.log('[총괄표제부]', it);
+        if(it.bcArea){
+          document.getElementById('bBcArea').textContent = Number(it.bcArea).toFixed(2)+'㎡';
+        }
+        if(it.platArea && document.getElementById('bArea').textContent === '—'){
+          document.getElementById('bArea').textContent = Number(it.platArea).toFixed(2)+'㎡';
+        }
+      }
+
+      // 그래도 bcArea 없으면 → 층별개요 시도 (지상층 면적 합산)
+      if(document.getElementById('bBcArea').textContent === '조회중...'){
+        var url3 = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrFlrOulnInfo'
+          +'?serviceKey='+encodeURIComponent(apiKey)
+          +'&sigunguCd='+_info.sigunguCd
+          +'&bjdongCd='+_info.bjdongCd
+          +'&platGbCd='+_info.platGbCd
+          +'&bun='+_info.bun
+          +'&ji='+_info.ji
+          +'&numOfRows=20&pageNo=1&_type=json';
+        return fetch(url3).then(function(r){return r.json();});
+      }
+      toast('조회 완료','ok');
+      return null;
+    })
+    .then(function(d3){
+      if(!d3) return;
+      var items = d3&&d3.response&&d3.response.body&&d3.response.body.items&&d3.response.body.items.item;
+      if(!items){
+        document.getElementById('bBcArea').textContent = '—';
+        toast('조회 완료 (건축면적 미등록)','ok');
+        return;
+      }
+      items = Array.isArray(items) ? items : [items];
+      console.log('[층별개요]', items);
+      // 1층 주건축물 주용도 면적 = 건축면적 근사
+      var f1 = items.find(function(x){
+        return (x.flrNo == 1 || x.flrNoNm === '1층') && x.flrGbCdNm && x.flrGbCdNm.indexOf('지상') >= 0;
+      });
+      if(f1 && f1.area){
+        document.getElementById('bBcArea').textContent = Number(f1.area).toFixed(2)+'㎡ (1층기준)';
+        toast('조회 완료 (1층면적으로 표시)','ok');
+      } else {
+        document.getElementById('bBcArea').textContent = '—';
+        toast('조회 완료 (건축면적 미등록)','ok');
+      }
     })
     .catch(function(err){
       console.error('[건축물대장 오류]', err);
