@@ -657,53 +657,15 @@ function switchEngine(engine, btn) {
 }
 
 function initVwMap() {
+  if (!VWORLD_KEY) { toast('VWorld API 키 없음 — 잠시 기다려주세요', 'err'); setTimeout(initVwMap, 1000); return; }
   vwMapInited = true;
-  if (!VWORLD_KEY) {
-    console.warn('VWorld 키 없음 - 카카오 위성만 사용');
-  }
 
-  // 카카오 위성 배경 타일 (한국 최적화, 빠름)
-  // 카카오 SkyView Z=19까지 지원
-  var kakaoSatLayer = new ol.layer.Tile({
-    source: new ol.source.XYZ({
-      tileUrlFunction: function(coord) {
-        var z = coord[0];
-        var x = coord[1];
-        var y = coord[2];
-        // 카카오 좌표계 변환 (TMS 방식)
-        var maxY = (1 << z) - 1;
-        var kakaoY = maxY - y;
-        // 카카오 SkyView 타일
-        return 'https://map'+(Math.floor(Math.random()*4))+'.daumcdn.net/map_skyview/L'+(19-z)+'/'+kakaoY+'/'+x+'.jpg?v=240601';
-      },
-      maxZoom: 19
-    })
-  });
-
-  // 카카오 일반 라벨 (도로명/지번 표시용 오버레이)
-  window._olKakaoLabelLayer = new ol.layer.Tile({
-    source: new ol.source.XYZ({
-      tileUrlFunction: function(coord) {
-        var z = coord[0];
-        var x = coord[1];
-        var y = coord[2];
-        var maxY = (1 << z) - 1;
-        var kakaoY = maxY - y;
-        return 'https://map'+(Math.floor(Math.random()*4))+'.daumcdn.net/map_2d_hd/2503erh/L'+(19-z)+'/'+kakaoY+'/'+x+'.png';
-      },
-      maxZoom: 19
-    }),
-    visible: false,
-    opacity: 0.9
-  });
-
-  // VWorld 위성 백업용 (카카오 안 될 때 대체)
+  // VWorld 위성 배경 타일 (서버 프록시 경유)
   var vwSatLayer = new ol.layer.Tile({
     source: new ol.source.XYZ({
       url: PROXY + '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg',
       maxZoom: 19
-    }),
-    visible: false  // 기본 OFF, 카카오가 메인
+    })
   });
   window._olVwSatLayer = vwSatLayer;
 
@@ -741,12 +703,10 @@ function initVwMap() {
   window._olMap = new ol.Map({
     target: 'olMap',
     layers: [
-      kakaoSatLayer,                    // 1. 카카오 위성 (메인 배경, 빠름)
-      vwSatLayer,                       // 2. VWorld 위성 (백업, 기본 OFF)
-      window._olKakaoLabelLayer,        // 3. 카카오 라벨 (선택)
-      window._olContourLayer,           // 4. NGII 등고선
-      window._olCadLayer,               // 5. VWorld 지적/지번 (메인 오버레이)
-      window._olHighlightLayer          // 6. 선택 필지 하이라이트 (최상위)
+      vwSatLayer,                       // 1. VWorld 위성 (배경)
+      window._olContourLayer,           // 2. NGII 등고선
+      window._olCadLayer,               // 3. VWorld 지적/지번
+      window._olHighlightLayer          // 4. 선택 필지 하이라이트
     ],
     view: new ol.View({
       center: ol.proj.fromLonLat([currentLng, currentLat]),
