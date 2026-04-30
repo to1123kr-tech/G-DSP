@@ -255,12 +255,9 @@ body{display:flex;flex-direction:column}
 // ==================== 설정 ====================
 var _proto = (window.location.protocol === 'https:' ? 'https:' : 'http:');
 var _host = window.location.hostname;
-// API 서버 주소: 운영 시 localStorage.gdsp_crawl_server에 https://api... 주소 저장 권장
-// 예: localStorage.setItem('gdsp_crawl_server','https://api.gdsp.co.kr')
-var PROXY = localStorage.getItem('gdsp_crawl_server') ||
-  ((_host.indexOf('nip.io') > -1 || _host === '168-107-15-68.nip.io')
-    ? _proto + '//' + _host
-    : 'http://168.107.15.68:5050');
+var PROXY = (_host.indexOf('nip.io') > -1 || _host === '168-107-15-68.nip.io')
+  ? _proto + '//' + _host
+  : (window.location.protocol === 'https:' ? 'https://168.107.15.68:5050' : 'http://168.107.15.68:5050');
 var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
 
 // ==================== 상태 ====================
@@ -275,6 +272,7 @@ var contextLat = 0, contextLng = 0, contextJibun = '';
 // VWorld 오버레이 관리
 var vwOverlays = {};
 var vwTilesetUrls = {
+  cadastral: 'lt_c_landinfobasemap',
   zone_use: 'lt_c_uq111',
   dist_plan: 'lt_c_uq121',
   eco1: 'lt_c_ue901',
@@ -288,6 +286,7 @@ var vwTilesetUrls = {
   elev: 'ELEV'
 };
 var vwNames = {
+  cadastral: '지적선+지번',
   zone_use: '용도지역',
   dist_plan: '지구단위계획',
   eco1: '환경 1등급',
@@ -300,6 +299,85 @@ var vwNames = {
   contour: '등고선',
   elev: '표고점'
 };
+
+
+// ==================== 선택/우클릭/레이어 보조 ====================
+var selectedPolygon = null;
+var lastCtxClientX = 0, lastCtxClientY = 0;
+
+function buildPnuFromAddress(addr, jibun) {
+  if (!addr || !addr.b_code) return '';
+  var mainNo = parseInt(addr.main_address_no || '0', 10) || 0;
+  var subNo = parseInt(addr.sub_address_no || '0', 10) || 0;
+  var platGb = (jibun && /(^|\s)산\s*\d+/.test(jibun)) ? '2' : '1';
+  return addr.b_code + platGb + String(mainNo).padStart(4, '0') + String(subNo).padStart(4, '0');
+}
+
+function drawSelectedPolygon(coords) {
+  if (!kakaoMap || !coords || !coords.length) return;
+  if (selectedPolygon) selectedPolygon.setMap(null);
+  var path = coords.map(function(c){ return new kakao.maps.LatLng(c[1], c[0]); });
+  selectedPolygon = new kakao.maps.Polygon({
+    path: path,
+    strokeWeight: 4,
+    strokeColor: '#00ff88',
+    strokeOpacity: 1,
+    strokeStyle: 'solid',
+    fillColor: '#00ff88',
+    fillOpacity: 0.18,
+    zIndex: 50
+  });
+  selectedPolygon.setMap(kakaoMap);
+}
+
+function highlightParcelByPnu(pnu) {
+  if (!pnu || !PROXY) return;
+  fetch(PROXY + '/api/wfs?pnu=' + encodeURIComponent(pnu) + '&lng=' + currentLng + '&lat=' + currentLat)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var f = d && d.features && d.features[0];
+      if (!f || !f.geometry) return;
+      var g = f.geometry, coords = null;
+      if (g.type === 'Polygon') coords = g.coordinates && g.coordinates[0];
+      if (g.type === 'MultiPolygon') coords = g.coordinates && g.coordinates[0] && g.coordinates[0][0];
+      if (coords) drawSelectedPolygon(coords);
+    })
+    .catch(function(){ /* 선택 테두리 실패는 무시 */ });
+}
+
+function placeContextMenu(x, y) {
+  var menu = document.getElementById('ctxMenu');
+  if (!menu) return;
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+  menu.classList.add('show');
+  var w = menu.offsetWidth || 180;
+  var h = menu.offsetHeight || 220;
+  var nx = Math.min(Math.max(8, x), window.innerWidth - w - 8);
+  var ny = Math.min(Math.max(8, y), window.innerHeight - h - 8);
+  menu.style.left = nx + 'px';
+  menu.style.top = ny + 'px';
+}
+
+function keepCadastralOnTop() {
+  var chk = document.getElementById('chkCadastral');
+  if (!kakaoMap || !chk || !chk.checked) return;
+  try { kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT); } catch(e) {}
+  try { kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT); } catch(e) {}
+}
+
+function toggleCadastral(on) {
+  if (!kakaoMap) return;
+  try {
+    if (on) {
+      kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+      toast('지적선+지번 ON', 'ok');
+    } else {
+      kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+      toast('지적선+지번 OFF');
+    }
+  } catch(e) {}
+}
 
 // ==================== 카카오 지도 초기화 ====================
 function initKakaoMap() {
@@ -315,6 +393,7 @@ function initKakaoMap() {
   };
   kakaoMap = new kakao.maps.Map(container, options);
   kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
+  kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
 
   kakaoGeocoder = new kakao.maps.services.Geocoder();
   kakaoMarker = new kakao.maps.Marker({position: new kakao.maps.LatLng(currentLat, currentLng), map: null});
@@ -333,15 +412,24 @@ function initKakaoMap() {
         var addr = result[0].address;
         var jibun = addr.address_name || '';
         selectedJibun = jibun;
+        selectedPnu = buildPnuFromAddress(addr, jibun);
         currentLat = lat; currentLng = lng;
         setText('pinJibun', '📍 ' + jibun);
         setText('pinCoord', '위도 ' + lat.toFixed(6) + ' / 경도 ' + lng.toFixed(6));
+        if (selectedPnu) highlightParcelByPnu(selectedPnu);
         toast('✓ ' + jibun, 'ok');
       } else {
         setText('pinJibun', '주소 없음');
       }
     });
   });
+
+  // 우클릭 마우스 좌표 저장: 메뉴가 실제 우클릭 위치에 뜨도록 보정
+  container.addEventListener('contextmenu', function(ev) {
+    ev.preventDefault();
+    lastCtxClientX = ev.clientX;
+    lastCtxClientY = ev.clientY;
+  }, true);
 
   // 우클릭: 컨텍스트 메뉴
   kakao.maps.event.addListener(kakaoMap, 'rightclick', function(e) {
@@ -351,16 +439,12 @@ function initKakaoMap() {
       if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
         contextJibun = result[0].address.address_name || '';
       }
-      var menu = document.getElementById('ctxMenu');
-      var rect = container.getBoundingClientRect();
-      // 마우스 위치 추정 (kakao 이벤트는 마우스 좌표 직접 안 줌, 화면 중앙 근처에 표시)
-      menu.style.left = (rect.left + rect.width/2 - 90) + 'px';
-      menu.style.top = (rect.top + rect.height/2 - 80) + 'px';
-      menu.classList.add('show');
+      placeContextMenu(lastCtxClientX || (window.innerWidth/2), lastCtxClientY || (window.innerHeight/2));
     });
   });
 
-  // 어디든 클릭하면 컨텍스트 메뉴 닫기
+  // 메뉴 내부 클릭은 닫힘 방지, 바깥 클릭만 닫기
+  document.getElementById('ctxMenu').addEventListener('click', function(ev){ ev.stopPropagation(); });
   document.addEventListener('click', function() {
     document.getElementById('ctxMenu').classList.remove('show');
   });
@@ -369,29 +453,10 @@ function initKakaoMap() {
   kakao.maps.event.addListener(kakaoMap, 'zoom_changed', refreshVwOverlays);
   kakao.maps.event.addListener(kakaoMap, 'dragend', refreshVwOverlays);
 
-  // 기본 지적편집도 ON (카카오: 빠른 지적선+지번)
-  kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+  // 기본 지적선+지번은 카카오 지적편집도로 즉시 표시
+  setTimeout(function() { toggleCadastral(true); }, 300);
 
-  toast('✓ 카카오 위성 + 지적선/지번 준비 완료', 'ok');
-}
-
-
-// ==================== 카카오 지적편집도 토글 ====================
-// 위성사진 위에 빨간 지적선 + 지번을 빠르게 표시합니다.
-// VWorld WMS가 아니라 카카오 기본 오버레이라서 로딩이 훨씬 빠릅니다.
-function toggleCadastral(on) {
-  if (!kakaoMap) return;
-  try {
-    if (on) {
-      kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-      toast('지적선+지번 ON', 'ok');
-    } else {
-      kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-      toast('지적선+지번 OFF');
-    }
-  } catch (e) {
-    console.warn('지적편집도 토글 오류', e);
-  }
+  toast('✓ 지도 준비 완료', 'ok');
 }
 
 // ==================== VWorld 오버레이 (CustomOverlay 방식) ====================
@@ -531,11 +596,16 @@ function redrawVwOverlay(type, layerName) {
   }
 
   // 카카오 영역 전체에 이미지 합성 (CustomOverlay 4개 점으로 위치 지정)
+  var mapEl = document.getElementById('kakaoMap');
+  var w = mapEl ? mapEl.clientWidth : 1024;
+  var h = mapEl ? mapEl.clientHeight : 768;
+  var opMap = { zone_use:0.34, dist_plan:0.42, eco1:0.45, eco2:0.42, eco3:0.38, eco4:0.42, her1:0.55, her2:0.48, her3:0.45, contour:0.70, elev:0.70 };
+  var opacity = opMap[type] || 0.42;
+  var blend = (type === 'contour' || type === 'elev' || type.indexOf('her') === 0) ? 'normal' : 'multiply';
   var imgHtml =
-    '<div style="position:relative;width:100%;height:100%">' +
-    '  <img src="' + url + '" style="position:absolute;top:0;left:0;width:100%;height:100%;' +
-    '    pointer-events:none;mix-blend-mode:' + (type === 'cadastral' ? 'normal' : 'multiply') + ';' +
-    '    opacity:' + (type === 'cadastral' ? '0.95' : '0.6') + '"/>' +
+    '<div style="width:' + w + 'px;height:' + h + 'px;pointer-events:none;overflow:hidden">' +
+    '  <img crossorigin="anonymous" src="' + url + '" style="display:block;width:100%;height:100%;' +
+    '    pointer-events:none;mix-blend-mode:' + blend + ';opacity:' + opacity + '"/>' +
     '</div>';
 
   // 정확한 좌표 일치를 위해 카카오 표준 방식: setOverlayMapType 활용 불가능 (외부 URL 안됨)
@@ -545,7 +615,7 @@ function redrawVwOverlay(type, layerName) {
     content: imgHtml,
     xAnchor: 0.5,
     yAnchor: 0.5,
-    zIndex: type === 'cadastral' ? 5 : 3,
+    zIndex: 3,
     map: kakaoMap
   });
 
@@ -557,9 +627,10 @@ function refreshVwOverlays() {
   Object.keys(vwOverlays).forEach(function(type) {
     if (vwOverlays[type] && vwOverlays[type].length > 0) {
       var layerName = vwTilesetUrls[type];
-      if (layerName) redrawVwOverlay(type, layerName);
+      if (layerName && type !== 'cadastral') redrawVwOverlay(type, layerName);
     }
   });
+  setTimeout(keepCadastralOnTop, 50);
 }
 
 // 새 toggleVwLayer (간단한 redrawVwOverlay 사용)
@@ -568,11 +639,13 @@ window.toggleVwLayer = function(type, on) {
     setTimeout(function(){ window.toggleVwLayer(type, on); }, 500);
     return;
   }
+  if (type === 'cadastral') { toggleCadastral(on); return; }
   var layerName = vwTilesetUrls[type];
   if (!layerName) return;
 
   if (on) {
     redrawVwOverlay(type, layerName);
+    keepCadastralOnTop();
     toast(vwNames[type] + ' ON', 'ok');
   } else {
     if (vwOverlays[type] && vwOverlays[type].forEach) {
@@ -602,6 +675,7 @@ function setMapType(type, btn) {
   // 좌측 토글도 동기화
   document.getElementById('chkSat').checked = (type !== 'normal');
   document.getElementById('chkHybrid').checked = (type === 'hybrid');
+  setTimeout(keepCadastralOnTop, 50);
 }
 
 function toggleMapType(type, on) {
@@ -621,6 +695,7 @@ function toggleHybrid(on) {
   if (!kakaoMap) return;
   if (on) kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
   else kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
+  setTimeout(keepCadastralOnTop, 50);
 }
 
 // ==================== 줌 ====================
@@ -652,6 +727,8 @@ function doSearch() {
       kakaoMarker.setMap(kakaoMap);
       currentLat = lat; currentLng = lng;
       selectedJibun = result[0].address_name || query;
+      selectedPnu = result[0].address ? buildPnuFromAddress(result[0].address, selectedJibun) : '';
+      if (selectedPnu) highlightParcelByPnu(selectedPnu);
       setText('pinJibun', '📍 ' + selectedJibun);
       setText('pinCoord', '위도 ' + lat.toFixed(6) + ' / 경도 ' + lng.toFixed(6));
       toast('✓ ' + selectedJibun, 'ok');
