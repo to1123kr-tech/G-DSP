@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌳 NEINS 환경성평가 분석</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.5.2/ol.css">
+<script src="https://cdn.jsdelivr.net/npm/ol@7.5.2/dist/ol.js"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+<script src="https://ecvam.neins.go.kr/apiConfirm.do?APIKEY=CBWU-BC6J-OFI9-ONPR"></script>
+<style>
+:root{
+  --bg:#0d1018; --panel:#13182a; --text:#e6eaf2; --muted:#8a93a8;
+  --line:rgba(255,255,255,0.08); --accent:#36cfc9; --gold:#ffd166;
+  --green:#06d6a0;
+  /* NEINS 등급 색상 */
+  --g1:#1a7f3c; --g2:#90c742; --g3:#ffd700; --g4:#ff8c00; --g5:#dc143c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Pretendard','Malgun Gothic',sans-serif;overflow:auto}
+
+/* 상단바 */
+.topbar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(19,24,42,0.95);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:100}
+.title{font-weight:700;font-size:16px;color:var(--green);flex:1}
+.tool-btn{padding:6px 12px;background:#1a2034;border:1px solid var(--line);border-radius:6px;color:var(--text);cursor:pointer;font-size:12px}
+.tool-btn:hover{background:#252b48;border-color:var(--accent)}
+
+/* 본문 */
+.container{max-width:1100px;margin:0 auto;padding:14px}
+
+/* 입력 섹션 */
+.input-sec{background:var(--panel);padding:14px;border-radius:10px;border:1px solid var(--line);margin-bottom:14px}
+.sec-title{font-size:14px;font-weight:600;color:var(--accent);margin-bottom:10px}
+
+/* 검색 입력 */
+.search-row{display:flex;gap:6px}
+.search-row input{flex:1;padding:10px 12px;background:#1a2034;border:1px solid var(--line);border-radius:6px;color:var(--text);font-size:13px}
+.search-row input:focus{outline:none;border-color:var(--accent)}
+.btn-search{padding:10px 24px;background:#1a2034;border:1px solid var(--accent);border-radius:6px;color:var(--accent);cursor:pointer;font-size:13px;font-weight:600}
+.btn-search:hover{background:rgba(54,207,201,0.2)}
+
+/* 검색 결과 목록 */
+.search-list{max-height:200px;overflow-y:auto;background:#0d1018;border:1px solid var(--line);border-radius:6px}
+.search-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line);font-size:12px}
+.search-item:last-child{border-bottom:none}
+.search-item:hover{background:rgba(54,207,201,0.1)}
+.search-item .item-info{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-item .item-info .item-region{color:var(--muted);font-size:10px;margin-bottom:2px}
+.btn-pick{padding:5px 14px;background:var(--accent);border:none;border-radius:4px;color:#000;cursor:pointer;font-size:11px;font-weight:600;flex-shrink:0;margin-left:8px}
+.btn-pick:hover{filter:brightness(1.1)}
+.btn-pick.added{background:var(--green);cursor:default;opacity:0.6}
+
+/* 선택된 지번 목록 */
+.selected-list{background:#0d1018;border:1px solid var(--line);border-radius:6px;padding:8px;min-height:60px}
+.selected-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#1a2034;border-radius:4px;margin-bottom:6px;font-size:12px}
+.selected-item:last-child{margin-bottom:0}
+.btn-rm{padding:4px 10px;background:rgba(220,20,60,0.2);border:1px solid #dc143c;border-radius:4px;color:#ff6b8a;cursor:pointer;font-size:11px}
+.btn-rm:hover{background:rgba(220,20,60,0.3)}
+.empty-msg{color:var(--muted);font-size:11px;text-align:center;padding:14px}
+
+.btn-analyze{padding:12px 30px;background:var(--green);border:none;border-radius:8px;color:#000;font-weight:700;font-size:14px;cursor:pointer;width:100%;margin-top:10px}
+.btn-analyze:hover{filter:brightness(1.1)}
+.btn-analyze:disabled{opacity:0.5;cursor:not-allowed}
+
+/* 로딩 */
+.loading{display:none;text-align:center;padding:40px;color:var(--muted);font-size:13px}
+.loading.show{display:block}
+.spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 결과 섹션 */
+.result-sec{display:none;margin-top:14px}
+.result-sec.show{display:block}
+
+.title-result{font-size:18px;font-weight:700;text-align:center;color:var(--green);padding:14px;background:var(--panel);border-radius:10px;margin-bottom:14px;border:1px solid var(--line)}
+.summary{background:var(--panel);padding:12px 16px;border-radius:10px;border:1px solid var(--line);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.summary .addr{font-size:13px;color:var(--gold);font-weight:600}
+.summary .total{font-size:13px;color:var(--muted)}
+.summary .total b{color:var(--accent)}
+
+/* 차트 + 표 카드 */
+.chart-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:900px){.chart-grid{grid-template-columns:1fr}}
+.chart-card{background:var(--panel);padding:14px;border-radius:10px;border:1px solid var(--line)}
+.chart-card .card-title{font-size:13px;font-weight:600;text-align:center;margin-bottom:8px;color:var(--text)}
+.chart-card canvas{max-height:200px}
+.chart-card table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px}
+.chart-card th{padding:5px;text-align:center;background:#1a2034;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line)}
+.chart-card td{padding:5px;text-align:center;border-bottom:1px solid var(--line)}
+.chart-card td:first-child{display:flex;align-items:center;gap:4px;justify-content:flex-start;padding-left:8px}
+.chart-card td:last-child{font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* 다운로드 */
+.dl-sec{display:flex;gap:8px;justify-content:center;padding:14px;flex-wrap:wrap}
+.dl-btn{padding:10px 20px;background:#1a2034;border:1px solid var(--line);border-radius:6px;color:var(--text);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:5px}
+.dl-btn:hover{background:#252b48;border-color:var(--accent)}
+
+/* 토스트 */
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);padding:10px 20px;background:rgba(13,16,24,0.95);border:1px solid var(--accent);border-radius:8px;color:var(--text);font-size:13px;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.3s;white-space:nowrap}
+.toast.show{opacity:1}
+.toast.err{border-color:#dc143c}
+.toast.ok{border-color:var(--green)}
+
+/* 에러 */
+.error-msg{background:rgba(220,20,60,0.1);border:1px solid #dc143c;color:#ff6b8a;padding:14px;border-radius:8px;font-size:13px;margin:10px 0}
+
+/* 미니 지도 */
+.map-control-bar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);padding:10px 14px;border-radius:10px 10px 0 0;border:1px solid var(--line);border-bottom:none;flex-wrap:wrap;gap:10px}
+.map-control-bar select{padding:6px 12px;background:#1a2034;border:1px solid var(--line);border-radius:6px;color:var(--text);font-size:13px;cursor:pointer}
+.map-control-bar .legend{display:flex;gap:12px;font-size:11px;flex-wrap:wrap}
+.map-control-bar .legend span{display:flex;align-items:center;gap:4px;color:var(--muted)}
+.map-control-bar .legend i{display:inline-block;width:10px;height:10px;border-radius:50%}
+#miniMap{width:100%;height:400px;border:1px solid var(--line);border-top:none;border-radius:0 0 10px 10px;background:#000;margin-bottom:14px}
+#miniMap .ol-control button{background:rgba(13,16,24,0.85);color:var(--text)}
+#miniMap .ol-control button:hover{background:rgba(54,207,201,0.5)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="title">🌳 NEINS 환경성평가 분석</div>
+  <button class="tool-btn" onclick="window.print()">🖨 인쇄</button>
+  <button class="tool-btn" onclick="window.close()">✕ 닫기</button>
+</div>
+
+<div class="container">
+
+  <!-- 입력 섹션 -->
+  <div class="input-sec">
+    <div class="sec-title">🔍 지번 검색</div>
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="예: 남양리 산 131-17 (또는 화성시 남양리 ...)" onkeydown="if(event.key==='Enter') doSearch()">
+      <button class="btn-search" onclick="doSearch()">검색</button>
+    </div>
+
+    <!-- 검색 결과 -->
+    <div id="searchResults" style="display:none">
+      <div class="sec-title" style="margin-top:12px">📋 검색 결과 <span id="resultCount" style="color:var(--muted);font-weight:400;font-size:11px"></span></div>
+      <div id="searchList" class="search-list"></div>
+    </div>
+
+    <!-- 선택된 지번 -->
+    <div class="sec-title" style="margin-top:12px">✅ 선택된 지번 (분석 대상)</div>
+    <div id="selectedList" class="selected-list">
+      <div class="empty-msg">검색 후 [담기] 버튼을 눌러 추가</div>
+    </div>
+
+    <button class="btn-analyze" onclick="doAnalyze()">🔍 분석 실행</button>
+  </div>
+
+  <!-- 로딩 -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div>NEINS 분석 중... (10-30초 소요)</div>
+  </div>
+
+  <!-- 결과 -->
+  <div class="result-sec" id="resultSec">
+    <div class="title-result">📊 국토환경성평가 등급 분석 결과</div>
+
+    <div class="summary">
+      <div class="addr" id="resultAddr">-</div>
+      <div class="total">전체 면적: <b id="resultTotal">-</b></div>
+    </div>
+
+    <!-- 분석대상 선택 + 범례 -->
+    <div class="map-control-bar">
+      <select id="analysisTarget" onchange="changeAnalysisTarget()">
+        <option value="0">분석대상: 국토환경성평가지도</option>
+        <option value="1">분석대상: 법제적 평가결과</option>
+        <option value="2">분석대상: 환경·생태적 평가결과</option>
+      </select>
+      <div class="legend">
+        <span><i style="background:#1a7f3c"></i>1등급</span>
+        <span><i style="background:#90c742"></i>2등급</span>
+        <span><i style="background:#ffd700"></i>3등급</span>
+        <span><i style="background:#ff8c00"></i>4등급</span>
+        <span><i style="background:#dc143c"></i>5등급</span>
+      </div>
+    </div>
+
+    <!-- 미니 지도 -->
+    <div id="miniMap"></div>
+
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="card-title">국토환경성평가지도</div>
+        <canvas id="chart1"></canvas>
+        <table id="table1"></table>
+      </div>
+      <div class="chart-card">
+        <div class="card-title">법제적 평가결과</div>
+        <canvas id="chart2"></canvas>
+        <table id="table2"></table>
+      </div>
+      <div class="chart-card">
+        <div class="card-title">환경·생태적 평가결과</div>
+        <canvas id="chart3"></canvas>
+        <table id="table3"></table>
+      </div>
+    </div>
+
+    <div class="dl-sec">
+      <button class="dl-btn" onclick="downloadResult('png')">📥 PNG</button>
+      <button class="dl-btn" onclick="downloadResult('jpg')">📥 JPG</button>
+      <button class="dl-btn" onclick="downloadResult('xlsx')">📥 XLS</button>
+    </div>
+
+    <div class="error-msg" id="errorMsg" style="display:none"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// PROXY 결정 (HTTPS 환경)
+var _proto = (window.location.protocol === 'https:' ? 'https:' : 'http:');
+var _host = window.location.hostname;
+var PROXY = (_host.indexOf('nip.io') > -1)
+  ? _proto + '//' + _host
+  : (window.opener && window.opener.PROXY) || 'http://168.107.15.68:5050';
+
+// 등급 색상
+var GRADE_COLORS = {
+  '1등급': '#1a7f3c',
+  '2등급': '#90c742',
+  '3등급': '#ffd700',
+  '4등급': '#ff8c00',
+  '5등급': '#dc143c',
+  '등급외': '#999',
+  '구축중': '#666',
+  '평가외': '#444'
+};
+
+var lastResult = null;
+var charts = {};
+var selectedParcels = []; // 선택된 지번 (분석 대상)
+
+// ── 지번 검색 ──
+function doSearch() {
+  var query = document.getElementById('searchInput').value.trim();
+  if (!query) {
+    toast('검색어를 입력하세요', 'err');
+    return;
+  }
+
+  // VWorld 검색 (서버 프록시 통해 호출)
+  fetch(PROXY + '/api/vw-search?query=' + encodeURIComponent(query))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) {
+        toast(data.error || '검색 실패', 'err');
+        return;
+      }
+      renderSearchResults(data.items || []);
+    })
+    .catch(function(err) {
+      toast('검색 오류: ' + err.message, 'err');
+    });
+}
+
+function renderSearchResults(items) {
+  var box = document.getElementById('searchResults');
+  var list = document.getElementById('searchList');
+  var count = document.getElementById('resultCount');
+
+  if (items.length === 0) {
+    box.style.display = 'none';
+    toast('검색 결과 없음', 'err');
+    return;
+  }
+
+  count.textContent = '(총 ' + items.length + '건)';
+  list.innerHTML = '';
+
+  items.forEach(function(item, idx) {
+    var addr = item.parcel || '-';
+    var pnu = item.pnu || '';
+
+    // 시도/시군구 추출
+    var parts = addr.split(' ');
+    var region = parts.slice(0, 3).join(' ');
+    var detail = parts.slice(3).join(' ');
+
+    var div = document.createElement('div');
+    div.className = 'search-item';
+    div.innerHTML =
+      '<div class="item-info">' +
+        '<div class="item-region">' + region + '</div>' +
+        '<div>' + detail + '</div>' +
+      '</div>' +
+      '<button class="btn-pick" data-idx="' + idx + '">담기</button>';
+
+    div.querySelector('.btn-pick').addEventListener('click', function() {
+      addToSelected(item);
+      this.textContent = '✓ 추가됨';
+      this.classList.add('added');
+      this.disabled = true;
+    });
+
+    list.appendChild(div);
+  });
+
+  box.style.display = 'block';
+}
+
+function addToSelected(item) {
+  // 중복 체크
+  var exists = selectedParcels.some(function(p) { return p.pnu === item.pnu; });
+  if (exists) {
+    toast('이미 추가됨', 'err');
+    return;
+  }
+
+  selectedParcels.push(item);
+  renderSelectedList();
+  toast('✅ 추가됨: ' + item.parcel, 'ok');
+}
+
+function removeFromSelected(idx) {
+  selectedParcels.splice(idx, 1);
+  renderSelectedList();
+}
+
+function renderSelectedList() {
+  var list = document.getElementById('selectedList');
+
+  if (selectedParcels.length === 0) {
+    list.innerHTML = '<div class="empty-msg">검색 후 [담기] 버튼을 눌러 추가</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  selectedParcels.forEach(function(p, idx) {
+    var div = document.createElement('div');
+    div.className = 'selected-item';
+    div.innerHTML =
+      '<div>' + (idx + 1) + '. ' + p.parcel + '</div>' +
+      '<button class="btn-rm" onclick="removeFromSelected(' + idx + ')">삭제</button>';
+    list.appendChild(div);
+  });
+}
+
+// 분석 실행
+function doAnalyze() {
+  if (selectedParcels.length === 0) {
+    toast('분석할 지번을 선택하세요', 'err');
+    return;
+  }
+
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('resultSec').classList.remove('show');
+  document.getElementById('errorMsg').style.display = 'none';
+
+  // PNU 또는 주소 전체 배열 전송
+  var parcels = selectedParcels.map(function(p) { return p.parcel; });
+  var parcelsParam = parcels.join('|||');
+
+  fetch(PROXY + '/api/neins-full?parcels=' + encodeURIComponent(parcelsParam))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('loading').classList.remove('show');
+      if (!data.ok) {
+        showError(data.error || '분석 실패');
+        return;
+      }
+      lastResult = data;
+      renderResult(data);
+    })
+    .catch(function(err) {
+      document.getElementById('loading').classList.remove('show');
+      showError('네트워크 오류: ' + err.message);
+    });
+}
+
+function showError(msg) {
+  var el = document.getElementById('errorMsg');
+  el.textContent = '❌ ' + msg;
+  el.style.display = 'block';
+  document.getElementById('resultSec').classList.add('show');
+}
+
+// 결과 렌더링
+function renderResult(data) {
+  document.getElementById('resultSec').classList.add('show');
+
+  var info = (data.analyze && data.analyze.info) || data.analyze || {};
+  var search = data.search || {};
+
+  // 주소
+  var addr = search.parcel || '-';
+  document.getElementById('resultAddr').textContent = '📍 ' + addr;
+
+  // 전체 면적
+  var total = info.resultTotal || 0;
+  document.getElementById('resultTotal').textContent = formatArea(total);
+
+  // 미니 지도 (개별 필지 폴리곤들 + NEINS WMS)
+  var polygons = data.polygons || [];
+  if (polygons.length === 0) {
+    // 폴리곤 없으면 합쳐진 NEINS 응답 사용
+    polygons = info.coordinateList || [];
+  }
+  if (polygons.length > 0) {
+    renderMiniMap(polygons, 'nem_ecvam');
+  }
+
+  // 차트 + 표 (3개)
+  var resultList = info.resultList || [];
+  resultList.forEach(function(item, idx) {
+    var n = idx + 1;
+    if (n > 3) return;
+    renderChart('chart' + n, item.resultList || []);
+    renderTable('table' + n, item.resultList || []);
+  });
+
+  toast('✅ 분석 완료', 'ok');
+}
+
+// 미니 지도 그리기 (NEINS WMS + 필지 폴리곤)
+var miniMapInstance = null;
+var miniWmsLayer = null;
+var miniParcelLayer = null;
+
+function renderMiniMap(polygonsList, wmsLayerName) {
+  // polygonsList: ["POLYGON((..))", "POLYGON((..))"] 배열 또는 단일 문자열
+  if (typeof polygonsList === 'string') polygonsList = [polygonsList];
+  
+  var allRings = [];
+  
+  polygonsList.forEach(function(polygonWkt) {
+    if (!polygonWkt) return;
+    // POLYGON ((x y, ...))
+    var match = polygonWkt.match(/POLYGON\s*\(\(\s*([^)]+)\s*\)\)/);
+    if (!match) return;
+    var ring = match[1].split(',').map(function(p) {
+      var xy = p.trim().split(/\s+/);
+      return [parseFloat(xy[0]), parseFloat(xy[1])];
+    });
+    allRings.push(ring);
+  });
+  
+  if (allRings.length === 0) return;
+  
+  // 모든 점에서 중심 + 영역 계산
+  var coords = [];
+  allRings.forEach(function(ring) { coords = coords.concat(ring); });
+
+  // 중심점 + 영역 계산
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  coords.forEach(function(c) {
+    if (c[0] < minX) minX = c[0];
+    if (c[0] > maxX) maxX = c[0];
+    if (c[1] < minY) minY = c[1];
+    if (c[1] > maxY) maxY = c[1];
+  });
+  var centerX = (minX + maxX) / 2;
+  var centerY = (minY + maxY) / 2;
+
+  // 폴리곤 피처 (복수 폴리곤 모두 추가)
+  var features = allRings.map(function(ring) {
+    var f = new ol.Feature({ geometry: new ol.geom.Polygon([ring]) });
+    f.setStyle(new ol.style.Style({
+      stroke: new ol.style.Stroke({ color: '#0080ff', width: 4 }),
+      fill: new ol.style.Fill({ color: 'rgba(0, 128, 255, 0.1)' })
+    }));
+    return f;
+  });
+  var polygonFeature = features[0]; // 호환성
+
+  // 첫 호출이면 지도 생성
+  if (!miniMapInstance) {
+    // NEINS WMS 레이어 (ecvamLayerCreate가 jQuery 사용)
+    if (typeof ecvamLayerCreate !== 'function') {
+      console.warn('NEINS API 로드 안 됨, 기본 지도만');
+    } else {
+      miniWmsLayer = ecvamLayerCreate(wmsLayerName, 'true');
+    }
+
+    // 필지 벡터 레이어 (복수 모두)
+    miniParcelLayer = new ol.layer.Vector({zIndex: 100,
+      source: new ol.source.Vector({ features: features })
+    });
+
+    var layers = [];
+    if (miniWmsLayer) layers.push(miniWmsLayer);
+    layers.push(miniParcelLayer);
+
+    miniMapInstance = new ol.Map({
+      target: 'miniMap',
+      layers: layers,
+      view: new ol.View({
+        center: [centerX, centerY],
+        zoom: 16,
+        projection: 'EPSG:3857'
+      }),
+      controls: ol.control.defaults.defaults({attribution: false})
+    });
+  } else {
+    // 폴리곤 갱신 (복수)
+    miniParcelLayer.getSource().clear();
+    features.forEach(function(f) { miniParcelLayer.getSource().addFeature(f); });
+    miniMapInstance.getView().setCenter([centerX, centerY]);
+  }
+
+  // 모든 폴리곤에 맞춰 줌
+  setTimeout(function() {
+    var extent = ol.extent.createEmpty();
+    features.forEach(function(f) {
+      ol.extent.extend(extent, f.getGeometry().getExtent());
+    });
+    miniMapInstance.getView().fit(extent, { padding: [40, 40, 40, 40], maxZoom: 18 });
+  }, 200);
+}
+
+// 분석대상 변경 (WMS 레이어 교체)
+function changeAnalysisTarget() {
+  if (!miniMapInstance) return;
+  var idx = document.getElementById('analysisTarget').value;
+  var layerNames = ['nem_ecvam', 'nem_ecvam_law', 'nem_ecvam_eco'];
+  var newLayerName = layerNames[parseInt(idx) || 0];
+
+  if (typeof ecvamLayerCreate !== 'function') {
+    toast('NEINS WMS 로드 안 됨', 'err');
+    return;
+  }
+
+  // 기존 WMS 제거 후 새로 추가
+  if (miniWmsLayer) {
+    miniMapInstance.removeLayer(miniWmsLayer);
+  }
+  miniWmsLayer = ecvamLayerCreate(newLayerName, 'true');
+  miniMapInstance.getLayers().insertAt(0, miniWmsLayer);
+
+  toast('지도 변경: ' + document.getElementById('analysisTarget').selectedOptions[0].text, 'ok');
+}
+
+// 면적 포맷
+function formatArea(m2) {
+  m2 = parseFloat(m2);
+  return Math.round(m2).toLocaleString() + ' m²';
+}
+
+// 차트 그리기
+function renderChart(canvasId, items) {
+  var ctx = document.getElementById(canvasId).getContext('2d');
+  if (charts[canvasId]) charts[canvasId].destroy();
+
+  // 0이 아닌 항목만
+  var filtered = items.filter(function(x){ return parseFloat(x.valueM2) > 0; });
+
+  charts[canvasId] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: filtered.map(function(x){ return x.grade; }),
+      datasets: [{
+        data: filtered.map(function(x){ return parseFloat(x.valuePer); }),
+        backgroundColor: filtered.map(function(x){ return GRADE_COLORS[x.grade] || '#999'; }),
+        borderWidth: 1, borderColor: '#0d1018'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var item = filtered[ctx.dataIndex];
+              return ctx.label + ': ' + parseFloat(item.valueM2).toLocaleString() + 'm² (' + item.valuePer + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// 표 그리기
+function renderTable(tableId, items) {
+  var html = '<thead><tr><th>등급</th><th>면적(m²)</th><th>비율(%)</th></tr></thead><tbody>';
+  items.forEach(function(item) {
+    var m2 = parseFloat(item.valueM2);
+    if (m2 === 0) return;
+    var color = GRADE_COLORS[item.grade] || '#999';
+    html += '<tr>' +
+      '<td><span class="dot" style="background:' + color + '"></span>' + item.grade + '</td>' +
+      '<td>' + m2.toLocaleString() + '</td>' +
+      '<td>' + item.valuePer + '%</td>' +
+      '</tr>';
+  });
+  html += '</tbody>';
+  document.getElementById(tableId).innerHTML = html;
+}
+
+// 다운로드
+function downloadResult(format) {
+  if (!lastResult) { toast('분석 먼저 실행', 'err'); return; }
+
+  if (format === 'xlsx') {
+    downloadXLSX();
+    return;
+  }
+
+  toast('📷 캡처 중...');
+  var target = document.getElementById('resultSec');
+  html2canvas(target, { useCORS: true, backgroundColor: '#0d1018', scale: 1.5 })
+    .then(function(canvas) {
+      canvas.toBlob(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        var ts = new Date();
+        var pad = function(n){return String(n).padStart(2,'0');};
+        var fname = 'NEINS_' + ts.getFullYear() + pad(ts.getMonth()+1) + pad(ts.getDate()) + '_' + pad(ts.getHours()) + pad(ts.getMinutes()) + '.' + format;
+        a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+        toast('✅ 다운로드 완료', 'ok');
+      }, format === 'jpg' ? 'image/jpeg' : 'image/png', 0.95);
+    });
+}
+
+function downloadXLSX() {
+  var info = (lastResult.analyze && lastResult.analyze.info) || {};
+  var search = lastResult.search || {};
+  var wb = XLSX.utils.book_new();
+
+  // 요약
+  var summary = [['NEINS 환경성평가 분석 결과'], [], ['주소', search.parcel || ''], ['전체 면적(m²)', info.resultTotal || 0]];
+  var ws1 = XLSX.utils.aoa_to_sheet(summary);
+  XLSX.utils.book_append_sheet(wb, ws1, '요약');
+
+  // 각 평가별
+  (info.resultList || []).forEach(function(item) {
+    var data = [['등급', '면적(m²)', '면적(ha)', '비율(%)']];
+    item.resultList.forEach(function(x) {
+      data.push([x.grade, x.valueM2, x.valueHa, x.valuePer]);
+    });
+    var ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, item.layerNm.substring(0, 30));
+  });
+
+  var ts = new Date();
+  var pad = function(n){return String(n).padStart(2,'0');};
+  XLSX.writeFile(wb, 'NEINS_' + ts.getFullYear() + pad(ts.getMonth()+1) + pad(ts.getDate()) + '.xlsx');
+  toast('✅ XLS 다운로드', 'ok');
+}
+
+function toast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type || '');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(function(){ t.className = 'toast'; }, 2500);
+}
+
+// 시작
+window.addEventListener('DOMContentLoaded', function() {
+  // URL 파라미터에서 지번 자동 입력 + 검색
+  var params = new URLSearchParams(window.location.search);
+  var initParcel = params.get('parcel');
+  if (initParcel) {
+    document.getElementById('searchInput').value = initParcel;
+    setTimeout(doSearch, 500);  // 자동 검색
+  }
+});
+</script>
+</body>
+</html>

@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 VWORLD_KEY = "16B90D39-90BB-3197-987A-54983A46F250"
-VWORLD_DOMAIN = "168.107.15.68"
+VWORLD_DOMAIN = "168-107-15-68.nip.io"
 _WGS84_TO_TM5186 = Transformer.from_crs("EPSG:4326", "EPSG:5186", always_xy=True)
 _TM5186_TO_WGS84 = Transformer.from_crs("EPSG:5186", "EPSG:4326", always_xy=True)
 
@@ -91,7 +91,7 @@ def _fetch_vworld_box(vworld_data, bbox, size=1000):
         "domain": VWORLD_DOMAIN,
         "geomFilter": f"BOX({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]})",
     }
-    headers = {"Referer": f"http://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}
+    headers = {"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}
     try:
         r = req.get(url, params=params, headers=headers, timeout=25)
         data = r.json()
@@ -115,7 +115,7 @@ def _fetch_ned_wfs_box(endpoint_name, bbox, size=500):
         "maxFeatures": str(size),
         "bbox": bbox_str
     }
-    headers = {"Referer": f"http://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}
+    headers = {"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}
     try:
         r = req.get(url, params=params, headers=headers, timeout=30)
         r.encoding = 'utf-8'
@@ -420,7 +420,7 @@ def vw_tile_proxy(map_type, z, x, y):
     """OpenLayers는 z/x/y로 호출, VWorld는 z/y/x로 받음"""
     try:
         url = f"https://api.vworld.kr/req/wmts/1.0.0/{VWORLD_KEY}/{map_type}/{z}/{y}/{x}.jpeg"
-        r = req.get(url, headers={"Referer": f"http://{VWORLD_DOMAIN}"}, timeout=10)
+        r = req.get(url, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=10)
         return r.content, 200, {'Content-Type': 'image/jpeg'}
     except:
         return b'', 404
@@ -434,7 +434,7 @@ def vw_wms_proxy():
         params['key'] = VWORLD_KEY
         params['domain'] = VWORLD_DOMAIN
         url = "https://api.vworld.kr/req/wms"
-        r = req.get(url, params=params, headers={"Referer": f"http://{VWORLD_DOMAIN}"}, timeout=10)
+        r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=10)
         return r.content, 200, {'Content-Type': r.headers.get('Content-Type', 'image/png')}
     except:
         return b'', 404
@@ -458,7 +458,7 @@ def wfs_parcel():
             params["geomFilter"] = f"BOX({float(lng)-f},{float(lat)-f},{float(lng)+f},{float(lat)+f})"
         else:
             return jsonify({"error": "pnu 또는 lng/lat 필요"}), 400
-        r = req.get("https://api.vworld.kr/req/data", params=params, headers={"Referer": f"http://{VWORLD_DOMAIN}"}, timeout=60)
+        r = req.get("https://api.vworld.kr/req/data", params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
         data = r.json()
         result = data.get("response", {}).get("result", {})
         fc = result.get("featureCollection", {})
@@ -479,7 +479,7 @@ def landinfo():
             "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
             "format": "json", "numOfRows": "1", "pageNo": "1", "pnu": pnu
         }
-        r = req.get(url, params=params, headers={"Referer": f"http://{VWORLD_DOMAIN}"}, timeout=60)
+        r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
         return jsonify(r.json())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -494,7 +494,7 @@ def vworld_proxy():
         params['key'] = VWORLD_KEY
         params['domain'] = VWORLD_DOMAIN
         url = f"https://api.vworld.kr/{path}"
-        r = req.get(url, params=params, headers={"Referer": f"http://{VWORLD_DOMAIN}"}, timeout=60)
+        r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
         try:
             return jsonify(r.json())
         except:
@@ -608,7 +608,7 @@ def wfs_area():
             "data": "LP_PA_CBND_BUBUN", "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
             "format": "json", "size": "1", "attrFilter": f"pnu:=:{pnu}"
         }
-        r = req.get("https://api.vworld.kr/req/data", params=params, headers={"Referer": f"http://{VWORLD_DOMAIN}"}, timeout=60)
+        r = req.get("https://api.vworld.kr/req/data", params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
         data = r.json()
         features = data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", [])
         if not features:
@@ -637,11 +637,281 @@ def vworld_tile_legacy():
         x = request.args.get('x')
         y = request.args.get('y')
         url = f"https://api.vworld.kr/req/wmts/1.0.0/{VWORLD_KEY}/Base/{z}/{y}/{x}.png"
-        r = req.get(url, headers={"Referer": f"http://{VWORLD_DOMAIN}"}, timeout=10)
+        r = req.get(url, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=10)
         return r.content, 200, {'Content-Type': 'image/png'}
     except:
         return b'', 404
 
+
+
+# ===== NEINS 환경성평가 크롤링 (server.py에 추가할 코드) =====
+
+
+# ===== NEINS 환경성평가 크롤링 v2 (server.py에 추가할 코드) =====
+# 흐름: 지번 → VWorld 검색 (PNU) → VWorld WFS (폴리곤) → NEINS 분석 (차트)
+
+import re as re_module
+
+
+
+# ===== NEINS 환경성평가 크롤링 v3 (복수 지번 지원) =====
+
+import re as re_module
+
+
+
+# ===== NEINS 환경성평가 크롤링 v4 (검색-선택-분석) =====
+
+import re as re_module
+
+
+def vworld_search_pnu(parcel_query, size=10):
+    """VWorld 검색 API로 지번 → 후보 목록 (단일 또는 복수)"""
+    url = "https://api.vworld.kr/req/search"
+    params = {
+        "service": "search",
+        "version": "2.0",
+        "request": "search",
+        "size": str(size),
+        "page": "1",
+        "crs": "EPSG:3857",
+        "format": "json",
+        "type": "address",
+        "category": "parcel",
+        "query": parcel_query,
+        "key": VWORLD_KEY,
+        "domain": VWORLD_DOMAIN
+    }
+    headers = {"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}
+    r = req.get(url, params=params, headers=headers, timeout=15)
+    if r.status_code != 200:
+        return []
+    data = r.json()
+    items = data.get('response', {}).get('result', {}).get('items', [])
+    return items
+
+
+def vworld_wfs_polygon(pnu, x, y):
+    """VWorld WFS로 PNU 주변 지적도 → 해당 PNU의 폴리곤"""
+    try:
+        x_f = float(x)
+        y_f = float(y)
+    except:
+        return None
+
+    bbox = f"{x_f-300},{y_f-300},{x_f+300},{y_f+300}"
+    url = "https://api.vworld.kr/req/wfs"
+    params = {
+        "service": "WFS", "version": "2.0.0", "request": "GetFeature",
+        "typename": "lp_pa_cbnd_bubun", "crs": "EPSG:3857",
+        "bbox": bbox, "maxFeatures": "100", "output": "GML2",
+        "domain": VWORLD_DOMAIN, "key": VWORLD_KEY
+    }
+    headers = {"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}
+    r = req.get(url, params=params, headers=headers, timeout=20)
+    if r.status_code != 200:
+        return None
+
+    xml_text = r.text
+    pattern = r'<gml:featureMember>(.*?)</gml:featureMember>'
+    features = re_module.findall(pattern, xml_text, re_module.DOTALL)
+
+    for feat in features:
+        if pnu in feat:
+            m = re_module.search(
+                r'<gml:LinearRing>.*?<gml:coordinates[^>]*>(.*?)</gml:coordinates>',
+                feat, re_module.DOTALL
+            )
+            if m:
+                return m.group(1).strip()
+    return None
+
+
+def coords_to_polygon_points(coords_str):
+    """VWorld 좌표 → WKT 내부 형식"""
+    if not coords_str:
+        return None
+    points = coords_str.split()
+    wkt_points = []
+    for p in points:
+        parts = p.split(',')
+        if len(parts) != 2:
+            continue
+        try:
+            x = float(parts[0])
+            y = float(parts[1])
+            wkt_points.append(f"{x} {y}")
+        except:
+            continue
+    if len(wkt_points) < 3:
+        return None
+    return ', '.join(wkt_points)
+
+
+def neins_analyze_polygon(polygon_wkt, address):
+    """NEINS 분석 API 호출 → JSON 결과"""
+    session = req.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    })
+
+    session.get("https://webgis.neins.go.kr/popup/analysisCadastralPopup.do", timeout=10)
+
+    analyze_url = "https://webgis.neins.go.kr/proxy/proxy.do"
+    params = {"url": "http://192.168.1.73:8083/rasterAnalysisFeature.do"}
+
+    feature_type = "Polygon"  # NEINS는 항상 Polygon (다중도 파이프 구분)
+
+    form_data = {
+        "url": "http://192.168.1.73:8083/rasterAnalysisFeature.do",
+        "coordinate": polygon_wkt,
+        "featureType": feature_type,
+        "epsgCd": "EPSG:3857",
+        "scaleValue": "5000",
+        "layerAnalysisGroupCd": "AG003",
+        "analysisType": "cadastral",
+        "dtailChkNon": "false",
+        "dtailAreaChkNon": "false",
+        "address": address,
+        "input_url": ""
+    }
+    headers = {
+        "Referer": "https://webgis.neins.go.kr/popup/analysisCadastralPopup.do",
+        "Origin": "https://webgis.neins.go.kr",
+        "X-Requested-With": "XMLHttpRequest",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Accept": "application/json, text/javascript, */*; q=0.01"
+    }
+
+    r = session.post(analyze_url, params=params, data=form_data, headers=headers, timeout=30)
+    if r.status_code != 200:
+        return None
+    return r.json()
+
+
+@app.route('/api/vw-search', methods=['GET'])
+def vworld_search_api():
+    """VWorld 검색 → 후보 목록 반환"""
+    query = request.args.get('query', '').strip()
+    if not query:
+        return jsonify({"ok": False, "error": "검색어 필요"}), 400
+
+    try:
+        items = vworld_search_pnu(query, size=10)
+        if not items:
+            return jsonify({"ok": False, "error": "검색 결과 없음"}), 404
+
+        # 클라이언트 친화적 형태로 변환
+        result_items = []
+        for item in items:
+            result_items.append({
+                "pnu": item.get('id', ''),
+                "parcel": item.get('address', {}).get('parcel', ''),
+                "point": item.get('point', {})
+            })
+
+        return jsonify({"ok": True, "items": result_items, "total": len(result_items)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route('/api/neins-full', methods=['GET', 'POST'])
+def neins_full_v4():
+    """지번 → 검색 → 폴리곤 → 분석 (단수/복수)"""
+    try:
+        if request.method == 'POST':
+            body = request.get_json() or {}
+            parcels = body.get('parcels', [])
+            if isinstance(parcels, str):
+                parcels = [parcels]
+        else:
+            parcels_str = request.args.get('parcels', '').strip()
+            single = request.args.get('parcel', '').strip()
+            if parcels_str:
+                parcels = [p.strip() for p in parcels_str.split('|||') if p.strip()]
+            elif single:
+                parcels = [single]
+            else:
+                parcels = []
+
+        if not parcels:
+            return jsonify({"ok": False, "error": "지번 필요"}), 400
+
+        polygon_parts = []
+        addrs = []
+        searches = []
+
+        for parcel in parcels:
+            items = vworld_search_pnu(parcel, size=1)
+            if not items:
+                return jsonify({"ok": False, "error": f"VWorld 검색 실패: {parcel}"}), 404
+
+            item = items[0]
+            pnu = item.get('id', '')
+            addr = item.get('address', {}).get('parcel', '')
+            point = item.get('point', {})
+
+            coords_raw = vworld_wfs_polygon(pnu, point.get('x'), point.get('y'))
+            if not coords_raw:
+                return jsonify({"ok": False, "error": f"WFS 폴리곤 추출 실패: {parcel}", "pnu": pnu}), 404
+
+            poly_points = coords_to_polygon_points(coords_raw)
+            if not poly_points:
+                return jsonify({"ok": False, "error": f"폴리곤 변환 실패: {parcel}"}), 500
+
+            polygon_parts.append(poly_points)
+            addrs.append(addr)
+            searches.append({"pnu": pnu, "parcel": addr, "point": point})
+
+        # NEINS 방식: POLYGON|POLYGON 파이프 구분
+        polygon_wkt = '|'.join(['POLYGON ((' + p + '))' for p in polygon_parts])
+
+        full_addr = '|'.join(addrs)  # NEINS 형식
+        analyze_data = neins_analyze_polygon(polygon_wkt, full_addr)
+        if not analyze_data:
+            return jsonify({"ok": False, "error": "NEINS 분석 실패"}), 500
+
+        # 각 필지의 개별 폴리곤들도 반환 (미니 지도용)
+        individual_polygons = ['POLYGON ((' + p + '))' for p in polygon_parts]
+
+        return jsonify({
+            "ok": True,
+            "search": searches[0] if len(searches) == 1 else {
+                "pnu": ' / '.join([s['pnu'] for s in searches]),
+                "parcel": full_addr,
+                "point": searches[0]['point'],
+                "all_searches": searches
+            },
+            "analyze": analyze_data,
+            "polygons": individual_polygons  # 개별 필지 폴리곤들
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+            "trace": traceback.format_exc()[:800]
+        }), 500
+
+
+@app.route('/api/neins-analyze-direct', methods=['POST'])
+def neins_analyze_direct_v4():
+    """직접 POLYGON/MULTIPOLYGON 좌표 받아서 분석"""
+    try:
+        body = request.get_json() or {}
+        polygon_wkt = body.get('polygon', '').strip()
+        address = body.get('address', '')
+        if not polygon_wkt:
+            return jsonify({"ok": False, "error": "POLYGON 필요"}), 400
+
+        result = neins_analyze_polygon(polygon_wkt, address)
+        if not result:
+            return jsonify({"ok": False, "error": "NEINS 분석 실패"}), 500
+
+        return jsonify({"ok": True, "data": result})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050)

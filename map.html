@@ -9,6 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/ol@7.5.2/dist/ol.js"></script>
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
 <script src="https://ecvam.neins.go.kr/apiConfirm.do?APIKEY=CBWU-BC6J-OFI9-ONPR"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -274,6 +275,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
     <!-- NEINS 환경성평가 (영대님 핵심!) -->
     <div class="lsec">
       <div class="ltitle">🌳 NEINS 환경성평가</div>
+      <button onclick="window.open('popup_neins.html','_blank','width=1200,height=900,scrollbars=yes,resizable=yes')" style="width:100%;padding:8px;background:rgba(6,214,160,0.15);border:1px solid #06d6a0;border-radius:6px;color:#06d6a0;cursor:pointer;font-size:12px;margin-bottom:8px;font-weight:600">🔍 환경분석 (NEINS)</button>
       <div class="lrow">
         <div class="llabel">국토환경성평가지도</div>
         <label class="tog"><input type="checkbox" id="chkNeinsEcvam" onchange="toggleNeinsLayer('nem_ecvam',this.checked)"><span class="tslider"></span></label>
