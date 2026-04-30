@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>G-DSP 지도 — 화성시 GIS 스타일</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@7.5.2/ol.css">
+<script src="https://cdn.jsdelivr.net/npm/ol@7.5.2/dist/ol.js"></script>
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
@@ -17,7 +19,6 @@
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Pretendard','Malgun Gothic',sans-serif;overflow:hidden}
 body{display:flex;flex-direction:column}
 
-/* 상단바 */
 .topbar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:rgba(19,24,42,0.95);border-bottom:1px solid var(--line);flex-shrink:0;z-index:100}
 .logo{font-weight:700;font-size:18px;color:var(--accent);letter-spacing:-0.5px}
 .logo .ver{font-size:9px;color:var(--gold);background:rgba(255,209,102,0.15);padding:1px 4px;border-radius:3px;margin-left:2px;font-weight:500}
@@ -32,10 +33,8 @@ body{display:flex;flex-direction:column}
 .tool-btn.heritage{background:#8b1e3f;border-color:#8b1e3f;color:#fff}
 .tool-btn.heritage:hover{background:#a52450}
 
-/* 본문 */
-.main{display:flex;flex:1;overflow:hidden;position:relative}
+.main{display:flex;flex:1;overflow:hidden;position:relative;min-height:0}
 
-/* 좌측 패널 */
 .sidebar{width:240px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;flex-shrink:0;padding:10px}
 .sec{margin-bottom:14px}
 .sec-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;padding-left:4px}
@@ -47,7 +46,6 @@ body{display:flex;flex-direction:column}
 .dot.yellow{background:var(--yellow)} .dot.green{background:var(--green)}
 .dot.purple{background:var(--purple)}
 
-/* 토글 스위치 */
 .tog{position:relative;width:36px;height:20px;flex-shrink:0;cursor:pointer}
 .tog input{opacity:0;width:0;height:0}
 .tog .slider{position:absolute;top:0;left:0;right:0;bottom:0;background:#2a3050;border-radius:20px;transition:0.2s}
@@ -55,11 +53,10 @@ body{display:flex;flex-direction:column}
 .tog input:checked+.slider{background:var(--accent)}
 .tog input:checked+.slider:before{transform:translateX(16px)}
 
-/* 지도 영역 */
-.map-wrap{flex:1;position:relative;overflow:hidden}
-#kakaoMap{position:absolute;inset:0;width:100%;height:100%;background:#1a1f30}
+.map-wrap{flex:1;position:relative;overflow:hidden;min-width:0}
+#olMap{position:absolute !important;inset:0 !important;width:100% !important;height:100% !important;background:#1a1f30}
+#olMap .ol-attribution,#olMap .ol-zoom{display:none !important}
 
-/* 지도 내부 컨트롤 */
 .map-info{position:absolute;bottom:14px;left:14px;background:rgba(13,16,24,0.92);padding:10px 14px;border-radius:8px;font-size:12px;color:var(--text);max-width:380px;z-index:50;border:1px solid var(--line);box-shadow:0 4px 16px rgba(0,0,0,0.4)}
 .map-info .pin-jibun{color:var(--gold);font-weight:600;font-size:13px}
 .map-info .pin-coord{color:var(--muted);font-size:11px;margin-top:2px}
@@ -72,176 +69,88 @@ body{display:flex;flex-direction:column}
 .map-type button{padding:8px 14px;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:12px}
 .map-type button.on{background:var(--accent);color:#000;font-weight:600}
 
-/* 토스트 */
-.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);padding:10px 20px;background:rgba(13,16,24,0.95);border:1px solid var(--accent);border-radius:8px;color:var(--text);font-size:13px;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.3s}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);padding:10px 20px;background:rgba(13,16,24,0.95);border:1px solid var(--accent);border-radius:8px;color:var(--text);font-size:13px;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.3s;white-space:nowrap}
 .toast.show{opacity:1}
 .toast.err{border-color:var(--red)}
 .toast.ok{border-color:var(--green)}
 
-/* 워터마크 */
 .watermark{position:absolute;bottom:14px;right:14px;color:rgba(255,255,255,0.3);font-size:10px;z-index:50;pointer-events:none}
 
-/* 로딩 */
-.loading{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(13,16,24,0.95);padding:20px 30px;border-radius:8px;color:var(--text);font-size:13px;z-index:200;display:none;border:1px solid var(--accent)}
-.loading.show{display:block}
-
-/* 컨텍스트 메뉴 */
 .ctx-menu{position:fixed;background:rgba(13,16,24,0.97);border:1px solid var(--line);border-radius:8px;padding:6px;z-index:500;display:none;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,0.5)}
 .ctx-menu.show{display:block}
 .ctx-item{padding:8px 14px;color:var(--text);cursor:pointer;font-size:13px;border-radius:4px}
 .ctx-item:hover{background:var(--accent);color:#000}
 .ctx-divider{height:1px;background:var(--line);margin:4px 0}
 
-/* 스크롤바 */
 .sidebar::-webkit-scrollbar{width:6px}
 .sidebar::-webkit-scrollbar-track{background:transparent}
 .sidebar::-webkit-scrollbar-thumb{background:#252b48;border-radius:3px}
-.sidebar::-webkit-scrollbar-thumb:hover{background:#36cfc9}
 
-@media (max-width: 768px) {
-  .sidebar{width:200px}
-  .tool-btn{padding:6px 8px;font-size:11px}
-}
+@media (max-width: 768px){.sidebar{width:200px}.tool-btn{padding:6px 8px;font-size:11px}}
 </style>
 </head>
 <body>
 
-<!-- 상단바 -->
 <div class="topbar">
   <div class="logo">G-DSP <span class="ver">v3</span></div>
   <div class="search-box">
-    <input type="text" id="searchInput" class="search-input" placeholder="지번 입력 (예: 봉담읍 와우리 597, 화성시 남양읍 ...)" onkeydown="if(event.key==='Enter')doSearch()">
+    <input type="text" id="searchInput" class="search-input" placeholder="지번 입력 (예: 봉담읍 와우리 597)" onkeydown="if(event.key==='Enter')doSearch()">
     <button class="btn" onclick="doSearch()">검색</button>
   </div>
   <div class="tools">
-    <button class="tool-btn" onclick="captureMap('png')" title="화면 PNG 다운">📷 PNG</button>
-    <button class="tool-btn" onclick="captureMap('jpg')" title="화면 JPG 다운">📷 JPG</button>
-    <button class="tool-btn heritage" onclick="openHeritageGIS()" title="국가유산청 보존관리지도">🏛 국가유산청</button>
+    <button class="tool-btn" onclick="captureMap('png')">📷 PNG</button>
+    <button class="tool-btn" onclick="captureMap('jpg')">📷 JPG</button>
+    <button class="tool-btn heritage" onclick="openHeritageGIS()">🏛 국가유산청</button>
     <button class="tool-btn" onclick="window.close()">✕ 닫기</button>
   </div>
 </div>
 
-<!-- 본문 -->
 <div class="main">
-  <!-- 좌측 패널 -->
   <div class="sidebar">
-    <!-- 기본 -->
     <div class="sec">
       <div class="sec-title">기본 레이어</div>
-      <div class="row">
-        <div class="label">🗺 위성사진</div>
-        <label class="tog"><input type="checkbox" id="chkSat" checked onchange="toggleMapType('skyview', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="row">
-        <div class="label">🛣 도로명/지명</div>
-        <label class="tog"><input type="checkbox" id="chkHybrid" checked onchange="toggleHybrid(this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="row">
-        <div class="label">📐 지적선+지번</div>
-        <label class="tog"><input type="checkbox" id="chkCadastral" checked onchange="toggleVwLayer('cadastral', this.checked)"><span class="slider"></span></label>
-      </div>
+      <div class="row"><div class="label">📐 지적선 + 지번</div><label class="tog"><input type="checkbox" id="chkCadastral" checked onchange="toggleLayer('cadastral', this.checked)"><span class="slider"></span></label></div>
     </div>
-
-    <!-- 토지정보 -->
     <div class="sec">
       <div class="sec-title">🏘 토지정보</div>
-      <div class="row">
-        <div class="label">용도지역</div>
-        <label class="tog"><input type="checkbox" id="chkZoneUse" onchange="toggleVwLayer('zone_use', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="row">
-        <div class="label">지구단위계획</div>
-        <label class="tog"><input type="checkbox" id="chkDistPlan" onchange="toggleVwLayer('dist_plan', this.checked)"><span class="slider"></span></label>
-      </div>
+      <div class="row"><div class="label">용도지역</div><label class="tog"><input type="checkbox" id="chkZoneUse" onchange="toggleLayer('zone_use', this.checked)"><span class="slider"></span></label></div>
+      <div class="row"><div class="label">지구단위계획</div><label class="tog"><input type="checkbox" id="chkDistPlan" onchange="toggleLayer('dist_plan', this.checked)"><span class="slider"></span></label></div>
     </div>
-
-    <!-- 환경등급 -->
     <div class="sec">
       <div class="sec-title">🌳 환경등급 (생태자연도)</div>
-      <div class="row">
-        <div class="label"><span class="dot red"></span>1등급</div>
-        <label class="tog"><input type="checkbox" id="chkEco1" onchange="toggleVwLayer('eco1', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="row">
-        <div class="label"><span class="dot orange"></span>2등급</div>
-        <label class="tog"><input type="checkbox" id="chkEco2" onchange="toggleVwLayer('eco2', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="row">
-        <div class="label"><span class="dot yellow"></span>3등급</div>
-        <label class="tog"><input type="checkbox" id="chkEco3" onchange="toggleVwLayer('eco3', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="row">
-        <div class="label"><span class="dot green"></span>별도관리</div>
-        <label class="tog"><input type="checkbox" id="chkEco4" onchange="toggleVwLayer('eco4', this.checked)"><span class="slider"></span></label>
-      </div>
+      <div class="row"><div class="label"><span class="dot red"></span>1등급</div><label class="tog"><input type="checkbox" id="chkEco1" onchange="toggleLayer('eco1', this.checked)"><span class="slider"></span></label></div>
+      <div class="row"><div class="label"><span class="dot orange"></span>2등급</div><label class="tog"><input type="checkbox" id="chkEco2" onchange="toggleLayer('eco2', this.checked)"><span class="slider"></span></label></div>
+      <div class="row"><div class="label"><span class="dot yellow"></span>3등급</div><label class="tog"><input type="checkbox" id="chkEco3" onchange="toggleLayer('eco3', this.checked)"><span class="slider"></span></label></div>
+      <div class="row"><div class="label"><span class="dot green"></span>별도관리</div><label class="tog"><input type="checkbox" id="chkEco4" onchange="toggleLayer('eco4', this.checked)"><span class="slider"></span></label></div>
     </div>
-
-    <!-- 문화재 -->
     <div class="sec">
       <div class="sec-title">🏛 문화재 (허가검토용)</div>
-      <div class="row">
-        <div class="label"><span class="dot red"></span>보호구역</div>
-        <label class="tog"><input type="checkbox" id="chkHer1" onchange="toggleVwLayer('her1', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="row">
-        <div class="label"><span class="dot orange"></span>영향검토</div>
-        <label class="tog"><input type="checkbox" id="chkHer2" onchange="toggleVwLayer('her2', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="row">
-        <div class="label"><span class="dot yellow"></span>영향평가</div>
-        <label class="tog"><input type="checkbox" id="chkHer3" onchange="toggleVwLayer('her3', this.checked)"><span class="slider"></span></label>
-      </div>
-    </div>
-
-    <!-- 지형 -->
-    <div class="sec">
-      <div class="sec-title">📐 지형정보</div>
-      <div class="row">
-        <div class="label">등고선</div>
-        <label class="tog"><input type="checkbox" id="chkContour" onchange="toggleVwLayer('contour', this.checked)"><span class="slider"></span></label>
-      </div>
-      <div class="row">
-        <div class="label">표고점</div>
-        <label class="tog"><input type="checkbox" id="chkElev" onchange="toggleVwLayer('elev', this.checked)"><span class="slider"></span></label>
-      </div>
+      <div class="row"><div class="label"><span class="dot red"></span>보호구역</div><label class="tog"><input type="checkbox" id="chkHer1" onchange="toggleLayer('her1', this.checked)"><span class="slider"></span></label></div>
+      <div class="row"><div class="label"><span class="dot orange"></span>영향검토</div><label class="tog"><input type="checkbox" id="chkHer2" onchange="toggleLayer('her2', this.checked)"><span class="slider"></span></label></div>
+      <div class="row"><div class="label"><span class="dot yellow"></span>영향평가</div><label class="tog"><input type="checkbox" id="chkHer3" onchange="toggleLayer('her3', this.checked)"><span class="slider"></span></label></div>
     </div>
   </div>
 
-  <!-- 지도 영역 -->
   <div class="map-wrap">
-    <div id="kakaoMap"></div>
-
-    <!-- 지도 타입 전환 -->
+    <div id="olMap"></div>
     <div class="map-type">
-      <button id="btnSkyview" class="on" onclick="setMapType('skyview', this)">위성</button>
-      <button id="btnHybrid" onclick="setMapType('hybrid', this)">위성+지명</button>
-      <button id="btnNormal" onclick="setMapType('normal', this)">일반</button>
+      <button id="btnSat" class="on" onclick="setBaseLayer('sat', this)">위성</button>
+      <button id="btnRoad" onclick="setBaseLayer('road', this)">일반</button>
     </div>
-
-    <!-- 줌 컨트롤 -->
     <div class="map-zoom">
-      <button onclick="zoomIn()" title="확대">+</button>
-      <button onclick="zoomOut()" title="축소">−</button>
+      <button onclick="zoomIn()">+</button>
+      <button onclick="zoomOut()">−</button>
     </div>
-
-    <!-- 정보 표시 -->
     <div class="map-info" id="mapInfo">
       <div class="pin-jibun" id="pinJibun">지도 클릭 시 필지 정보 표시</div>
       <div class="pin-coord" id="pinCoord">화성시 남양읍 (기본 위치)</div>
     </div>
-
-    <!-- 워터마크 -->
     <div class="watermark">G-DSP © 2026 · 측정값은 참고용</div>
-
-    <!-- 로딩 -->
-    <div class="loading" id="loading">⏳ 로딩 중...</div>
   </div>
 </div>
 
-<!-- 토스트 -->
 <div class="toast" id="toast"></div>
 
-<!-- 컨텍스트 메뉴 -->
 <div class="ctx-menu" id="ctxMenu">
   <div class="ctx-item" onclick="ctxAction('copy_jibun')">📋 지번 복사</div>
   <div class="ctx-item" onclick="ctxAction('copy_coord')">📋 좌표 복사</div>
@@ -255,407 +164,263 @@ body{display:flex;flex-direction:column}
 // ==================== 설정 ====================
 var _proto = (window.location.protocol === 'https:' ? 'https:' : 'http:');
 var _host = window.location.hostname;
-var PROXY = (_host.indexOf('nip.io') > -1 || _host === '168-107-15-68.nip.io')
+var PROXY = (_host.indexOf('nip.io') > -1)
   ? _proto + '//' + _host
   : 'http://168.107.15.68:5050';
-var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
 
 // ==================== 상태 ====================
-var kakaoMap = null;
-var kakaoMarker = null;
+var olMap = null;
+var baseSatLayer = null, baseRoadLayer = null;
+var dynLayers = {}; // 동적 레이어 (cadastral, zone_use, eco1, ...)
+var highlightLayer = null;
+var markerLayer = null;
 var kakaoGeocoder = null;
-var currentMapType = 'skyview';
 var currentLat = 37.2055, currentLng = 126.8317;
-var selectedJibun = '', selectedPnu = '';
+var selectedJibun = '', selectedCoord = '';
 var contextLat = 0, contextLng = 0, contextJibun = '';
 
-// VWorld 오버레이 관리
-var vwOverlays = {};
-var vwTilesetUrls = {
-  cadastral: 'lt_c_landinfobasemap',
-  zone_use: 'lt_c_uq111',
-  dist_plan: 'lt_c_uq121',
-  eco1: 'lt_c_ue901',
-  eco2: 'lt_c_ue902',
-  eco3: 'lt_c_ue903',
-  eco4: 'lt_c_ue904',
-  her1: 'lt_c_ud801',
-  her2: 'lt_c_ud802',
-  her3: 'lt_c_ud810',
-  contour: 'CONTOUR',
-  elev: 'ELEV'
-};
-var vwNames = {
-  cadastral: '지적선+지번',
-  zone_use: '용도지역',
-  dist_plan: '지구단위계획',
-  eco1: '환경 1등급',
-  eco2: '환경 2등급',
-  eco3: '환경 3등급',
-  eco4: '환경 별도관리',
-  her1: '문화재 보호구역',
-  her2: '문화재 영향검토',
-  her3: '문화재 영향평가',
-  contour: '등고선',
-  elev: '표고점'
+// VWorld WMS 레이어 매핑
+var WMS_LAYERS = {
+  cadastral:  { name: 'lt_c_landinfobasemap', label: '지적선+지번', opacity: 1.0,  zIndex: 5 },
+  zone_use:   { name: 'lt_c_uq111',           label: '용도지역',     opacity: 0.55, zIndex: 3 },
+  dist_plan:  { name: 'lt_c_uq121',           label: '지구단위계획', opacity: 0.55, zIndex: 3 },
+  eco1:       { name: 'lt_c_ue901',           label: '환경 1등급',   opacity: 0.55, zIndex: 4 },
+  eco2:       { name: 'lt_c_ue902',           label: '환경 2등급',   opacity: 0.55, zIndex: 4 },
+  eco3:       { name: 'lt_c_ue903',           label: '환경 3등급',   opacity: 0.55, zIndex: 4 },
+  eco4:       { name: 'lt_c_ue904',           label: '별도관리',     opacity: 0.55, zIndex: 4 },
+  her1:       { name: 'lt_c_ud801',           label: '문화재 보호',   opacity: 0.6,  zIndex: 4 },
+  her2:       { name: 'lt_c_ud802',           label: '영향검토',     opacity: 0.5,  zIndex: 4 },
+  her3:       { name: 'lt_c_ud810',           label: '영향평가',     opacity: 0.4,  zIndex: 4 }
 };
 
-// ==================== 카카오 지도 초기화 ====================
-function initKakaoMap() {
-  if (!window.kakao || !window.kakao.maps) {
-    setTimeout(initKakaoMap, 200);
+// ==================== 지도 초기화 ====================
+function initMap() {
+  if (typeof ol === 'undefined') {
+    setTimeout(initMap, 200);
     return;
   }
-  var container = document.getElementById('kakaoMap');
-  var options = {
-    center: new kakao.maps.LatLng(currentLat, currentLng),
-    level: 3,
-    mapTypeId: kakao.maps.MapTypeId.SKYVIEW
-  };
-  kakaoMap = new kakao.maps.Map(container, options);
-  kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
 
-  kakaoGeocoder = new kakao.maps.services.Geocoder();
-  kakaoMarker = new kakao.maps.Marker({position: new kakao.maps.LatLng(currentLat, currentLng), map: null});
+  // 1. 위성 배경 (VWorld)
+  baseSatLayer = new ol.layer.Tile({
+    source: new ol.source.XYZ({
+      url: PROXY + '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg',
+      maxZoom: 19,
+      crossOrigin: 'anonymous'
+    }),
+    zIndex: 1
+  });
 
-  // 좌클릭: 필지 정보
-  kakao.maps.event.addListener(kakaoMap, 'click', function(e) {
-    var latLng = e.latLng;
-    var lat = latLng.getLat(), lng = latLng.getLng();
-    kakaoMarker.setPosition(latLng);
-    kakaoMarker.setMap(kakaoMap);
+  // 2. 일반 배경 (VWorld Base)
+  baseRoadLayer = new ol.layer.Tile({
+    source: new ol.source.XYZ({
+      url: PROXY + '/api/vw-tile/Base/{z}/{y}/{x}.png',
+      maxZoom: 19,
+      crossOrigin: 'anonymous'
+    }),
+    visible: false,
+    zIndex: 1
+  });
+
+  // 3. 선택 필지 하이라이트 레이어
+  highlightLayer = new ol.layer.Vector({
+    source: new ol.source.Vector(),
+    style: new ol.style.Style({
+      stroke: new ol.style.Stroke({ color: '#ff4757', width: 3 }),
+      fill: new ol.style.Fill({ color: 'rgba(255,71,87,0.15)' })
+    }),
+    zIndex: 9
+  });
+
+  // 4. 마커 레이어
+  markerLayer = new ol.layer.Vector({
+    source: new ol.source.Vector(),
+    style: new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 8,
+        fill: new ol.style.Fill({ color: '#36cfc9' }),
+        stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+      })
+    }),
+    zIndex: 10
+  });
+
+  olMap = new ol.Map({
+    target: 'olMap',
+    layers: [baseSatLayer, baseRoadLayer, highlightLayer, markerLayer],
+    view: new ol.View({
+      center: ol.proj.fromLonLat([currentLng, currentLat]),
+      zoom: 17,
+      maxZoom: 21,
+      minZoom: 6
+    }),
+    controls: []
+  });
+
+  // viewport 0 문제 해결 - 여러 시점에 강제 리사이즈
+  setTimeout(function(){ if (olMap) olMap.updateSize(); }, 100);
+  setTimeout(function(){ if (olMap) olMap.updateSize(); }, 500);
+  setTimeout(function(){ if (olMap) olMap.updateSize(); }, 1500);
+  window.addEventListener('resize', function(){ if (olMap) olMap.updateSize(); });
+
+  // 좌클릭: 필지 정보 + 마커
+  olMap.on('click', function(evt) {
+    var lonLat = ol.proj.toLonLat(evt.coordinate);
+    var lng = lonLat[0], lat = lonLat[1];
+    currentLat = lat; currentLng = lng;
+
+    // 마커 추가
+    markerLayer.getSource().clear();
+    var marker = new ol.Feature({ geometry: new ol.geom.Point(evt.coordinate) });
+    markerLayer.getSource().addFeature(marker);
+
     setText('pinJibun', '⏳ 조회 중...');
     setText('pinCoord', '위도 ' + lat.toFixed(6) + ' / 경도 ' + lng.toFixed(6));
 
-    kakaoGeocoder.coord2Address(lng, lat, function(result, status) {
-      if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
-        var addr = result[0].address;
-        var jibun = addr.address_name || '';
-        selectedJibun = jibun;
-        currentLat = lat; currentLng = lng;
-        setText('pinJibun', '📍 ' + jibun);
-        setText('pinCoord', '위도 ' + lat.toFixed(6) + ' / 경도 ' + lng.toFixed(6));
-        toast('✓ ' + jibun, 'ok');
-      } else {
-        setText('pinJibun', '주소 없음');
-      }
-    });
+    // 카카오 주소 변환
+    if (kakaoGeocoder) {
+      kakaoGeocoder.coord2Address(lng, lat, function(result, status) {
+        if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
+          var jibun = result[0].address.address_name || '';
+          selectedJibun = jibun;
+          setText('pinJibun', '📍 ' + jibun);
+          toast('✓ ' + jibun, 'ok');
+          // 필지 하이라이트
+          highlightParcel(lng, lat);
+        } else {
+          setText('pinJibun', '주소 없음');
+        }
+      });
+    }
   });
 
   // 우클릭: 컨텍스트 메뉴
-  kakao.maps.event.addListener(kakaoMap, 'rightclick', function(e) {
-    contextLat = e.latLng.getLat();
-    contextLng = e.latLng.getLng();
-    kakaoGeocoder.coord2Address(contextLng, contextLat, function(result, status) {
-      if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
-        contextJibun = result[0].address.address_name || '';
-      }
-      var menu = document.getElementById('ctxMenu');
-      var rect = container.getBoundingClientRect();
-      // 마우스 위치 추정 (kakao 이벤트는 마우스 좌표 직접 안 줌, 화면 중앙 근처에 표시)
-      menu.style.left = (rect.left + rect.width/2 - 90) + 'px';
-      menu.style.top = (rect.top + rect.height/2 - 80) + 'px';
-      menu.classList.add('show');
-    });
+  olMap.getViewport().addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    var coord = olMap.getEventCoordinate(e);
+    var lonLat = ol.proj.toLonLat(coord);
+    contextLng = lonLat[0]; contextLat = lonLat[1];
+
+    if (kakaoGeocoder) {
+      kakaoGeocoder.coord2Address(contextLng, contextLat, function(result, status) {
+        if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
+          contextJibun = result[0].address.address_name || '';
+        }
+      });
+    }
+    var menu = document.getElementById('ctxMenu');
+    menu.style.left = e.clientX + 'px';
+    menu.style.top = e.clientY + 'px';
+    menu.classList.add('show');
   });
 
-  // 어디든 클릭하면 컨텍스트 메뉴 닫기
   document.addEventListener('click', function() {
     document.getElementById('ctxMenu').classList.remove('show');
   });
 
-  // 줌 변경 시 VWorld 오버레이 자동 갱신
-  kakao.maps.event.addListener(kakaoMap, 'zoom_changed', refreshVwOverlays);
-  kakao.maps.event.addListener(kakaoMap, 'dragend', refreshVwOverlays);
+  // 카카오 SDK 로드 후 geocoder 초기화
+  if (window.kakao && kakao.maps && kakao.maps.services) {
+    kakaoGeocoder = new kakao.maps.services.Geocoder();
+  } else {
+    var checkKakao = setInterval(function(){
+      if (window.kakao && kakao.maps && kakao.maps.services) {
+        kakaoGeocoder = new kakao.maps.services.Geocoder();
+        clearInterval(checkKakao);
+      }
+    }, 200);
+  }
 
-  // 기본 레이어 자동 ON (지적선+지번)
+  // 기본 레이어 자동 ON (지적선)
   setTimeout(function() {
-    toggleVwLayer('cadastral', true);
-  }, 500);
+    toggleLayer('cadastral', true);
+  }, 800);
 
   toast('✓ 지도 준비 완료', 'ok');
 }
 
-// ==================== VWorld 오버레이 (CustomOverlay 방식) ====================
-// 카카오 SDK는 외부 WMS 직접 지원 안 함 → 타일 이미지를 CustomOverlay로 합성
-function toggleVwLayer(type, on) {
-  if (!kakaoMap) return;
-  var layerName = vwTilesetUrls[type];
-  if (!layerName) return;
-
-  if (on) {
-    if (vwOverlays[type]) {
-      // 이미 있으면 다시 표시
-      vwOverlays[type].forEach(function(o) { o.setMap(kakaoMap); });
-    } else {
-      // 새로 생성
-      vwOverlays[type] = [];
-      addVwTileOverlay(type, layerName);
-    }
-    toast(vwNames[type] + ' ON', 'ok');
-  } else {
-    if (vwOverlays[type]) {
-      vwOverlays[type].forEach(function(o) { o.setMap(null); });
-      vwOverlays[type] = null;
-    }
-    toast(vwNames[type] + ' OFF');
-  }
-}
-
-// 카카오 영역에 VWorld WMS 타일 그리기 (CustomOverlay)
-function addVwTileOverlay(type, layerName) {
-  if (!kakaoMap) return;
-  var bounds = kakaoMap.getBounds();
-  var sw = bounds.getSouthWest();
-  var ne = bounds.getNorthEast();
-
-  // 타일 이미지 URL (서버 프록시 경유)
-  var url;
-  if (type === 'contour' || type === 'elev') {
-    // NGII 바로e맵 (등고선/표고점 포함)
-    var level = kakaoMap.getLevel();
-    // 레벨 변환은 복잡하므로 일단 WMS 방식 시도
-    url = PROXY + '/api/vw-wms?LAYERS=' + layerName +
-      '&FORMAT=image/png&TRANSPARENT=true' +
-      '&SRS=EPSG:4326&WIDTH=1024&HEIGHT=1024' +
-      '&BBOX=' + sw.getLng() + ',' + sw.getLat() + ',' + ne.getLng() + ',' + ne.getLat() +
-      '&SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&t=' + Date.now();
-  } else {
-    // VWorld WMS
-    url = PROXY + '/api/vw-wms?LAYERS=' + layerName +
-      '&STYLES=' + layerName +
-      '&FORMAT=image/png&TRANSPARENT=true' +
-      '&SRS=EPSG:4326&WIDTH=1024&HEIGHT=1024' +
-      '&BBOX=' + sw.getLng() + ',' + sw.getLat() + ',' + ne.getLng() + ',' + ne.getLat() +
-      '&SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1';
-  }
-
-  // CustomOverlay로 배치
-  var content = document.createElement('img');
-  content.src = url;
-  content.style.cssText = 'pointer-events:none;mix-blend-mode:' +
-    (type === 'cadastral' ? 'normal' : 'multiply') +
-    ';opacity:' + (type === 'cadastral' ? '0.95' : '0.6') +
-    ';width:100%;height:100%';
-  content.crossOrigin = 'anonymous';
-  content.onerror = function() { /* 무시 */ };
-
-  // 영역 좌상/우하 좌표로 div 배치 (kakao 영역에 맞춤)
-  var overlay = new kakao.maps.CustomOverlay({
-    map: kakaoMap,
-    position: new kakao.maps.LatLng((sw.getLat()+ne.getLat())/2, (sw.getLng()+ne.getLng())/2),
-    content: '<div></div>', // placeholder - 진짜 그림은 다른 방식 사용
-    xAnchor: 0.5,
-    yAnchor: 0.5,
-    zIndex: type === 'cadastral' ? 5 : 3
-  });
-
-  // 실제로는 카카오의 OverlayMapType 방식을 사용하는 것이 더 정석
-  // → addOverlayMapTypeId 와 비슷한 사용자 정의 타일 레이어 만들기
-  if (!vwOverlays[type]) vwOverlays[type] = [];
-
-  // 카카오 SDK의 정식 방식: TileLayer-like overlay 사용
-  var customTileLayer = createCustomTileLayer(layerName, type);
-  if (customTileLayer) {
-    kakaoMap.addOverlayMapTypeId(customTileLayer);
-    vwOverlays[type].push({ setMap: function(m) {
-      if (m) kakaoMap.addOverlayMapTypeId(customTileLayer);
-      else kakaoMap.removeOverlayMapTypeId(customTileLayer);
-    }, _isCustom: true, _id: customTileLayer });
-  }
-}
-
-// 카카오용 사용자 정의 TileLayer (외부 타일 URL을 카카오 위에 깔기)
-// 카카오 SDK는 OverlayMapType.LAYER_TYPE을 직접 만들 수는 없으므로
-// 대신 CustomOverlay를 격자로 배치하는 방식 사용
-function createCustomTileLayer(layerName, type) {
-  // 더미 - 실제 구현은 아래 redrawVwOverlay 사용
-  return null;
-}
-
-// ==================== VWorld 오버레이 - 격자 타일 방식 ====================
-// 카카오 SDK 위에 256x256 픽셀 단위로 타일 합성
-function redrawVwOverlay(type, layerName) {
-  if (!kakaoMap) return;
-
-  // 기존 오버레이 제거
-  if (vwOverlays[type] && vwOverlays[type].forEach) {
-    vwOverlays[type].forEach(function(o) { if (o.setMap) o.setMap(null); });
-  }
-  vwOverlays[type] = [];
-
-  // 현재 영역과 줌 레벨로 타일 그리드 계산
-  var bounds = kakaoMap.getBounds();
-  var sw = bounds.getSouthWest();
-  var ne = bounds.getNorthEast();
-  var level = kakaoMap.getLevel(); // 카카오: 1(가까움) ~ 14(멀리)
-
-  // 카카오 level → 표준 zoom 변환 (대략)
-  var zoom = 19 - level;
-  if (zoom < 12) zoom = 12; if (zoom > 19) zoom = 19;
-
-  // 한 번에 한 큰 이미지 호출 (간단)
-  var url;
-  if (type === 'contour' || type === 'elev') {
-    // NGII는 별도 처리 (WMTS) - 일단 VWorld WMS와 동일 방식 시도
-    url = PROXY + '/api/vw-wms?LAYERS=' + layerName +
-      '&FORMAT=image/png&TRANSPARENT=true' +
-      '&SRS=EPSG:4326&WIDTH=1024&HEIGHT=1024' +
-      '&BBOX=' + sw.getLng() + ',' + sw.getLat() + ',' + ne.getLng() + ',' + ne.getLat() +
-      '&SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1';
-  } else {
-    url = PROXY + '/api/vw-wms?LAYERS=' + layerName +
-      '&STYLES=' + layerName +
-      '&FORMAT=image/png&TRANSPARENT=true' +
-      '&SRS=EPSG:4326&WIDTH=1024&HEIGHT=1024' +
-      '&BBOX=' + sw.getLng() + ',' + sw.getLat() + ',' + ne.getLng() + ',' + ne.getLat() +
-      '&SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1';
-  }
-
-  // 카카오 영역 전체에 이미지 합성 (CustomOverlay 4개 점으로 위치 지정)
-  var imgHtml =
-    '<div style="position:relative;width:100%;height:100%">' +
-    '  <img src="' + url + '" style="position:absolute;top:0;left:0;width:100%;height:100%;' +
-    '    pointer-events:none;mix-blend-mode:' + (type === 'cadastral' ? 'normal' : 'multiply') + ';' +
-    '    opacity:' + (type === 'cadastral' ? '0.95' : '0.6') + '"/>' +
-    '</div>';
-
-  // 정확한 좌표 일치를 위해 카카오 표준 방식: setOverlayMapType 활용 불가능 (외부 URL 안됨)
-  // → 우회: 큰 이미지 1장을 화면 전체에 깔기
-  var overlay = new kakao.maps.CustomOverlay({
-    position: new kakao.maps.LatLng((sw.getLat()+ne.getLat())/2, (sw.getLng()+ne.getLng())/2),
-    content: imgHtml,
-    xAnchor: 0.5,
-    yAnchor: 0.5,
-    zIndex: type === 'cadastral' ? 5 : 3,
-    map: kakaoMap
-  });
-
-  vwOverlays[type].push(overlay);
-}
-
-// 줌/이동 시 오버레이 다시 그리기
-function refreshVwOverlays() {
-  Object.keys(vwOverlays).forEach(function(type) {
-    if (vwOverlays[type] && vwOverlays[type].length > 0) {
-      var layerName = vwTilesetUrls[type];
-      if (layerName) redrawVwOverlay(type, layerName);
-    }
-  });
-}
-
-// 새 toggleVwLayer (간단한 redrawVwOverlay 사용)
-window.toggleVwLayer = function(type, on) {
-  if (!kakaoMap) {
-    setTimeout(function(){ window.toggleVwLayer(type, on); }, 500);
+// ==================== VWorld WMS 레이어 토글 ====================
+function toggleLayer(type, on) {
+  if (!olMap) {
+    setTimeout(function(){ toggleLayer(type, on); }, 500);
     return;
   }
-  var layerName = vwTilesetUrls[type];
-  if (!layerName) return;
+  var info = WMS_LAYERS[type];
+  if (!info) return;
 
   if (on) {
-    redrawVwOverlay(type, layerName);
-    toast(vwNames[type] + ' ON', 'ok');
-  } else {
-    if (vwOverlays[type] && vwOverlays[type].forEach) {
-      vwOverlays[type].forEach(function(o) { if (o.setMap) o.setMap(null); });
-      vwOverlays[type] = [];
+    if (dynLayers[type]) {
+      dynLayers[type].setVisible(true);
+    } else {
+      var lyr = new ol.layer.Tile({
+        source: new ol.source.TileWMS({
+          url: PROXY + '/api/vw-wms',
+          params: {
+            'LAYERS': info.name,
+            'STYLES': info.name,
+            'FORMAT': 'image/png',
+            'TRANSPARENT': true,
+            'TILED': true,
+            'VERSION': '1.3.0',
+            'CRS': 'EPSG:3857'
+          },
+          serverType: 'mapserver',
+          crossOrigin: 'anonymous'
+        }),
+        opacity: info.opacity,
+        zIndex: info.zIndex
+      });
+      olMap.addLayer(lyr);
+      dynLayers[type] = lyr;
     }
-    toast(vwNames[type] + ' OFF');
+    toast(info.label + ' ON', 'ok');
+  } else {
+    if (dynLayers[type]) {
+      dynLayers[type].setVisible(false);
+    }
+    toast(info.label + ' OFF');
   }
-};
+}
 
-// ==================== 지도 타입 전환 ====================
-function setMapType(type, btn) {
-  if (!kakaoMap) return;
-  document.querySelectorAll('.map-type button').forEach(function(b){b.classList.remove('on')});
+// ==================== 배경 레이어 전환 ====================
+function setBaseLayer(type, btn) {
+  document.querySelectorAll('.map-type button').forEach(function(b){ b.classList.remove('on'); });
   if (btn) btn.classList.add('on');
-  currentMapType = type;
-  if (type === 'normal') {
-    kakaoMap.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
-    kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
-  } else if (type === 'skyview') {
-    kakaoMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW);
-    kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
-  } else if (type === 'hybrid') {
-    kakaoMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW);
-    kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
-  }
-  // 좌측 토글도 동기화
-  document.getElementById('chkSat').checked = (type !== 'normal');
-  document.getElementById('chkHybrid').checked = (type === 'hybrid');
-}
-
-function toggleMapType(type, on) {
-  if (!kakaoMap) return;
-  if (on) {
-    kakaoMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW);
-    if (document.getElementById('chkHybrid').checked) {
-      kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
-    }
+  if (type === 'sat') {
+    baseSatLayer.setVisible(true);
+    baseRoadLayer.setVisible(false);
   } else {
-    kakaoMap.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
-    kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
+    baseSatLayer.setVisible(false);
+    baseRoadLayer.setVisible(true);
   }
-}
-
-function toggleHybrid(on) {
-  if (!kakaoMap) return;
-  if (on) kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
-  else kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
 }
 
 // ==================== 줌 ====================
 function zoomIn() {
-  if (!kakaoMap) return;
-  var lv = kakaoMap.getLevel();
-  if (lv > 1) kakaoMap.setLevel(lv - 1);
+  if (!olMap) return;
+  var view = olMap.getView();
+  view.animate({ zoom: view.getZoom() + 1, duration: 200 });
 }
 function zoomOut() {
-  if (!kakaoMap) return;
-  var lv = kakaoMap.getLevel();
-  if (lv < 14) kakaoMap.setLevel(lv + 1);
+  if (!olMap) return;
+  var view = olMap.getView();
+  view.animate({ zoom: view.getZoom() - 1, duration: 200 });
 }
 
-// ==================== 지번 검색 ====================
+// ==================== 검색 ====================
 function doSearch() {
   if (!kakaoGeocoder) { toast('지도 준비 중...', 'err'); return; }
   var query = document.getElementById('searchInput').value.trim();
   if (!query) { toast('검색어를 입력하세요', 'err'); return; }
 
-  // 1. 주소 검색
   kakaoGeocoder.addressSearch(query, function(result, status) {
     if (status === kakao.maps.services.Status.OK && result[0]) {
       var lat = parseFloat(result[0].y), lng = parseFloat(result[0].x);
-      var pos = new kakao.maps.LatLng(lat, lng);
-      kakaoMap.setCenter(pos);
-      kakaoMap.setLevel(2);
-      kakaoMarker.setPosition(pos);
-      kakaoMarker.setMap(kakaoMap);
-      currentLat = lat; currentLng = lng;
-      selectedJibun = result[0].address_name || query;
-      setText('pinJibun', '📍 ' + selectedJibun);
-      setText('pinCoord', '위도 ' + lat.toFixed(6) + ' / 경도 ' + lng.toFixed(6));
-      toast('✓ ' + selectedJibun, 'ok');
-      // VWorld 오버레이 갱신
-      setTimeout(refreshVwOverlays, 300);
+      moveToCoord(lng, lat, result[0].address_name || query);
     } else {
-      // 키워드 검색 fallback
       var places = new kakao.maps.services.Places();
       places.keywordSearch(query, function(data, st) {
         if (st === kakao.maps.services.Status.OK && data[0]) {
           var lat = parseFloat(data[0].y), lng = parseFloat(data[0].x);
-          var pos = new kakao.maps.LatLng(lat, lng);
-          kakaoMap.setCenter(pos);
-          kakaoMap.setLevel(2);
-          kakaoMarker.setPosition(pos);
-          kakaoMarker.setMap(kakaoMap);
-          currentLat = lat; currentLng = lng;
-          selectedJibun = data[0].address_name || data[0].place_name || query;
-          setText('pinJibun', '📍 ' + selectedJibun);
-          setText('pinCoord', '위도 ' + lat.toFixed(6) + ' / 경도 ' + lng.toFixed(6));
-          toast('✓ ' + selectedJibun, 'ok');
-          setTimeout(refreshVwOverlays, 300);
+          moveToCoord(lng, lat, data[0].address_name || data[0].place_name || query);
         } else {
           toast('검색 결과 없음', 'err');
         }
@@ -664,46 +429,83 @@ function doSearch() {
   });
 }
 
-// ==================== 화면 캡처 ====================
+function moveToCoord(lng, lat, jibun) {
+  currentLat = lat; currentLng = lng; selectedJibun = jibun;
+  var view = olMap.getView();
+  view.animate({
+    center: ol.proj.fromLonLat([lng, lat]),
+    zoom: 18,
+    duration: 500
+  });
+  // 마커
+  markerLayer.getSource().clear();
+  var marker = new ol.Feature({ geometry: new ol.geom.Point(ol.proj.fromLonLat([lng, lat])) });
+  markerLayer.getSource().addFeature(marker);
+  setText('pinJibun', '📍 ' + jibun);
+  setText('pinCoord', '위도 ' + lat.toFixed(6) + ' / 경도 ' + lng.toFixed(6));
+  toast('✓ ' + jibun, 'ok');
+  // 필지 하이라이트
+  highlightParcel(lng, lat);
+}
+
+// ==================== 필지 하이라이트 (서버 WFS) ====================
+function highlightParcel(lng, lat) {
+  highlightLayer.getSource().clear();
+  fetch(PROXY + '/api/wfs?lng=' + lng + '&lat=' + lat)
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data && data.features && data.features.length > 0) {
+        var format = new ol.format.GeoJSON();
+        var features = format.readFeatures(data, {
+          featureProjection: 'EPSG:3857',
+          dataProjection: 'EPSG:4326'
+        });
+        highlightLayer.getSource().addFeatures(features);
+      }
+    })
+    .catch(function(err){ console.warn('하이라이트 실패:', err); });
+}
+
+// ==================== 캡처 ====================
 function captureMap(format) {
   format = format || 'png';
   toast('📷 캡처 중...');
   var target = document.querySelector('.map-wrap');
   if (!target) { toast('캡처 대상 없음', 'err'); return; }
 
-  html2canvas(target, {
-    useCORS: true,
-    allowTaint: true,
-    logging: false,
-    backgroundColor: null,
-    scale: 1.5
-  }).then(function(canvas) {
-    canvas.toBlob(function(blob) {
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      var ts = new Date();
-      var pad = function(n){return String(n).padStart(2,'0');};
-      var jibunPart = selectedJibun ? selectedJibun.replace(/\s+/g, '_').substring(0, 20) : 'map';
-      var fname = 'GDSP_' + jibunPart + '_' +
-        ts.getFullYear() + pad(ts.getMonth()+1) + pad(ts.getDate()) + '_' +
-        pad(ts.getHours()) + pad(ts.getMinutes()) + '.' + format;
-      a.href = url;
-      a.download = fname;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-      toast('✓ ' + format.toUpperCase() + ' 다운로드 완료', 'ok');
-    }, format === 'jpg' ? 'image/jpeg' : 'image/png', format === 'jpg' ? 0.92 : 1.0);
-  }).catch(function(err) {
-    console.error('캡처 실패:', err);
-    toast('캡처 실패', 'err');
+  // OpenLayers 강제 렌더 후 캡처
+  olMap.once('rendercomplete', function() {
+    html2canvas(target, {
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      backgroundColor: null,
+      scale: 1.5
+    }).then(function(canvas) {
+      canvas.toBlob(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        var ts = new Date();
+        var pad = function(n){return String(n).padStart(2,'0');};
+        var jibunPart = selectedJibun ? selectedJibun.replace(/\s+/g, '_').substring(0, 25) : 'map';
+        var fname = 'GDSP_' + jibunPart + '_' +
+          ts.getFullYear() + pad(ts.getMonth()+1) + pad(ts.getDate()) + '_' +
+          pad(ts.getHours()) + pad(ts.getMinutes()) + '.' + format;
+        a.href = url; a.download = fname;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+        toast('✓ ' + format.toUpperCase() + ' 다운로드 완료', 'ok');
+      }, format === 'jpg' ? 'image/jpeg' : 'image/png', format === 'jpg' ? 0.92 : 1.0);
+    }).catch(function(err) {
+      console.error('캡처 실패:', err);
+      toast('캡처 실패', 'err');
+    });
   });
+  olMap.renderSync();
 }
 
 // ==================== 국가유산청 GIS ====================
 function openHeritageGIS() {
-  // 좌표/주소 클립보드 복사
   var copyText = selectedJibun || (currentLat.toFixed(6) + ', ' + currentLng.toFixed(6));
   if (navigator.clipboard) {
     navigator.clipboard.writeText(copyText).then(function(){
@@ -719,13 +521,13 @@ function ctxAction(action) {
   if (action === 'copy_jibun') {
     if (contextJibun && navigator.clipboard) {
       navigator.clipboard.writeText(contextJibun);
-      toast('📋 ' + contextJibun + ' 복사', 'ok');
-    }
+      toast('📋 ' + contextJibun, 'ok');
+    } else { toast('주소 없음', 'err'); }
   } else if (action === 'copy_coord') {
     var c = contextLat.toFixed(6) + ', ' + contextLng.toFixed(6);
     if (navigator.clipboard) {
       navigator.clipboard.writeText(c);
-      toast('📋 ' + c + ' 복사', 'ok');
+      toast('📋 ' + c, 'ok');
     }
   } else if (action === 'open_heritage') {
     if (navigator.clipboard) navigator.clipboard.writeText(contextJibun || (contextLat + ', ' + contextLng));
@@ -735,13 +537,11 @@ function ctxAction(action) {
   } else if (action === 'open_eum') {
     if (contextJibun) {
       window.open('https://www.eum.go.kr/web/ar/lu/luLandDet.jsp?addr=' + encodeURIComponent(contextJibun), '_blank');
-    } else {
-      toast('주소 정보 없음', 'err');
-    }
+    } else { toast('주소 없음', 'err'); }
   }
 }
 
-// ==================== 유틸리티 ====================
+// ==================== 유틸 ====================
 function setText(id, text) {
   var el = document.getElementById(id);
   if (el) el.textContent = text;
@@ -755,23 +555,8 @@ function toast(msg, type) {
   toast._timer = setTimeout(function(){ t.className = 'toast'; }, 2500);
 }
 
-// ==================== 초기화 ====================
-window.addEventListener('DOMContentLoaded', function() {
-  initKakaoMap();
-
-  // VWorld 키 가져오기 (필요 시)
-  if (!VWORLD_KEY) {
-    fetch(PROXY + '/api/vworld/key')
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        if (d.key) {
-          VWORLD_KEY = d.key;
-          localStorage.setItem('gdsp_vworld', d.key);
-        }
-      })
-      .catch(function(){ /* 무시 */ });
-  }
-});
+// ==================== 시작 ====================
+window.addEventListener('DOMContentLoaded', initMap);
 </script>
 </body>
 </html>
