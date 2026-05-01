@@ -528,6 +528,44 @@ def iros_proxy_cont():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# ==================== 토지이음 GIS 프록시 (CORS 우회) ====================
+# UOC100=문화재보호구역, UOC200=문화재, UOC800=역사문화환경보존지역
+# 좌표계: EPSG:5179 (UTM-K)
+@app.route('/api/eum-proxy')
+def eum_proxy():
+    """토지이음 GIS 시스템 프록시 — 문화재 등 토지이용 규제 레이어 GeoJSON 반환"""
+    layer = request.args.get('layer', 'BA')
+    mbr = request.args.get('mbr', '')
+    code = request.args.get('code', '')
+    version = request.args.get('version', '20260414')
+
+    if not mbr or not code:
+        return jsonify({"error": "mbr and code parameters required"}), 400
+
+    eum_url = (
+        'https://www.eum.ne.kr:9001/MapPlan/MapPlan'
+        f'?req=search&version={version}&layer={layer}'
+        f'&mbr={mbr}&code={code}'
+    )
+
+    try:
+        # 토지이음 SSL 인증서 검증 비활성화
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+        r = req.get(eum_url, timeout=15, verify=False, headers={'User-Agent': 'Mozilla/5.0'})
+        if r.status_code == 200:
+            response = make_response(r.text)
+            response.headers['Content-Type'] = 'application/json; charset=utf-8'
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response
+        return jsonify({"error": f"eum returned {r.status_code}"}), 502
+    except Exception as e:
+        logger.exception("eum_proxy 오류")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/health')
 def health():
     return jsonify({"status": "ok", "message": "G-DSP 서버 실행 중", "version": "3.0", "ok": True})
