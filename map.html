@@ -808,18 +808,27 @@ function initVwMap() {
     var coord = window._olMap.getEventCoordinate(e);
     var lonlat = ol.proj.toLonLat(coord);
     ctxLng = lonlat[0]; ctxLat = lonlat[1];
+    popupPnu = ''; popupJibun = '';
     // 우클릭 좌표로 주소 조회
     if (kakaoGeocoder) {
       kakaoGeocoder.coord2Address(ctxLng, ctxLat, function(result, status) {
         if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
           var a = result[0].address;
           popupJibun = a.address_name || '';
-          if (a.b_code) {
-            popupPnu = buildPnu(a);
-          } else {
-            popupPnu = '';
-          }
           document.getElementById('ctxAddr').textContent = popupJibun.length > 28 ? popupJibun.substring(0,28)+'...' : popupJibun;
+          // b_code가 없으면 coord2RegionCode로 보강
+          kakaoGeocoder.coord2RegionCode(ctxLng, ctxLat, function(rr, rs) {
+            if (rs === kakao.maps.services.Status.OK && rr) {
+              for (var i = 0; i < rr.length; i++) {
+                if (rr[i].region_type === 'B') {
+                  if (!a.b_code) a.b_code = rr[i].code;
+                  break;
+                }
+              }
+            }
+            popupPnu = a.b_code ? buildPnu(a) : '';
+            console.log('[VWorld 우클릭] ' + popupJibun + ' → ' + popupPnu);
+          });
         }
       });
     }
@@ -1308,7 +1317,26 @@ function highlightParcel(pnu) {
     })
     .catch(function(e){ console.log('필지 경계 조회 실패:', e); });
 }
-function openTab(tab) { if(!popupPnu){toast('필지를 선택하세요','err');return;} showPopup(popupPnu,popupJibun,tab); closeCtxMenu(); }
+function openTab(tab) {
+  if (!popupPnu) {
+    // PNU가 아직 안 만들어졌으면 잠깐 대기 후 재시도 (비동기 콜백 대기)
+    var retries = 0;
+    var waitTimer = setInterval(function() {
+      retries++;
+      if (popupPnu) {
+        clearInterval(waitTimer);
+        showPopup(popupPnu, popupJibun, tab);
+        closeCtxMenu();
+      } else if (retries >= 10) {
+        clearInterval(waitTimer);
+        toast('주소 조회 실패. 다시 시도하세요', 'err');
+      }
+    }, 100);
+    return;
+  }
+  showPopup(popupPnu, popupJibun, tab);
+  closeCtxMenu();
+}
 function cmCopyCoord() { var txt=ctxLat.toFixed(6)+', '+ctxLng.toFixed(6); navigator.clipboard&&navigator.clipboard.writeText(txt); toast('좌표 복사됨'); closeCtxMenu(); }
 
 // ── 팝업 ──
