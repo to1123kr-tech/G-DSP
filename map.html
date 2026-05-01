@@ -1388,9 +1388,13 @@ function loadBld(pnu) {
   document.getElementById('bldLoading').style.display=''; document.getElementById('bldContent').style.display='none';
   document.getElementById('bldEmpty').style.display='none';
   if(!BLDG_KEY){document.getElementById('bldLoading').textContent='건축물대장 API 키 없음';return;}
-  var s=pnu.substring(0,5),b=pnu.substring(5,10),g=pnu.substring(10,11);
+  var s=pnu.substring(0,5),b=pnu.substring(5,10);
+  // PNU 산여부(1=일반, 2=산) → 건축물 API platGbCd(0=일반토지, 1=산)로 변환
+  var pnuMt = pnu.substring(10,11);
+  var g = (pnuMt === '2') ? '1' : '0';
   var bun=String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
   var ji=String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
+  console.log('[건축물대장] PNU=' + pnu + ' → s=' + s + ', b=' + b + ', platGbCd=' + g + ', bun=' + bun + ', ji=' + ji);
   // 총괄표제부 먼저
   fetch('https://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo?serviceKey='+encodeURIComponent(BLDG_KEY)+'&sigunguCd='+s+'&bjdongCd='+b+'&platGbCd='+g+'&bun='+bun+'&ji='+ji+'&numOfRows=1&pageNo=1&_type=json')
     .then(function(r){return r.json();})
