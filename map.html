@@ -167,12 +167,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 /* 측정 레이어 */
 #measureCanvas{position:absolute;inset:0;z-index:30;pointer-events:none}
 
-/* 지도 위 측정 도구 (우측 상단) */
-#mapMeasureCtrl{position:absolute;top:14px;right:14px;z-index:35;display:flex;flex-direction:column;gap:6px;background:rgba(13,16,24,0.85);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px;backdrop-filter:blur(8px)}
+/* 지도 위 측정 도구 (좌측 하단) */
+#mapMeasureCtrl{position:absolute;bottom:14px;left:14px;z-index:35;display:flex;flex-direction:row;gap:6px;background:rgba(13,16,24,0.85);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px;backdrop-filter:blur(8px)}
 .map-tool-btn{width:36px;height:36px;background:rgba(26,32,52,0.9);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#e6eaf2;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
 .map-tool-btn:hover{background:rgba(54,207,201,0.2);border-color:#36cfc9}
 .map-tool-btn.active{background:#36cfc9;color:#000}
-.map-tool-result{font-size:11px;color:#36cfc9;text-align:center;padding:4px 6px;background:rgba(54,207,201,0.1);border-radius:4px;min-width:80px;display:none}
+.map-tool-result{font-size:11px;color:#36cfc9;text-align:center;padding:6px 10px;background:rgba(54,207,201,0.15);border-radius:6px;min-width:80px;display:none;align-self:center;font-weight:600}
 .map-tool-result.show{display:block}
 
 /* 지도 컨트롤 */
@@ -186,7 +186,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 #coordBar{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);background:rgba(15,17,23,.8);backdrop-filter:blur(8px);border:1px solid var(--line2);border-radius:5px;padding:3px 10px;font-size:10px;color:var(--txt3);z-index:20;pointer-events:none}
 
 /* 선택 배너 */
-#selBar{position:absolute;bottom:30px;left:10px;background:rgba(15,17,23,.92);backdrop-filter:blur(8px);border:1px solid var(--neon);border-radius:7px;padding:5px 12px;font-size:11px;color:var(--neon);z-index:20;display:none;max-width:280px}
+#selBar{position:absolute;bottom:70px;left:14px;background:rgba(15,17,23,.92);backdrop-filter:blur(8px);border:1px solid var(--neon);border-radius:7px;padding:5px 12px;font-size:11px;color:var(--neon);z-index:20;display:none;max-width:280px}
 
 /* 우클릭 메뉴 */
 #ctxMenu{position:fixed;z-index:999;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:160px;display:none;overflow:hidden}
@@ -319,7 +319,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
       </div>
     </div>
 
-    <!-- NEINS 환경성평가 (영대님 핵심!) -->
+    <!-- NEINS 환경성평가 (통합) -->
     <div class="lsec">
       <div class="ltitle">🌳 NEINS 환경성평가</div>
       <button onclick="window.open('popup_neins.html','_blank','width=1200,height=900,scrollbars=yes,resizable=yes')" style="width:100%;padding:8px;background:rgba(6,214,160,0.15);border:1px solid #06d6a0;border-radius:6px;color:#06d6a0;cursor:pointer;font-size:12px;margin-bottom:8px;font-weight:600">🔍 환경분석 (NEINS)</button>
@@ -327,11 +327,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
         <div class="llabel">국토환경성평가지도</div>
         <label class="tog"><input type="checkbox" id="chkNeinsEcvam" onchange="toggleNeinsLayer('nem_ecvam',this.checked)"><span class="tslider"></span></label>
       </div>
-    </div>
-
-    <!-- NEINS 보전구역 (자주 쓰는) -->
-    <div class="lsec">
-      <div class="ltitle">🏞 NEINS 보전구역</div>
       <div class="lrow">
         <div class="llabel">농업진흥구역</div>
         <label class="tog"><input type="checkbox" id="chkAgrPro" onchange="toggleNeinsLayer('nem_lpe48',this.checked)"><span class="tslider"></span></label>
@@ -352,11 +347,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
         <div class="llabel">개발제한구역</div>
         <label class="tog"><input type="checkbox" id="chkGreen" onchange="toggleNeinsLayer('nem_lpe35',this.checked)"><span class="tslider"></span></label>
       </div>
-    </div>
-
-    <!-- NEINS 녹지/수원 -->
-    <div class="lsec">
-      <div class="ltitle">💧 NEINS 녹지/수원</div>
       <div class="lrow">
         <div class="llabel">보전녹지</div>
         <label class="tog"><input type="checkbox" id="chkGreen1" onchange="toggleNeinsLayer('nem_lpe29',this.checked)"><span class="tslider"></span></label>
@@ -451,7 +441,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 
     <canvas id="measureCanvas"></canvas>
 
-    <!-- 측정 도구 (지도 우측 상단) -->
+    <!-- 측정 도구 (지도 좌측 하단) -->
     <div id="mapMeasureCtrl">
       <button class="map-tool-btn" id="btnMsDist" onclick="startMeasure('dist')" title="거리 측정">📏</button>
       <button class="map-tool-btn" id="btnMsArea" onclick="startMeasure('area')" title="면적 측정">⬛</button>
