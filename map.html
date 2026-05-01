@@ -211,7 +211,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 /* 필지정보 팝업 */
 #infoPopup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:780px;max-width:95vw;max-height:90vh;background:var(--bg2);border:1px solid var(--line2);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:500;display:none;flex-direction:column;overflow:hidden}
 #infoPopup.show{display:flex}
-.popup-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg3);border-bottom:1px solid var(--line);flex-shrink:0}
+.popup-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg3);border-bottom:1px solid var(--line);flex-shrink:0;cursor:move;user-select:none}
 .popup-title{font-size:14px;font-weight:700;color:var(--neon)}
 .popup-jibun{font-size:11px;color:var(--txt2);margin-top:2px}
 .popup-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line2);background:transparent;color:var(--txt2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
@@ -1422,7 +1422,74 @@ function showPopup(pnu, jibun, tab) {
   document.getElementById('popJibun').textContent = jibun;
   switchTab(tab||'land');
 }
-function closePopup() { document.getElementById('infoPopup').classList.remove('show'); }
+function closePopup() {
+  var p = document.getElementById('infoPopup');
+  p.classList.remove('show');
+  // 닫을 때 위치 초기화 (다음에 열 때 가운데부터)
+  p.style.left = '';
+  p.style.top = '';
+  p.style.transform = '';
+}
+
+// 일필지 정보 팝업 드래그 이동
+(function setupPopupDrag() {
+  var popup = null, hdr = null;
+  var dragging = false, startX = 0, startY = 0, popX = 0, popY = 0;
+
+  function init() {
+    popup = document.getElementById('infoPopup');
+    hdr = popup ? popup.querySelector('.popup-hdr') : null;
+    if (!hdr) return;
+    hdr.addEventListener('mousedown', onDown);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    // 닫기 버튼 클릭은 드래그로 인식하지 않게
+    var closeBtn = hdr.querySelector('.popup-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+    }
+  }
+
+  function onDown(e) {
+    if (e.target.closest('.popup-close')) return; // 닫기 버튼 클릭은 무시
+    dragging = true;
+    var rect = popup.getBoundingClientRect();
+    // 첫 드래그 시 transform 제거하고 left/top으로 위치 고정
+    popup.style.left = rect.left + 'px';
+    popup.style.top = rect.top + 'px';
+    popup.style.transform = 'none';
+    startX = e.clientX;
+    startY = e.clientY;
+    popX = rect.left;
+    popY = rect.top;
+    e.preventDefault();
+  }
+
+  function onMove(e) {
+    if (!dragging || !popup) return;
+    var dx = e.clientX - startX;
+    var dy = e.clientY - startY;
+    var newX = popX + dx;
+    var newY = popY + dy;
+    // 화면 밖으로 너무 안 나가게
+    var minVisible = 100;
+    var w = popup.offsetWidth;
+    var h = popup.offsetHeight;
+    newX = Math.max(-w + minVisible, Math.min(window.innerWidth - minVisible, newX));
+    newY = Math.max(0, Math.min(window.innerHeight - 40, newY));
+    popup.style.left = newX + 'px';
+    popup.style.top = newY + 'px';
+  }
+
+  function onUp() { dragging = false; }
+
+  // DOMContentLoaded 후 초기화
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
 function switchTab(tab) {
   document.querySelectorAll('.ptab').forEach(function(t){ t.classList.remove('on'); });
   document.querySelectorAll('.tab-content').forEach(function(c){ c.classList.remove('on'); });
