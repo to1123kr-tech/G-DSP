@@ -107,6 +107,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 #mapWrap{flex:1;position:relative;overflow:hidden}
 #kakaoMapDiv{position:absolute;inset:0;z-index:1;visibility:hidden}
 #vworldMapDiv{position:absolute;inset:0;z-index:3;visibility:visible}
+#vworld3dDiv{position:absolute;inset:0;z-index:2;visibility:hidden;background:#1a1f2e}
+#vworld3dDiv iframe{width:100%;height:100%;border:0;display:block}
+#roadviewDiv{position:absolute;inset:0;z-index:4;visibility:hidden;background:#000}
 @keyframes vwSpin{to{transform:rotate(360deg)}}
 
 /* 워터마크 - 항상 표시, 지울 수 없음 */
@@ -129,6 +132,14 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 
 /* 측정 레이어 */
 #measureCanvas{position:absolute;inset:0;z-index:30;pointer-events:none}
+
+/* 지도 위 측정 도구 (우측 상단) */
+#mapMeasureCtrl{position:absolute;top:14px;right:14px;z-index:35;display:flex;flex-direction:column;gap:6px;background:rgba(13,16,24,0.85);border:1px solid rgba(255,255,255,0.12);border-radius:8px;padding:6px;backdrop-filter:blur(8px)}
+.map-tool-btn{width:36px;height:36px;background:rgba(26,32,52,0.9);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#e6eaf2;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.map-tool-btn:hover{background:rgba(54,207,201,0.2);border-color:#36cfc9}
+.map-tool-btn.active{background:#36cfc9;color:#000}
+.map-tool-result{font-size:11px;color:#36cfc9;text-align:center;padding:4px 6px;background:rgba(54,207,201,0.1);border-radius:4px;min-width:80px;display:none}
+.map-tool-result.show{display:block}
 
 /* 지도 컨트롤 */
 #mapCtrl{position:absolute;right:10px;top:10px;z-index:20;display:flex;flex-direction:column;gap:3px}
@@ -233,8 +244,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
   <div id="statusDot"></div>
   <div id="statusTxt">대기중</div>
   <div class="tr">
-    <button class="tbtn" id="btnVwMode" onclick="switchMapMode('vworld')" title="VWorld - 상세 분석" style="background:#36cfc9;color:#000;font-weight:600">🛰 VWorld</button>
+    <button class="tbtn" id="btnVwMode" onclick="switchMapMode('vworld')" title="VWorld 2D - 상세 분석" style="background:#36cfc9;color:#000;font-weight:600">🛰 VWorld 2D</button>
+    <button class="tbtn" id="btnVw3dMode" onclick="switchMapMode('vworld3d')" title="VWorld 3D - 입체 지형">🌐 3D</button>
     <button class="tbtn" id="btnKkMode" onclick="switchMapMode('kakao')" title="카카오 - 빠른 확인">🗺 카카오</button>
+    <button class="tbtn" id="btnRvMode" onclick="switchMapMode('roadview')" title="카카오 로드뷰">🚗 로드뷰</button>
     <button class="tbtn" onclick="captureMap('png')" title="화면 PNG 다운">📷 PNG</button>
     <button class="tbtn" onclick="captureMap('jpg')" title="화면 JPG 다운">📷 JPG</button>
     <button class="tbtn" onclick="openHeritageGIS()" title="국가유산청 보존관리지도" style="background:#8b1e3f;color:#fff;border-color:#8b1e3f">🏛 국가유산청</button>
@@ -305,10 +318,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
         <div class="llabel">개발제한구역</div>
         <label class="tog"><input type="checkbox" id="chkGreen" onchange="toggleNeinsLayer('nem_lpe35',this.checked)"><span class="tslider"></span></label>
       </div>
-      <div class="lrow">
-        <div class="llabel">자연환경보전지역</div>
-        <label class="tog"><input type="checkbox" id="chkNatPro" onchange="toggleNeinsLayer('nem_lpe28',this.checked)"><span class="tslider"></span></label>
-      </div>
     </div>
 
     <!-- NEINS 녹지/수원 -->
@@ -325,22 +334,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
       <div class="lrow">
         <div class="llabel">자연녹지</div>
         <label class="tog"><input type="checkbox" id="chkGreen3" onchange="toggleNeinsLayer('nem_lpe31',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">상수원보호구역</div>
-        <label class="tog"><input type="checkbox" id="chkWater" onchange="toggleNeinsLayer('nem_lpe22',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">백두대간보호</div>
-        <label class="tog"><input type="checkbox" id="chkBaek" onchange="toggleNeinsLayer('nem_lpe15',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">수변구역</div>
-        <label class="tog"><input type="checkbox" id="chkSubyon" onchange="toggleNeinsLayer('nem_lpe16',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">산림유전자원보호</div>
-        <label class="tog"><input type="checkbox" id="chkForGen" onchange="toggleNeinsLayer('nem_lpe46',this.checked)"><span class="tslider"></span></label>
       </div>
     </div>
 
@@ -374,15 +367,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
       </div>
     </div>
 
-    <!-- 거리/면적 측정 -->
-    <div class="lsec">
-      <div class="ltitle">측정</div>
-      <button class="msbtn" id="btnMsDist" onclick="startMeasure('dist')">📏 거리 측정</button>
-      <button class="msbtn" id="btnMsArea" onclick="startMeasure('area')">⬛ 면적 측정</button>
-      <button class="msbtn" onclick="clearMeasure()" style="color:var(--red)">🗑 측정 초기화</button>
-      <div id="msResult">-</div>
-    </div>
-
     <!-- 마커 메모 -->
     <div class="lsec">
       <div class="ltitle">마커 메모</div>
@@ -393,7 +377,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
     <!-- 다운로드 -->
     <div class="lsec">
       <div class="ltitle">다운로드</div>
-      <button class="dlbtn" onclick="downloadCadDxf()">📐 지적도 DXF</button>
       <button class="dlbtn" onclick="downloadMapImage('jibun')">🖼️ 지번 이미지</button>
       <button class="dlbtn" onclick="downloadMapImage('map')">🛰️ 지도 이미지</button>
     </div>
@@ -416,7 +399,17 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
     <div id="vworldMapDiv">
       <div id="olMap" style="width:100%;height:100%"></div>
     </div>
+    <div id="vworld3dDiv"></div>
+    <div id="roadviewDiv"></div>
     <canvas id="measureCanvas"></canvas>
+
+    <!-- 측정 도구 (지도 우측 상단) -->
+    <div id="mapMeasureCtrl">
+      <button class="map-tool-btn" id="btnMsDist" onclick="startMeasure('dist')" title="거리 측정">📏</button>
+      <button class="map-tool-btn" id="btnMsArea" onclick="startMeasure('area')" title="면적 측정">⬛</button>
+      <button class="map-tool-btn" onclick="clearMeasure()" title="측정 초기화" style="color:#ff6b6b">🗑</button>
+      <div id="msResult" class="map-tool-result"></div>
+    </div>
 
     <!-- 워터마크 (항상 표시, 삭제 불가) -->
     <div id="watermark">
@@ -1411,7 +1404,7 @@ function updateMeasureDraw() {
   measurePolyline.setMap(kakaoMap);
   if(measureMode==='dist'&&measurePts.length>=2){
     var d=measurePolyline.getLength();
-    document.getElementById('msResult').textContent='거리: '+(d>=1000?(d/1000).toFixed(2)+'km':d.toFixed(1)+'m');
+    var msr=document.getElementById('msResult'); msr.textContent='거리: '+(d>=1000?(d/1000).toFixed(2)+'km':d.toFixed(1)+'m'); msr.classList.add('show');
   }
 }
 function finishMeasure() {
@@ -1420,7 +1413,7 @@ function finishMeasure() {
     if(measurePolygon) measurePolygon.setMap(null);
     measurePolygon=new kakao.maps.Polygon({path:path,strokeWeight:2,strokeColor:'#00e5ff',strokeOpacity:.9,fillColor:'rgba(0,229,255,.15)',fillOpacity:1});
     measurePolygon.setMap(kakaoMap);
-    document.getElementById('msResult').textContent='면적: '+measurePolygon.getArea().toFixed(1)+'㎡';
+    var msr2=document.getElementById('msResult'); msr2.textContent='면적: '+measurePolygon.getArea().toFixed(1)+'㎡'; msr2.classList.add('show');
   }
   measureMode=null;
   document.getElementById('btnMsDist').classList.remove('on');
@@ -1432,7 +1425,7 @@ function clearMeasure() {
   measureOverlays.forEach(function(o){o.setMap(null);}); measureOverlays=[];
   if(measurePolyline){measurePolyline.setMap(null);measurePolyline=null;}
   if(measurePolygon){measurePolygon.setMap(null);measurePolygon=null;}
-  document.getElementById('msResult').textContent='-';
+  var msr3=document.getElementById('msResult'); msr3.textContent=''; msr3.classList.remove('show');
   document.getElementById('btnMsDist').classList.remove('on');
   document.getElementById('btnMsArea').classList.remove('on');
 }
@@ -1610,32 +1603,112 @@ function downloadMapImage(type) {
 // ── 인쇄 ──
 function doPrint() { window.print(); }
 
-// ── 카카오 / VWorld 모드 전환 ──
+// ── 4모드 전환: VWorld 2D / VWorld 3D / 카카오 / 로드뷰 ──
+var _vw3dInited = false;
+var _roadviewInited = false;
+var _roadview = null;
+var _roadviewClient = null;
+
 function switchMapMode(mode) {
   var kDiv = document.getElementById('kakaoMapDiv');
   var vDiv = document.getElementById('vworldMapDiv');
+  var v3Div = document.getElementById('vworld3dDiv');
+  var rvDiv = document.getElementById('roadviewDiv');
   var btnK = document.getElementById('btnKkMode');
   var btnV = document.getElementById('btnVwMode');
+  var btnV3 = document.getElementById('btnVw3dMode');
+  var btnR = document.getElementById('btnRvMode');
+
+  // 모두 hidden
+  if (kDiv) kDiv.style.visibility = 'hidden';
+  if (vDiv) vDiv.style.visibility = 'hidden';
+  if (v3Div) v3Div.style.visibility = 'hidden';
+  if (rvDiv) rvDiv.style.visibility = 'hidden';
+  // 모든 버튼 기본 색
+  [btnK, btnV, btnV3, btnR].forEach(function(b){ if(b){ b.style.background=''; b.style.color=''; b.style.fontWeight=''; }});
+
+  function activeBtn(b) { if(b){ b.style.background='#36cfc9'; b.style.color='#000'; b.style.fontWeight='600'; }}
 
   if (mode === 'kakao') {
     if (kDiv) kDiv.style.visibility = 'visible';
-    if (vDiv) vDiv.style.visibility = 'hidden';
-    if (btnK) { btnK.style.background = '#36cfc9'; btnK.style.color = '#000'; btnK.style.fontWeight = '600'; }
-    if (btnV) { btnV.style.background = ''; btnV.style.color = ''; btnV.style.fontWeight = ''; }
+    activeBtn(btnK);
     if (kakaoMap && kakao && kakao.maps) {
       setTimeout(function(){ kakao.maps.event.trigger(kakaoMap, 'resize'); }, 100);
     }
-    toast('🗺 카카오 지도 (빠른 확인)', 'ok');
+    toast('🗺 카카오 지도', 'ok');
+  } else if (mode === 'vworld3d') {
+    if (v3Div) v3Div.style.visibility = 'visible';
+    activeBtn(btnV3);
+    initVworld3D();
+    toast('🌐 VWorld 3D 지도', 'ok');
+  } else if (mode === 'roadview') {
+    if (rvDiv) rvDiv.style.visibility = 'visible';
+    activeBtn(btnR);
+    initRoadview();
+    toast('🚗 카카오 로드뷰', 'ok');
   } else {
+    // 기본: vworld 2D
     if (vDiv) vDiv.style.visibility = 'visible';
-    if (kDiv) kDiv.style.visibility = 'hidden';
-    if (btnV) { btnV.style.background = '#36cfc9'; btnV.style.color = '#000'; btnV.style.fontWeight = '600'; }
-    if (btnK) { btnK.style.background = ''; btnK.style.color = ''; btnK.style.fontWeight = ''; }
+    activeBtn(btnV);
     if (window._olMap) {
       setTimeout(function(){ window._olMap.updateSize(); }, 100);
     }
-    toast('🛰 VWorld 지도 (상세 분석)', 'ok');
+    toast('🛰 VWorld 2D', 'ok');
   }
+}
+
+// VWorld 3D iframe 초기화 (vw_map.html 사용)
+function initVworld3D() {
+  if (_vw3dInited) return;
+  var v3Div = document.getElementById('vworld3dDiv');
+  if (!v3Div) return;
+  // 현재 지도 중심 좌표 가져오기
+  var lng = 126.83, lat = 37.20;
+  if (window._olMap) {
+    try {
+      var center = ol.proj.toLonLat(_olMap.getView().getCenter());
+      lng = center[0]; lat = center[1];
+    } catch(e){}
+  }
+  // iframe 생성
+  var url = 'vw_map.html?key=' + encodeURIComponent(VWORLD_KEY) + '&lng=' + lng + '&lat=' + lat;
+  v3Div.innerHTML = '<iframe id="vw3dFrame" src="' + url + '" allowfullscreen></iframe>';
+  _vw3dInited = true;
+}
+
+// 카카오 로드뷰 초기화
+function initRoadview() {
+  if (_roadviewInited) return;
+  if (!kakao || !kakao.maps) { toast('카카오 SDK 로드 대기중', 'err'); return; }
+  var rvDiv = document.getElementById('roadviewDiv');
+  if (!rvDiv) return;
+
+  // 현재 위치 사용
+  var lng = 126.83, lat = 37.20;
+  if (window._olMap) {
+    try {
+      var center = ol.proj.toLonLat(_olMap.getView().getCenter());
+      lng = center[0]; lat = center[1];
+    } catch(e){}
+  }
+  if (kakaoMap) {
+    var c = kakaoMap.getCenter();
+    lat = c.getLat(); lng = c.getLng();
+  }
+
+  _roadview = new kakao.maps.Roadview(rvDiv);
+  _roadviewClient = new kakao.maps.RoadviewClient();
+  var pos = new kakao.maps.LatLng(lat, lng);
+  _roadviewClient.getNearestPanoId(pos, 50, function(panoId) {
+    if (panoId) {
+      _roadview.setPanoId(panoId, pos);
+      _roadviewInited = true;
+    } else {
+      rvDiv.innerHTML = '<div style="color:#fff;text-align:center;padding:40px;font-size:14px;line-height:1.6">'
+        + '🚗 이 지점에 로드뷰가 없습니다.<br><br>'
+        + '<small>도로 인근으로 이동 후 다시 시도해주세요.</small></div>';
+    }
+  });
 }
 
 // ── PNG/JPG 캡처 ──
