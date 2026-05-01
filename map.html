@@ -313,13 +313,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
         <div class="llabel">용도지역 (VWorld)</div>
         <label class="tog"><input type="checkbox" id="chkYd" onchange="toggleWmsLayer('yd',this.checked)"><span class="tslider"></span></label>
       </div>
-      <div class="lrow">
-        <div class="llabel">지구단위계획</div>
-        <label class="tog"><input type="checkbox" id="chkDistPlan" onchange="toggleWmsLayer('distplan',this.checked)"><span class="tslider"></span></label>
-      </div>
     </div>
 
-    <!-- NEINS 환경성평가 (통합) -->
+    <!-- NEINS 환경성평가 -->
     <div class="lsec">
       <div class="ltitle">🌳 NEINS 환경성평가</div>
       <button onclick="window.open('popup_neins.html','_blank','width=1200,height=900,scrollbars=yes,resizable=yes')" style="width:100%;padding:8px;background:rgba(6,214,160,0.15);border:1px solid #06d6a0;border-radius:6px;color:#06d6a0;cursor:pointer;font-size:12px;margin-bottom:8px;font-weight:600">🔍 환경분석 (NEINS)</button>
@@ -327,54 +323,22 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
         <div class="llabel">국토환경성평가지도</div>
         <label class="tog"><input type="checkbox" id="chkNeinsEcvam" onchange="toggleNeinsLayer('nem_ecvam',this.checked)"><span class="tslider"></span></label>
       </div>
-      <div class="lrow">
-        <div class="llabel">농업진흥구역</div>
-        <label class="tog"><input type="checkbox" id="chkAgrPro" onchange="toggleNeinsLayer('nem_lpe48',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">농업보호구역</div>
-        <label class="tog"><input type="checkbox" id="chkAgrPro2" onchange="toggleNeinsLayer('nem_lpe49',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">보전산지(임업용)</div>
-        <label class="tog"><input type="checkbox" id="chkForLim" onchange="toggleNeinsLayer('nem_lpe41',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">보전산지(공익용)</div>
-        <label class="tog"><input type="checkbox" id="chkForGyo" onchange="toggleNeinsLayer('nem_lpe42',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">개발제한구역</div>
-        <label class="tog"><input type="checkbox" id="chkGreen" onchange="toggleNeinsLayer('nem_lpe35',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">보전녹지</div>
-        <label class="tog"><input type="checkbox" id="chkGreen1" onchange="toggleNeinsLayer('nem_lpe29',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">생산녹지</div>
-        <label class="tog"><input type="checkbox" id="chkGreen2" onchange="toggleNeinsLayer('nem_lpe30',this.checked)"><span class="tslider"></span></label>
-      </div>
-      <div class="lrow">
-        <div class="llabel">자연녹지</div>
-        <label class="tog"><input type="checkbox" id="chkGreen3" onchange="toggleNeinsLayer('nem_lpe31',this.checked)"><span class="tslider"></span></label>
-      </div>
     </div>
 
-    <!-- VWorld 문화재 -->
+    <!-- 문화재 (토지이음) -->
     <div class="lsec">
-      <div class="ltitle">🏛 문화재 (VWorld)</div>
+      <div class="ltitle">🏛 문화재 (토지이음)</div>
       <div class="lrow">
-        <div class="llabel"><span style="color:#ff4757">●</span> 보호구역</div>
-        <label class="tog"><input type="checkbox" id="chkHer1" onchange="toggleWmsLayer('her1',this.checked)"><span class="tslider"></span></label>
+        <div class="llabel"><span style="color:#ff4757">●</span> 문화재보호구역</div>
+        <label class="tog"><input type="checkbox" id="chkEumUOC100" onchange="toggleEumLayer('UOC100',this.checked)"><span class="tslider"></span></label>
       </div>
       <div class="lrow">
-        <div class="llabel"><span style="color:#ff9f43">●</span> 영향검토</div>
-        <label class="tog"><input type="checkbox" id="chkHer2" onchange="toggleWmsLayer('her2',this.checked)"><span class="tslider"></span></label>
+        <div class="llabel"><span style="color:#ff9f43">●</span> 문화재</div>
+        <label class="tog"><input type="checkbox" id="chkEumUOC200" onchange="toggleEumLayer('UOC200',this.checked)"><span class="tslider"></span></label>
       </div>
       <div class="lrow">
-        <div class="llabel"><span style="color:#ffd166">●</span> 영향평가</div>
-        <label class="tog"><input type="checkbox" id="chkHer3" onchange="toggleWmsLayer('her3',this.checked)"><span class="tslider"></span></label>
+        <div class="llabel"><span style="color:#ffd166">●</span> 역사문화환경보존</div>
+        <label class="tog"><input type="checkbox" id="chkEumUOC800" onchange="toggleEumLayer('UOC800',this.checked)"><span class="tslider"></span></label>
       </div>
     </div>
 
@@ -939,15 +903,10 @@ function toggleWmsLayer(type, on) {
   }
   if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
   var layerMap = {
-    yd: 'lt_c_uq111',
-    distplan: 'lt_c_uq121',
-    her1: 'lt_c_uo101',  // 문화재 (실제 작동 확인된 ID)
-    her2: 'lt_c_ud802',
-    her3: 'lt_c_ud810'
+    yd: 'lt_c_uq111'
   };
   var nameMap = {
-    yd: '용도지역', distplan: '지구단위계획',
-    her1: '문화재 (보존관리지도)', her2: '영향검토', her3: '영향평가'
+    yd: '용도지역'
   };
   var layerName = layerMap[type];
   if (!layerName) return;
@@ -1017,6 +976,99 @@ function toggleNeinsLayer(layerId, on) {
     }
     toast((nameMap[layerId] || layerId) + ' OFF');
   }
+}
+
+
+// ── 토지이음 문화재 레이어 (eum.ne.kr) ──
+// UOC100=문화재보호구역, UOC200=문화재, UOC800=역사문화환경보존지역
+window._eumLayers = window._eumLayers || {};
+window._eumColors = {
+  'UOC100': {fill: 'rgba(255,71,87,0.35)', stroke: '#ff4757', name: '문화재보호구역'},
+  'UOC200': {fill: 'rgba(255,159,67,0.35)', stroke: '#ff9f43', name: '문화재'},
+  'UOC800': {fill: 'rgba(255,209,102,0.35)', stroke: '#ffd166', name: '역사문화환경보존지역'}
+};
+
+function toggleEumLayer(code, on) {
+  if (!window._olMap) { toast('지도 준비중', 'err'); return; }
+  var info = window._eumColors[code];
+  if (!info) return;
+
+  if (!on) {
+    // OFF: 레이어 숨김
+    if (window._eumLayers[code]) {
+      window._eumLayers[code].setVisible(false);
+    }
+    toast(info.name + ' OFF');
+    return;
+  }
+
+  // ON: 이미 있으면 다시 보이기
+  if (window._eumLayers[code]) {
+    window._eumLayers[code].setVisible(true);
+    // 현재 화면에 데이터 다시 가져옴
+    fetchEumData(code);
+    return;
+  }
+
+  // 처음: Vector 레이어 새로 생성
+  var src = new ol.source.Vector();
+  var lyr = new ol.layer.Vector({
+    source: src,
+    style: new ol.style.Style({
+      fill: new ol.style.Fill({ color: info.fill }),
+      stroke: new ol.style.Stroke({ color: info.stroke, width: 2 })
+    })
+  });
+  window._olMap.addLayer(lyr);
+  window._eumLayers[code] = lyr;
+  toast(info.name + ' ON', 'ok');
+
+  // 현재 화면 영역의 데이터 가져옴
+  fetchEumData(code);
+
+  // 지도 이동/줌 시 자동으로 데이터 다시 가져오기
+  if (!window._eumMoveListener) {
+    window._eumMoveListener = true;
+    window._olMap.on('moveend', function() {
+      Object.keys(window._eumLayers).forEach(function(c) {
+        if (window._eumLayers[c].getVisible()) fetchEumData(c);
+      });
+    });
+  }
+}
+
+function fetchEumData(code) {
+  if (!window._olMap || !window._eumLayers[code]) return;
+  // 현재 지도 영역(EPSG:3857) → EPSG:5179 (UTM-K)로 변환
+  var ext = window._olMap.getView().calculateExtent();
+  var min = ol.proj.transform([ext[0], ext[1]], 'EPSG:3857', 'EPSG:5179');
+  var max = ol.proj.transform([ext[2], ext[3]], 'EPSG:3857', 'EPSG:5179');
+  var mbr = min[0].toFixed(2) + ',' + min[1].toFixed(2) + ',' + max[0].toFixed(2) + ',' + max[1].toFixed(2);
+
+  // 서버 프록시를 통해 토지이음 호출 (CORS 우회)
+  var url = PROXY + '/api/eum-proxy?layer=BA&mbr=' + encodeURIComponent(mbr) + '&code=' + code;
+
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(geo) {
+      if (!geo || !geo.features) return;
+      var src = window._eumLayers[code].getSource();
+      src.clear();
+      // GeoJSON 좌표(EPSG:5179) → EPSG:3857로 변환해서 추가
+      var format = new ol.format.GeoJSON({
+        dataProjection: 'EPSG:5179',
+        featureProjection: 'EPSG:3857'
+      });
+      try {
+        var features = format.readFeatures(geo);
+        src.addFeatures(features);
+      } catch(e) {
+        console.warn('eum 파싱 오류:', e);
+      }
+    })
+    .catch(function(e) {
+      console.warn('토지이음 ' + code + ' 호출 실패:', e);
+    });
 }
 
 
