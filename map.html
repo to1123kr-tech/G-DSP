@@ -815,7 +815,7 @@ function initVwMap() {
           var a = result[0].address;
           popupJibun = a.address_name || '';
           if (a.b_code) {
-            popupPnu = a.b_code + '0' + String(parseInt(a.main_address_no)||0).padStart(4,'0') + String(parseInt(a.sub_address_no)||0).padStart(4,'0');
+            popupPnu = buildPnu(a);
           } else {
             popupPnu = '';
           }
@@ -1125,11 +1125,12 @@ function applyResult(doc) {
     if (status===kakao.maps.services.Status.OK && result[0] && result[0].address) {
       var addr = result[0].address;
       if (addr.b_code) {
-        pnu = addr.b_code+'0'+String(parseInt(addr.main_address_no)||0).padStart(4,'0')+String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+        pnu = buildPnu(addr);
         jibun = addr.address_name || jibun;
       }
     }
     currentPnu=pnu; currentJibun=jibun;
+    console.log('[PNU] ' + jibun + ' → ' + pnu);
     moveMap(lng, lat);
     // VWorld 모드일 때 확실하게 이동
     if (currentEngine === 'vworld' && VWORLD_KEY) {
@@ -1143,40 +1144,52 @@ function applyResult(doc) {
   });
 }
 
+// PNU 생성 (표준: 법정동10 + 산여부1 + 본번4 + 부번4 = 19자리)
+// 산여부: 1=일반필지(평지), 2=산
+function buildPnu(addr) {
+  if (!addr || !addr.b_code) return '';
+  var bcode = String(addr.b_code).padEnd(10, '0').substring(0, 10);
+  var isMountain = (addr.mountain_yn === 'Y') ||
+                   (addr.address_name && addr.address_name.indexOf(' 산') !== -1);
+  var g = isMountain ? '2' : '1';
+  var bun = String(parseInt(addr.main_address_no)||0).padStart(4,'0');
+  var ji  = String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
+  return bcode + g + bun + ji;
+}
+
 // ── 지도 클릭 ──
 function onMapClick(lng, lat) {
   currentLng=lng; currentLat=lat;
   if (!kakaoGeocoder) return;
   // 1단계: 주소 가져오기
   kakaoGeocoder.coord2Address(lng, lat, function(result, status) {
-    var jibun = '', mainNo = '0', subNo = '0';
+    var jibun = '';
+    var addr = null;
     if (status === kakao.maps.services.Status.OK && result[0] && result[0].address) {
-      var addr = result[0].address;
+      addr = result[0].address;
       jibun = addr.address_name || '';
-      mainNo = addr.main_address_no || '0';
-      subNo = addr.sub_address_no || '0';
     }
     if (!jibun) return;
-    // 2단계: 법정동코드 가져오기
+    // 2단계: 법정동코드 가져오기 (b_code가 없을 수 있어서 보강)
     kakaoGeocoder.coord2RegionCode(lng, lat, function(regionResult, regionStatus) {
-      if (regionStatus !== kakao.maps.services.Status.OK || !regionResult) return;
       var bCode = '';
-      for (var i = 0; i < regionResult.length; i++) {
-        if (regionResult[i].region_type === 'B') {
-          bCode = regionResult[i].code;
-          break;
+      if (regionStatus === kakao.maps.services.Status.OK && regionResult) {
+        for (var i = 0; i < regionResult.length; i++) {
+          if (regionResult[i].region_type === 'B') {
+            bCode = regionResult[i].code;
+            break;
+          }
         }
       }
-      if (!bCode) return;
-      var platGb = (jibun.indexOf('산') >= 0 && jibun.indexOf('산') < jibun.lastIndexOf(' ') + 4) ? '2' : '1';
-      var pnu = bCode.length >= 10
-        ? bCode + platGb + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0')
-        : bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+      // addr.b_code가 있으면 우선 사용, 없으면 regionCode로 보강
+      if (addr && !addr.b_code && bCode) addr.b_code = bCode;
+      var pnu = buildPnu(addr);
       currentPnu = pnu; currentJibun = jibun;
+      console.log('[PNU 클릭] ' + jibun + ' → ' + pnu);
       setSelBar(currentJibun);
       setStatus('연동됨', true);
       toast('✓ ' + jibun, 'ok');
-      highlightParcel(pnu);
+      if (pnu) highlightParcel(pnu);
     });
   });
 }
@@ -1209,27 +1222,24 @@ function showCtxMenu(x, y) {
   if (kakaoGeocoder) {
     kakaoGeocoder.coord2Address(ctxLng, ctxLat, function(result, status) {
       var addrName = '이 위치';
-      var mainNo = '0', subNo = '0';
+      var addr = null;
       if (status===kakao.maps.services.Status.OK&&result[0]&&result[0].address) {
-        var a = result[0].address;
-        addrName = a.address_name || addrName;
-        mainNo = a.main_address_no || '0';
-        subNo = a.sub_address_no || '0';
+        addr = result[0].address;
+        addrName = addr.address_name || addrName;
       }
       document.getElementById('ctxAddr').textContent = addrName.length>28?addrName.substring(0,28)+'...':addrName;
-      // 법정동코드 가져오기
+      // 법정동코드 가져오기 (b_code 보강용)
       kakaoGeocoder.coord2RegionCode(ctxLng, ctxLat, function(rr, rs) {
         if (rs !== kakao.maps.services.Status.OK || !rr) return;
         var bCode = '';
         for (var i = 0; i < rr.length; i++) {
           if (rr[i].region_type === 'B') { bCode = rr[i].code; break; }
         }
-        if (bCode) {
-          var platGb2 = (addrName.indexOf('산') >= 0) ? '2' : '1';
-          popupPnu = bCode.length >= 10
-            ? bCode + platGb2 + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0')
-            : bCode + '0' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+        if (addr && !addr.b_code && bCode) addr.b_code = bCode;
+        if (addr && addr.b_code) {
+          popupPnu = buildPnu(addr);
           popupJibun = addrName;
+          console.log('[PNU 우클릭] ' + popupJibun + ' → ' + popupPnu);
         }
       });
     });
