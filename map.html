@@ -941,13 +941,13 @@ function toggleWmsLayer(type, on) {
   var layerMap = {
     yd: 'lt_c_uq111',
     distplan: 'lt_c_uq121',
-    her1: 'lt_c_ud801',
+    her1: 'lt_c_uo101',  // 문화재 (실제 작동 확인된 ID)
     her2: 'lt_c_ud802',
     her3: 'lt_c_ud810'
   };
   var nameMap = {
     yd: '용도지역', distplan: '지구단위계획',
-    her1: '문화재 보호', her2: '영향검토', her3: '영향평가'
+    her1: '문화재 (보존관리지도)', her2: '영향검토', her3: '영향평가'
   };
   var layerName = layerMap[type];
   if (!layerName) return;
