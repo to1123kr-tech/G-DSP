@@ -110,6 +110,40 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 #vworld3dDiv{position:absolute;inset:0;z-index:2;visibility:hidden;background:#1a1f2e}
 #vworld3dDiv iframe{width:100%;height:100%;border:0;display:block}
 #roadviewDiv{position:absolute;inset:0;z-index:4;visibility:hidden;background:#000}
+
+/* 로드뷰 미니맵 (PIP) */
+#rvMiniMap{
+  position:absolute;top:50px;right:10px;
+  width:280px;height:200px;
+  z-index:6;visibility:hidden;
+  border:2px solid var(--neon);border-radius:8px;
+  box-shadow:0 4px 20px rgba(0,229,255,.4);
+  background:#1a1f2e;overflow:hidden;
+  transition:all .2s ease;
+}
+#rvMiniMap.expanded{width:420px;height:300px}
+#rvMiniMap.collapsed{width:48px;height:48px}
+#rvMiniMap.collapsed #rvMiniMapInner{display:none}
+#rvMiniMap.collapsed #rvMiniHeader{height:100%;justify-content:center}
+#rvMiniHeader{
+  height:24px;background:rgba(0,229,255,.15);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 8px;font-size:10px;color:var(--neon);font-weight:700;
+  border-bottom:1px solid var(--line2);cursor:move;user-select:none;
+}
+#rvMiniHeader .ttl{display:flex;align-items:center;gap:4px}
+#rvMiniHeader .btns{display:flex;gap:4px}
+#rvMiniHeader button{
+  background:transparent;border:none;color:var(--neon);
+  cursor:pointer;font-size:12px;padding:0 4px;line-height:1;
+}
+#rvMiniHeader button:hover{color:#fff}
+#rvMiniMapInner{width:100%;height:calc(100% - 24px);position:relative}
+.rv-walker{
+  width:24px;height:24px;background:var(--neon);
+  border:2px solid #fff;border-radius:50%;
+  box-shadow:0 0 8px var(--neon);
+}
 @keyframes vwSpin{to{transform:rotate(360deg)}}
 
 /* 워터마크 - 항상 표시, 지울 수 없음 */
@@ -401,6 +435,20 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
     </div>
     <div id="vworld3dDiv"></div>
     <div id="roadviewDiv"></div>
+
+    <!-- 로드뷰 미니맵 (PIP) -->
+    <div id="rvMiniMap">
+      <div id="rvMiniHeader">
+        <div class="ttl">🗺 위치</div>
+        <div class="btns">
+          <button onclick="rvMiniSize('expand')" title="크게">▣</button>
+          <button onclick="rvMiniSize('normal')" title="보통">◫</button>
+          <button onclick="rvMiniSize('collapse')" title="작게">▭</button>
+        </div>
+      </div>
+      <div id="rvMiniMapInner"></div>
+    </div>
+
     <canvas id="measureCanvas"></canvas>
 
     <!-- 측정 도구 (지도 우측 상단) -->
@@ -1147,6 +1195,14 @@ function onMapClick(lng, lat) {
 function moveMap(lng, lat) {
   if (kakaoMap) { kakaoMap.setCenter(new kakao.maps.LatLng(lat,lng)); kakaoMap.setLevel(3); moveMarker(lng,lat); }
   if (vwMapInited) moveVwMap(lng,lat);
+  // VWorld 3D iframe 동기화
+  if (_vw3dInited) {
+    setTimeout(function(){ moveVworld3D(lng, lat); }, 200);
+  }
+  // 로드뷰 + 미니맵 동기화
+  if (_roadviewInited) {
+    setTimeout(function(){ moveRoadview(lng, lat); }, 200);
+  }
 }
 function moveMarker(lng, lat) {
   if (kakaoMarker&&kakaoMap) { kakaoMarker.setPosition(new kakao.maps.LatLng(lat,lng)); kakaoMarker.setMap(kakaoMap); }
@@ -1608,12 +1664,17 @@ var _vw3dInited = false;
 var _roadviewInited = false;
 var _roadview = null;
 var _roadviewClient = null;
+var _rvMiniMap = null;        // 로드뷰 PIP 미니맵
+var _rvMiniMarker = null;     // 미니맵 워커(파란점)
+var _currentMode = 'vworld';  // 현재 모드 추적
+var _lastRvLat = null, _lastRvLng = null;
 
 function switchMapMode(mode) {
   var kDiv = document.getElementById('kakaoMapDiv');
   var vDiv = document.getElementById('vworldMapDiv');
   var v3Div = document.getElementById('vworld3dDiv');
   var rvDiv = document.getElementById('roadviewDiv');
+  var rvMini = document.getElementById('rvMiniMap');
   var btnK = document.getElementById('btnKkMode');
   var btnV = document.getElementById('btnVwMode');
   var btnV3 = document.getElementById('btnVw3dMode');
@@ -1624,27 +1685,38 @@ function switchMapMode(mode) {
   if (vDiv) vDiv.style.visibility = 'hidden';
   if (v3Div) v3Div.style.visibility = 'hidden';
   if (rvDiv) rvDiv.style.visibility = 'hidden';
+  if (rvMini) rvMini.style.visibility = 'hidden';
   // 모든 버튼 기본 색
   [btnK, btnV, btnV3, btnR].forEach(function(b){ if(b){ b.style.background=''; b.style.color=''; b.style.fontWeight=''; }});
 
   function activeBtn(b) { if(b){ b.style.background='#36cfc9'; b.style.color='#000'; b.style.fontWeight='600'; }}
 
+  _currentMode = mode || 'vworld';
+
   if (mode === 'kakao') {
     if (kDiv) kDiv.style.visibility = 'visible';
     activeBtn(btnK);
     if (kakaoMap && kakao && kakao.maps) {
-      setTimeout(function(){ kakao.maps.event.trigger(kakaoMap, 'resize'); }, 100);
+      setTimeout(function(){
+        kakao.maps.event.trigger(kakaoMap, 'resize');
+        kakaoMap.setCenter(new kakao.maps.LatLng(currentLat, currentLng));
+      }, 100);
     }
     toast('🗺 카카오 지도', 'ok');
   } else if (mode === 'vworld3d') {
     if (v3Div) v3Div.style.visibility = 'visible';
     activeBtn(btnV3);
     initVworld3D();
+    // 검색 좌표가 있으면 카메라 이동
+    setTimeout(function(){ moveVworld3D(currentLng, currentLat); }, 800);
     toast('🌐 VWorld 3D 지도', 'ok');
   } else if (mode === 'roadview') {
     if (rvDiv) rvDiv.style.visibility = 'visible';
+    if (rvMini) rvMini.style.visibility = 'visible';
     activeBtn(btnR);
     initRoadview();
+    // 검색 좌표가 있으면 그 위치로 이동
+    setTimeout(function(){ moveRoadview(currentLng, currentLat); }, 300);
     toast('🚗 카카오 로드뷰', 'ok');
   } else {
     // 기본: vworld 2D
@@ -1662,53 +1734,152 @@ function initVworld3D() {
   if (_vw3dInited) return;
   var v3Div = document.getElementById('vworld3dDiv');
   if (!v3Div) return;
-  // 현재 지도 중심 좌표 가져오기
-  var lng = 126.83, lat = 37.20;
-  if (window._olMap) {
-    try {
-      var center = ol.proj.toLonLat(_olMap.getView().getCenter());
-      lng = center[0]; lat = center[1];
-    } catch(e){}
-  }
+  // 현재 좌표 사용 (검색했으면 검색 좌표)
+  var lng = currentLng || 126.83;
+  var lat = currentLat || 37.20;
   // iframe 생성
   var url = 'vw_map.html?key=' + encodeURIComponent(VWORLD_KEY) + '&lng=' + lng + '&lat=' + lat;
   v3Div.innerHTML = '<iframe id="vw3dFrame" src="' + url + '" allowfullscreen></iframe>';
   _vw3dInited = true;
 }
 
+// VWorld 3D 카메라 이동 (iframe postMessage)
+function moveVworld3D(lng, lat) {
+  if (!lng || !lat) return;
+  var frame = document.getElementById('vw3dFrame');
+  if (!frame || !frame.contentWindow) return;
+  try {
+    frame.contentWindow.postMessage({
+      type: 'moveTo',
+      lng: lng,
+      lat: lat,
+      zoom: 17
+    }, '*');
+  } catch(e) { console.warn('3D 이동 실패:', e); }
+}
+
 // 카카오 로드뷰 초기화
 function initRoadview() {
-  if (_roadviewInited) return;
-  if (!kakao || !kakao.maps) { toast('카카오 SDK 로드 대기중', 'err'); return; }
   var rvDiv = document.getElementById('roadviewDiv');
   if (!rvDiv) return;
+  if (!kakao || !kakao.maps) { toast('카카오 SDK 로드 대기중', 'err'); return; }
 
-  // 현재 위치 사용
-  var lng = 126.83, lat = 37.20;
-  if (window._olMap) {
-    try {
-      var center = ol.proj.toLonLat(_olMap.getView().getCenter());
-      lng = center[0]; lat = center[1];
-    } catch(e){}
-  }
-  if (kakaoMap) {
-    var c = kakaoMap.getCenter();
-    lat = c.getLat(); lng = c.getLng();
-  }
+  if (_roadviewInited) return;
+
+  // 현재 좌표 사용
+  var lng = currentLng || 126.83;
+  var lat = currentLat || 37.20;
 
   _roadview = new kakao.maps.Roadview(rvDiv);
   _roadviewClient = new kakao.maps.RoadviewClient();
-  var pos = new kakao.maps.LatLng(lat, lng);
-  _roadviewClient.getNearestPanoId(pos, 50, function(panoId) {
-    if (panoId) {
-      _roadview.setPanoId(panoId, pos);
-      _roadviewInited = true;
-    } else {
-      rvDiv.innerHTML = '<div style="color:#fff;text-align:center;padding:40px;font-size:14px;line-height:1.6">'
-        + '🚗 이 지점에 로드뷰가 없습니다.<br><br>'
-        + '<small>도로 인근으로 이동 후 다시 시도해주세요.</small></div>';
+
+  // 로드뷰 위치 변경 → 미니맵 마커 동기화
+  kakao.maps.event.addListener(_roadview, 'position_changed', function() {
+    var p = _roadview.getPosition();
+    if (!p) return;
+    var lat2 = p.getLat(), lng2 = p.getLng();
+    _lastRvLat = lat2; _lastRvLng = lng2;
+    if (_rvMiniMap && _rvMiniMarker) {
+      var ll = new kakao.maps.LatLng(lat2, lng2);
+      _rvMiniMarker.setPosition(ll);
+      _rvMiniMap.setCenter(ll);
     }
   });
+
+  _roadviewInited = true;
+
+  // 미니맵 초기화
+  initRvMiniMap(lng, lat);
+
+  // 첫 위치 설정
+  moveRoadview(lng, lat);
+}
+
+// 로드뷰를 특정 좌표로 이동
+function moveRoadview(lng, lat) {
+  if (!_roadviewInited || !_roadviewClient || !_roadview) return;
+  if (!lng || !lat) return;
+  var pos = new kakao.maps.LatLng(lat, lng);
+  _roadviewClient.getNearestPanoId(pos, 100, function(panoId) {
+    if (panoId) {
+      _roadview.setPanoId(panoId, pos);
+      // 미니맵도 함께 이동
+      if (_rvMiniMap) {
+        _rvMiniMap.setCenter(pos);
+        if (_rvMiniMarker) _rvMiniMarker.setPosition(pos);
+      }
+    } else {
+      var rvDiv = document.getElementById('roadviewDiv');
+      if (rvDiv) {
+        rvDiv.innerHTML = '<div style="color:#fff;text-align:center;padding:40px;font-size:14px;line-height:1.6">'
+          + '🚗 이 지점에 로드뷰가 없습니다.<br><br>'
+          + '<small>도로 인근으로 이동 후 다시 시도해주세요.<br>'
+          + '미니맵에서 도로를 클릭하면 가장 가까운 로드뷰로 이동합니다.</small></div>';
+      }
+    }
+  });
+}
+
+// 로드뷰 미니맵 초기화
+function initRvMiniMap(lng, lat) {
+  var inner = document.getElementById('rvMiniMapInner');
+  if (!inner || _rvMiniMap) return;
+  var center = new kakao.maps.LatLng(lat, lng);
+
+  _rvMiniMap = new kakao.maps.Map(inner, {
+    center: center,
+    level: 3
+  });
+  // 위성+라벨 모드
+  _rvMiniMap.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
+
+  // 로드뷰 가능 도로 오버레이 표시
+  _rvMiniMap.addOverlayMapTypeId(kakao.maps.MapTypeId.ROADVIEW);
+
+  // 워커 마커
+  _rvMiniMarker = new kakao.maps.Marker({
+    position: center,
+    map: _rvMiniMap,
+    image: new kakao.maps.MarkerImage(
+      'data:image/svg+xml;base64,' + btoa(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">' +
+        '<circle cx="16" cy="16" r="10" fill="#00e5ff" stroke="#fff" stroke-width="3"/>' +
+        '<circle cx="16" cy="16" r="4" fill="#fff"/></svg>'
+      ),
+      new kakao.maps.Size(32, 32),
+      { offset: new kakao.maps.Point(16, 16) }
+    )
+  });
+
+  // 미니맵 클릭 → 로드뷰 그 위치로 이동
+  kakao.maps.event.addListener(_rvMiniMap, 'click', function(mouseEvent) {
+    var pos = mouseEvent.latLng;
+    _roadviewClient.getNearestPanoId(pos, 50, function(panoId) {
+      if (panoId) {
+        _roadview.setPanoId(panoId, pos);
+      } else {
+        toast('이 지점에 로드뷰가 없습니다', 'err');
+      }
+    });
+  });
+}
+
+// 미니맵 크기 조절
+function rvMiniSize(size) {
+  var mini = document.getElementById('rvMiniMap');
+  if (!mini) return;
+  mini.classList.remove('expanded', 'collapsed');
+  if (size === 'expand') mini.classList.add('expanded');
+  else if (size === 'collapse') mini.classList.add('collapsed');
+  // 카카오맵 리사이즈
+  setTimeout(function() {
+    if (_rvMiniMap && kakao && kakao.maps) {
+      kakao.maps.event.trigger(_rvMiniMap, 'resize');
+      if (_lastRvLat && _lastRvLng) {
+        _rvMiniMap.setCenter(new kakao.maps.LatLng(_lastRvLat, _lastRvLng));
+      }
+    }
+  }, 220);
 }
 
 // ── PNG/JPG 캡처 ──
