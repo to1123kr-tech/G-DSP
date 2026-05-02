@@ -2,85 +2,77 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>VWorld 3D 분석 API — 기능 탐색</title>
+<title>VWorld 3D API — 기능 탐색 v2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// ⚠️ 영대님 vw_map.html 패턴 — document.write로 동기 로드 (vw 객체 등록 보장)
+var VWORLD_KEY = '16B90D39-90BB-3197-987A-54983A46F250';
+var VWORLD_DOMAIN = '168-107-15-68.nip.io';
+document.write('<sc'+'ript src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+VWORLD_KEY+'&domain='+VWORLD_DOMAIN+'"><\/sc'+'ript>');
+</script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #0a0e14; color: #e2e8f0; font-family: 'Pretendard', -apple-system, sans-serif; padding: 20px; }
-h1 { color: #36cfc9; margin-bottom: 8px; font-size: 22px; }
-.sub { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
+body { background: #0a0e14; color: #e2e8f0; font-family: 'Pretendard', -apple-system, sans-serif; padding: 16px; }
+h1 { color: #36cfc9; margin-bottom: 6px; font-size: 20px; }
+.sub { color: #94a3b8; font-size: 12px; margin-bottom: 14px; }
 
-#vmap { width: 100%; height: 500px; background: #1a2233; border: 1px solid #36cfc9; border-radius: 6px; }
+#vmap { width: 100%; height: 380px; background: #1a2233; border: 1px solid #36cfc9; border-radius: 6px; }
 
-.panel {
-  background: #1a2233; border: 1px solid #2d3748; border-radius: 6px;
-  padding: 16px; margin-top: 16px;
-}
-.panel h2 { color: #36cfc9; font-size: 15px; margin-bottom: 10px; display:flex; align-items:center; gap:8px;}
-.panel h2 .badge { font-size:10px; padding:2px 8px; background:rgba(54,207,201,0.15); border:1px solid #36cfc9; border-radius:4px; }
+.panel { background: #1a2233; border: 1px solid #2d3748; border-radius: 6px; padding: 12px; margin-top: 12px; }
+.panel h2 { color: #36cfc9; font-size: 14px; margin-bottom: 8px; display:flex; align-items:center; gap:6px; }
+.panel h2 .badge { font-size:9px; padding:1px 6px; background:rgba(54,207,201,0.15); border:1px solid #36cfc9; border-radius:3px; }
 
-button {
-  padding: 8px 14px; margin: 4px; background: #36cfc9; border: none; color: #0a0e14;
-  border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;
-}
+button { padding: 7px 12px; margin: 3px; background: #36cfc9; border: none; color: #0a0e14; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; }
 button:hover { background: #2ab9b3; }
 button.secondary { background: transparent; color: #36cfc9; border: 1px solid #36cfc9; }
+button.warn { background: #f59e0b; color: #0a0e14; }
 
-#output {
-  background: #0a0e14; padding: 12px; border-radius: 4px; max-height: 400px;
-  overflow: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px;
-  color: #cbd5e1; white-space: pre-wrap; line-height: 1.5;
-  border: 1px solid #2d3748;
-}
+#output { background: #0a0e14; padding: 10px; border-radius: 4px; max-height: 380px; overflow: auto; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #cbd5e1; white-space: pre-wrap; line-height: 1.55; border: 1px solid #2d3748; }
 #output .ok { color: #4ade80; }
 #output .err { color: #f87171; }
 #output .info { color: #60a5fa; }
 #output .key { color: #fbbf24; }
-
-.stat { display:inline-block; padding:4px 10px; background:rgba(54,207,201,0.1); border-radius:4px; margin-right:6px; font-size:11px;}
-.stat b { color:#36cfc9; }
+#output .hilite { color: #f0abfc; font-weight:600; }
 </style>
 </head>
 <body>
 
-<h1>🌐 VWorld 3D 분석·시뮬레이션 API 2.0 탐색</h1>
-<div class="sub">영대님 G-DSP에서 사용 가능한 3D 기능 (표고/등고선/토공량 등) 확인용 샘플</div>
+<h1>🌐 VWorld 3D API — 기능 탐색 v2</h1>
+<div class="sub">document.write 동기 로드 방식 (vw 객체 보장)</div>
 
 <div id="vmap"></div>
 
 <div class="panel">
   <h2>① 기능 탐색 <span class="badge">Inspector</span></h2>
-  <button onclick="inspectAPI()">🔍 vw 객체 전체 분석</button>
-  <button onclick="inspectMap()" class="secondary">🗺️ map 객체 분석</button>
-  <button onclick="searchByKeyword('elev')" class="secondary">⛰️ "elev" 검색 (표고)</button>
-  <button onclick="searchByKeyword('contour')" class="secondary">📈 "contour" 검색 (등고선)</button>
-  <button onclick="searchByKeyword('analy')" class="secondary">📊 "analysis" 검색</button>
-  <button onclick="searchByKeyword('terrain')" class="secondary">🏔️ "terrain" 검색</button>
-  <button onclick="searchByKeyword('height')" class="secondary">📏 "height" 검색</button>
+  <button onclick="inspectAPI()">🔍 vw 전체 분석</button>
+  <button onclick="inspectMap()" class="secondary">🗺️ map 분석</button>
+  <button onclick="searchByKeyword('elev')" class="secondary">⛰️ elev</button>
+  <button onclick="searchByKeyword('contour')" class="secondary">📈 contour</button>
+  <button onclick="searchByKeyword('analy')" class="secondary">📊 analy</button>
+  <button onclick="searchByKeyword('terrain')" class="secondary">🏔️ terrain</button>
+  <button onclick="searchByKeyword('height')" class="secondary">📏 height</button>
+  <button onclick="searchByKeyword('volume')" class="secondary">📦 volume</button>
+  <button onclick="searchByKeyword('cut')" class="secondary">✂️ cut</button>
+  <button onclick="searchByKeyword('section')" class="secondary">📐 section</button>
 </div>
 
 <div class="panel">
-  <h2>② 표고값 조회 시도 <span class="badge">Test</span></h2>
-  <button onclick="testElevation()">📍 화성시청 좌표(126.831, 37.199) 표고 조회</button>
-  <button onclick="testCameraHeight()" class="secondary">📷 현재 카메라 높이 확인</button>
+  <h2>② 표고값 조회 <span class="badge">Test</span></h2>
+  <button onclick="testElevation()">📍 화성시청 표고 조회</button>
+  <button onclick="testCameraHeight()" class="secondary">📷 카메라 위치</button>
+  <button onclick="dumpAllVwClasses()" class="warn">📋 vw 전체 트리 덤프</button>
 </div>
 
 <div class="panel">
   <h2>📋 출력</h2>
-  <div id="output">초기화 중... (스크립트 로딩 대기)</div>
-  <div style="margin-top:8px">
+  <div id="output">초기화 대기 중...</div>
+  <div style="margin-top:6px">
     <button onclick="clearOutput()" class="secondary">🗑️ 지우기</button>
+    <button onclick="copyOutput()" class="secondary">📋 전체 복사</button>
   </div>
 </div>
 
-<!-- VWorld 3D API 로드 (영대님 인증키 + 도메인) -->
 <script>
-const VWORLD_KEY = '16B90D39-90BB-3197-987A-54983A46F250';
-const VWORLD_DOMAIN = '168-107-15-68.nip.io';
-
-// ═══════════════════════════════════════════════
-// 유틸 — 출력
-// ═══════════════════════════════════════════════
 function log(msg, cls='') {
   const out = document.getElementById('output');
   const span = document.createElement('span');
@@ -90,181 +82,148 @@ function log(msg, cls='') {
   out.scrollTop = out.scrollHeight;
   console.log('[VW3D]', msg);
 }
-function clearOutput() {
-  document.getElementById('output').innerHTML = '';
+function clearOutput() { document.getElementById('output').innerHTML = ''; }
+function copyOutput() {
+  navigator.clipboard.writeText(document.getElementById('output').innerText)
+    .then(() => log('✅ 클립보드 복사됨', 'ok'));
 }
 
-// ═══════════════════════════════════════════════
-// 1. 스크립트 동적 로드
-// ═══════════════════════════════════════════════
-log('🔄 VWorld 3D API 2.0 스크립트 로딩 중...', 'info');
-log(`   URL: https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=${VWORLD_KEY}&domain=${VWORLD_DOMAIN}`, 'info');
-
-const script = document.createElement('script');
-script.type = 'text/javascript';
-script.src = `https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=${VWORLD_KEY}&domain=${VWORLD_DOMAIN}`;
-script.onload = () => {
-  log('✅ 스크립트 로드 완료', 'ok');
-  setTimeout(initMap, 800);
-};
-script.onerror = (e) => {
-  log('❌ 스크립트 로드 실패: ' + (e.message || '알 수 없는 오류'), 'err');
-  log('   → 도메인 등록 확인 필요 또는 API 자체 차단 가능성', 'err');
-};
-document.head.appendChild(script);
-
-// ═══════════════════════════════════════════════
-// 2. 지도 초기화 시도
-// ═══════════════════════════════════════════════
 let map = null;
-function initMap() {
+window.addEventListener('load', function() {
+  log('═══ 시작 ═══', 'info');
+  log('vworldApiKey: ' + (window.vworldApiKey || '(없음)'));
+  log('vworldIsValid: ' + (window.vworldIsValid !== undefined ? window.vworldIsValid : '(없음)'));
+  if (window.vworldErrMsg) log('vworldErrMsg: ' + window.vworldErrMsg, 'err');
+
   if (typeof vw === 'undefined') {
-    log('❌ vw 객체 없음 — 스크립트 정상 로드 안됨', 'err');
-    log('   → 콘솔(F12) 확인하세요', 'err');
+    log('❌ vw 객체 없음', 'err');
     return;
   }
-  log('✅ vw 객체 확인됨', 'ok');
-  
+  log('✅ vw 객체 확인됨!', 'ok');
+  initMap();
+});
+
+function initMap() {
   try {
-    // 화성시청 좌표 기준
-    const options = new vw.MapOption(vw.BasemapType.PHOTO);
-    options.controlsDensity = vw.DensityType.EMPTY;
-    options.interactionsDensity = vw.DensityType.FULL;
-    options.initPosition.Target = new vw.TargetPosition({
-      target: new vw.Coord(126.831, 37.199),
-      distance: 5000,
-      direction: new vw.Direction(0, -45, 0)
-    });
-    
     map = new vw.Map();
-    map.setOption(options);
-    map.setMapId('vmap');
+    map.setOption({
+      mapId: 'vmap',
+      initPosition: new vw.CameraPosition(
+        new vw.CoordZ(126.831, 37.199, 5000),
+        new vw.Direction(0, -45, 0)
+      ),
+      logo: false, navigation: true
+    });
     map.start();
-    
-    log('✅ 3D 지도 생성 완료 (화성시 중심)', 'ok');
-    log('💡 위 [기능 탐색] 버튼을 눌러 사용 가능한 메서드를 확인하세요', 'info');
+    log('✅ 3D 지도 생성 완료', 'ok');
+    log('💡 위 버튼들을 눌러 기능 탐색하세요', 'info');
   } catch (e) {
     log('❌ 지도 생성 실패: ' + e.message, 'err');
-    log('   스택: ' + (e.stack || ''), 'err');
   }
 }
 
-// ═══════════════════════════════════════════════
-// 3. API 객체 분석 (재귀)
-// ═══════════════════════════════════════════════
 function inspectAPI() {
   if (typeof vw === 'undefined') { log('vw 없음', 'err'); return; }
-  
-  log('\n═══ vw 객체 최상위 키 ═══', 'info');
+  log('\n═══ vw 최상위 키 ═══', 'info');
   const keys = Object.keys(vw).sort();
   log(`총 ${keys.length}개`, 'key');
   keys.forEach(k => {
-    const t = typeof vw[k];
-    log(`  vw.${k}  [${t}]`);
+    let detail = '';
+    try {
+      const t = typeof vw[k];
+      if (t === 'function' && /^[A-Z]/.test(k)) detail = '(클래스)';
+      else if (t === 'object' && vw[k]) detail = `(객체, 하위 ${Object.keys(vw[k]).length}개)`;
+    } catch(e){}
+    log(`  vw.${k} ${detail}`);
   });
 }
 
 function inspectMap() {
-  if (!map) { log('map 없음 — 지도 초기화 먼저', 'err'); return; }
-  
-  log('\n═══ map 객체 메서드/속성 ═══', 'info');
+  if (!map) { log('map 없음', 'err'); return; }
+  log('\n═══ map 인스턴스 ═══', 'info');
   const proto = Object.getPrototypeOf(map);
   const allKeys = [...Object.keys(map), ...Object.getOwnPropertyNames(proto)]
-    .filter(k => k !== 'constructor')
-    .sort();
+    .filter(k => k !== 'constructor').sort();
   log(`총 ${allKeys.length}개`, 'key');
   allKeys.forEach(k => {
-    try {
-      const t = typeof map[k];
-      log(`  map.${k}  [${t}]`);
-    } catch(e) {}
+    try { log(`  map.${k}  [${typeof map[k]}]`); } catch(e) {}
   });
 }
 
-// ═══════════════════════════════════════════════
-// 4. 키워드로 함수/객체 검색
-// ═══════════════════════════════════════════════
 function searchByKeyword(kw) {
   if (typeof vw === 'undefined') { log('vw 없음', 'err'); return; }
-  
-  log(`\n═══ "${kw}" 키워드 검색 ═══`, 'info');
+  log(`\n═══ "${kw}" 검색 ═══`, 'info');
   const found = [];
-  
+  const visited = new WeakSet();
   function searchObj(obj, path, depth) {
-    if (depth > 3 || !obj) return;
+    if (depth > 4 || !obj || typeof obj !== 'object' || visited.has(obj)) return;
+    visited.add(obj);
     try {
-      const keys = Object.keys(obj);
-      keys.forEach(k => {
+      Object.getOwnPropertyNames(obj).forEach(k => {
+        if (k.startsWith('_') || k === 'constructor') return;
         const fullPath = path + '.' + k;
         if (k.toLowerCase().includes(kw.toLowerCase())) {
-          const t = typeof obj[k];
-          found.push(`${fullPath}  [${t}]`);
+          let t = ''; try { t = typeof obj[k]; } catch(e){ t='?'; }
+          found.push({ path: fullPath, type: t });
         }
-        if (typeof obj[k] === 'object' && obj[k] !== null && depth < 3) {
-          searchObj(obj[k], fullPath, depth + 1);
-        }
+        try {
+          if (typeof obj[k] === 'object' && obj[k] !== null && depth < 4) searchObj(obj[k], fullPath, depth+1);
+          else if (typeof obj[k] === 'function' && obj[k].prototype && depth < 3) searchObj(obj[k].prototype, fullPath+'.prototype', depth+1);
+        } catch(e){}
       });
-    } catch(e) {}
+    } catch(e){}
   }
-  
   searchObj(vw, 'vw', 0);
-  if (map) searchObj(map, 'map', 0);
-  
-  if (found.length === 0) {
-    log(`  ❌ "${kw}" 매칭 없음`, 'err');
-  } else {
+  if (map) { searchObj(map, 'map', 0); searchObj(Object.getPrototypeOf(map), 'map.proto', 0); }
+  if (found.length === 0) log(`  ❌ "${kw}" 매칭 없음`, 'err');
+  else {
     log(`  ✅ ${found.length}개 발견:`, 'ok');
-    found.forEach(f => log('    ' + f));
+    found.forEach(f => log(`    ${f.path}  [${f.type}]`, 'hilite'));
   }
 }
 
-// ═══════════════════════════════════════════════
-// 5. 표고값 조회 시도
-// ═══════════════════════════════════════════════
 function testElevation() {
-  if (!map) { log('map 없음 — 지도 초기화 먼저', 'err'); return; }
-  
+  if (!map) { log('map 없음', 'err'); return; }
   log('\n═══ 표고값 조회 시도 ═══', 'info');
   log('대상: 화성시청 (126.831, 37.199)');
-  
-  // 가능성 있는 메서드들 모두 시도
-  const candidates = [
-    'getElevation', 'getHeight', 'getTerrainHeight',
-    'sampleHeight', 'getAltitude', 'getZ'
-  ];
-  
-  // map에 있는지
+  const candidates = ['getElevation','getHeight','getTerrainHeight','sampleHeight','getAltitude','getZ','getTerrainElevation','getElevAt'];
+  let foundAny = false;
   candidates.forEach(name => {
     if (typeof map[name] === 'function') {
-      log(`  ✅ map.${name}() 발견!`, 'ok');
-      try {
-        const result = map[name](126.831, 37.199);
-        log(`     결과: ${JSON.stringify(result)}`, 'ok');
-      } catch(e) {
-        log(`     호출 에러: ${e.message}`, 'err');
-      }
+      foundAny = true; log(`  ✅ map.${name}() 발견!`, 'ok');
+      try { log(`     결과: ${JSON.stringify(map[name](126.831, 37.199))}`, 'ok'); }
+      catch(e) { log(`     에러: ${e.message}`, 'err'); }
     }
+    if (typeof vw[name] === 'function') { foundAny = true; log(`  ✅ vw.${name}() 발견!`, 'ok'); }
   });
-  
-  // vw에 있는지
-  candidates.forEach(name => {
-    if (typeof vw[name] === 'function') {
-      log(`  ✅ vw.${name}() 발견!`, 'ok');
-    }
-  });
-  
-  log('\n💡 결과 없으면 → searchByKeyword로 다른 단어 시도', 'info');
+  if (!foundAny) { log('  ❌ 후보 메서드 없음', 'err'); log('  → searchByKeyword 로 다른 단어 시도', 'info'); }
 }
 
 function testCameraHeight() {
   if (!map) { log('map 없음', 'err'); return; }
-  try {
-    const pos = map.getCurrentPosition();
-    log('\n═══ 카메라 위치 ═══', 'info');
-    log(JSON.stringify(pos, null, 2));
-  } catch(e) {
-    log('에러: ' + e.message, 'err');
+  try { log('\n' + JSON.stringify(map.getCurrentPosition(), null, 2)); }
+  catch(e) { log('에러: ' + e.message, 'err'); }
+}
+
+function dumpAllVwClasses() {
+  if (typeof vw === 'undefined') { log('vw 없음', 'err'); return; }
+  log('\n═══ vw 전체 트리 ═══', 'info');
+  const visited = new WeakSet();
+  function walk(obj, depth) {
+    if (depth > 3 || !obj || visited.has(obj)) return;
+    visited.add(obj);
+    try {
+      Object.getOwnPropertyNames(obj).filter(k => !k.startsWith('_')).sort().forEach(k => {
+        try {
+          const t = typeof obj[k];
+          const indent = '  '.repeat(depth);
+          if (t === 'function') log(`${indent}${k}() [func]`);
+          else if (t === 'object' && obj[k] !== null) { log(`${indent}${k} {obj}`); walk(obj[k], depth+1); }
+        } catch(e){}
+      });
+    } catch(e){}
   }
+  walk(vw, 0);
 }
 </script>
 
