@@ -1040,7 +1040,7 @@ function initVmap2(){
   // 기본 레이어 - VWorld 위성 타일 (Oracle 프록시 경유)
   var bgLayer = new ol.layer.Tile({
     source: new ol.source.XYZ({
-      url: PROXY + '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg',
+      url: PROXY + '/api/vw-tile/Satellite/{z}/{x}/{y}.jpeg',
       crossOrigin: 'anonymous',
       maxZoom: 19
     }),
@@ -1335,8 +1335,8 @@ function vwSwitchType(type){
     var layers = _olMap2.getLayers().getArray();
     if(layers.length > 0 && layers[0].getSource){
       var newUrl = (type === 'Satellite')
-        ? '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg'
-        : '/api/vw-tile/Base/{z}/{y}/{x}.jpeg';
+        ? '/api/vw-tile/Satellite/{z}/{x}/{y}.jpeg'
+        : '/api/vw-tile/Base/{z}/{x}/{y}.jpeg';
       layers[0].getSource().setUrl(newUrl);
     }
   } catch(e){ console.error('전환 실패:', e); }
