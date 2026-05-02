@@ -1611,35 +1611,22 @@ function loadPlan(pnu) {
     .catch(function(){document.getElementById('planLoading').textContent='조회 실패';});
 }
 
-// 토지이음 지도 iframe 로드 (다른 법령 상세 확인용)
+// 토지이음 지도 iframe 로드 (다른 법령은 영대님이 iframe 안에서 직접 확인)
 function loadEumIframe(pnu) {
   var iframe = document.getElementById('eumIframe');
   var hint = document.getElementById('eumLoadHint');
   if (!iframe || !pnu || pnu.length !== 19) return;
 
-  // PNU 19자리 분해
-  // 4159125621 1 2078 0005
-  // 시군구(5) + 법정동(5) + 산여부(1) + 본번(4) + 부번(4)
-  var sigungu = pnu.substring(0, 5);   // 41591
-  var beopjeong = pnu.substring(5, 10); // 25621
-  var ledgGbn = pnu.substring(10, 11);  // 1=일반, 2=산
-  var bobn = pnu.substring(11, 15);     // 2078
-  var bubn = pnu.substring(15, 19);     // 0005
-
-  // UrlConnector를 통해 토지이용계획 + 행위제한내용 페이지 자동 로드
-  var urlParam = 'adm_sect_cd=' + sigungu +
-                 '|land_loc_cd=' + beopjeong +
-                 '|ledg_gbn=' + ledgGbn +
-                 '|bobn=' + bobn +
-                 '|bubn=' + bubn;
-  var url = 'https://api.eum.go.kr/web/api/korep/UrlConnector.jsp?url=' + encodeURIComponent(urlParam);
+  // 토지이음 지도 페이지 — PNU 자동 이동
+  // 영대님 원칙: 누락 위험 없는 토지이음 100% 그대로 표시
+  var url = 'https://www.eum.go.kr/web/mp/mpMapDet.jsp?pnu=' + pnu;
 
   // 같은 PNU면 다시 로드 안 함
   if (iframe._loadedPnu === pnu) return;
   iframe._loadedPnu = pnu;
   iframe.src = url;
   if (hint) {
-    hint.textContent = '토지이용계획 + 행위제한내용 로딩 중...';
+    hint.textContent = '토지이음 지도 로딩 중... (다른 법령은 iframe 안에서 직접 확인)';
     setTimeout(function(){ if(hint) hint.style.display='none'; }, 3000);
   }
   console.log('[토지이음] ' + pnu + ' → ' + url);
@@ -1649,15 +1636,7 @@ function loadEumIframe(pnu) {
 function openEumNewWindow() {
   var pnu = currentPnu || popupPnu;
   if (!pnu || pnu.length !== 19) { toast('PNU 정보 없음', 'err'); return; }
-  // 분해
-  var sigungu = pnu.substring(0, 5);
-  var beopjeong = pnu.substring(5, 10);
-  var ledgGbn = pnu.substring(10, 11);
-  var bobn = pnu.substring(11, 15);
-  var bubn = pnu.substring(15, 19);
-  var urlParam = 'adm_sect_cd=' + sigungu + '|land_loc_cd=' + beopjeong +
-                 '|ledg_gbn=' + ledgGbn + '|bobn=' + bobn + '|bubn=' + bubn;
-  var url = 'https://api.eum.go.kr/web/api/korep/UrlConnector.jsp?url=' + encodeURIComponent(urlParam);
+  var url = 'https://www.eum.go.kr/web/mp/mpMapDet.jsp?pnu=' + pnu;
   window.open(url, '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
 }
 
