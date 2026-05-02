@@ -1032,12 +1032,12 @@ function initVmap2(){
     return;
   }
 
-  // PROXY: 현재 페이지 프로토콜에 맞춰 동적 결정
-  // - HTTPS 페이지에서 HTTP 리소스 호출하면 Mixed Content로 차단됨
-  // - HTTP 페이지에서는 그대로 HTTP 사용
-  var PROXY = (window.location.protocol === 'https:' ? 'https:' : 'http:') + '//168.107.15.68:5050';
+  // PROXY: 상대 경로 (현재 페이지와 같은 호스트)
+  // - HTTPS 페이지면 자동으로 HTTPS 사용, HTTP 페이지면 HTTP
+  // - 인증서 도메인 불일치 문제 회피
+  var PROXY = '';
 
-  // 기본 레이어 - OSM 대체: VWorld 위성 타일 (Oracle 프록시 경유)
+  // 기본 레이어 - VWorld 위성 타일 (Oracle 프록시 경유)
   var bgLayer = new ol.layer.Tile({
     source: new ol.source.XYZ({
       url: PROXY + '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg',
@@ -1334,10 +1334,9 @@ function vwSwitchType(type){
   try{
     var layers = _olMap2.getLayers().getArray();
     if(layers.length > 0 && layers[0].getSource){
-      var proto = (window.location.protocol === 'https:' ? 'https:' : 'http:');
       var newUrl = (type === 'Satellite')
-        ? proto + '//168.107.15.68:5050/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg'
-        : proto + '//168.107.15.68:5050/api/vw-tile/Base/{z}/{y}/{x}.jpeg';
+        ? '/api/vw-tile/Satellite/{z}/{y}/{x}.jpeg'
+        : '/api/vw-tile/Base/{z}/{y}/{x}.jpeg';
       layers[0].getSource().setUrl(newUrl);
     }
   } catch(e){ console.error('전환 실패:', e); }
@@ -1390,8 +1389,7 @@ function downloadCircleDxf(){
     jibun: _selectedParcel.jibun || ''
   };
 
-  var proto2 = (window.location.protocol === 'https:' ? 'https:' : 'http:');
-  fetch(proto2 + '//168.107.15.68:5050/api/wfs-dxf-circle', {
+  fetch('/api/wfs-dxf-circle', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
