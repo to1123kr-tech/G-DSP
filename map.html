@@ -575,8 +575,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
       <div id="planContent" style="display:none">
         <div class="section-title">지역·지구등 지정여부</div>
         <table class="yd-table">
-          <tr><th>국토계획법 지역·지구</th><th>다른 법령 지역·지구</th></tr>
-          <tr><td id="planYd">-</td><td id="planOther">-</td></tr>
+          <tr><th>국토계획법 지역·지구</th></tr>
+          <tr><td id="planYd">-</td></tr>
         </table>
         <div class="section-title">규제 내용</div>
         <div class="law-box" id="planLaw">-</div>
@@ -1602,7 +1602,7 @@ function loadPlan(pnu) {
       if(p){
         var yd1=p.prposArea1Nm||'-';
         var yd2=p.prposArea2Nm&&p.prposArea2Nm!=='지정되지않음'?', '+p.prposArea2Nm:'';
-        setText('planYd',yd1+yd2); setText('planOther','-');
+        setText('planYd',yd1+yd2);
         setText('planLaw','용도지역: '+yd1+(yd2||'')+'\n도로접면: '+(p.roadSideCodeNm||'-')+'\n지형높이: '+(p.tpgrphHgCodeNm||'-')+'\n지형형상: '+(p.tpgrphFrmCodeNm||'-'));
       }
       // 토지이음 지도 자동 로드 (PNU 기반)
