@@ -44,11 +44,31 @@ body.dark{--bg:#0f1623;--bg2:#141e2e;--bg3:#1a2640;--card:#1a2640;--line:#243552
 .hbtn.close{border-color:rgba(239,68,68,.3);color:var(--red)}
 .hbtn.close:hover{background:rgba(239,68,68,.08)}
 
-.tabs{display:flex;gap:2px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0}
-.tab{height:42px;padding:0 16px;font-size:13px;font-weight:700;color:var(--txt3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:.15s;display:flex;align-items:center;gap:7px}
-.tab:hover{color:var(--txt2)}
-.tab.on{color:var(--blue);border-bottom-color:var(--blue)}
-.tab svg{width:13px;height:13px}
+.tabs{display:flex;gap:8px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0}
+.tab{
+  height:48px;padding:0 20px;font-size:15px;font-weight:700;
+  color:var(--txt2);cursor:pointer;
+  border:1.5px solid var(--line);
+  background:rgba(255,255,255,0.03);
+  border-radius:8px;
+  transition:.15s;
+  display:flex;align-items:center;gap:8px;
+  letter-spacing:-0.01em;
+}
+.tab:hover{
+  color:var(--blue);
+  border-color:var(--blue);
+  background:rgba(54,207,201,0.08);
+  transform:translateY(-1px);
+}
+.tab.on{
+  color:#fff;
+  background:var(--blue);
+  border-color:var(--blue);
+  box-shadow:0 2px 8px rgba(54,207,201,0.35);
+}
+.tab.on svg{stroke:#fff}
+.tab svg{width:16px;height:16px;flex-shrink:0}
 .tab-view{display:none;flex:1;overflow:hidden;flex-direction:column;height:0}
 .tab-view.on{display:flex;height:auto}
 .vmap-wrap{position:relative;flex-shrink:0;height:340px}
