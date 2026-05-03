@@ -513,10 +513,31 @@ html,body{height:100%;overflow:hidden}
 .hbtn.close{border-color:rgba(239,68,68,.3);color:var(--red)}
 .hbtn.close:hover{background:rgba(239,68,68,.08)}
 .hbtn.active{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.3);color:var(--blue2)}
-.tabs{display:flex;gap:2px;padding:0 16px;background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0}
-.tab{height:40px;padding:0 16px;font-size:13px;font-weight:700;color:var(--txt3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:.15s;display:flex;align-items:center;gap:7px}
-.tab:hover{color:var(--txt2)}
-.tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+.tabs{display:flex;gap:8px;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line);flex-shrink:0}
+.tab{
+  height:48px;padding:0 20px;font-size:15px;font-weight:700;
+  color:var(--txt2);cursor:pointer;
+  border:1.5px solid var(--line);
+  background:rgba(255,255,255,0.03);
+  border-radius:8px;
+  transition:.15s;
+  display:flex;align-items:center;gap:8px;
+  letter-spacing:-0.01em;
+}
+.tab:hover{
+  color:var(--blue);
+  border-color:var(--blue);
+  background:rgba(54,207,201,0.08);
+  transform:translateY(-1px);
+}
+.tab.on{
+  color:#fff;
+  background:var(--blue);
+  border-color:var(--blue);
+  box-shadow:0 2px 8px rgba(54,207,201,0.35);
+}
+.tab.on svg{stroke:#fff}
+.tab svg{width:16px;height:16px;flex-shrink:0}
 .tab-view{display:none;flex:1;overflow:hidden;flex-direction:column}
 .tab-view.on{display:flex}
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.4)}
@@ -534,17 +555,21 @@ html,body{height:100%;overflow:hidden}
     </div>
   </div>
   <div class="tabs">
-    <button class="tab on" id="tab-dxf" onclick="switchTab('dxf')">
-      <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      DXF 수량산출
+    <button class="tab on" id="tab-ngii" onclick="switchTab('ngii')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      수치지형도변환
     </button>
-    <button class="tab" id="tab-conv" onclick="switchTab('conv')">
-      <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-      공간정보 변환
+    <button class="tab" id="tab-sanrang" onclick="switchTab('sanrang')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 11l-3-3-7 7v3h3z"/><path d="M18 7l1-1a2.83 2.83 0 0 0 0-4 2.83 2.83 0 0 0-4 0L7 10v3h3l8-8z"/><path d="M3 21h18"/></svg>
+      산e랑변환
+    </button>
+    <button class="tab" id="tab-dxf" onclick="switchTab('dxf')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+      수량산출
     </button>
   </div>
 
-  <div class="tab-view on" id="view-dxf-tab">
+  <div class="tab-view" id="view-dxf-tab">
     <!-- ③ DXF -->
     <div id="dxf-wrap" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
       <div style="padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;gap:6px">
@@ -635,6 +660,89 @@ html,body{height:100%;overflow:hidden}
     </div>
 
   </div>
+  <!-- 수치지형도변환 -->
+  <div class="tab-view on" id="view-ngii-tab" style="overflow:auto;padding:24px">
+    <div style="max-width:720px;margin:0 auto">
+      <!-- 안내 -->
+      <div style="margin-bottom:18px">
+        <div style="font-size:18px;font-weight:700;color:var(--txt1);margin-bottom:6px">🗺️ 수치지형도 R12 변환</div>
+        <div style="font-size:13px;color:var(--txt2);line-height:1.6">
+          국토지리정보원 수치지형도(DXF)를 AutoCAD 호환 R12 버전으로 변환합니다.<br>
+          분석용 모드는 등고선 + 표고점 + 하천 + 수계 레이어만 남기고 나머지는 제거합니다.
+        </div>
+      </div>
+
+      <!-- 변환 모드 선택 -->
+      <div style="margin-bottom:18px">
+        <div style="font-size:13px;font-weight:700;color:var(--txt1);margin-bottom:10px">변환 모드</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label class="ng-mode on" data-mode="original" style="display:flex;align-items:flex-start;gap:10px;padding:14px 16px;background:var(--card);border:2px solid var(--blue);border-radius:10px;cursor:pointer;transition:.15s">
+            <input type="radio" name="ngMode" value="original" checked style="margin-top:3px">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--txt1);margin-bottom:3px">📦 원본 변환</div>
+              <div style="font-size:11px;color:var(--txt2);line-height:1.5">모든 레이어 유지<br>R12로 버전만 다운그레이드</div>
+            </div>
+          </label>
+          <label class="ng-mode" data-mode="analysis" style="display:flex;align-items:flex-start;gap:10px;padding:14px 16px;background:var(--card);border:2px solid var(--line);border-radius:10px;cursor:pointer;transition:.15s">
+            <input type="radio" name="ngMode" value="analysis" style="margin-top:3px">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--txt1);margin-bottom:3px">🏔 분석용 변환</div>
+              <div style="font-size:11px;color:var(--txt2);line-height:1.5">등고선·표고점·하천·수계만 남김<br>경사도/수계 분석에 바로 사용</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 드롭존 -->
+      <div id="ngDropZone" style="border:2px dashed var(--line2);border-radius:12px;padding:48px 20px;text-align:center;cursor:pointer;background:var(--card);transition:.2s">
+        <div style="font-size:44px;margin-bottom:10px;opacity:0.7">📂</div>
+        <div style="font-size:14px;color:var(--txt1);margin-bottom:4px;font-weight:600">DXF 파일을 드래그하거나 클릭</div>
+        <div style="font-size:11px;color:var(--txt3)">여러 파일 동시 처리 가능</div>
+        <input type="file" id="ngFileInput" accept=".dxf,.DXF" multiple style="display:none">
+      </div>
+
+      <!-- 파일 리스트 -->
+      <div id="ngFileList" style="margin-top:12px;display:flex;flex-direction:column;gap:8px"></div>
+
+      <!-- 진행바 -->
+      <div id="ngProgressBar" style="height:4px;background:var(--line);border-radius:2px;margin-top:14px;overflow:hidden;display:none">
+        <div id="ngProgressFill" style="height:100%;background:var(--blue);width:0%;transition:width 0.3s"></div>
+      </div>
+
+      <!-- 변환 버튼 -->
+      <button id="ngBtnConvert" disabled style="margin-top:16px;width:100%;padding:14px;background:var(--blue);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;opacity:0.4;transition:.15s">
+        ⬇ 변환 후 다운로드
+      </button>
+
+      <!-- 안내 -->
+      <div style="margin-top:18px;padding:14px;background:var(--card);border:1px solid var(--line);border-radius:8px;font-size:11px;color:var(--txt2);line-height:1.7">
+        <b style="color:var(--txt1)">ℹ️ 변환 정보</b><br>
+        • 버전: AC1015(R2000) → AC1009(R12)<br>
+        • CLASSES/OBJECTS 섹션 제거<br>
+        • 인코딩: CP949 유지 (한글 호환)<br>
+        • 분석용 필터: B0014***(등고선) + F0017***(표고점) + C0076***(하천) + C0052***(수계)<br>
+        • <a href="dxf_inspector.html" target="_blank" style="color:var(--blue);text-decoration:underline">🔍 변환 결과 검증 도구 열기</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 산e랑변환 -->
+  <div class="tab-view" id="view-sanrang-tab">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:40px">
+      <div style="text-align:center;max-width:480px">
+        <div style="font-size:48px;margin-bottom:16px;opacity:0.6">🏔️</div>
+        <div style="font-size:18px;font-weight:700;color:var(--txt1);margin-bottom:8px">산e랑변환</div>
+        <div style="font-size:13px;color:var(--txt2);line-height:1.6;margin-bottom:24px">
+          산지전용허가 분석을 위한 DXF↔SHP 변환 도구.<br>
+          지번 자동변환 / 직접그리기 / DXF변환 모드 제공.
+        </div>
+        <div style="display:inline-block;padding:8px 16px;background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:6px;color:#f59e0b;font-size:12px;font-weight:600">
+          🚧 준비 중 (사무실 코드 통합 후)
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="tab-view" id="view-conv-tab">
     <div id="conv-wrap" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
       <div class="panel-hdr">
@@ -678,6 +786,157 @@ html,body{height:100%;overflow:hidden}
 </div>
 <div id="toast"></div>
 <script>
+// ===================== 수치지형도변환 (R12) =====================
+(function(){
+  var ngFiles = [];
+  var ngDropZone = null, ngFileInput = null, ngFileList = null;
+  var ngBtnConvert = null, ngProgressBar = null, ngProgressFill = null;
+
+  function ngInit(){
+    if (ngDropZone) return;
+    ngDropZone = document.getElementById('ngDropZone');
+    ngFileInput = document.getElementById('ngFileInput');
+    ngFileList = document.getElementById('ngFileList');
+    ngBtnConvert = document.getElementById('ngBtnConvert');
+    ngProgressBar = document.getElementById('ngProgressBar');
+    ngProgressFill = document.getElementById('ngProgressFill');
+    if (!ngDropZone) return;
+
+    ngDropZone.addEventListener('click', function(){ ngFileInput.click(); });
+    ngFileInput.addEventListener('change', function(e){ ngAdd([].slice.call(e.target.files)); });
+    ngDropZone.addEventListener('dragover', function(e){
+      e.preventDefault();
+      ngDropZone.style.borderColor = 'var(--blue)';
+      ngDropZone.style.background = 'rgba(54,207,201,0.05)';
+    });
+    ngDropZone.addEventListener('dragleave', function(){
+      ngDropZone.style.borderColor = 'var(--line2)';
+      ngDropZone.style.background = 'var(--card)';
+    });
+    ngDropZone.addEventListener('drop', function(e){
+      e.preventDefault();
+      ngDropZone.style.borderColor = 'var(--line2)';
+      ngDropZone.style.background = 'var(--card)';
+      var fs = [].slice.call(e.dataTransfer.files).filter(function(f){
+        return f.name.toLowerCase().endsWith('.dxf');
+      });
+      ngAdd(fs);
+    });
+
+    ngBtnConvert.addEventListener('click', ngConvert);
+
+    // 모드 라디오
+    document.querySelectorAll('.ng-mode').forEach(function(label){
+      label.addEventListener('click', function(){
+        document.querySelectorAll('.ng-mode').forEach(function(l){
+          l.classList.remove('on');
+          l.style.borderColor = 'var(--line)';
+        });
+        label.classList.add('on');
+        label.style.borderColor = 'var(--blue)';
+      });
+    });
+  }
+
+  function ngAdd(newFiles){
+    newFiles.forEach(function(f){
+      if (!ngFiles.find(function(x){ return x.file.name === f.name && x.file.size === f.size; })) {
+        ngFiles.push({ file: f, status: 'wait' });
+      }
+    });
+    ngRender();
+    ngBtnConvert.disabled = ngFiles.length === 0;
+    ngBtnConvert.style.opacity = ngFiles.length === 0 ? '0.4' : '1';
+  }
+
+  function ngFmtSize(b){
+    if (b > 1024*1024) return (b/1024/1024).toFixed(1) + 'MB';
+    return (b/1024).toFixed(0) + 'KB';
+  }
+
+  function ngRender(){
+    var labels = { wait:'대기', prog:'변환중...', done:'✓ 완료', fail:'✗ 실패' };
+    var colors = {
+      wait: 'background:rgba(148,163,184,0.15);color:var(--txt2)',
+      prog: 'background:rgba(54,207,201,0.15);color:var(--blue)',
+      done: 'background:rgba(74,222,128,0.15);color:#22c55e',
+      fail: 'background:rgba(239,68,68,0.15);color:#ef4444'
+    };
+    ngFileList.innerHTML = ngFiles.map(function(item){
+      var stat = item.stats || '';
+      return '<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px">'
+        + '<span style="flex:1;font-size:13px;color:var(--txt1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + item.file.name + '">' + item.file.name + '</span>'
+        + '<span style="font-size:11px;color:var(--txt3)">' + ngFmtSize(item.file.size) + '</span>'
+        + (stat ? '<span style="font-size:10px;color:var(--txt2)">' + stat + '</span>' : '')
+        + '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:4px;' + colors[item.status] + '">' + labels[item.status] + '</span>'
+      + '</div>';
+    }).join('');
+  }
+
+  function ngSetStatus(i, s, stats){
+    ngFiles[i].status = s;
+    if (stats) ngFiles[i].stats = stats;
+    ngRender();
+  }
+
+  async function ngConvert(){
+    ngBtnConvert.disabled = true;
+    ngBtnConvert.style.opacity = '0.6';
+    ngProgressBar.style.display = 'block';
+
+    var mode = document.querySelector('input[name="ngMode"]:checked').value;
+
+    for (var i = 0; i < ngFiles.length; i++) {
+      if (ngFiles[i].status === 'done') continue;
+      ngSetStatus(i, 'prog');
+      ngProgressFill.style.width = Math.round((i / ngFiles.length) * 100) + '%';
+
+      try {
+        var fd = new FormData();
+        fd.append('file', ngFiles[i].file);
+        fd.append('mode', mode);
+
+        var res = await fetch('/api/convert-dxf', { method: 'POST', body: fd });
+        if (!res.ok) {
+          var err = await res.json();
+          throw new Error(err.error || '서버 오류 (' + res.status + ')');
+        }
+
+        var srcVer = res.headers.get('X-Src-Version') || '?';
+        var keptLayers = res.headers.get('X-Kept-Layers') || '?';
+        var copied = res.headers.get('X-Copied-Entities') || '?';
+        var statsTxt = srcVer + ' → R12 · 레이어 ' + keptLayers + ' · 객체 ' + copied;
+
+        var blob = await res.blob();
+        var suffix = mode === 'original' ? '_R12' : '_분석용';
+        var outName = ngFiles[i].file.name.replace(/\.dxf$/i, suffix + '.dxf');
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = outName; a.click();
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+
+        ngSetStatus(i, 'done', statsTxt);
+      } catch (e) {
+        console.error(e);
+        ngSetStatus(i, 'fail', e.message);
+      }
+    }
+
+    ngProgressFill.style.width = '100%';
+    setTimeout(function(){
+      ngProgressBar.style.display = 'none';
+      ngProgressFill.style.width = '0%';
+    }, 1000);
+    ngBtnConvert.disabled = false;
+    ngBtnConvert.style.opacity = '1';
+    toast('변환 완료', 'ok');
+  }
+
+  // 탭 전환 시 초기화
+  window._ngInit = ngInit;
+  document.addEventListener('DOMContentLoaded', ngInit);
+})();
+
 function switchTab(t){
   document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('on');});
   document.querySelectorAll('.tab-view').forEach(function(v){v.classList.remove('on');});
