@@ -50,7 +50,9 @@ def _layer_kept(name):
 
 
 def _copy_entity_r12(e, target):
-    """수치지형도용 엔티티 복사 (R12 호환)"""
+    """수치지형도용 엔티티 복사 - 필수 4타입만 (속도 최적화)
+    LWPOLYLINE / POINT(표고점) / TEXT / INSERT
+    """
     t = e.dxftype()
     layer = e.dxf.get('layer', '0')
     color = e.dxf.get('color', 256)
@@ -66,27 +68,8 @@ def _copy_entity_r12(e, target):
                     except Exception: pass
                 return 1
 
-        elif t == 'POLYLINE':
-            pts = [(v.dxf.location[0], v.dxf.location[1]) for v in e.vertices]
-            if len(pts) >= 2:
-                target.add_polyline2d(pts, dxfattribs=base)
-                return 1
-
-        elif t == 'LINE':
-            target.add_line(start=tuple(e.dxf.start)[:2], end=tuple(e.dxf.end)[:2], dxfattribs=base)
-            return 1
-
         elif t == 'POINT':
             target.add_point(e.dxf.location, dxfattribs=base)
-            return 1
-
-        elif t == 'CIRCLE':
-            target.add_circle(e.dxf.center, e.dxf.radius, dxfattribs=base)
-            return 1
-
-        elif t == 'ARC':
-            target.add_arc(center=e.dxf.center, radius=e.dxf.radius,
-                start_angle=e.dxf.start_angle, end_angle=e.dxf.end_angle, dxfattribs=base)
             return 1
 
         elif t == 'TEXT':
@@ -96,16 +79,6 @@ def _copy_entity_r12(e, target):
             try: txt.dxf.insert = e.dxf.insert
             except Exception: pass
             return 1
-
-        elif t == 'MTEXT':
-            try:
-                txt = target.add_text(e.text, dxfattribs={
-                    **base, 'height': e.dxf.get('char_height', 1), 'rotation': e.dxf.get('rotation', 0)
-                })
-                txt.dxf.insert = e.dxf.insert
-                return 1
-            except Exception:
-                pass
 
         elif t == 'INSERT':
             target.add_blockref(e.dxf.name, e.dxf.get('insert', (0, 0, 0)), dxfattribs={
@@ -161,12 +134,21 @@ def api_convert_dxf():
             except Exception:
                 pass
 
-        # 블록 복사
+        # 모델스페이스에서 실제 사용되는 INSERT의 블록 이름만 미리 수집
+        used_blocks = set()
+        for e in src.modelspace():
+            if e.dxftype() == 'INSERT':
+                if mode == 'analysis' and e.dxf.get('layer', '0') not in kept:
+                    continue
+                used_blocks.add(e.dxf.name)
+
+        # 사용되는 블록만 복사 (속도 최적화)
         for bdef in src.blocks:
-            if bdef.name.startswith('*'):
+            name = bdef.name
+            if name.startswith('*') or name not in used_blocks:
                 continue
             try:
-                nb = new.blocks.new(bdef.name)
+                nb = new.blocks.new(name)
                 for e in bdef:
                     _copy_entity_r12(e, nb)
             except Exception:
