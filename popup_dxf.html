@@ -233,29 +233,7 @@ select {
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <div class="tab-view on" id="view-ngii">
     <div class="container">
-      <h2>🗺️ 수치지형도 R12 변환</h2>
-      <div class="desc">
-        국토지리정보원 수치지형도(DXF)를 AutoCAD 호환 R12 버전으로 변환합니다.<br>
-        분석용 모드는 등고선 + 표고점 + 하천 + 수계 레이어만 남기고 나머지는 제거합니다.
-      </div>
-
-      <div class="section-title">변환 모드</div>
-      <div class="mode-grid">
-        <label class="mode-card on" data-mode="original">
-          <input type="radio" name="ngiiMode" value="original" checked>
-          <div>
-            <div class="mode-title">📦 원본 변환</div>
-            <div class="mode-sub">모든 레이어 유지<br>R12로 버전만 다운그레이드</div>
-          </div>
-        </label>
-        <label class="mode-card" data-mode="analysis">
-          <input type="radio" name="ngiiMode" value="analysis">
-          <div>
-            <div class="mode-title">🏔 분석용 변환</div>
-            <div class="mode-sub">등고선·표고점·하천·수계만 남김<br>경사도/수계 분석에 바로 사용</div>
-          </div>
-        </label>
-      </div>
+      <h2 style="margin-bottom:18px">수치지형도변환</h2>
 
       <div class="dropzone" id="ngiiDrop">
         <div class="ic">📂</div>
@@ -267,15 +245,15 @@ select {
       <div class="file-list" id="ngiiList"></div>
       <div class="progress" id="ngiiProgress"><div class="progress-fill" id="ngiiFill"></div></div>
 
-      <button class="btn-main" id="ngiiBtn" disabled>⬇ 변환 후 다운로드</button>
-
-      <div class="info-box">
-        <b>ℹ️ 변환 정보</b><br>
-        • 버전: AC1015(R2000) → AC1009(R12)<br>
-        • CLASSES/OBJECTS 섹션 제거<br>
-        • 인코딩: CP949 유지 (한글 호환)<br>
-        • 분석용 필터: B0014***(등고선) + F0017***(표고점) + C0076***(하천) + C0052***(수계)<br>
-        • <a href="dxf_inspector.html" target="_blank">🔍 변환 결과 검증 도구</a>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
+        <button class="btn-main" id="ngiiBtnOriginal" disabled style="margin-top:0;background:var(--blue2)">
+          ⬇ 원본 다운<br>
+          <span style="font-size:11px;font-weight:400;opacity:0.85">모든 레이어 유지</span>
+        </button>
+        <button class="btn-main" id="ngiiBtnAnalysis" disabled style="margin-top:0">
+          ⬇ 분석용 다운<br>
+          <span style="font-size:11px;font-weight:400;opacity:0.85">등고선·표고점·하천·수계만</span>
+        </button>
       </div>
     </div>
   </div>
@@ -423,7 +401,8 @@ var ngiiFiles = [];
 var ngiiDrop = document.getElementById('ngiiDrop');
 var ngiiInput = document.getElementById('ngiiInput');
 var ngiiList = document.getElementById('ngiiList');
-var ngiiBtn = document.getElementById('ngiiBtn');
+var ngiiBtnOriginal = document.getElementById('ngiiBtnOriginal');
+var ngiiBtnAnalysis = document.getElementById('ngiiBtnAnalysis');
 var ngiiProgress = document.getElementById('ngiiProgress');
 var ngiiFill = document.getElementById('ngiiFill');
 
@@ -450,26 +429,39 @@ function ngiiAdd(newFiles){
     }
   });
   ngiiRender();
-  ngiiBtn.disabled = ngiiFiles.length === 0;
+  ngiiUpdateBtns();
+}
+
+function ngiiRemove(idx){
+  ngiiFiles.splice(idx, 1);
+  ngiiRender();
+  ngiiUpdateBtns();
+}
+
+function ngiiUpdateBtns(){
+  var disabled = ngiiFiles.length === 0;
+  ngiiBtnOriginal.disabled = disabled;
+  ngiiBtnAnalysis.disabled = disabled;
 }
 
 function ngiiRender(){
   var labels = { wait:'대기', prog:'변환중...', done:'✓ 완료', fail:'✗ 실패' };
-  ngiiList.innerHTML = ngiiFiles.map(function(item){
+  ngiiList.innerHTML = ngiiFiles.map(function(item, idx){
     var stat = item.stats ? '<span class="file-stat">' + item.stats + '</span>' : '';
     return '<div class="file-item">'
       + '<span class="file-name" title="' + item.file.name + '">' + item.file.name + '</span>'
       + '<span class="file-size">' + fmtSize(item.file.size) + '</span>'
       + stat
       + '<span class="file-badge ' + item.status + '">' + labels[item.status] + '</span>'
+      + '<button onclick="ngiiRemove(' + idx + ')" style="background:none;border:none;cursor:pointer;color:var(--txt3);font-size:16px;padding:0 4px;line-height:1" title="삭제">✕</button>'
     + '</div>';
   }).join('');
 }
 
-ngiiBtn.addEventListener('click', async function(){
-  ngiiBtn.disabled = true;
+async function ngiiConvert(mode){
+  ngiiBtnOriginal.disabled = true;
+  ngiiBtnAnalysis.disabled = true;
   ngiiProgress.classList.add('on');
-  var mode = document.querySelector('input[name="ngiiMode"]:checked').value;
 
   for (var i = 0; i < ngiiFiles.length; i++) {
     if (ngiiFiles[i].status === 'done') continue;
@@ -514,9 +506,12 @@ ngiiBtn.addEventListener('click', async function(){
     ngiiProgress.classList.remove('on');
     ngiiFill.style.width = '0%';
   }, 1000);
-  ngiiBtn.disabled = false;
+  ngiiUpdateBtns();
   toast('변환 완료', 'ok');
-});
+}
+
+ngiiBtnOriginal.addEventListener('click', function(){ ngiiConvert('original'); });
+ngiiBtnAnalysis.addEventListener('click', function(){ ngiiConvert('analysis'); });
 
 // ============================================================
 // 탭 2: 산e랑변환 (DXF → SHP/GPX)
