@@ -1,24 +1,6 @@
 # =============================================================
-# server.py 추가 코드 — DXF 변환 통합 (R12 + 산e랑)
-# =============================================================
-# 적용 방법:
-#   1. server.py 상단 import 영역에 추가:
-#        import re, math, tempfile, zipfile
-#        try:
-#            import shapefile  # pip install pyshp
-#            HAS_PYSHP = True
-#        except ImportError:
-#            HAS_PYSHP = False
-#
-#   2. 의존성 설치 (Oracle 서버):
-#        pip install pyshp --break-system-packages
-#        # ezdxf, pyproj는 이미 설치되어 있음
-#
-#   3. 아래 코드 전체를 server.py에 추가 (다른 라우트들과 같은 위치)
-#
-#   4. 서버 재시작:
-#        sudo pkill -9 -f gunicorn
-#        sudo systemctl restart gdsp
+# server.py 추가 코드 — DXF 변환 (R12 + 산e랑)
+# 최적화 버전: 4가지 엔티티 + 사용 블록만 복사 (5~10초 목표)
 # =============================================================
 
 import re as _re_dxf
@@ -34,7 +16,7 @@ except ImportError:
 
 
 # =============================================================
-# [1] 수치지형도 R12 변환 + 분석용 필터링
+# [1] 수치지형도 R12 변환
 # =============================================================
 ANALYSIS_LAYER_PATTERNS = [
     _re_dxf.compile(r'^B0014\d{3}$'),   # 등고선
@@ -50,9 +32,7 @@ def _layer_kept(name):
 
 
 def _copy_entity_r12(e, target):
-    """수치지형도용 엔티티 복사 - 필수 4타입만 (속도 최적화)
-    LWPOLYLINE / POINT(표고점) / TEXT / INSERT
-    """
+    """필수 4타입만 (속도 최적화)"""
     t = e.dxftype()
     layer = e.dxf.get('layer', '0')
     color = e.dxf.get('color', 256)
@@ -67,22 +47,21 @@ def _copy_entity_r12(e, target):
                     try: pl.close(True)
                     except Exception: pass
                 return 1
-
         elif t == 'POINT':
             target.add_point(e.dxf.location, dxfattribs=base)
             return 1
-
         elif t == 'TEXT':
             txt = target.add_text(e.dxf.text, dxfattribs={
-                **base, 'height': e.dxf.get('height', 1), 'rotation': e.dxf.get('rotation', 0)
+                **base, 'height': e.dxf.get('height', 1),
+                'rotation': e.dxf.get('rotation', 0)
             })
             try: txt.dxf.insert = e.dxf.insert
             except Exception: pass
             return 1
-
         elif t == 'INSERT':
             target.add_blockref(e.dxf.name, e.dxf.get('insert', (0, 0, 0)), dxfattribs={
-                **base, 'xscale': e.dxf.get('xscale', 1), 'yscale': e.dxf.get('yscale', 1),
+                **base, 'xscale': e.dxf.get('xscale', 1),
+                'yscale': e.dxf.get('yscale', 1),
                 'rotation': e.dxf.get('rotation', 0)
             })
             return 1
@@ -93,7 +72,6 @@ def _copy_entity_r12(e, target):
 
 @app.route('/api/convert-dxf', methods=['POST'])
 def api_convert_dxf():
-    """수치지형도 DXF → R12 변환 (mode=original/analysis)"""
     if 'file' not in request.files:
         return jsonify({'error': '파일이 없습니다'}), 400
     f = request.files['file']
@@ -110,13 +88,11 @@ def api_convert_dxf():
             f.save(tmp.name)
             tmp_path = tmp.name
 
-        # 원본 읽기
         try:
             src = ezdxf.readfile(tmp_path, encoding='cp949')
         except Exception:
             src = ezdxf.readfile(tmp_path)
 
-        # 새 R12 문서
         new = ezdxf.new('R12')
         new_msp = new.modelspace()
 
@@ -134,7 +110,7 @@ def api_convert_dxf():
             except Exception:
                 pass
 
-        # 모델스페이스에서 실제 사용되는 INSERT의 블록 이름만 미리 수집
+        # 사용 블록만 미리 수집
         used_blocks = set()
         for e in src.modelspace():
             if e.dxftype() == 'INSERT':
@@ -142,7 +118,7 @@ def api_convert_dxf():
                     continue
                 used_blocks.add(e.dxf.name)
 
-        # 사용되는 블록만 복사 (속도 최적화)
+        # 사용 블록만 복사
         for bdef in src.blocks:
             name = bdef.name
             if name.startswith('*') or name not in used_blocks:
@@ -154,7 +130,7 @@ def api_convert_dxf():
             except Exception:
                 pass
 
-        # 모델스페이스 복사
+        # 모델스페이스
         copied = 0
         for e in src.modelspace():
             layer = e.dxf.get('layer', '0')
@@ -163,17 +139,15 @@ def api_convert_dxf():
             n = _copy_entity_r12(e, new_msp)
             if n: copied += n
 
-        # 헤더 복사
+        # 헤더
         for k in ('$EXTMIN', '$EXTMAX', '$LIMMIN', '$LIMMAX'):
             try: new.header[k] = src.header[k]
             except Exception: pass
 
-        # bytes 변환
         buf = io.StringIO()
         new.write(buf, fmt='asc')
         out_bytes = buf.getvalue().encode('cp949', errors='replace')
 
-        # 파일명
         base_name = os.path.splitext(os.path.basename(f.filename))[0]
         suffix = '_R12' if mode == 'original' else '_분석용'
         out_name = f"{base_name}{suffix}.dxf"
@@ -209,7 +183,6 @@ PRJ_TEXT_KO = {
 
 
 def _sr_remove_junk(coords):
-    """5σ 이상치 제거"""
     if len(coords) < 4:
         return coords
     pts = coords[:-1] if coords[0] == coords[-1] else list(coords)
@@ -229,7 +202,6 @@ def _sr_remove_junk(coords):
 
 
 def _sr_dedup(polylines, precision=1):
-    """중복 폴리라인 제거 (85% 겹침)"""
     def make_sig(coords):
         return frozenset(
             (round(x, precision), round(y, precision))
@@ -258,7 +230,6 @@ def _sr_dedup(polylines, precision=1):
 
 
 def _sr_get_polylines(path):
-    """DXF에서 폴리라인 추출"""
     doc = ezdxf.readfile(path)
     msp = doc.modelspace()
     result = []
@@ -271,7 +242,6 @@ def _sr_get_polylines(path):
         coords = _sr_remove_junk(raw)
         if coords[0] != coords[-1]:
             coords = list(coords) + [coords[0]]
-        # 면적 계산
         area = 0.0
         for i in range(len(coords) - 1):
             x1, y1 = coords[i]
@@ -293,7 +263,6 @@ def _sr_get_polylines(path):
 
 @app.route('/api/sanrang/list', methods=['POST'])
 def api_sanrang_list():
-    """DXF 업로드 → 폴리라인 목록 (선택 UI용)"""
     if 'file' not in request.files:
         return jsonify({'error': '파일이 없습니다'}), 400
     f = request.files['file']
@@ -329,13 +298,6 @@ def api_sanrang_list():
 
 @app.route('/api/sanrang/convert', methods=['POST'])
 def api_sanrang_convert():
-    """
-    DXF → SHP/GPX 변환
-    - file: DXF
-    - epsg: EPSG:5185/5186/5187/5188 (기본 5186)
-    - format: shp / gpx (기본 shp)
-    - indices: 변환할 폴리라인 인덱스 (콤마 구분, 빈 값이면 전체)
-    """
     if 'file' not in request.files:
         return jsonify({'error': '파일이 없습니다'}), 400
     f = request.files['file']
@@ -358,7 +320,6 @@ def api_sanrang_convert():
 
         polylines = _sr_get_polylines(tmp_path)
         
-        # 선택된 인덱스만 필터링
         if indices_str:
             indices = [int(x) for x in indices_str.split(',') if x.strip().isdigit()]
             selected = [polylines[i] for i in indices if 0 <= i < len(polylines)]
@@ -373,7 +334,7 @@ def api_sanrang_convert():
 
         if fmt == 'shp':
             if not HAS_PYSHP:
-                return jsonify({'error': 'pyshp 미설치 (서버 관리자에게 문의)'}), 500
+                return jsonify({'error': 'pyshp 미설치'}), 500
             
             with _tmp_dxf.TemporaryDirectory() as tmpdir:
                 base = os.path.join(tmpdir, "polygon")
