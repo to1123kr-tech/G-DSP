@@ -4126,7 +4126,7 @@
                 <div class="nd-irow"><span class="nd-ik">용적률</span><span class="nd-iv nd-iv-g" id="ndInfoFar">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">건축년도</span><span class="nd-iv" id="ndInfoYear">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">소유구분</span><span class="nd-iv" id="ndBldOwner">-</span></div>
-                <button class="nd-bld-btn" onclick="showView('bld')">건축물대장 상세보기</button>
+                <button class="nd-bld-btn" onclick="openBldDownload()">건축물대장 상세보기</button>
               </div>
             </div>
 
@@ -4349,7 +4349,7 @@
                   <div class="ik">소유구분</div>
                   <div class="iv" id="gBldOwner">-</div>
                 </div>
-                <button class="gbtn-neon" onclick="showView('bld')">건축물대장 상세보기</button>
+                <button class="gbtn-neon" onclick="openBldDownload()">건축물대장 상세보기</button>
               </div>
               <div class="gsec">
                 <div class="gsec-t">발급 연결</div>
@@ -8112,7 +8112,26 @@
       .catch(function(){ ndApplySearch(lng, lat, searchAddr, ''); });
     }
 
+    // ✨ 새 함수 (2026-06-02): 건축물대장 상세보기 - popup_download.html bld 탭을 새 탭으로
+    function openBldDownload() {
+      var pnu = currentPnu || '';
+      var jibun = currentJibun || '';
+      var url = 'popup_download.html?tab=bld';
+      if (pnu) url += '&pnu=' + encodeURIComponent(pnu);
+      if (jibun) url += '&jibun=' + encodeURIComponent(jibun);
+      window.open(url, '_blank');
+    }
+
     function ndApplySearch(lng, lat, jibun, pnu) {
+      // ✨ 버그 수정 (2026-06-02): 새 필지 검색 시 이전 건축물 정보 초기화
+      // 새 필지에 건물이 없을 때 이전 데이터가 그대로 남는 문제 해결
+      ['ndInfoUse','ndInfoFloor','ndInfoBldArea','ndInfoTotArea','ndInfoBcr','ndInfoFar','ndInfoYear','ndBldOwner',
+       'ndRcUse','ndRcBcr','ndRcFar','gBcr','gFar','bUse','bFloor','bArea','bBcArea','bYear','rcUse','rcBcr','rcFar',
+       'bldOwner','gBldOwner','ndInfoOwner'].forEach(function(id){
+        var el = document.getElementById(id);
+        if (el) el.textContent = '-';
+      });
+      
       // 카카오맵으로 이동 (대시보드는 카카오맵 전용)
       if (ndMap) {
         var _pos2 = new kakao.maps.LatLng(lat, lng);

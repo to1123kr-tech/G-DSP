@@ -1820,6 +1820,27 @@ window.addEventListener('DOMContentLoaded', function(){
       if(box && !box.contains(e.target)) box.style.display='none';
     });
   });
+  
+  // ✨ 추가 (2026-06-02): URL 파라미터로 tab/pnu/jibun 받기
+  // index.html에서 "건축물대장 상세보기" 클릭 시 자동 연동
+  var params = new URLSearchParams(location.search);
+  var tab = params.get('tab');
+  var pnu = params.get('pnu');
+  var jibun = params.get('jibun');
+  
+  if (tab) {
+    // 지정된 탭으로 전환
+    setTimeout(function(){ switchTab(tab); }, 100);
+  }
+  if (jibun) {
+    // 지번 입력칸에 자동 채움
+    var bldInp = document.getElementById('bldJibunInput');
+    if (bldInp) bldInp.value = jibun;
+    // 건축물대장 API 자동 조회 (탭 로드 후)
+    if (tab === 'bld' && typeof callBldApi === 'function') {
+      setTimeout(function(){ callBldApi(); }, 500);
+    }
+  }
 });
 </script>
 </body>
