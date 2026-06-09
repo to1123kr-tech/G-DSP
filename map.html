@@ -747,8 +747,7 @@ function initVwMap() {
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms',
       params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
-      serverType: 'mapserver',
-      crossOrigin: 'anonymous'
+      serverType: 'mapserver'
     }),
     visible: true,
     opacity: 0.85
@@ -947,8 +946,7 @@ function toggleWmsLayer(type, on) {
         source: new ol.source.TileWMS({
           url: 'https://api.vworld.kr/req/wms',
           params: { 'LAYERS': layerName, 'STYLES': layerName, 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
-          serverType: 'mapserver',
-          crossOrigin: 'anonymous'
+          serverType: 'mapserver'
         }),
         opacity: 0.55
       });
