@@ -735,17 +735,20 @@ function initVwMap() {
   // VWorld 위성 배경 타일 (서버 프록시 경유)
   var vwSatLayer = new ol.layer.Tile({
     source: new ol.source.XYZ({
-      url: PROXY + '/api/vw-tile/Satellite/{z}/{x}/{y}.jpeg',
-      maxZoom: 19
+      // VWorld 직접 호출 (프록시 제거) — VWorld는 z/y/x 순서
+      url: 'https://api.vworld.kr/req/wmts/1.0.0/' + VWORLD_KEY + '/Satellite/{z}/{y}/{x}.jpeg',
+      maxZoom: 19,
+      crossOrigin: 'anonymous'
     })
   });
 
-  // 지적도 WMS 레이어 (기본 ON, 서버 프록시 경유)
+  // 지적도 WMS 레이어 (기본 ON, VWorld 직접 호출)
   window._olCadLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
-      url: PROXY + '/api/vw-wms',
-      params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true },
-      serverType: 'mapserver'
+      url: 'https://api.vworld.kr/req/wms',
+      params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
+      serverType: 'mapserver',
+      crossOrigin: 'anonymous'
     }),
     visible: true,
     opacity: 0.85
@@ -877,7 +880,7 @@ function _wmsUrl(layerName, bbox) {
   return 'https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
     +'&layers='+layerName+'&styles=&crs=EPSG:4326'
     +'&bbox='+bbox+'&width=256&height=256&format=image/png&transparent=true'
-    +'&Key='+VWORLD_KEY;
+    +'&Key='+VWORLD_KEY+'&domain='+location.hostname;
 }
 function _tileXYZtoBBox(x, y, z) {
   var n = Math.pow(2, z);
@@ -942,9 +945,10 @@ function toggleWmsLayer(type, on) {
     } else {
       var lyr = new ol.layer.Tile({
         source: new ol.source.TileWMS({
-          url: PROXY + '/api/vw-wms',
-          params: { 'LAYERS': layerName, 'STYLES': layerName, 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true },
-          serverType: 'mapserver'
+          url: 'https://api.vworld.kr/req/wms',
+          params: { 'LAYERS': layerName, 'STYLES': layerName, 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
+          serverType: 'mapserver',
+          crossOrigin: 'anonymous'
         }),
         opacity: 0.55
       });
