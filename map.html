@@ -1255,50 +1255,35 @@ function doSearch() {
   var hasCity = /시$|군$|구$|도$/.test(q.split(' ')[0]);
   var query = hasCity ? q : '화성시 ' + q;
   setStatus('검색중...', false);
+  // ⭐ REST 키 불필요 - 지도 SDK 내장 검색
+  if (!(window.kakao && kakao.maps && kakao.maps.services)) {
+    toast('카카오 SDK 로딩 중... 잠시 후 재시도', 'err'); setStatus('대기중', true); return;
+  }
+  var gc = new kakao.maps.services.Geocoder();
+  var ps = new kakao.maps.services.Places();
+  var OK = kakao.maps.services.Status.OK;
+
+  function handle(docs){
+    if (docs.length === 1) applyResult(docs[0]);
+    else showDrop(docs);
+  }
   // 1차: 주소 검색
-  fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(query) + '&size=5', {
-    headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    var docs = d.documents || [];
-    if (docs.length) {
-      if (docs.length === 1) applyResult(docs[0]);
-      else showDrop(docs);
-      return;
-    }
+  gc.addressSearch(query, function(docs, st){
+    if (st === OK && docs.length) { handle(docs); return; }
     // 화성시 빼고 재시도
-    return fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(q) + '&size=5', {
-      headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
-    }).then(function(r2){ return r2.json(); }).then(function(d2){
-      var docs2 = d2.documents || [];
-      if (docs2.length) {
-        if (docs2.length === 1) applyResult(docs2[0]);
-        else showDrop(docs2);
-        return;
-      }
+    gc.addressSearch(q, function(docs2, st2){
+      if (st2 === OK && docs2.length) { handle(docs2); return; }
       // 2차: 키워드(장소/명칭) 검색
-      return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(query) + '&size=5', {
-        headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
-      }).then(function(r3){ return r3.json(); }).then(function(d3){
-        var docs3 = d3.documents || [];
-        if (!docs3.length) {
-          // 화성시 빼고 키워드 재시도
-          return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(q) + '&size=5', {
-            headers: { 'Authorization': 'KakaoAK ' + KAKAO_KEY }
-          }).then(function(r4){ return r4.json(); }).then(function(d4){
-            var docs4 = d4.documents || [];
-            if (!docs4.length) throw new Error('not found');
-            if (docs4.length === 1) applyResult(docs4[0]);
-            else showDrop(docs4);
-          });
-        }
-        if (docs3.length === 1) applyResult(docs3[0]);
-        else showDrop(docs3);
+      ps.keywordSearch(query, function(docs3, st3){
+        if (st3 === OK && docs3.length) { handle(docs3); return; }
+        // 화성시 빼고 키워드 재시도
+        ps.keywordSearch(q, function(docs4, st4){
+          if (st4 === OK && docs4.length) { handle(docs4); return; }
+          toast('검색 결과 없음', 'err'); setStatus('대기중', true);
+        });
       });
     });
-  })
-  .catch(function(){ toast('검색 결과 없음', 'err'); setStatus('대기중', true); });
+  });
 }
 
 function showDrop(docs) {
