@@ -742,7 +742,7 @@ function initVwMap() {
     })
   });
 
-  // 연속지적도 (본번+부번: 경계선+지번 다 보임, 배경 깨끗) ⭐
+  // 연속지적도 (본번+부번: 파란 경계선+지번) ⭐ + 올리브색 제거 blend
   window._olCadLineLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms',
@@ -752,20 +752,20 @@ function initVwMap() {
     visible: true,
     opacity: 1.0
   });
+  // ⭐ 올리브색 배경 제거: multiply 블렌드 → 밝은 배경면 투명, 진한 선/지번만
+  window._olCadLineLayer.on('prerender', function(evt){ evt.context.globalCompositeOperation = 'multiply'; });
+  window._olCadLineLayer.on('postrender', function(evt){ evt.context.globalCompositeOperation = 'source-over'; });
 
-  // 지적도 WMS 레이어 (편집지적도-지번, 기본 ON, VWorld 직접 호출)
+  // 편집지적도 (예비, 미사용)
   window._olCadLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms',
       params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
       serverType: 'mapserver'
     }),
-    visible: true,
+    visible: false,
     opacity: 1.0
   });
-  // ⭐ 올리브색 배경 필터 제거: multiply 블렌드 → 밝은 배경면은 투명해지고 진한 선/지번만 남음
-  window._olCadLayer.on('prerender', function(evt){ evt.context.globalCompositeOperation = 'multiply'; });
-  window._olCadLayer.on('postrender', function(evt){ evt.context.globalCompositeOperation = 'source-over'; });
 
   // 선택 필지 하이라이트 벡터 레이어
   window._olHighlightSource = new ol.source.Vector();
@@ -789,7 +789,7 @@ function initVwMap() {
 
   window._olMap = new ol.Map({
     target: 'olMap',
-    layers: [vwSatLayer, window._olContourLayer, window._olCadLayer, window._olHighlightLayer],
+    layers: [vwSatLayer, window._olContourLayer, window._olCadLineLayer, window._olHighlightLayer],
     view: new ol.View({
       center: ol.proj.fromLonLat([currentLng, currentLat]),
       zoom: 17,
@@ -928,8 +928,8 @@ function _removeWmsTileset(key) {
 
 function toggleCadastral(on) {
   if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
-  if (window._olCadLayer) {
-    window._olCadLayer.setVisible(on);
+  if (window._olCadLineLayer) {
+    window._olCadLineLayer.setVisible(on);
   }
   toast(on ? '지적선+지번 ON' : '지적선+지번 OFF');
 }
