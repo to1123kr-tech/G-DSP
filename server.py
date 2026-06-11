@@ -289,21 +289,35 @@ def wfs_dxf_circle():
     # ⭐ 복수 필지 PNU 목록 (선택필지만 모드용)
     pnus = body.get("pnus") or []
     if isinstance(pnus, str): pnus = [pnus]
+    # ⭐ 직접선택 영역 폴리곤 (GeoJSON, 경위도)
+    draw_polygon = None
+    try:
+        pg = body.get("polygon")
+        if pg and pg.get("coordinates"):
+            draw_polygon = shapely_shape(pg)
+    except:
+        draw_polygon = None
 
     # bbox 계산 (도(deg) 단위)
     if radius_m <= 0:
         # 선택필지만: 작은 bbox (필지 주변 ~150m)
         eff_r = 150.0
+        buffer_m = max(300, min(800, eff_r * 0.8))
+        query_radius_m = eff_r + buffer_m
+        lat_deg = query_radius_m / 111000.0
+        lng_deg = query_radius_m / (111000.0 * max(0.1, math.cos(math.radians(center_lat))))
+        bbox = [center_lng - lng_deg, center_lat - lat_deg, center_lng + lng_deg, center_lat + lat_deg]
+        radius_deg = eff_r / 111000.0
+        circle_filter = Point(center_lng, center_lat).buffer(radius_deg * 1.15)
     else:
         eff_r = radius_m
-    buffer_m = max(300, min(800, eff_r * 0.8))
-    query_radius_m = eff_r + buffer_m
-    lat_deg = query_radius_m / 111000.0
-    lng_deg = query_radius_m / (111000.0 * max(0.1, math.cos(math.radians(center_lat))))
-    bbox = [center_lng - lng_deg, center_lat - lat_deg, center_lng + lng_deg, center_lat + lat_deg]
-
-    radius_deg = eff_r / 111000.0
-    circle_filter = Point(center_lng, center_lat).buffer(radius_deg * 1.15)
+        buffer_m = max(300, min(800, eff_r * 0.8))
+        query_radius_m = eff_r + buffer_m
+        lat_deg = query_radius_m / 111000.0
+        lng_deg = query_radius_m / (111000.0 * max(0.1, math.cos(math.radians(center_lat))))
+        bbox = [center_lng - lng_deg, center_lat - lat_deg, center_lng + lng_deg, center_lat + lat_deg]
+        radius_deg = eff_r / 111000.0
+        circle_filter = Point(center_lng, center_lat).buffer(radius_deg * 1.15)
 
     # 레이어별 병렬 가져오기
     t_fetch_start = time.time()
@@ -320,10 +334,12 @@ def wfs_dxf_circle():
     fetch_time = time.time() - t_fetch_start
 
     # 영역 필터링
-    # - 선택필지만(radius=0): PNU 목록과 일치하는 필지만 (지적 외 레이어는 그 필지들과 교차)
+    # - 직접선택(draw_polygon): ⭐그린 영역에 걸치면 전부 포함
+    # - 선택필지만(radius=0): PNU 목록과 일치하는 필지만
     # - 반경 모드: ⭐원에 조금이라도 걸치면 포함 (intersects - 구멍 방지)
     sel_union = None
-    if radius_m <= 0 and pnus:
+    use_pnus_mode = (draw_polygon is None) and (radius_m <= 0) and bool(pnus)
+    if use_pnus_mode:
         # 선택 필지 geometry 먼저 수집 (cadastra에서)
         sel_geoms = []
         for f in features_by_layer.get('cadastra', []):
@@ -340,7 +356,7 @@ def wfs_dxf_circle():
         for f in features_by_layer.get(lid, []):
             try:
                 g = shapely_shape(f.get('geometry'))
-                if radius_m <= 0 and pnus:
+                if use_pnus_mode:
                     if lid == 'cadastra':
                         p = (f.get('properties') or {})
                         if str(p.get('pnu') or '') in [str(x) for x in pnus]:
