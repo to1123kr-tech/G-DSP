@@ -83,24 +83,33 @@ VWORLD_LAYERS = {
 
 # ==================== VWorld 데이터 가져오기 ====================
 def _fetch_vworld_box(vworld_data, bbox, size=1000):
-    """일반 VWorld data API 호출"""
+    """일반 VWorld data API 호출 (⭐페이징: 모든 피처 다 받을 때까지 → 구멍 방지)"""
     url = "https://api.vworld.kr/req/data"
-    params = {
-        "service": "data", "request": "GetFeature", "data": vworld_data,
-        "key": VWORLD_KEY, "format": "json", "size": str(size),
-        "domain": VWORLD_DOMAIN,
-        "geomFilter": f"BOX({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]})",
-    }
     headers = {"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}
-    try:
-        r = req.get(url, params=params, headers=headers, timeout=25)
-        data = r.json()
-        fc = data.get("response", {}).get("result", {}).get("featureCollection", {})
-        if fc:
-            return fc.get("features", []) or []
-    except Exception as e:
-        logger.error(f"[WFS {vworld_data}] {e}")
-    return []
+    all_features = []
+    page = 1
+    max_pages = 10  # 안전장치 (1000×10=최대 1만개)
+    while page <= max_pages:
+        params = {
+            "service": "data", "request": "GetFeature", "data": vworld_data,
+            "key": VWORLD_KEY, "format": "json", "size": str(size), "page": str(page),
+            "domain": VWORLD_DOMAIN,
+            "geomFilter": f"BOX({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]})",
+        }
+        try:
+            r = req.get(url, params=params, headers=headers, timeout=25)
+            data = r.json()
+            fc = data.get("response", {}).get("result", {}).get("featureCollection", {})
+            feats = (fc.get("features", []) or []) if fc else []
+            all_features.extend(feats)
+            # 받은 개수가 size 미만이면 마지막 페이지
+            if len(feats) < size:
+                break
+            page += 1
+        except Exception as e:
+            logger.error(f"[WFS {vworld_data}] p{page} {e}")
+            break
+    return all_features
 
 
 def _fetch_ned_wfs_box(endpoint_name, bbox, size=500):
@@ -271,21 +280,29 @@ def wfs_dxf_circle():
         return jsonify({"error": "lng/lat 또는 center_lng/center_lat 필요"}), 400
 
     radius_m = float(body.get("radius", 500))
-    radius_m = max(100, min(2000, radius_m))
+    radius_m = max(0, min(2000, radius_m))  # 0 = 선택필지만
     requested = body.get("layers") or ["cadastra"]
     layer_ids = [l for l in requested if l in VWORLD_LAYERS]
     if not layer_ids:
         return jsonify({"error": "유효한 레이어 없음"}), 400
     jibun = (body.get("jibun") or "").strip()
+    # ⭐ 복수 필지 PNU 목록 (선택필지만 모드용)
+    pnus = body.get("pnus") or []
+    if isinstance(pnus, str): pnus = [pnus]
 
     # bbox 계산 (도(deg) 단위)
-    buffer_m = max(300, min(800, radius_m * 0.8))
-    query_radius_m = radius_m + buffer_m
+    if radius_m <= 0:
+        # 선택필지만: 작은 bbox (필지 주변 ~150m)
+        eff_r = 150.0
+    else:
+        eff_r = radius_m
+    buffer_m = max(300, min(800, eff_r * 0.8))
+    query_radius_m = eff_r + buffer_m
     lat_deg = query_radius_m / 111000.0
     lng_deg = query_radius_m / (111000.0 * max(0.1, math.cos(math.radians(center_lat))))
     bbox = [center_lng - lng_deg, center_lat - lat_deg, center_lng + lng_deg, center_lat + lat_deg]
-    
-    radius_deg = radius_m / 111000.0
+
+    radius_deg = eff_r / 111000.0
     circle_filter = Point(center_lng, center_lat).buffer(radius_deg * 1.15)
 
     # 레이어별 병렬 가져오기
@@ -302,14 +319,37 @@ def wfs_dxf_circle():
                 features_by_layer[lid] = []
     fetch_time = time.time() - t_fetch_start
 
-    # 원 영역 필터링 (지적/건물은 폴리곤이라 부분교차 OK)
+    # 영역 필터링
+    # - 선택필지만(radius=0): PNU 목록과 일치하는 필지만 (지적 외 레이어는 그 필지들과 교차)
+    # - 반경 모드: ⭐원에 조금이라도 걸치면 포함 (intersects - 구멍 방지)
+    sel_union = None
+    if radius_m <= 0 and pnus:
+        # 선택 필지 geometry 먼저 수집 (cadastra에서)
+        sel_geoms = []
+        for f in features_by_layer.get('cadastra', []):
+            p = (f.get('properties') or {})
+            if str(p.get('pnu') or '') in [str(x) for x in pnus]:
+                try: sel_geoms.append(shapely_shape(f.get('geometry')))
+                except: pass
+        if sel_geoms:
+            from shapely.ops import unary_union
+            sel_union = unary_union(sel_geoms).buffer(0.00001)  # 약간 버퍼(경계 맞닿음 포함)
+
     for lid in layer_ids:
         filtered = []
         for f in features_by_layer.get(lid, []):
             try:
                 g = shapely_shape(f.get('geometry'))
-                if g.intersects(circle_filter):
-                    filtered.append(f)
+                if radius_m <= 0 and pnus:
+                    if lid == 'cadastra':
+                        p = (f.get('properties') or {})
+                        if str(p.get('pnu') or '') in [str(x) for x in pnus]:
+                            filtered.append(f)
+                    elif sel_union is not None and g.intersects(sel_union):
+                        filtered.append(f)
+                else:
+                    if g.intersects(circle_filter):
+                        filtered.append(f)
             except:
                 filtered.append(f)
         features_by_layer[lid] = filtered
@@ -372,12 +412,11 @@ def wfs_dxf_circle():
             layer_stats[text_layer] = text_count
         total += cnt
 
-    # 기준점
+    # 기준점 (⭐원 표시 제거 - 영대님 요청. 노트 텍스트만)
     cx, cy = _wgs84_to_cad(center_lng, center_lat)
     if "기준점" not in doc.layers:
         doc.layers.new(name="기준점", dxfattribs={"color": 8})
     try:
-        msp.add_circle((cx, cy), radius=2.0, dxfattribs={"layer": "기준점"})
         note = f"G-DSP {jibun or ''} r={int(radius_m)}m"
         t = msp.add_text(note, dxfattribs={"layer": "기준점", "height": 5.0, "style": "HANGUL"})
         t.set_placement((cx, cy - radius_m - 30), align=TextEntityAlignment.MIDDLE_CENTER)
