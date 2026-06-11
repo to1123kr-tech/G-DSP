@@ -7682,7 +7682,7 @@
       if (ndVwKey) { cb(ndVwKey); return; }
       var saved = localStorage.getItem('gdsp_vworld');
       if (saved) { ndVwKey = saved; cb(ndVwKey); return; }
-      fetch(GDSP_SERVER + '/api/vworld/key')
+      fetch('/api/vworld/key')
         .then(function(r){ return r.json(); })
         .then(function(d){ if(d.key){ ndVwKey = d.key; cb(ndVwKey); } else cb(''); })
         .catch(function(){ cb(''); });
@@ -7732,29 +7732,123 @@
     }
 
     function ndInitKakaoFallback() {
-      if (!window.kakao || !window.kakao.maps) { setTimeout(ndInitKakaoFallback, 300); return; }
+      if (typeof ol === 'undefined') { setTimeout(ndInitKakaoFallback, 300); return; }
       var container = document.getElementById('ndKakaoMap');
       if (!container || ndMapInited) return;
-      ndMapInited = true; ndVwMapInited = true;
-      var options = { center: new kakao.maps.LatLng(37.2055, 126.8317), level: 4 };
-      ndMap = new kakao.maps.Map(container, options);
-      ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW);
-      ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID);
-      ndGeocoder = new kakao.maps.services.Geocoder();
-      // ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT); // 지적도 기본 OFF
-      // 마커 초기화
-      ndMarker = new kakao.maps.Marker({ map: null });
-      // 클릭 이벤트
-      kakao.maps.event.addListener(ndMap, 'click', function(e) {
-        ndOnMapClick(e.latLng.getLng(), e.latLng.getLat());
-        ndHideCtxMenu();
+
+      ndGetVwKey(function(key){
+        if(!key){ setTimeout(ndInitKakaoFallback, 500); return; }
+        if(ndMapInited) return;
+        ndMapInited = true; ndVwMapInited = true;
+
+        // 카카오 geocoder는 주소검색용으로 유지
+        if (window.kakao && window.kakao.maps && !ndGeocoder) {
+          try { ndGeocoder = new kakao.maps.services.Geocoder(); } catch(e){}
+        }
+
+        // 위성 배경 (VWorld 직접)
+        var vwSat = new ol.layer.Tile({
+          source: new ol.source.XYZ({
+            url: 'https://api.vworld.kr/req/wmts/1.0.0/'+key+'/Satellite/{z}/{y}/{x}.jpeg',
+            crossOrigin: 'anonymous', maxZoom: 19
+          }), preload: 2
+        });
+        // ⭐ 빨간 지적선 + 지번
+        window._ndCadSource = new ol.source.Vector();
+        window._ndCadLayer = new ol.layer.Vector({
+          source: window._ndCadSource,
+          style: function(feature){
+            var styles=[ new ol.style.Style({
+              stroke: new ol.style.Stroke({ color:'#ff2d2d', width:1.6 }),
+              fill: new ol.style.Fill({ color:'rgba(255,45,45,0.02)' })
+            }) ];
+            var jb=feature.get('jibun');
+            if(jb){ styles.push(new ol.style.Style({ text:new ol.style.Text({
+              text:jb, font:'bold 13px "Malgun Gothic",sans-serif',
+              fill:new ol.style.Fill({color:'#fff'}),
+              stroke:new ol.style.Stroke({color:'#000',width:3}), overflow:true
+            })})); }
+            return styles;
+          }
+        });
+        // 선택 마커(하이라이트)
+        window._ndMarkerSource = new ol.source.Vector();
+        window._ndMarkerLayer = new ol.layer.Vector({
+          source: window._ndMarkerSource,
+          style: new ol.style.Style({
+            image: new ol.style.Circle({ radius:7,
+              fill:new ol.style.Fill({color:'#ffd200'}),
+              stroke:new ol.style.Stroke({color:'#000',width:2}) })
+          })
+        });
+
+        ndMap = new ol.Map({
+          target: 'ndKakaoMap',
+          layers: [vwSat, window._ndCadLayer, window._ndMarkerLayer],
+          view: new ol.View({ center: ol.proj.fromLonLat([126.8317,37.2055]), zoom:17, maxZoom:21, minZoom:6 }),
+          controls: []
+        });
+
+        // 좌클릭
+        ndMap.on('click', function(evt){
+          var c = ol.proj.toLonLat(evt.coordinate);
+          ndOnMapClick(c[0], c[1]);
+          ndHideCtxMenu();
+        });
+        // 우클릭 → 메뉴
+        ndMap.getViewport().addEventListener('contextmenu', function(e){
+          e.preventDefault();
+          var coord = ndMap.getEventCoordinate(e);
+          var ll = ol.proj.toLonLat(coord);
+          ndShowCtxMenu(e.clientX, e.clientY, ll[1], ll[0]);
+        });
+        // 이동/줌 → 지적선 갱신
+        var _ndT=null;
+        ndMap.on('moveend', function(){
+          if(_ndT) clearTimeout(_ndT);
+          _ndT = setTimeout(ndLoadCadastral, 350);
+        });
+        setTimeout(function(){ try{ ndMap.updateSize(); }catch(e){} }, 200);
+
+        var em=document.getElementById('ndMapEmpty');
+        if(em) em.style.display='none';
       });
-      // 우클릭 이벤트
-      kakao.maps.event.addListener(ndMap, 'rightclick', function(e) {
-        var lat = e.latLng.getLat(), lng = e.latLng.getLng();
-        ndShowCtxMenu(e.point.x, e.point.y, lat, lng);
-      });
-      document.getElementById('ndMapEmpty').style.display = 'none';
+    }
+
+    // ⭐ nd 지도 빨간 지적선 로드
+    var _ndCadLoading=false, _ndCadKey='';
+    function ndLoadCadastral(){
+      if(!ndMap || !window._ndCadSource || !ndMap.getView) return;
+      var view = ndMap.getView();
+      if(view.getZoom() < 16){ window._ndCadSource.clear(); return; }
+      var ext = view.calculateExtent(ndMap.getSize());
+      var mn = ol.proj.toLonLat([ext[0],ext[1]]);
+      var mx = ol.proj.toLonLat([ext[2],ext[3]]);
+      var key = mn[0].toFixed(4)+','+mn[1].toFixed(4)+','+mx[0].toFixed(4)+','+mx[1].toFixed(4);
+      if(key===_ndCadKey || _ndCadLoading) return;
+      _ndCadLoading=true; _ndCadKey=key;
+      fetch('/api/cad-box?minx='+mn[0]+'&miny='+mn[1]+'&maxx='+mx[0]+'&maxy='+mx[1]+'&size=300')
+        .then(function(r){return r.json();})
+        .then(function(d){
+          _ndCadLoading=false; window._ndCadSource.clear();
+          var fs=d&&d.features; if(!fs||!fs.length) return;
+          fs.forEach(function(f){
+            try{
+              var g=f.geometry; if(!g) return;
+              var rings = g.type==='MultiPolygon'? g.coordinates.map(function(p){return p[0];})
+                        : g.type==='Polygon'? [g.coordinates[0]] : null;
+              if(!rings) return;
+              var jb=(f.properties&&f.properties.jibun)||'';
+              rings.forEach(function(ring){
+                var merc=ring.map(function(c){return ol.proj.fromLonLat(c);});
+                var feat=new ol.Feature({geometry:new ol.geom.Polygon([merc])});
+                feat.set('jibun',jb);
+                window._ndCadSource.addFeature(feat);
+              });
+            }catch(e){}
+          });
+        })
+        .catch(function(e){ _ndCadLoading=false; });
     }
 
     var _ndCtxLat = 0, _ndCtxLng = 0, _ndCtxJibun = '';
@@ -7821,21 +7915,25 @@
       if (menu && !menu.contains(e.target)) ndHideCtxMenu();
     });
 
+    // OpenLayers 마커 표시
+    function ndSetMarker(lng, lat){
+      if(!window._ndMarkerSource) return;
+      window._ndMarkerSource.clear();
+      var feat = new ol.Feature({ geometry: new ol.geom.Point(ol.proj.fromLonLat([lng, lat])) });
+      window._ndMarkerSource.addFeature(feat);
+    }
+
     function ndSetMapType(type, btn) {
       document.querySelectorAll('.nd-mt-btn').forEach(function(b){ b.classList.remove('on'); });
       if (btn) btn.classList.add('on');
       ndMapType = type;
-      if (ndVwMap) {
-        // VWorld 배경지도 전환
+      if (ndMap && ndMap.getLayers) {
         try {
-          if (type === 'normal') ndVwMap.setBasemap('GRAPHIC');
-          else if (type === 'skyview') ndVwMap.setBasemap('SATELLITE');
-          else if (type === 'hybrid') ndVwMap.setBasemap('HYBRID');
-        } catch(e) {}
-      } else if (ndMap) {
-        if (type === 'normal') { ndMap.setMapTypeId(kakao.maps.MapTypeId.ROADMAP); ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID); }
-        else if (type === 'skyview') { ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW); ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID); }
-        else if (type === 'hybrid') { ndMap.setMapTypeId(kakao.maps.MapTypeId.SKYVIEW); ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.HYBRID); }
+          var bg = ndMap.getLayers().getArray()[0];
+          var key = ndVwKey || (localStorage.getItem('gdsp_vworld')||'');
+          var layerName = (type==='normal') ? 'Base' : (type==='hybrid' ? 'Hybrid' : 'Satellite');
+          bg.getSource().setUrl('https://api.vworld.kr/req/wmts/1.0.0/'+key+'/'+layerName+'/{z}/{y}/{x}.jpeg');
+        } catch(e){}
       }
     }
 
@@ -7843,11 +7941,11 @@
       ndVwCadOn = !ndVwCadOn;
       var btn = document.getElementById('ndCadBtn');
       if (btn) btn.classList.toggle('on', ndVwCadOn);
-      toast(ndVwCadOn ? '지적도 ON' : '지적도 OFF');
-      if (ndMap) {
-        if (ndVwCadOn) ndMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-        else ndMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
+      if (window._ndCadLayer) {
+        window._ndCadLayer.setVisible(ndVwCadOn);
+        if(ndVwCadOn) ndLoadCadastral();
       }
+      toast(ndVwCadOn ? '지적선 ON' : '지적선 OFF');
     }
 
     // 지도 클릭 → 역지오코딩 → 토지정보 조회
@@ -7861,11 +7959,8 @@
           ndGeocoder = gc;
         } else return;
       }
-      // 마커 이동
-      if(ndMap && ndMarker){
-        var _pos = new kakao.maps.LatLng(lat, lng);
-        ndMarker.setPosition(_pos); ndMarker.setMap(ndMap);
-      }
+      // 마커 이동 (OpenLayers)
+      ndSetMarker(lng, lat);
       // 이전 소유자 정보 초기화
       setText('ndInfoOwner', '조회중...');
       // 1단계: 주소 가져오기
@@ -8210,12 +8305,10 @@
         if (el) el.textContent = '-';
       });
       
-      // 카카오맵으로 이동 (대시보드는 카카오맵 전용)
-      if (ndMap) {
-        var _pos2 = new kakao.maps.LatLng(lat, lng);
-        ndMap.setCenter(_pos2);
-        // ndMap.setLevel(3);  // 줌 레벨 유지
-        if(ndMarker){ ndMarker.setPosition(_pos2); ndMarker.setMap(ndMap); }
+      // VWorld(OpenLayers)로 이동
+      if (ndMap && ndMap.getView) {
+        ndMap.getView().animate({ center: ol.proj.fromLonLat([lng, lat]), zoom: 18, duration: 400 });
+        ndSetMarker(lng, lat);
       }
       // 정보 업데이트
       currentPnu = pnu; currentJibun = jibun; armed = true;
