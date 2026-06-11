@@ -299,7 +299,13 @@ def wfs_dxf_circle():
         draw_polygon = None
 
     # bbox 계산 (도(deg) 단위)
-    if radius_m <= 0:
+    if draw_polygon is not None:
+        # 직접선택: 그린 영역 bbox + 여유
+        pminx, pminy, pmaxx, pmaxy = draw_polygon.bounds
+        pad = 0.003
+        bbox = [pminx - pad, pminy - pad, pmaxx + pad, pmaxy + pad]
+        circle_filter = draw_polygon  # ⭐그린 영역에 걸치면 포함
+    elif radius_m <= 0:
         # 선택필지만: 작은 bbox (필지 주변 ~150m)
         eff_r = 150.0
         buffer_m = max(300, min(800, eff_r * 0.8))
