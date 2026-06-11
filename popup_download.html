@@ -1040,6 +1040,7 @@ function copyTiles(){
 /* ===================== OpenLayers 지도 (지적도 탭) ===================== */
 var _olMap2 = null, _olMap2loaded = false;
 var _parcelSource = null;   // 선택 필지 피처 레이어
+var _cadSource = null;      // ⭐ 빨간 지적선 소스
 var PROXY = '';  // 상대 경로 (현재 페이지와 같은 호스트)
 var _radiusSource = null;   // 반경 원 레이어
 var _selectedParcel = null; // {pnu, jibun, addr, lng, lat}
@@ -1075,44 +1076,23 @@ function initVmap2(){
   // ── 지적선 WMS 오버레이 (직접 호출, 빠름 ⚡) ──
   // ⚠️ WMS는 crossOrigin 절대 넣으면 안됨 (CORS 헤더 안주므로 일반 img로 로드해야 통과)
 
-  // (1) 연속지적도 - 본번+부번 (파란 경계선+지번) ⭐ + 올리브색 제거 blend
-  var cadLineLayer = new ol.layer.Tile({
-    source: new ol.source.TileWMS({
-      url: 'https://api.vworld.kr/req/wms',
-      params: {
-        'LAYERS': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
-        'STYLES': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
-        'FORMAT': 'image/png',
-        'TRANSPARENT': true,
-        'TILED': true,
-        'key': VWORLD_KEY,
-        'domain': location.hostname
-      },
-      serverType: 'mapserver'
-    }),
-    opacity: 1.0
-  });
-  // ⭐ 올리브색 배경 제거: multiply 블렌드 → 밝은 배경면 투명, 진한 선/지번만
-  cadLineLayer.on('prerender', function(evt){ evt.context.globalCompositeOperation = 'multiply'; });
-  cadLineLayer.on('postrender', function(evt){ evt.context.globalCompositeOperation = 'source-over'; });
-
-  // (2) 편집지적도(LX맵) - 예비, 미사용
-  var cadWmsLayer = new ol.layer.Tile({
-    source: new ol.source.TileWMS({
-      url: 'https://api.vworld.kr/req/wms',
-      params: {
-        'LAYERS': 'lt_c_landinfobasemap',
-        'STYLES': 'lt_c_landinfobasemap',
-        'FORMAT': 'image/png',
-        'TRANSPARENT': true,
-        'TILED': true,
-        'key': VWORLD_KEY,
-        'domain': location.hostname
-      },
-      serverType: 'mapserver'
-    }),
-    visible: false,
-    opacity: 1.0
+  // ⭐ 빨간 WFS 지적선 + 지번 레이어 (메인과 동일)
+  _cadSource = new ol.source.Vector();
+  var cadLineLayer = new ol.layer.Vector({
+    source: _cadSource,
+    style: function(feature){
+      var styles=[ new ol.style.Style({
+        stroke: new ol.style.Stroke({ color:'#ff2d2d', width:1.6 }),
+        fill: new ol.style.Fill({ color:'rgba(255,45,45,0.02)' })
+      }) ];
+      var jb=feature.get('jibun');
+      if(jb){ styles.push(new ol.style.Style({ text:new ol.style.Text({
+        text:jb, font:'bold 13px "Malgun Gothic",sans-serif',
+        fill:new ol.style.Fill({color:'#fff'}),
+        stroke:new ol.style.Stroke({color:'#000',width:3}), overflow:true
+      })})); }
+      return styles;
+    }
   });
 
   // 선택 필지 벡터 레이어 (노란 채우기)
@@ -1178,7 +1158,53 @@ function initVmap2(){
     onMapClickParcel(lonlat[0], lonlat[1]);
   });
 
+  // ⭐ 이동/줌 → 빨간 지적선 갱신
+  var _pdCadT=null;
+  _olMap2.on('moveend', function(){
+    if(_pdCadT) clearTimeout(_pdCadT);
+    _pdCadT = setTimeout(loadCadBox, 150);
+  });
+
   _olMap2loaded = true;
+}
+
+// ⭐ 다운로드 지도 빨간 지적선 로드
+var _pdCadLoading=false, _pdCadKey='';
+function loadCadBox(){
+  if(!_olMap2 || !_cadSource) return;
+  var view = _olMap2.getView();
+  if(view.getZoom() < 16){ _cadSource.clear(); return; }
+  var ext = view.calculateExtent(_olMap2.getSize());
+  var mn = ol.proj.toLonLat([ext[0],ext[1]]);
+  var mx = ol.proj.toLonLat([ext[2],ext[3]]);
+  var padX=(mx[0]-mn[0])*0.15, padY=(mx[1]-mn[1])*0.15;
+  var bx0=mn[0]-padX, by0=mn[1]-padY, bx1=mx[0]+padX, by1=mx[1]+padY;
+  var key = bx0.toFixed(4)+','+by0.toFixed(4)+','+bx1.toFixed(4)+','+by1.toFixed(4);
+  if(key===_pdCadKey || _pdCadLoading) return;
+  _pdCadLoading=true; _pdCadKey=key;
+  fetch('/api/cad-box?minx='+bx0+'&miny='+by0+'&maxx='+bx1+'&maxy='+by1+'&size=500')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      _pdCadLoading=false;
+      var fs=d&&d.features; if(!fs||!fs.length){ return; }
+      _cadSource.clear();
+      fs.forEach(function(f){
+        try{
+          var g=f.geometry; if(!g) return;
+          var rings = g.type==='MultiPolygon'? g.coordinates.map(function(p){return p[0];})
+                    : g.type==='Polygon'? [g.coordinates[0]] : null;
+          if(!rings) return;
+          var jb=(f.properties&&f.properties.jibun)||'';
+          rings.forEach(function(ring){
+            var merc=ring.map(function(c){return ol.proj.fromLonLat(c);});
+            var feat=new ol.Feature({geometry:new ol.geom.Polygon([merc])});
+            feat.set('jibun',jb);
+            _cadSource.addFeature(feat);
+          });
+        }catch(e){}
+      });
+    })
+    .catch(function(e){ _pdCadLoading=false; });
 }
 
 // 지도 클릭 시 필지 조회
