@@ -1760,7 +1760,17 @@ function callBldApi(){
   var jibun = document.getElementById('bldJibunInput').value.trim();
   if(!jibun){ toast('지번을 입력하세요 (예: 남양읍 한가울길 70)','err'); return; }
   var apiKey = localStorage.getItem('gdsp_building')||'';
-  if(!apiKey){ toast('건축물대장 API 키를 설정에서 먼저 입력하세요','err'); return; }
+  if(!apiKey){
+    // 서버에서 받아서 재시도
+    fetch('/api/building/key')
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.key){ localStorage.setItem('gdsp_building',d.key); callBldApi(); }
+        else { toast('건축물대장 API 키 로드 실패','err'); }
+      })
+      .catch(function(){ toast('건축물대장 API 키 로드 실패','err'); });
+    return;
+  }
 
   toast('주소 → PNU 변환 중...');
 
