@@ -1164,9 +1164,22 @@ function initVmap2(){
     }
   });
 
+  // ⭐ 검색 위치 마커 레이어
+  window._searchMarkerSource = new ol.source.Vector();
+  var searchMarkerLayer = new ol.layer.Vector({
+    source: window._searchMarkerSource,
+    style: new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 8,
+        fill: new ol.style.Fill({ color: '#ffd200' }),
+        stroke: new ol.style.Stroke({ color: '#000', width: 2 })
+      })
+    })
+  });
+
   _olMap2 = new ol.Map({
     target: 'vmap2',
-    layers: [bgLayer, cadLineLayer, parcelLayer, radiusLayer],
+    layers: [bgLayer, cadLineLayer, parcelLayer, radiusLayer, searchMarkerLayer],
     view: new ol.View({
       center: ol.proj.fromLonLat([126.831, 37.199]),
       zoom: 16,
@@ -1710,6 +1723,13 @@ function jdSelectAddr(i){
       zoom: 17,
       duration: 400
     });
+  }
+  // ⭐ 마커 표시
+  if(window._searchMarkerSource){
+    window._searchMarkerSource.clear();
+    window._searchMarkerSource.addFeature(new ol.Feature({
+      geometry: new ol.geom.Point(ol.proj.fromLonLat([item.lng, item.lat]))
+    }));
   }
   toast(item.addr+' 이동','ok');
   // 자동 클릭 시뮬레이션
