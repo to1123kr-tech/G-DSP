@@ -983,21 +983,24 @@ function loadWfsCadastral(){
     window._olWfsCadSource.clear();
     return;
   }
-  // 화면 중심 좌표
-  var c = ol.proj.toLonLat(view.getCenter());
-  var key = c[0].toFixed(4)+','+c[1].toFixed(4)+',z'+Math.round(zoom);
-  if(key === _wfsCadLastKey) return; // 같은 위치면 재요청 안함
+  // 화면 범위(extent) → 경위도 bbox
+  var ext = view.calculateExtent(window._olMap.getSize());
+  var min = ol.proj.toLonLat([ext[0], ext[1]]);
+  var max = ol.proj.toLonLat([ext[2], ext[3]]);
+  var key = min[0].toFixed(4)+','+min[1].toFixed(4)+','+max[0].toFixed(4)+','+max[1].toFixed(4);
+  if(key === _wfsCadLastKey) return; // 같은 범위면 재요청 안함
   if(_wfsCadLoading) return;
   _wfsCadLoading = true;
   _wfsCadLastKey = key;
 
-  fetch(PROXY+'/api/wfs-area?lng='+c[0]+'&lat='+c[1]+'&size=100')
+  var url = PROXY+'/api/cad-box?minx='+min[0]+'&miny='+min[1]+'&maxx='+max[0]+'&maxy='+max[1]+'&size=300';
+  fetch(url)
     .then(function(r){ return r.json(); })
     .then(function(d){
       _wfsCadLoading = false;
       var features = d && d.features;
-      if(!features || !features.length){ return; }
       window._olWfsCadSource.clear();
+      if(!features || !features.length){ return; }
       // GeoJSON(EPSG:4326) → 3857 변환하며 그리기
       features.forEach(function(f){
         try{
@@ -1006,22 +1009,18 @@ function loadWfsCadastral(){
           if(geom.type==='MultiPolygon') rings = geom.coordinates.map(function(p){return p[0];});
           else if(geom.type==='Polygon') rings = [geom.coordinates[0]];
           else return;
-          var jibun = (f.properties && (f.properties.jibun || f.properties.addr)) || '';
-          // 지번에서 "동/리" 빼고 번지만 (예: "산23-1" 또는 "123-4")
-          var shortJibun = jibun;
-          var m = jibun.match(/(산?\s?\d+(-\d+)?)\s*[가-힣]?$/);
-          if(m) shortJibun = m[1].replace(/\s/g,'');
+          var jibun = (f.properties && f.properties.jibun) || '';
           rings.forEach(function(ring){
             var merc = ring.map(function(c){ return ol.proj.fromLonLat(c); });
             var poly = new ol.geom.Polygon([merc]);
             var feat = new ol.Feature({ geometry: poly });
-            feat.set('jibun', shortJibun);
+            feat.set('jibun', jibun);
             window._olWfsCadSource.addFeature(feat);
           });
         }catch(e){}
       });
     })
-    .catch(function(e){ _wfsCadLoading = false; console.warn('WFS 지적선 실패', e); });
+    .catch(function(e){ _wfsCadLoading = false; console.warn('지적선 로드 실패', e); });
 }
 
 function toggleWmsLayer(type, on) {
