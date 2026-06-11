@@ -568,9 +568,13 @@ var _kakaoKey = (window.opener && window.opener.KAKAO_APP_KEY) || localStorage.g
 (function(){
   fetch('/api/kakao/key')
     .then(function(r){return r.json();})
-    .then(function(d){
-      if(d.key){ _kakaoKey=d.key; localStorage.setItem('gdsp_kakao',d.key); }
-    }).catch(function(){});
+    .then(function(d){ if(d.key){ _kakaoKey=d.key; localStorage.setItem('gdsp_kakao',d.key); } })
+    .catch(function(){});
+  // ⭐ 건축물대장 API 키 자동 로드
+  fetch('/api/building/key')
+    .then(function(r){return r.json();})
+    .then(function(d){ if(d.key){ localStorage.setItem('gdsp_building',d.key); } })
+    .catch(function(){});
 })();
 
 // 오라클 서버에서 VWorld 키 자동 로드 (지도 직접호출용)
