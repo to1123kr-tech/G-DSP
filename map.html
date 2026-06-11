@@ -781,7 +781,7 @@ function initVwMap() {
   window._olWfsCadSource = new ol.source.Vector();
   window._olWfsCadLayer = new ol.layer.Vector({
     source: window._olWfsCadSource,
-    style: function(feature){
+    style: function(feature, resolution){
       var styles = [
         // 빨간 지적선
         new ol.style.Style({
@@ -789,9 +789,9 @@ function initVwMap() {
           fill: new ol.style.Fill({ color: 'rgba(255,45,45,0.02)' })
         })
       ];
-      // 지번 텍스트 (흰 글씨 + 검정 테두리 = 어디서나 잘보임)
+      // ⭐ 지번은 충분히 확대했을 때만 (겹침 방지)
       var jibun = feature.get('jibun');
-      if(jibun){
+      if(jibun && resolution < 0.7){
         styles.push(new ol.style.Style({
           text: new ol.style.Text({
             text: jibun,
