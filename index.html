@@ -6181,9 +6181,12 @@
       }
       var kakaoKey = localStorage.getItem('gdsp_kakao') || '';
       if (!kakaoKey) {
-        // localStorage에 없으면 서버에서 자동으로
-        ndGetKakaoKey(function(k){ if(k){ localStorage.setItem('gdsp_kakao', k); } });
-        kakaoKey = localStorage.getItem('gdsp_kakao') || '';
+        // localStorage에 없으면 서버에서 받아서 재시도 (비동기 처리)
+        ndGetKakaoKey(function(k){
+          if(k){ localStorage.setItem('gdsp_kakao', k); hdrSearch(); }
+          else { toast('카카오 API 키 로드 실패', 'err'); }
+        });
+        return; // 키 받은 후 재호출됨
       }
       if (kakaoKey) {
         fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent('화성시 ' + q), {
