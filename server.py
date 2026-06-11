@@ -298,6 +298,20 @@ def wfs_dxf_circle():
     except:
         draw_polygon = None
 
+    # ⭐ 선택 필지 geometry들 (외곽 반경 기준용)
+    parcel_union = None
+    try:
+        pgs = body.get("parcel_geoms") or []
+        geoms = []
+        for g in pgs:
+            try: geoms.append(shapely_shape(g))
+            except: pass
+        if geoms:
+            from shapely.ops import unary_union
+            parcel_union = unary_union(geoms)
+    except:
+        parcel_union = None
+
     # bbox 계산 (도(deg) 단위)
     if draw_polygon is not None:
         # 직접선택: 그린 영역 bbox + 여유
@@ -306,24 +320,27 @@ def wfs_dxf_circle():
         bbox = [pminx - pad, pminy - pad, pmaxx + pad, pmaxy + pad]
         circle_filter = draw_polygon  # ⭐그린 영역에 걸치면 포함
     elif radius_m <= 0:
-        # 선택필지만: 작은 bbox (필지 주변 ~150m)
-        eff_r = 150.0
-        buffer_m = max(300, min(800, eff_r * 0.8))
-        query_radius_m = eff_r + buffer_m
-        lat_deg = query_radius_m / 111000.0
-        lng_deg = query_radius_m / (111000.0 * max(0.1, math.cos(math.radians(center_lat))))
-        bbox = [center_lng - lng_deg, center_lat - lat_deg, center_lng + lng_deg, center_lat + lat_deg]
-        radius_deg = eff_r / 111000.0
-        circle_filter = Point(center_lng, center_lat).buffer(radius_deg * 1.15)
+        # 선택필지만: 필지 bbox + 여유
+        if parcel_union is not None:
+            pminx, pminy, pmaxx, pmaxy = parcel_union.bounds
+            pad = 0.003
+            bbox = [pminx - pad, pminy - pad, pmaxx + pad, pmaxy + pad]
+        else:
+            eff_r = 150.0
+            lat_deg = (eff_r + 300) / 111000.0
+            lng_deg = (eff_r + 300) / (111000.0 * max(0.1, math.cos(math.radians(center_lat))))
+            bbox = [center_lng - lng_deg, center_lat - lat_deg, center_lng + lng_deg, center_lat + lat_deg]
+        circle_filter = None  # pnus 모드에서 사용 안함
     else:
-        eff_r = radius_m
-        buffer_m = max(300, min(800, eff_r * 0.8))
-        query_radius_m = eff_r + buffer_m
-        lat_deg = query_radius_m / 111000.0
-        lng_deg = query_radius_m / (111000.0 * max(0.1, math.cos(math.radians(center_lat))))
-        bbox = [center_lng - lng_deg, center_lat - lat_deg, center_lng + lng_deg, center_lat + lat_deg]
-        radius_deg = eff_r / 111000.0
-        circle_filter = Point(center_lng, center_lat).buffer(radius_deg * 1.15)
+        # ⭐ 반경 모드: 필지 외곽에서 radius_m 버퍼 (중심 아님!)
+        radius_deg = radius_m / 111000.0
+        if parcel_union is not None:
+            circle_filter = parcel_union.buffer(radius_deg)
+        else:
+            circle_filter = Point(center_lng, center_lat).buffer(radius_deg * 1.15)
+        fminx, fminy, fmaxx, fmaxy = circle_filter.bounds
+        pad = 0.002
+        bbox = [fminx - pad, fminy - pad, fmaxx + pad, fmaxy + pad]
 
     # 레이어별 병렬 가져오기
     t_fetch_start = time.time()
@@ -370,7 +387,9 @@ def wfs_dxf_circle():
                     elif sel_union is not None and g.intersects(sel_union):
                         filtered.append(f)
                 else:
-                    if g.intersects(circle_filter):
+                    if circle_filter is not None and g.intersects(circle_filter):
+                        filtered.append(f)
+                    elif circle_filter is None:
                         filtered.append(f)
             except:
                 filtered.append(f)
@@ -434,16 +453,7 @@ def wfs_dxf_circle():
             layer_stats[text_layer] = text_count
         total += cnt
 
-    # 기준점 (⭐원 표시 제거 - 영대님 요청. 노트 텍스트만)
-    cx, cy = _wgs84_to_cad(center_lng, center_lat)
-    if "기준점" not in doc.layers:
-        doc.layers.new(name="기준점", dxfattribs={"color": 8})
-    try:
-        note = f"G-DSP {jibun or ''} r={int(radius_m)}m"
-        t = msp.add_text(note, dxfattribs={"layer": "기준점", "height": 5.0, "style": "HANGUL"})
-        t.set_placement((cx, cy - radius_m - 30), align=TextEntityAlignment.MIDDLE_CENTER)
-    except:
-        pass
+    # 기준점/노트 제거 (영대님 요청: 선택한 데이터 외 아무것도 안 넣음)
 
     # DXF 직렬화
     stream = io.StringIO()
