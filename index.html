@@ -7806,7 +7806,7 @@
         var _ndT=null;
         ndMap.on('moveend', function(){
           if(_ndT) clearTimeout(_ndT);
-          _ndT = setTimeout(ndLoadCadastral, 350);
+          _ndT = setTimeout(ndLoadCadastral, 150);
         });
         setTimeout(function(){ try{ ndMap.updateSize(); }catch(e){} }, 200);
 
@@ -7824,14 +7824,18 @@
       var ext = view.calculateExtent(ndMap.getSize());
       var mn = ol.proj.toLonLat([ext[0],ext[1]]);
       var mx = ol.proj.toLonLat([ext[2],ext[3]]);
-      var key = mn[0].toFixed(4)+','+mn[1].toFixed(4)+','+mx[0].toFixed(4)+','+mx[1].toFixed(4);
+      // 화면보다 살짝 넓게(가장자리까지 채움)
+      var padX=(mx[0]-mn[0])*0.15, padY=(mx[1]-mn[1])*0.15;
+      var bx0=mn[0]-padX, by0=mn[1]-padY, bx1=mx[0]+padX, by1=mx[1]+padY;
+      var key = bx0.toFixed(4)+','+by0.toFixed(4)+','+bx1.toFixed(4)+','+by1.toFixed(4);
       if(key===_ndCadKey || _ndCadLoading) return;
       _ndCadLoading=true; _ndCadKey=key;
-      fetch('/api/cad-box?minx='+mn[0]+'&miny='+mn[1]+'&maxx='+mx[0]+'&maxy='+mx[1]+'&size=300')
+      fetch('/api/cad-box?minx='+bx0+'&miny='+by0+'&maxx='+bx1+'&maxy='+by1+'&size=500')
         .then(function(r){return r.json();})
         .then(function(d){
-          _ndCadLoading=false; window._ndCadSource.clear();
-          var fs=d&&d.features; if(!fs||!fs.length) return;
+          _ndCadLoading=false;
+          var fs=d&&d.features; if(!fs||!fs.length){ return; }
+          window._ndCadSource.clear();
           fs.forEach(function(f){
             try{
               var g=f.geometry; if(!g) return;
@@ -8305,9 +8309,8 @@
         if (el) el.textContent = '-';
       });
       
-      // VWorld(OpenLayers)로 이동
+      // 클릭한 자리 그대로 - 지도 이동 안 함, 마커만 표시
       if (ndMap && ndMap.getView) {
-        ndMap.getView().animate({ center: ol.proj.fromLonLat([lng, lat]), zoom: 18, duration: 400 });
         ndSetMarker(lng, lat);
       }
       // 정보 업데이트
