@@ -556,8 +556,27 @@ function updateScaleBtns(){
 <script>
 /* ===================== 공통 ===================== */
 var regItems = [], _tt;
-var _vwKey = localStorage.getItem('gdsp_vworld_key') || '';
+var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
+var _vwKey = VWORLD_KEY;
 var _kakaoKey = (window.opener && window.opener.KAKAO_APP_KEY) || localStorage.getItem('gdsp_kakao') || localStorage.getItem('gdsp_kakao_key') || '';
+
+// 오라클 서버에서 VWorld 키 자동 로드 (지도 직접호출용)
+(function(){
+  if(!VWORLD_KEY){
+    fetch(PROXY+'/api/vworld/key')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d&&d.key){
+          VWORLD_KEY=d.key; _vwKey=d.key;
+          localStorage.setItem('gdsp_vworld',d.key);
+          if(!_olMap2loaded && document.getElementById('view-jideok') && document.getElementById('view-jideok').classList.contains('on')){
+            initVmap2();
+          }
+        }
+      })
+      .catch(function(){ console.log('VWorld 키 로드 실패 - 서버 확인'); });
+  }
+})();
 
 function toast(msg, type){
   var t = document.getElementById('toast');
@@ -1032,32 +1051,42 @@ function initVmap2(){
     setTimeout(initVmap2, 500);
     return;
   }
+  // VWorld 키 없으면 서버에서 받고 재시도
+  if(!VWORLD_KEY){
+    fetch(PROXY+'/api/vworld/key').then(function(r){return r.json();}).then(function(d){
+      if(d&&d.key){ VWORLD_KEY=d.key; _vwKey=d.key; localStorage.setItem('gdsp_vworld',d.key); initVmap2(); }
+      else { toast('VWorld 키를 불러올 수 없습니다','err'); }
+    }).catch(function(){ toast('VWorld 키 로드 실패','err'); });
+    return;
+  }
 
   // PROXY는 전역 변수 사용 (var PROXY = '' 가 상단에 선언됨)
 
-  // 기본 레이어 - VWorld 위성 타일 (Oracle 프록시 경유)
+  // 기본 레이어 - VWorld 위성 타일 (직접 호출, 빠름) ⚡ z/y/x 순서
   var bgLayer = new ol.layer.Tile({
     source: new ol.source.XYZ({
-      url: PROXY + '/api/vw-tile/Satellite/{z}/{x}/{y}.jpeg',
+      url: 'https://api.vworld.kr/req/wmts/1.0.0/' + VWORLD_KEY + '/Satellite/{z}/{y}/{x}.jpeg',
       crossOrigin: 'anonymous',
       maxZoom: 19
     }),
     preload: 2
   });
 
-  // 지적선 WMS 오버레이 (지번/경계)
+  // 지적선 WMS 오버레이 (지번/경계) - 직접 호출, 빠름 ⚡
+  // ⚠️ WMS는 crossOrigin 절대 넣으면 안됨 (CORS 헤더 안주므로 일반 img로 로드해야 통과)
   var cadWmsLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
-      url: PROXY + '/api/vw-wms',
+      url: 'https://api.vworld.kr/req/wms',
       params: {
         'LAYERS': 'lt_c_landinfobasemap',
         'STYLES': 'lt_c_landinfobasemap',
         'FORMAT': 'image/png',
         'TRANSPARENT': true,
-        'VERSION': '1.1.1'
+        'TILED': true,
+        'key': VWORLD_KEY,
+        'domain': location.hostname
       },
-      serverType: 'geoserver',
-      crossOrigin: 'anonymous'
+      serverType: 'mapserver'
     }),
     opacity: 0.9
   });
@@ -1332,9 +1361,8 @@ function vwSwitchType(type){
   try{
     var layers = _olMap2.getLayers().getArray();
     if(layers.length > 0 && layers[0].getSource){
-      var newUrl = (type === 'Satellite')
-        ? '/api/vw-tile/Satellite/{z}/{x}/{y}.jpeg'
-        : '/api/vw-tile/Base/{z}/{x}/{y}.jpeg';
+      // VWorld 직접 호출 (z/y/x 순서)
+      var newUrl = 'https://api.vworld.kr/req/wmts/1.0.0/' + VWORLD_KEY + '/' + type + '/{z}/{y}/{x}.jpeg';
       layers[0].getSource().setUrl(newUrl);
     }
   } catch(e){ console.error('전환 실패:', e); }
