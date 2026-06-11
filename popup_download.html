@@ -908,42 +908,47 @@ function startNgiiDownload(){
   toast('다운로더 실행 요청 — 프로그램이 설치되지 않았다면 아래에서 설치하세요','ok');
 }
 
-/* ===================== 지번검색 (카카오 REST) ===================== */
+/* ===================== 지번검색 (⭐SDK 내장 - REST 키 불필요) ===================== */
+function _kkReady(cb){
+  if(window.kakao && kakao.maps && kakao.maps.services){ cb(true); return; }
+  if(window.kakao && kakao.maps && kakao.maps.load){
+    kakao.maps.load(function(){ cb(!!(kakao.maps && kakao.maps.services)); });
+  } else { cb(false); }
+}
+function _kkSearchList(q, cb){ // cb(list|null) list=[{addr,lat,lng,address}]
+  _kkReady(function(ok){
+    if(!ok){ cb(null); return; }
+    var gc = new kakao.maps.services.Geocoder();
+    var OK = kakao.maps.services.Status.OK;
+    gc.addressSearch(q, function(docs, st){
+      if(st === OK && docs.length){
+        cb(docs.map(function(r){ return {addr:r.address_name, lat:parseFloat(r.y), lng:parseFloat(r.x), address:r.address}; }));
+        return;
+      }
+      var ps = new kakao.maps.services.Places();
+      ps.keywordSearch(q, function(d2, st2){
+        if(st2 === OK && d2.length){
+          cb(d2.map(function(r){ return {addr:r.address_name||r.place_name, lat:parseFloat(r.y), lng:parseFloat(r.x)}; }));
+        } else cb([]);
+      });
+    });
+  });
+}
+
 function dtmSearch(){
   var q = (document.getElementById('dtmAddr').value||'').trim();
   if(!q){ toast('주소를 입력하세요','err'); return; }
 
-  if(!_kakaoKey){
-    toast('카카오 API 키 없음 — 좌표 직접 입력 불가','err');
-    return;
-  }
-  fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(q)+'&size=5',{
-    headers:{'Authorization':'KakaoAK '+_kakaoKey}
-  })
-  .then(function(r){return r.json();})
-  .then(function(d){
-    var docs = d.documents||[];
-    if(!docs.length){
-      return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query='+encodeURIComponent(q)+'&size=5',{
-        headers:{'Authorization':'KakaoAK '+_kakaoKey}
-      }).then(function(r2){return r2.json();}).then(function(d2){
-        return (d2.documents||[]).map(function(r){
-          return {addr:r.address_name||r.place_name, lat:parseFloat(r.y), lng:parseFloat(r.x)};
-        });
-      });
-    }
-    return docs.map(function(r){return {addr:r.address_name, lat:parseFloat(r.y), lng:parseFloat(r.x)};});
-  })
-  .then(function(list){
+  _kkSearchList(q, function(list){
+    if(list === null){ toast('카카오 SDK 로딩 중 — 잠시 후 재시도','err'); return; }
     var box = document.getElementById('dtmSrchResult');
-    if(!list||!list.length){ toast('검색 결과 없음','err'); return; }
+    if(!list.length){ toast('검색 결과 없음','err'); return; }
     box.style.display='block';
     box._list = list;
     box.innerHTML = list.map(function(item,i){
       return '<div onclick="dtmSelectAddr('+i+')" style="padding:9px 14px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600;color:var(--txt)" onmouseover="this.style.background=\'rgba(37,99,235,.06)\'" onmouseout="this.style.background=\'\'">'+item.addr+'</div>';
     }).join('');
-  })
-  .catch(function(){ toast('검색 실패','err'); });
+  });
 }
 
 function dtmSelectAddr(i){
@@ -1672,42 +1677,21 @@ function sendJdToParent(){
   }catch(e){ toast('전송 실패','err'); }
 }
 
-/* ===================== 지적도 탭 지번검색 (카카오 REST) ===================== */
+/* ===================== 지적도 탭 지번검색 (⭐SDK 내장 - REST 키 불필요) ===================== */
 function jdSearch(){
   var q = (document.getElementById('jdAddr').value||'').trim();
   if(!q){ toast('주소를 입력하세요','err'); return; }
 
-  if(!_kakaoKey){
-    toast('카카오 API 키 없음','err');
-    return;
-  }
-  fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(q)+'&size=5',{
-    headers:{'Authorization':'KakaoAK '+_kakaoKey}
-  })
-  .then(function(r){return r.json();})
-  .then(function(d){
-    var docs = d.documents||[];
-    if(!docs.length){
-      return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query='+encodeURIComponent(q)+'&size=5',{
-        headers:{'Authorization':'KakaoAK '+_kakaoKey}
-      }).then(function(r2){return r2.json();}).then(function(d2){
-        return (d2.documents||[]).map(function(r){
-          return {addr:r.address_name||r.place_name, lat:parseFloat(r.y), lng:parseFloat(r.x)};
-        });
-      });
-    }
-    return docs.map(function(r){return {addr:r.address_name, lat:parseFloat(r.y), lng:parseFloat(r.x)};});
-  })
-  .then(function(list){
+  _kkSearchList(q, function(list){
+    if(list === null){ toast('카카오 SDK 로딩 중 — 잠시 후 재시도','err'); return; }
     var box = document.getElementById('jdSrchResult');
-    if(!list||!list.length){ toast('검색 결과 없음','err'); return; }
+    if(!list.length){ toast('검색 결과 없음','err'); return; }
     box.style.display='block';
     box._list = list;
     box.innerHTML = list.map(function(item,i){
       return '<div onclick="jdSelectAddr('+i+')" style="padding:9px 14px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600;color:var(--txt)" onmouseover="this.style.background=\'rgba(37,99,235,.06)\'" onmouseout="this.style.background=\'\'">'+item.addr+'</div>';
     }).join('');
-  })
-  .catch(function(){ toast('검색 실패','err'); });
+  });
 }
 
 function jdSelectAddr(i){
@@ -1731,46 +1715,40 @@ function jdSelectAddr(i){
 }
 
 /* ===================== 건축물대장 ===================== */
-// 카카오 주소 검색으로 PNU 만들기 (지번 → b_code + 본번 + 부번 → PNU 19자리)
+// 카카오 주소 검색으로 PNU 만들기 (⭐SDK 내장 - REST 키 불필요)
 function buildPnuFromKakao(jibun){
   return new Promise(function(resolve, reject){
-    if(!_kakaoKey){
-      reject('카카오 API 키 없음');
-      return;
-    }
-    fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(jibun)+'&size=5',{
-      headers:{'Authorization':'KakaoAK '+_kakaoKey}
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var docs = d.documents||[];
-      // 지번 주소 우선
-      var found = null;
-      for(var i=0;i<docs.length;i++){
-        if(docs[i].address){ found = docs[i].address; break; }
-      }
-      if(!found){
-        reject('주소 검색 결과 없음');
-        return;
-      }
-      var bcode = found.b_code || '';                  // 10자리 법정동코드
-      var mtnYn = found.mountain_yn === 'Y' ? '2':'1'; // 산여부 (1:일반, 2:산)
-      var bun   = (found.main_address_no||'0').padStart(4,'0');
-      var ji    = (found.sub_address_no ||'0').padStart(4,'0');
-      if(bcode.length !== 10){ reject('법정동코드 오류'); return; }
+    _kkReady(function(ok){
+      if(!ok){ reject('카카오 SDK 로딩 실패'); return; }
+      new kakao.maps.services.Geocoder().addressSearch(jibun, function(docs, st){
+        if(st !== kakao.maps.services.Status.OK || !docs.length){ reject('주소 검색 결과 없음'); return; }
+        // 지번 주소 우선 (좌표는 doc 레벨에서)
+        var found = null, fdoc = null;
+        for(var i=0;i<docs.length;i++){
+          if(docs[i].address){ found = docs[i].address; fdoc = docs[i]; break; }
+        }
+        if(!found){
+          reject('주소 검색 결과 없음');
+          return;
+        }
+        var bcode = found.b_code || '';                  // 10자리 법정동코드
+        var mtnYn = found.mountain_yn === 'Y' ? '2':'1'; // 산여부 (1:일반, 2:산)
+        var bun   = (found.main_address_no||'0').padStart(4,'0');
+        var ji    = (found.sub_address_no ||'0').padStart(4,'0');
+        if(bcode.length !== 10){ reject('법정동코드 오류'); return; }
 
-      var pnu       = bcode + mtnYn + bun + ji;          // PNU 19자리
-      var sigunguCd = bcode.substring(0,5);
-      var bjdongCd  = bcode.substring(5,10);
-      var platGbCd  = mtnYn === '2' ? '1' : '0';         // 건축물대장 API: 1:산, 0:일반
-      resolve({
-        pnu:pnu, sigunguCd:sigunguCd, bjdongCd:bjdongCd,
+        var pnu       = bcode + mtnYn + bun + ji;          // PNU 19자리
+        var sigunguCd = bcode.substring(0,5);
+        var bjdongCd  = bcode.substring(5,10);
+        var platGbCd  = mtnYn === '2' ? '1' : '0';         // 건축물대장 API: 1:산, 0:일반
+        resolve({
+          pnu:pnu, sigunguCd:sigunguCd, bjdongCd:bjdongCd,
         platGbCd:platGbCd, bun:bun, ji:ji,
         addr: found.address_name,
-        lat: parseFloat(found.y), lng: parseFloat(found.x)
+        lat: parseFloat(fdoc.y), lng: parseFloat(fdoc.x)
+        });
       });
-    })
-    .catch(function(e){ reject('카카오 검색 실패: '+e); });
+    });
   });
 }
 
