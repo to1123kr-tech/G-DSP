@@ -6,6 +6,8 @@
   <meta http-equiv="X-UA-Compatible" content="IE=11">
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>G-DSP - 공간정보 통합 업무 플랫폼</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ol/8.2.0/ol.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ol/8.2.0/dist/ol.js"></script>
   <script>
   (function(){
     var k = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
@@ -5829,63 +5831,134 @@
         document.getElementById('kakaoMapDiv').style.zIndex = '1';
         setText('mapT','VWorld 지도');
         if(!mainVwMapInited) _initMainVwMap();
-        else if(mainVwMap && currentJibun) _moveMainVwMap();
+        else if(mainVwMap){ setTimeout(function(){ try{ mainVwMap.updateSize(); }catch(e){} if(currentJibun) _moveMainVwMap(); }, 100); }
       }
     }
 
     function _initMainVwMap(){
       ndGetVwKey(function(key){
         if(!key){ toast('VWorld 키를 설정에서 입력하세요','err'); switchMainMap('kakao'); return; }
-        // 스크립트 로드 (이미 로드됐으면 skip)
-        function _doInit(){
-          if(mainVwMapInited) return;
-          mainVwMapInited = true;
-          var opts = {
-            mapId: 'vworldMapDiv',
-            initPosition: new vw.CameraPosition(
-              new vw.CoordZ(126.83, 37.20, 3000),
-              new vw.Direction(0,-90,0)
-            ),
-            logo: false, navigation: true
-          };
-          mainVwMap = new vw.Map();
-          mainVwMap.setOption(opts);
-          mainVwMap.start();
-          // 지적도 WMS
-          _addMainVwCadastral(key);
-          // 클릭
-          mainVwMap.onClick.addEventListener(function(wp,ep,carto){
-            if(!carto) return;
-            ndOnMapClick(carto.longitudeDD, carto.latitudeDD);
-          });
-          setText('mapT','VWorld 지도');
-          if(currentJibun) _moveMainVwMap();
-        }
-        if(typeof vw !== 'undefined'){ _doInit(); }
-        else { ndLoadVwScript(key, _doInit); }
+        if(typeof ol === 'undefined'){ toast('지도 라이브러리 로딩 중...'); setTimeout(_initMainVwMap, 500); return; }
+        if(mainVwMapInited) return;
+        mainVwMapInited = true;
+
+        // 위성 배경 (VWorld 직접 호출, z/y/x)
+        var vwSat = new ol.layer.Tile({
+          source: new ol.source.XYZ({
+            url: 'https://api.vworld.kr/req/wmts/1.0.0/'+key+'/Satellite/{z}/{y}/{x}.jpeg',
+            crossOrigin: 'anonymous', maxZoom: 19
+          }), preload: 2
+        });
+
+        // ⭐ 빨간 WFS 지적선 + 지번 레이어
+        window._mainCadSource = new ol.source.Vector();
+        window._mainCadLayer = new ol.layer.Vector({
+          source: window._mainCadSource,
+          style: function(feature){
+            var styles = [ new ol.style.Style({
+              stroke: new ol.style.Stroke({ color: '#ff2d2d', width: 1.6 }),
+              fill: new ol.style.Fill({ color: 'rgba(255,45,45,0.02)' })
+            }) ];
+            var jibun = feature.get('jibun');
+            if(jibun){
+              styles.push(new ol.style.Style({ text: new ol.style.Text({
+                text: jibun, font: 'bold 13px "Malgun Gothic",sans-serif',
+                fill: new ol.style.Fill({ color: '#ffffff' }),
+                stroke: new ol.style.Stroke({ color: '#000000', width: 3 }),
+                overflow: true
+              }) }));
+            }
+            return styles;
+          }
+        });
+
+        // 선택 필지 하이라이트
+        window._mainHlSource = new ol.source.Vector();
+        window._mainHlLayer = new ol.layer.Vector({
+          source: window._mainHlSource,
+          style: new ol.style.Style({
+            stroke: new ol.style.Stroke({ color: 'rgba(255,210,0,1)', width: 3 }),
+            fill: new ol.style.Fill({ color: 'rgba(255,210,0,0.2)' })
+          })
+        });
+
+        // 카카오 현재 중심 → 시작 위치
+        var cLng = 126.8317, cLat = 37.2055;
+        if(kakaoMap){ try{ var kc=kakaoMap.getCenter(); cLng=kc.getLng(); cLat=kc.getLat(); }catch(e){} }
+
+        mainVwMap = new ol.Map({
+          target: 'vworldMapDiv',
+          layers: [vwSat, window._mainCadLayer, window._mainHlLayer],
+          view: new ol.View({ center: ol.proj.fromLonLat([cLng,cLat]), zoom: 17, maxZoom: 21, minZoom: 6 }),
+          controls: []
+        });
+
+        // 클릭 → 기존 핸들러 연동
+        mainVwMap.on('click', function(evt){
+          var c = ol.proj.toLonLat(evt.coordinate);
+          ndOnMapClick(c[0], c[1]);
+        });
+
+        // 이동/줌 끝나면 지적선 갱신 (줌 16+ 만)
+        var _mTimer=null;
+        mainVwMap.on('moveend', function(){
+          if(_mTimer) clearTimeout(_mTimer);
+          _mTimer = setTimeout(_loadMainCadastral, 350);
+        });
+
+        setText('mapT','VWorld 지도');
+        setTimeout(function(){ try{ mainVwMap.updateSize(); }catch(e){} }, 200);
+        if(currentJibun) _moveMainVwMap();
       });
     }
 
-    function _addMainVwCadastral(key){
-      if(!mainVwMap) return;
-      try{
-        var wmsLayer = new vw.Layers();
-        var wmsSource = new vw.source.TileWMS();
-        wmsSource.setUrl('https://api.vworld.kr/req/wms?Key='+key+'&');
-        wmsSource.setParams('tilesize=256');
-        wmsSource.setLayers('lt_c_landinfobasemap');
-        wmsSource.setStyles('lt_c_landinfobasemap');
-        wmsSource.setFormat('image/png');
-        wmsLayer.add(new vw.layer.Tile(wmsSource));
-      }catch(e){}
+    // ⭐ 메인 지도 빨간 지적선 로드
+    var _mainCadLoading=false, _mainCadKey='';
+    function _loadMainCadastral(){
+      if(!mainVwMap || !window._mainCadSource) return;
+      var view = mainVwMap.getView();
+      if(view.getZoom() < 16){ window._mainCadSource.clear(); return; }
+      var ext = view.calculateExtent(mainVwMap.getSize());
+      var min = ol.proj.toLonLat([ext[0],ext[1]]);
+      var max = ol.proj.toLonLat([ext[2],ext[3]]);
+      var key = min[0].toFixed(4)+','+min[1].toFixed(4)+','+max[0].toFixed(4)+','+max[1].toFixed(4);
+      if(key === _mainCadKey || _mainCadLoading) return;
+      _mainCadLoading=true; _mainCadKey=key;
+      fetch('/api/cad-box?minx='+min[0]+'&miny='+min[1]+'&maxx='+max[0]+'&maxy='+max[1]+'&size=300')
+        .then(function(r){return r.json();})
+        .then(function(d){
+          _mainCadLoading=false;
+          window._mainCadSource.clear();
+          var fs = d && d.features; if(!fs||!fs.length) return;
+          fs.forEach(function(f){
+            try{
+              var g=f.geometry; if(!g) return;
+              var rings;
+              if(g.type==='MultiPolygon') rings=g.coordinates.map(function(p){return p[0];});
+              else if(g.type==='Polygon') rings=[g.coordinates[0]];
+              else return;
+              var jibun=(f.properties&&f.properties.jibun)||'';
+              rings.forEach(function(ring){
+                var merc=ring.map(function(c){return ol.proj.fromLonLat(c);});
+                var feat=new ol.Feature({geometry:new ol.geom.Polygon([merc])});
+                feat.set('jibun',jibun);
+                window._mainCadSource.addFeature(feat);
+              });
+            }catch(e){}
+          });
+        })
+        .catch(function(e){ _mainCadLoading=false; console.warn('지적선 로드 실패',e); });
     }
 
+    function _addMainVwCadastral(key){ /* OpenLayers 2D에서 _loadMainCadastral이 처리 */ }
+
     function _moveMainVwMap(){
-      if(!mainVwMap || !currentJibun) return;
-      // 카카오에서 현재 중심 가져와서 VWorld 이동
+      if(!mainVwMap) return;
       if(kakaoMap){
-        var c = kakaoMap.getCenter();
-        try{ mainVwMap.moveTo(new vw.CoordZ(c.getLng(), c.getLat(), 500)); }catch(e){}
+        try{
+          var c = kakaoMap.getCenter();
+          mainVwMap.getView().animate({ center: ol.proj.fromLonLat([c.getLng(), c.getLat()]), zoom: 18, duration: 400 });
+        }catch(e){}
       }
     }
     var _kakaoInited = false;
