@@ -755,7 +755,7 @@ function initVwMap() {
   window._olCadLineLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms',
-      params: { 'LAYERS': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun', 'STYLES': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
+      params: { 'LAYERS': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun', 'STYLES': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': '168-107-15-68.nip.io' },
       serverType: 'mapserver'
     }),
     visible: true,
@@ -769,7 +769,7 @@ function initVwMap() {
   window._olCadLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms',
-      params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
+      params: { 'LAYERS': 'lt_c_landinfobasemap', 'STYLES': 'lt_c_landinfobasemap', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': '168-107-15-68.nip.io' },
       serverType: 'mapserver'
     }),
     visible: false,
@@ -938,7 +938,7 @@ function _wmsUrl(layerName, bbox) {
   return 'https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
     +'&layers='+layerName+'&styles=&crs=EPSG:4326'
     +'&bbox='+bbox+'&width=256&height=256&format=image/png&transparent=true'
-    +'&Key='+VWORLD_KEY+'&domain='+location.hostname;
+    +'&Key='+VWORLD_KEY+'&domain=168-107-15-68.nip.io';
 }
 function _tileXYZtoBBox(x, y, z) {
   var n = Math.pow(2, z);
@@ -1057,7 +1057,7 @@ function toggleWmsLayer(type, on) {
       var lyr = new ol.layer.Tile({
         source: new ol.source.TileWMS({
           url: 'https://api.vworld.kr/req/wms',
-          params: { 'LAYERS': layerName, 'STYLES': layerName, 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
+          params: { 'LAYERS': layerName, 'STYLES': layerName, 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': '168-107-15-68.nip.io' },
           serverType: 'mapserver'
         }),
         opacity: 0.55
