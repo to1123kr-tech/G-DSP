@@ -360,10 +360,9 @@ function updateScaleBtns(){
               <span><b>자동 영역</b> (반경 기준)</span>
             </label>
             <div id="radiusGroup" style="margin-left:24px;display:flex;gap:5px">
+              <button class="rad-btn" data-r="0" onclick="setRadius(0)">선택필지만</button>
               <button class="rad-btn" data-r="200" onclick="setRadius(200)">200m</button>
               <button class="rad-btn on" data-r="500" onclick="setRadius(500)">500m</button>
-              <button class="rad-btn" data-r="1000" onclick="setRadius(1000)">1km</button>
-              <button class="rad-btn" data-r="1500" onclick="setRadius(1500)">1.5km</button>
             </div>
             <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2);cursor:pointer;margin-top:4px">
               <input type="radio" name="areaMode" value="select" onchange="setAreaMode('select')" style="accent-color:var(--blue)">
@@ -1042,7 +1041,8 @@ var _parcelSource = null;   // 선택 필지 피처 레이어
 var _cadSource = null;      // ⭐ 빨간 지적선 소스
 var PROXY = '';  // 상대 경로 (현재 페이지와 같은 호스트)
 var _radiusSource = null;   // 반경 원 레이어
-var _selectedParcel = null; // {pnu, jibun, addr, lng, lat}
+var _selectedParcel = null; // 마지막 선택 (호환용)
+var _selectedParcels = []; // ⭐ 복수 선택 필지 목록 [{pnu,jibun,addr,lng,lat,geom}]
 var _currentRadius = 500;   // 기본 반경 500m
 
 function initVmap2(){
@@ -1263,32 +1263,46 @@ function onMapClickParcel(lng, lat){
           var f = features[0];
           var p = f.properties || {};
           var geom = f.geometry;
+          var thisPnu = p.pnu || pnu;
 
-          // 선택 필지 정보 저장
-          _selectedParcel = {
-            pnu: p.pnu || pnu,
-            jibun: p.jibun || jibunStr.split(' ').pop() || '',
-            addr: jibunStr,
-            lng: lng, lat: lat
-          };
+          // ⭐ 복수 선택: 이미 선택된 필지면 해제, 아니면 추가
+          var existIdx = _selectedParcels.findIndex(function(sp){ return sp.pnu === thisPnu; });
+          if(existIdx >= 0){
+            _selectedParcels.splice(existIdx, 1);
+            toast('필지 해제: ' + (p.jibun || thisPnu), 'ok');
+          } else {
+            _selectedParcels.push({
+              pnu: thisPnu,
+              jibun: p.jibun || jibunStr.split(' ').pop() || '',
+              addr: jibunStr,
+              lng: lng, lat: lat,
+              geom: geom
+            });
+            toast('필지 추가: ' + (p.jibun || '선택됨') + ' (총 ' + _selectedParcels.length + '개)', 'ok');
+          }
+          // 마지막 선택 = 기존 호환용
+          _selectedParcel = _selectedParcels.length ? _selectedParcels[_selectedParcels.length-1] : null;
 
-          // 정보 패널 업데이트
-          document.getElementById('jd-addr').textContent = jibunStr;
+          // 정보 패널 업데이트 (마지막 클릭 기준)
+          document.getElementById('jd-addr').textContent = jibunStr + (_selectedParcels.length>1 ? ' 외 '+(_selectedParcels.length-1)+'필지' : '');
           document.getElementById('jd-jmok').textContent = p.jimok_nm || p.jimok || '—';
           document.getElementById('jd-area').textContent = p.bchk ? p.bchk + '㎡' : (p.area ? p.area + '㎡' : '—');
-          document.getElementById('jd-pnu').textContent = p.pnu || pnu;
+          document.getElementById('jd-pnu').textContent = _selectedParcels.length + '개 선택';
           var extraEl = document.getElementById('jd-info-extra');
           if(extraEl) extraEl.style.display = 'block';
 
-          // 지도에 필지 하이라이트
-          highlightParcel(geom);
+          // 지도에 선택 필지들 전부 하이라이트
+          redrawSelectedParcels();
 
-          // 필지 중심점 계산 → 반경 원 표시
-          var center = computeCentroid(geom) || [lng, lat];
-          showRadiusCircle(center[0], center[1], _currentRadius);
+          // 반경 원 표시 (선택필지만이면 원 없음)
+          if(_selectedParcels.length){
+            var center = computeCentroid(_selectedParcels[_selectedParcels.length-1].geom) || [lng, lat];
+            showRadiusCircle(center[0], center[1], _currentRadius);
+          } else {
+            if(_radiusSource) _radiusSource.clear();
+          }
 
-          setDxfStatus('필지 선택됨. 반경/레이어를 확인 후 다운로드하세요');
-          toast('필지: ' + (_selectedParcel.jibun || '선택됨'), 'ok');
+          setDxfStatus(_selectedParcels.length ? (_selectedParcels.length+'개 필지 선택됨. 반경/레이어 확인 후 다운로드') : '필지를 클릭하세요');
         })
         .catch(function(e){
           console.error(e);
@@ -1314,6 +1328,21 @@ function highlightParcel(geom){
     });
     _parcelSource.addFeature(feat);
   }catch(e){ console.error('필지 하이라이트 실패', e); }
+}
+
+// ⭐ 선택된 모든 필지 다시 그리기 (복수 선택)
+function redrawSelectedParcels(){
+  if(!_parcelSource) return;
+  _parcelSource.clear();
+  var reader = new ol.format.GeoJSON();
+  _selectedParcels.forEach(function(sp){
+    if(!sp.geom) return;
+    try{
+      var feat = reader.readFeature({ type:'Feature', geometry: sp.geom },
+        { dataProjection:'EPSG:4326', featureProjection:'EPSG:3857' });
+      _parcelSource.addFeature(feat);
+    }catch(e){}
+  });
 }
 
 // GeoJSON geometry → 중심점 (위경도)
@@ -1383,7 +1412,10 @@ function setRadius(r){
   document.querySelectorAll('#radiusGroup .rad-btn').forEach(function(btn){
     btn.classList.toggle('on', parseInt(btn.dataset.r) === r);
   });
-  if(_selectedParcel){
+  if(r <= 0){
+    // 선택필지만: 반경 원 숨김
+    if(_radiusSource) _radiusSource.clear();
+  } else if(_selectedParcel){
     showRadiusCircle(_selectedParcel.lng, _selectedParcel.lat, r);
   }
 }
@@ -1433,8 +1465,8 @@ function setDxfStatus(msg){
 
 // ===== 반경 DXF 다운로드 =====
 function downloadCircleDxf(){
-  if(!_selectedParcel){
-    toast('먼저 필지를 클릭하세요', 'err');
+  if(!_selectedParcels.length){
+    toast('먼저 필지를 클릭하세요 (복수 선택 가능)', 'err');
     return;
   }
 
@@ -1456,12 +1488,19 @@ function downloadCircleDxf(){
   btn.textContent = '⏳ DXF 생성 중...';
   setDxfStatus('서버에서 지적도 데이터 수집 중... (5~15초)');
 
+  // 복수 필지의 중심(평균) 좌표
+  var cLng=0, cLat=0;
+  _selectedParcels.forEach(function(sp){ cLng+=sp.lng; cLat+=sp.lat; });
+  cLng/=_selectedParcels.length; cLat/=_selectedParcels.length;
+
+  var lastSp = _selectedParcels[_selectedParcels.length-1];
   var body = {
-    lng: _selectedParcel.lng,
-    lat: _selectedParcel.lat,
-    radius: _currentRadius,
+    lng: cLng,
+    lat: cLat,
+    radius: _currentRadius,   // 0 = 선택필지만
     layers: layers,
-    jibun: _selectedParcel.jibun || ''
+    jibun: lastSp.jibun || '',
+    pnus: _selectedParcels.map(function(sp){ return sp.pnu; })  // ⭐ 복수 PNU
   };
 
   fetch('/api/wfs-dxf-circle', {
@@ -1478,8 +1517,11 @@ function downloadCircleDxf(){
     var url = URL.createObjectURL(ret.blob);
     var a = document.createElement('a');
     a.href = url;
-    var safeJibun = (_selectedParcel.jibun || 'parcel').replace(/\s+/g,'_');
-    a.download = 'gdsp_' + safeJibun + '_r' + _currentRadius + 'm.dxf';
+    var lastSp2 = _selectedParcels.length ? _selectedParcels[_selectedParcels.length-1] : null;
+    var safeJibun = ((lastSp2 && lastSp2.jibun) || 'parcel').replace(/\s+/g,'_');
+    if(_selectedParcels.length > 1) safeJibun += '_외' + (_selectedParcels.length-1);
+    var rTag = _currentRadius > 0 ? '_r' + _currentRadius + 'm' : '_필지만';
+    a.download = 'gdsp_' + safeJibun + rTag + '.dxf';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
