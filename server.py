@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 VWORLD_KEY = "16B90D39-90BB-3197-987A-54983A46F250"
 VWORLD_DOMAIN = "168-107-15-68.nip.io"
-KAKAO_APP_KEY = "0f432d6e8470eed32f947e3c7db146b9"  # REST API 키
+KAKAO_APP_KEY = "c670e0bc85874ef6267220f09882b379"  # REST API 키 (JS키 0f432d...와 다름!)
 _WGS84_TO_TM5186 = Transformer.from_crs("EPSG:4326", "EPSG:5186", always_xy=True)
 _TM5186_TO_WGS84 = Transformer.from_crs("EPSG:5186", "EPSG:4326", always_xy=True)
 
