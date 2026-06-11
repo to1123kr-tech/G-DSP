@@ -5924,7 +5924,7 @@
       var key = min[0].toFixed(4)+','+min[1].toFixed(4)+','+max[0].toFixed(4)+','+max[1].toFixed(4);
       if(key === _mainCadKey || _mainCadLoading) return;
       _mainCadLoading=true; _mainCadKey=key;
-      fetch('/api/cad-box?minx='+min[0]+'&miny='+min[1]+'&maxx='+max[0]+'&maxy='+max[1]+'&size=300')
+      fetch('/api/cad-box?minx='+min[0]+'&miny='+min[1]+'&maxx='+max[0]+'&maxy='+max[1]+'&size=1000')
         .then(function(r){return r.json();})
         .then(function(d){
           _mainCadLoading=false;
@@ -7830,7 +7830,7 @@
       var key = bx0.toFixed(4)+','+by0.toFixed(4)+','+bx1.toFixed(4)+','+by1.toFixed(4);
       if(key===_ndCadKey || _ndCadLoading) return;
       _ndCadLoading=true; _ndCadKey=key;
-      fetch('/api/cad-box?minx='+bx0+'&miny='+by0+'&maxx='+bx1+'&maxy='+by1+'&size=500')
+      fetch('/api/cad-box?minx='+bx0+'&miny='+by0+'&maxx='+bx1+'&maxy='+by1+'&size=1000')
         .then(function(r){return r.json();})
         .then(function(d){
           _ndCadLoading=false;
