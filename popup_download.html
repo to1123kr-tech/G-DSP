@@ -1075,13 +1075,13 @@ function initVmap2(){
   // ── 지적선 WMS 오버레이 (직접 호출, 빠름 ⚡) ──
   // ⚠️ WMS는 crossOrigin 절대 넣으면 안됨 (CORS 헤더 안주므로 일반 img로 로드해야 통과)
 
-  // (1) 연속지적도 - 멀리서도 필지 경계선 보임 (넓은 줌 범위)
+  // (1) 연속지적도 - 본번+부번 (경계선+지번 다 보임, 배경 깨끗) ⭐
   var cadLineLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms',
       params: {
-        'LAYERS': 'lp_pa_cbnd_bubun',
-        'STYLES': 'lp_pa_cbnd_bubun',
+        'LAYERS': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
+        'STYLES': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
         'FORMAT': 'image/png',
         'TRANSPARENT': true,
         'TILED': true,
@@ -1090,7 +1090,7 @@ function initVmap2(){
       },
       serverType: 'mapserver'
     }),
-    opacity: 0.9
+    opacity: 1.0
   });
 
   // (2) 편집지적도(LX맵) - 가까이서 지번 글씨 보임
