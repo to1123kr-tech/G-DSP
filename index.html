@@ -7698,7 +7698,8 @@
     }
 
     // ⭐ 카카오 REST API 키 서버에서 자동 로드 (모든 PC에서 설정 없이 작동)
-    var KAKAO_FALLBACK_KEY = '0f432d6e8470eed32f947e3c7db146b9';
+    if(localStorage.getItem('gdsp_kakao')==='0f432d6e8470eed32f947e3c7db146b9'){localStorage.setItem('gdsp_kakao','c670e0bc85874ef6267220f09882b379');}
+    var KAKAO_FALLBACK_KEY = 'c670e0bc85874ef6267220f09882b379'; // REST 키
     function ndGetKakaoKey(cb) {
       var saved = localStorage.getItem('gdsp_kakao');
       if (saved) { cb(saved); return; }
@@ -8356,8 +8357,11 @@
         if (el) el.textContent = '-';
       });
       
-      // 클릭한 자리 그대로 - 지도 이동 안 함, 마커만 표시
+      // ⭐ 검색은 지도 이동 필요 (클릭과 달리 먼 곳을 찾는 것이므로)
       if (ndMap && ndMap.getView) {
+        var _v = ndMap.getView();
+        var _z = _v.getZoom();
+        _v.animate({ center: ol.proj.fromLonLat([lng, lat]), zoom: (_z < 17 ? 18 : _z), duration: 400 });
         ndSetMarker(lng, lat);
       }
       // 정보 업데이트
