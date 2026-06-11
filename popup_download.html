@@ -337,17 +337,15 @@ function updateScaleBtns(){
       <!-- 우측: 다운로드 패널 -->
       <div style="flex:45;flex-shrink:0;overflow-y:auto;padding:14px;background:var(--card);border-left:1px solid var(--line);display:flex;flex-direction:column;gap:10px">
 
-        <!-- 선택 주소 -->
+        <!-- 선택 필지 (간소화) -->
         <div class="sec" style="margin:0;padding:14px">
-          <div class="sec-t" style="margin-bottom:8px">📍 선택 주소</div>
-          <div id="jd-addr" style="font-size:13px;font-weight:700;color:var(--blue2);min-height:20px;line-height:1.5">지도에서 필지를 클릭하거나 주소를 검색하세요</div>
+          <div class="sec-t" style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+            <span>📍 선택 필지</span>
+            <button onclick="clearSelectedParcels()" style="height:24px;padding:0 10px;border-radius:6px;border:1px solid var(--line2);background:var(--bg2);color:var(--txt2);font-size:10px;font-weight:700;cursor:pointer">초기화</button>
+          </div>
+          <div id="jd-addr" style="font-size:13px;font-weight:700;color:var(--blue2);min-height:20px;line-height:1.5">지도에서 필지를 클릭하세요 (복수 선택 가능)</div>
           <div style="display:none" id="jd-info-extra">
-            <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:11px;color:var(--txt3);line-height:1.7">
-              <span>지목: <b style="color:var(--txt2)" id="jd-jmok">—</b></span>
-              &nbsp;|&nbsp;
-              <span>면적: <b style="color:var(--green)" id="jd-area">—</b></span>
-            </div>
-            <div style="font-size:10px;color:var(--txt3);margin-top:4px">PNU: <span id="jd-pnu" style="font-family:monospace">—</span></div>
+            <div style="font-size:10px;color:var(--txt3);margin-top:4px"><span id="jd-pnu" style="font-family:monospace">—</span></div>
           </div>
         </div>
 
@@ -366,8 +364,14 @@ function updateScaleBtns(){
             </div>
             <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2);cursor:pointer;margin-top:4px">
               <input type="radio" name="areaMode" value="select" onchange="setAreaMode('select')" style="accent-color:var(--blue)">
-              <span><b>직접 선택</b> (드래그로 영역 그리기)</span>
+              <span><b>직접 선택</b> (영역 그리기)</span>
             </label>
+            <div id="drawBtnGroup" style="display:none;gap:6px;margin-left:24px">
+              <button class="rad-btn" data-d="Circle" onclick="startDraw('Circle')">⭕ 원</button>
+              <button class="rad-btn" data-d="Box" onclick="startDraw('Box')">⬜ 사각</button>
+              <button class="rad-btn" data-d="Polygon" onclick="startDraw('Polygon')">🔷 다각형</button>
+              <button class="rad-btn" onclick="clearDraw()">지우기</button>
+            </div>
           </div>
         </div>
 
@@ -1285,9 +1289,7 @@ function onMapClickParcel(lng, lat){
 
           // 정보 패널 업데이트 (마지막 클릭 기준)
           document.getElementById('jd-addr').textContent = jibunStr + (_selectedParcels.length>1 ? ' 외 '+(_selectedParcels.length-1)+'필지' : '');
-          document.getElementById('jd-jmok').textContent = p.jimok_nm || p.jimok || '—';
-          document.getElementById('jd-area').textContent = p.bchk ? p.bchk + '㎡' : (p.area ? p.area + '㎡' : '—');
-          document.getElementById('jd-pnu').textContent = _selectedParcels.length + '개 선택';
+          document.getElementById('jd-pnu').textContent = _selectedParcels.length + '개 필지 선택됨';
           var extraEl = document.getElementById('jd-info-extra');
           if(extraEl) extraEl.style.display = 'block';
 
@@ -1343,6 +1345,20 @@ function redrawSelectedParcels(){
       _parcelSource.addFeature(feat);
     }catch(e){}
   });
+}
+
+// ⭐ 선택 필지 전체 초기화
+function clearSelectedParcels(){
+  _selectedParcels = [];
+  _selectedParcel = null;
+  if(_parcelSource) _parcelSource.clear();
+  if(_radiusSource) _radiusSource.clear();
+  if(window._drawSource) window._drawSource.clear();
+  document.getElementById('jd-addr').textContent = '지도에서 필지를 클릭하세요 (복수 선택 가능)';
+  var extraEl = document.getElementById('jd-info-extra');
+  if(extraEl) extraEl.style.display = 'none';
+  setDxfStatus('초기화됨');
+  toast('선택 초기화', 'ok');
 }
 
 // GeoJSON geometry → 중심점 (위경도)
@@ -1429,11 +1445,80 @@ function setAreaMode(mode){
     radiusGroup.style.opacity = (mode === 'auto') ? '1' : '0.3';
     radiusGroup.style.pointerEvents = (mode === 'auto') ? 'auto' : 'none';
   }
+  var drawGroup = document.getElementById('drawBtnGroup');
+  if(drawGroup) drawGroup.style.display = (mode === 'select') ? 'flex' : 'none';
   if(mode === 'select'){
-    setDxfStatus('지도에서 드래그로 영역을 선택하세요 (구현 예정)');
+    setDxfStatus('원/사각/다각형 버튼을 누르고 지도에 그리세요');
   } else {
+    stopDraw();
     setDxfStatus('');
   }
+}
+
+// ⭐ 직접선택 그리기 (OpenLayers Draw - 그리는 동안 지도이동 자동차단)
+var _drawInteraction = null;
+var _drawnGeom = null; // 그린 영역 (경위도 좌표 폴리곤)
+function _ensureDrawLayer(){
+  if(window._drawSource) return;
+  window._drawSource = new ol.source.Vector();
+  window._drawLayer = new ol.layer.Vector({
+    source: window._drawSource,
+    style: new ol.style.Style({
+      fill: new ol.style.Fill({ color: 'rgba(37,99,235,0.12)' }),
+      stroke: new ol.style.Stroke({ color: '#2563eb', width: 2, lineDash: [6,4] })
+    })
+  });
+  _olMap2.addLayer(window._drawLayer);
+}
+function startDraw(type){
+  if(!_olMap2){ toast('지도 로딩 중', 'err'); return; }
+  _ensureDrawLayer();
+  stopDraw();
+  window._drawSource.clear();
+  _drawnGeom = null;
+  // 버튼 표시
+  document.querySelectorAll('#drawBtnGroup .rad-btn').forEach(function(b){
+    b.classList.toggle('on', b.dataset.d === type);
+  });
+  var opts = { source: window._drawSource };
+  if(type === 'Box'){
+    opts.type = 'Circle';
+    opts.geometryFunction = ol.interaction.Draw.createBox();
+  } else {
+    opts.type = type; // 'Circle' or 'Polygon'
+  }
+  _drawInteraction = new ol.interaction.Draw(opts);
+  _drawInteraction.on('drawend', function(evt){
+    var geom = evt.feature.getGeometry();
+    var poly;
+    if(geom.getType() === 'Circle'){
+      poly = ol.geom.Polygon.fromCircle(geom, 64);
+    } else {
+      poly = geom;
+    }
+    // 3857 → 4326 좌표 배열
+    var coords = poly.getCoordinates()[0].map(function(c){ return ol.proj.toLonLat(c); });
+    _drawnGeom = { type:'Polygon', coordinates: [coords] };
+    stopDraw();
+    document.querySelectorAll('#drawBtnGroup .rad-btn').forEach(function(b){ b.classList.remove('on'); });
+    setDxfStatus('영역 그려짐. 다운로드하면 이 영역에 걸친 필지 전부 포함됩니다');
+    toast('영역 선택 완료', 'ok');
+  });
+  _olMap2.addInteraction(_drawInteraction);
+  setDxfStatus(type==='Polygon' ? '클릭으로 점 찍고 더블클릭으로 완성' : '드래그해서 그리세요');
+}
+function stopDraw(){
+  if(_drawInteraction && _olMap2){
+    _olMap2.removeInteraction(_drawInteraction);
+    _drawInteraction = null;
+  }
+}
+function clearDraw(){
+  stopDraw();
+  if(window._drawSource) window._drawSource.clear();
+  _drawnGeom = null;
+  document.querySelectorAll('#drawBtnGroup .rad-btn').forEach(function(b){ b.classList.remove('on'); });
+  setDxfStatus('영역 지움');
 }
 
 // 위성/일반 지도 전환 (OpenLayers VWorld 타일)
@@ -1502,6 +1587,10 @@ function downloadCircleDxf(){
     jibun: lastSp.jibun || '',
     pnus: _selectedParcels.map(function(sp){ return sp.pnu; })  // ⭐ 복수 PNU
   };
+  // ⭐ 직접선택 모드: 그린 영역 폴리곤 전송 (걸치면 전부 포함)
+  if(_areaMode === 'select' && _drawnGeom){
+    body.polygon = _drawnGeom;
+  }
 
   fetch('/api/wfs-dxf-circle', {
     method: 'POST',
