@@ -742,7 +742,18 @@ function initVwMap() {
     })
   });
 
-  // 지적도 WMS 레이어 (기본 ON, VWorld 직접 호출)
+  // 연속지적도 (멀리서도 필지 경계선 보임, 직접 호출)
+  window._olCadLineLayer = new ol.layer.Tile({
+    source: new ol.source.TileWMS({
+      url: 'https://api.vworld.kr/req/wms',
+      params: { 'LAYERS': 'lp_pa_cbnd_bubun', 'STYLES': 'lp_pa_cbnd_bubun', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
+      serverType: 'mapserver'
+    }),
+    visible: true,
+    opacity: 0.9
+  });
+
+  // 지적도 WMS 레이어 (편집지적도-지번, 기본 ON, VWorld 직접 호출)
   window._olCadLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms',
@@ -775,7 +786,7 @@ function initVwMap() {
 
   window._olMap = new ol.Map({
     target: 'olMap',
-    layers: [vwSatLayer, window._olContourLayer, window._olCadLayer, window._olHighlightLayer],
+    layers: [vwSatLayer, window._olContourLayer, window._olCadLineLayer, window._olCadLayer, window._olHighlightLayer],
     view: new ol.View({
       center: ol.proj.fromLonLat([currentLng, currentLat]),
       zoom: 17,
@@ -916,6 +927,9 @@ function toggleCadastral(on) {
   if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
   if (window._olCadLayer) {
     window._olCadLayer.setVisible(on);
+  }
+  if (window._olCadLineLayer) {
+    window._olCadLineLayer.setVisible(on);
   }
   toast(on ? '지적선+지번 ON' : '지적선+지번 OFF');
 }
