@@ -1187,7 +1187,7 @@ function loadCadBox(){
   var key = bx0.toFixed(4)+','+by0.toFixed(4)+','+bx1.toFixed(4)+','+by1.toFixed(4);
   if(key===_pdCadKey || _pdCadLoading) return;
   _pdCadLoading=true; _pdCadKey=key;
-  fetch('/api/cad-box?minx='+bx0+'&miny='+by0+'&maxx='+bx1+'&maxy='+by1+'&size=500')
+  fetch('/api/cad-box?minx='+bx0+'&miny='+by0+'&maxx='+bx1+'&maxy='+by1+'&size=1000')
     .then(function(r){return r.json();})
     .then(function(d){
       _pdCadLoading=false;
@@ -1587,7 +1587,9 @@ function downloadCircleDxf(){
     radius: _currentRadius,   // 0 = 선택필지만
     layers: layers,
     jibun: lastSp.jibun || '',
-    pnus: _selectedParcels.map(function(sp){ return sp.pnu; })  // ⭐ 복수 PNU
+    pnus: _selectedParcels.map(function(sp){ return sp.pnu; }),  // ⭐ 복수 PNU
+    // ⭐ 필지 외곽 기준 반경용: 선택 필지 geometry들
+    parcel_geoms: _selectedParcels.map(function(sp){ return sp.geom; }).filter(Boolean)
   };
   // ⭐ 직접선택 모드: 그린 영역 폴리곤 전송 (걸치면 전부 포함)
   if(_areaMode === 'select' && _drawnGeom){
