@@ -1093,7 +1093,7 @@ function initVmap2(){
     opacity: 1.0
   });
 
-  // (2) 편집지적도(LX맵) - 가까이서 지번 글씨 보임
+  // (2) 편집지적도(LX맵) - 지번 글씨 보임
   var cadWmsLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms',
@@ -1108,8 +1108,11 @@ function initVmap2(){
       },
       serverType: 'mapserver'
     }),
-    opacity: 0.9
+    opacity: 1.0
   });
+  // ⭐ 올리브색 배경 필터 제거: multiply 블렌드 → 밝은 배경면은 투명, 진한 선/지번만 남음
+  cadWmsLayer.on('prerender', function(evt){ evt.context.globalCompositeOperation = 'multiply'; });
+  cadWmsLayer.on('postrender', function(evt){ evt.context.globalCompositeOperation = 'source-over'; });
 
   // 선택 필지 벡터 레이어 (노란 채우기)
   _parcelSource = new ol.source.Vector();
@@ -1159,7 +1162,7 @@ function initVmap2(){
 
   _olMap2 = new ol.Map({
     target: 'vmap2',
-    layers: [bgLayer, cadLineLayer, parcelLayer, radiusLayer],
+    layers: [bgLayer, cadWmsLayer, parcelLayer, radiusLayer],
     view: new ol.View({
       center: ol.proj.fromLonLat([126.831, 37.199]),
       zoom: 16,
