@@ -6180,6 +6180,11 @@
         toast('✓ ' + q + ' - 연동 완료' + (pnu ? ' (PNU확인)' : ''), 'ok');
       }
       var kakaoKey = localStorage.getItem('gdsp_kakao') || '';
+      if (!kakaoKey) {
+        // localStorage에 없으면 서버에서 자동으로
+        ndGetKakaoKey(function(k){ if(k){ localStorage.setItem('gdsp_kakao', k); } });
+        kakaoKey = localStorage.getItem('gdsp_kakao') || '';
+      }
       if (kakaoKey) {
         fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent('화성시 ' + q), {
           headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
@@ -7688,6 +7693,32 @@
         .catch(function(){ cb(''); });
     }
 
+    // ⭐ 카카오 REST API 키 서버에서 자동 로드 (모든 PC에서 설정 없이 작동)
+    function ndGetKakaoKey(cb) {
+      var saved = localStorage.getItem('gdsp_kakao');
+      if (saved) { cb(saved); return; }
+      fetch('/api/kakao/key')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if(d.key){
+            localStorage.setItem('gdsp_kakao', d.key); // 캐시 저장
+            cb(d.key);
+          } else cb('');
+        })
+        .catch(function(){ cb(''); });
+    }
+
+    // 페이지 로드 시 카카오 키 자동 세팅
+    (function(){
+      ndGetKakaoKey(function(key){
+        if(key){
+          // 설정 화면 입력칸도 채우기
+          var el = document.getElementById('kakaoKey');
+          if(el && !el.value) el.value = key;
+        }
+      });
+    })();
+
     // VWorld 스크립트 동적 로드
     function ndLoadVwScript(key, cb) {
       if (typeof vw !== 'undefined') { cb(); return; }
@@ -8223,7 +8254,14 @@
       if (!q) { toast('검색어를 입력하세요', 'err'); return; }
       if (!ndMapInited) { ndInitMap(); }
       var kakaoKey = localStorage.getItem('gdsp_kakao') || '';
-      if (!kakaoKey) { toast('카카오 API 키를 설정에서 입력하세요', 'err'); return; }
+      if (!kakaoKey) {
+        // 서버에서 자동으로 받아서 재시도
+        ndGetKakaoKey(function(k){
+          if(k){ localStorage.setItem('gdsp_kakao', k); ndDoSearch(); }
+          else { toast('카카오 API 키를 설정에서 입력하세요', 'err'); }
+        });
+        return;
+      }
       // 시/군/구 없이 동/리만 입력 시 화성시 자동 붙임
       var hasCity = /시$|군$|구$|도$/.test(q.split(' ')[0]);
       var searchAddr = hasCity ? q : '화성시 ' + q;
