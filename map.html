@@ -614,7 +614,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 
 <script>
 var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
-var KAKAO_KEY = localStorage.getItem('gdsp_kakao') || '0f432d6e8470eed32f947e3c7db146b9'; // REST API 키 (서버와 동일)
+if(localStorage.getItem('gdsp_kakao')==='0f432d6e8470eed32f947e3c7db146b9'){localStorage.setItem('gdsp_kakao','c670e0bc85874ef6267220f09882b379');}
+var KAKAO_KEY = localStorage.getItem('gdsp_kakao') || 'c670e0bc85874ef6267220f09882b379'; // REST API 키
 // ⭐ 서버에서 최신 키 자동 로드 (모든 PC 공통)
 (function(){
   fetch('/api/kakao/key')
