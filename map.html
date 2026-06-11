@@ -742,15 +742,15 @@ function initVwMap() {
     })
   });
 
-  // 연속지적도 (멀리서도 필지 경계선 보임, 직접 호출)
+  // 연속지적도 (본번+부번: 경계선+지번 다 보임, 배경 깨끗) ⭐
   window._olCadLineLayer = new ol.layer.Tile({
     source: new ol.source.TileWMS({
       url: 'https://api.vworld.kr/req/wms',
-      params: { 'LAYERS': 'lp_pa_cbnd_bubun', 'STYLES': 'lp_pa_cbnd_bubun', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
+      params: { 'LAYERS': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun', 'STYLES': 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun', 'FORMAT': 'image/png', 'TRANSPARENT': true, 'TILED': true, 'key': VWORLD_KEY, 'domain': location.hostname },
       serverType: 'mapserver'
     }),
     visible: true,
-    opacity: 0.9
+    opacity: 1.0
   });
 
   // 지적도 WMS 레이어 (편집지적도-지번, 기본 ON, VWorld 직접 호출)
