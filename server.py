@@ -752,18 +752,27 @@ def cad_box():
             minx, maxx = lng - span, lng + span
             miny, maxy = lat - span, lat + span
         size = request.args.get('size', default=200, type=int)
-        # VWorld data API - geomFilter BOX (EPSG:4326)
-        params = {
-            "service": "data", "request": "GetFeature", "version": "2.0",
-            "data": "LP_PA_CBND_BUBUN", "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
-            "format": "json", "size": str(size), "page": "1",
-            "geometry": "true", "attribute": "true", "crs": "EPSG:4326",
-            "geomFilter": f"BOX({minx},{miny},{maxx},{maxy})"
-        }
-        r = req.get("https://api.vworld.kr/req/data", params=params,
-                    headers={"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}, timeout=30)
-        data = r.json()
-        features = data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", [])
+        # ⭐ 페이징: 화면 필지 전부 받기 (구멍처럼 보이는 누락 제거)
+        all_features = []
+        page = 1
+        max_pages = 8  # 안전장치 (size×8)
+        while page <= max_pages:
+            params = {
+                "service": "data", "request": "GetFeature", "version": "2.0",
+                "data": "LP_PA_CBND_BUBUN", "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
+                "format": "json", "size": str(size), "page": str(page),
+                "geometry": "true", "attribute": "true", "crs": "EPSG:4326",
+                "geomFilter": f"BOX({minx},{miny},{maxx},{maxy})"
+            }
+            r = req.get("https://api.vworld.kr/req/data", params=params,
+                        headers={"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}, timeout=30)
+            data = r.json()
+            feats = data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", []) or []
+            all_features.extend(feats)
+            if len(feats) < size:
+                break
+            page += 1
+        features = all_features
         out = []
         for f in features:
             props = f.get("properties", {}) or {}
