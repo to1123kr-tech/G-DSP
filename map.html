@@ -825,9 +825,22 @@ function initVwMap() {
     opacity: 0.7
   });
 
+  // ⭐ 검색/클릭 위치 마커 레이어 (노란 점)
+  window._olMarkerSource = new ol.source.Vector();
+  window._olMarkerLayer = new ol.layer.Vector({
+    source: window._olMarkerSource,
+    style: new ol.style.Style({
+      image: new ol.style.Circle({
+        radius: 8,
+        fill: new ol.style.Fill({ color: '#ffd200' }),
+        stroke: new ol.style.Stroke({ color: '#000', width: 2 })
+      })
+    })
+  });
+
   window._olMap = new ol.Map({
     target: 'olMap',
-    layers: [vwSatLayer, window._olContourLayer, window._olWfsCadLayer, window._olHighlightLayer],
+    layers: [vwSatLayer, window._olContourLayer, window._olWfsCadLayer, window._olHighlightLayer, window._olMarkerLayer],
     view: new ol.View({
       center: ol.proj.fromLonLat([currentLng, currentLat]),
       zoom: 17,
@@ -893,8 +906,16 @@ function moveVwMap(lng, lat) {
   if (!window._olMap) return;
   window._olMap.getView().animate({
     center: ol.proj.fromLonLat([lng, lat]),
+    zoom: Math.max(window._olMap.getView().getZoom(), 17),
     duration: 500
   });
+  // ⭐ 위치 마커 표시
+  if (window._olMarkerSource) {
+    window._olMarkerSource.clear();
+    window._olMarkerSource.addFeature(new ol.Feature({
+      geometry: new ol.geom.Point(ol.proj.fromLonLat([lng, lat]))
+    }));
+  }
 }
 
 function zoomIn() {
@@ -1346,6 +1367,13 @@ function buildPnu(addr) {
 // ── 지도 클릭 ──
 function onMapClick(lng, lat) {
   currentLng=lng; currentLat=lat;
+  // ⭐ VWorld OL 지도에도 마커 동기화
+  if (window._olMarkerSource) {
+    window._olMarkerSource.clear();
+    window._olMarkerSource.addFeature(new ol.Feature({
+      geometry: new ol.geom.Point(ol.proj.fromLonLat([lng, lat]))
+    }));
+  }
   if (!kakaoGeocoder) return;
   // 1단계: 주소 가져오기
   kakaoGeocoder.coord2Address(lng, lat, function(result, status) {
