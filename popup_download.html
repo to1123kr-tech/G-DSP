@@ -1083,13 +1083,14 @@ function initVmap2(){
   _cadSource = new ol.source.Vector();
   var cadLineLayer = new ol.layer.Vector({
     source: _cadSource,
-    style: function(feature){
+    style: function(feature, resolution){
       var styles=[ new ol.style.Style({
         stroke: new ol.style.Stroke({ color:'#ff2d2d', width:1.6 }),
         fill: new ol.style.Fill({ color:'rgba(255,45,45,0.02)' })
       }) ];
+      // ⭐ 지번은 충분히 확대했을 때만 (겹침 방지)
       var jb=feature.get('jibun');
-      if(jb){ styles.push(new ol.style.Style({ text:new ol.style.Text({
+      if(jb && resolution < 0.7){ styles.push(new ol.style.Style({ text:new ol.style.Text({
         text:jb, font:'bold 13px "Malgun Gothic",sans-serif',
         fill:new ol.style.Fill({color:'#fff'}),
         stroke:new ol.style.Stroke({color:'#000',width:3}), overflow:true
