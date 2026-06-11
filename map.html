@@ -761,8 +761,11 @@ function initVwMap() {
       serverType: 'mapserver'
     }),
     visible: true,
-    opacity: 0.85
+    opacity: 1.0
   });
+  // ⭐ 올리브색 배경 필터 제거: multiply 블렌드 → 밝은 배경면은 투명해지고 진한 선/지번만 남음
+  window._olCadLayer.on('prerender', function(evt){ evt.context.globalCompositeOperation = 'multiply'; });
+  window._olCadLayer.on('postrender', function(evt){ evt.context.globalCompositeOperation = 'source-over'; });
 
   // 선택 필지 하이라이트 벡터 레이어
   window._olHighlightSource = new ol.source.Vector();
@@ -786,7 +789,7 @@ function initVwMap() {
 
   window._olMap = new ol.Map({
     target: 'olMap',
-    layers: [vwSatLayer, window._olContourLayer, window._olCadLineLayer, window._olHighlightLayer],
+    layers: [vwSatLayer, window._olContourLayer, window._olCadLayer, window._olHighlightLayer],
     view: new ol.View({
       center: ol.proj.fromLonLat([currentLng, currentLat]),
       zoom: 17,
@@ -925,11 +928,8 @@ function _removeWmsTileset(key) {
 
 function toggleCadastral(on) {
   if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
-  if (window._olCadLineLayer) {
-    window._olCadLineLayer.setVisible(on);
-  }
   if (window._olCadLayer) {
-    window._olCadLayer.setVisible(false); // 편집지적도는 배경 칙칙해서 미사용
+    window._olCadLayer.setVisible(on);
   }
   toast(on ? '지적선+지번 ON' : '지적선+지번 OFF');
 }
