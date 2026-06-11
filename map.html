@@ -993,7 +993,7 @@ function loadWfsCadastral(){
   _wfsCadLoading = true;
   _wfsCadLastKey = key;
 
-  var url = PROXY+'/api/cad-box?minx='+min[0]+'&miny='+min[1]+'&maxx='+max[0]+'&maxy='+max[1]+'&size=300';
+  var url = PROXY+'/api/cad-box?minx='+min[0]+'&miny='+min[1]+'&maxx='+max[0]+'&maxy='+max[1]+'&size=1000';
   fetch(url)
     .then(function(r){ return r.json(); })
     .then(function(d){
