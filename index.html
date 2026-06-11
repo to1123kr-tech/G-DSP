@@ -7701,11 +7701,17 @@
     (function(){
       ndGetKakaoKey(function(key){
         if(key){
-          // 설정 화면 입력칸도 채우기
           var el = document.getElementById('kakaoKey');
           if(el && !el.value) el.value = key;
         }
       });
+      // ⭐ 건축물대장 키 자동 로드
+      if(!localStorage.getItem('gdsp_building')){
+        fetch('/api/building/key')
+          .then(function(r){return r.json();})
+          .then(function(d){ if(d.key){ localStorage.setItem('gdsp_building',d.key); } })
+          .catch(function(){});
+      }
     })();
 
     // VWorld 스크립트 동적 로드
