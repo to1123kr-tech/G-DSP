@@ -561,7 +561,8 @@ function updateScaleBtns(){
 var regItems = [], _tt;
 var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '16B90D39-90BB-3197-987A-54983A46F250';
 var _vwKey = VWORLD_KEY;
-var _kakaoKey = (window.opener && window.opener.KAKAO_APP_KEY) || localStorage.getItem('gdsp_kakao') || localStorage.getItem('gdsp_kakao_key') || '0f432d6e8470eed32f947e3c7db146b9';
+if(localStorage.getItem('gdsp_kakao')==='0f432d6e8470eed32f947e3c7db146b9'){localStorage.setItem('gdsp_kakao','c670e0bc85874ef6267220f09882b379');}
+var _kakaoKey = (window.opener && window.opener.KAKAO_APP_KEY) || localStorage.getItem('gdsp_kakao') || localStorage.getItem('gdsp_kakao_key') || 'c670e0bc85874ef6267220f09882b379';
 
 // ⭐ 서버에서 최신 키 자동 로드 (모든 PC 공통)
 (function(){
