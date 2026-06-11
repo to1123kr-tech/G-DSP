@@ -664,7 +664,7 @@ function drawGrid(){
   // 카카오 level: 낮을수록 확대됨
   // 너무 축소(넓은 영역)되면 격자가 너무 많아지므로 자동 숨김
   var level = _kMap.getLevel();
-  var maxLevel = (_gridScale === 5000) ? 10 : 7;
+  var maxLevel = (_gridScale === 5000) ? 10 : 9;
   if(level > maxLevel){
     // 너무 축소됨 — 격자 안 그림
     return;
@@ -691,10 +691,10 @@ function drawGrid(){
   var startLat = Math.floor(minLat / dLat) * dLat;
   var startLng = Math.floor(minLng / dLng) * dLng;
 
-  // 격자 수 계산 — 200개 넘으면 그리지 않음 (성능)
+  // 격자 수 계산 — 너무 많으면 그리지 않음 (성능)
   var rows = Math.ceil((maxLat - startLat) / dLat) + 1;
   var cols = Math.ceil((maxLng - startLng) / dLng) + 1;
-  if(rows * cols > 200) return;
+  if(rows * cols > 600) return;
 
   // 격자선 그리기
   for(var lat = startLat; lat <= maxLat + dLat; lat += dLat){
