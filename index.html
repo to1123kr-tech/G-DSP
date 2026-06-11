@@ -6179,69 +6179,49 @@
         setTimeout(function () { if (currentJibun) moveMapToJibun(currentJibun); }, 200);
         toast('✓ ' + q + ' - 연동 완료' + (pnu ? ' (PNU확인)' : ''), 'ok');
       }
-      var kakaoKey = localStorage.getItem('gdsp_kakao') || '';
-      if (!kakaoKey) {
-        // localStorage에 없으면 서버에서 받아서 재시도 (비동기 처리)
-        ndGetKakaoKey(function(k){
-          if(k){ localStorage.setItem('gdsp_kakao', k); hdrSearch(); }
-          else { toast('카카오 API 키 로드 실패', 'err'); }
-        });
-        return; // 키 받은 후 재호출됨
-      }
-      if (kakaoKey) {
-        fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent('화성시 ' + q), {
-          headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            var docs = d && d.documents;
-            if (docs && docs.length) {
-              var doc = docs[0];
-              var addr = doc.address;
-              if (addr && addr.b_code) {
-                var pnu = addr.b_code + (addr.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(addr.main_address_no) || 0).padStart(4, '0') + String(parseInt(addr.sub_address_no) || 0).padStart(4, '0');
-                applySearch(pnu);
-              } else {
-                // 도로명만 있는 경우 → 좌표로 역지오코딩
-                fetch('https://dapi.kakao.com/v2/local/geo/coord2address.json?x=' + doc.x + '&y=' + doc.y + '&input_coord=WGS84', {
-                  headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
-                })
-                .then(function (r2) { return r2.json(); })
-                .then(function (d2) {
-                  var addr2 = d2 && d2.documents && d2.documents[0] && d2.documents[0].address;
-                  if (addr2 && addr2.b_code) {
-                    var pnu = addr2.b_code + (addr2.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(addr2.main_address_no) || 0).padStart(4, '0') + String(parseInt(addr2.sub_address_no) || 0).padStart(4, '0');
-                    searchJibun = addr2.address_name || searchJibun;
-                    applySearch(pnu);
-                  } else { applySearch(''); }
-                }).catch(function () { applySearch(''); });
-              }
-            } else {
-              // 키워드 검색 fallback
-              fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent('화성시 ' + q) + '&size=1', {
-                headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
-              })
-              .then(function (r) { return r.json(); })
-              .then(function (d) {
-                var doc = d && d.documents && d.documents[0];
-                if (doc) {
-                  fetch('https://dapi.kakao.com/v2/local/geo/coord2address.json?x=' + doc.x + '&y=' + doc.y + '&input_coord=WGS84', {
-                    headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
-                  })
-                  .then(function (r2) { return r2.json(); })
-                  .then(function (d2) {
-                    var addr2 = d2 && d2.documents && d2.documents[0] && d2.documents[0].address;
-                    if (addr2 && addr2.b_code) {
-                      var pnu = addr2.b_code + (addr2.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(addr2.main_address_no) || 0).padStart(4, '0') + String(parseInt(addr2.sub_address_no) || 0).padStart(4, '0');
-                      searchJibun = addr2.address_name || searchJibun;
-                      applySearch(pnu);
-                    } else { applySearch(''); }
-                  }).catch(function () { applySearch(''); });
+      // ⭐ REST 키 불필요 - 지도 SDK 내장 검색
+      if (window.kakao && kakao.maps && kakao.maps.services) {
+        var _gc = new kakao.maps.services.Geocoder();
+        function _pnuFromAddr(a){
+          return a.b_code + (a.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(a.main_address_no) || 0).padStart(4, '0') + String(parseInt(a.sub_address_no) || 0).padStart(4, '0');
+        }
+        function _byCoord(x, y){
+          _gc.coord2Address(parseFloat(x), parseFloat(y), function(res2, st2){
+            var addr2 = (st2 === kakao.maps.services.Status.OK) && res2[0] && res2[0].address;
+            if (addr2 && addr2.b_code) {
+              searchJibun = addr2.address_name || searchJibun;
+              applySearch(_pnuFromAddr(addr2));
+            } else if (addr2) {
+              // b_code 없으면 region코드로 보강
+              _gc.coord2RegionCode(parseFloat(x), parseFloat(y), function(regs, st3){
+                var bT = (st3 === kakao.maps.services.Status.OK) && (regs||[]).filter(function(r){return r.region_type==='B';})[0];
+                if (bT) {
+                  searchJibun = addr2.address_name || searchJibun;
+                  applySearch(bT.code + (addr2.mountain_yn==='Y'?'2':'1') + String(parseInt(addr2.main_address_no)||0).padStart(4,'0') + String(parseInt(addr2.sub_address_no)||0).padStart(4,'0'));
                 } else { applySearch(''); }
-              }).catch(function () { applySearch(''); });
+              });
+            } else { applySearch(''); }
+          });
+        }
+        _gc.addressSearch('화성시 ' + q, function(docs, status){
+          if (status === kakao.maps.services.Status.OK && docs.length) {
+            var doc = docs[0];
+            var addr = doc.address;
+            if (addr && addr.b_code) {
+              applySearch(_pnuFromAddr(addr));
+            } else {
+              _byCoord(doc.x, doc.y);
             }
-          })
-          .catch(function () { applySearch(''); });
+          } else {
+            // 키워드 검색 fallback
+            var _ps = new kakao.maps.services.Places();
+            _ps.keywordSearch('화성시 ' + q, function(kdocs, kst){
+              if (kst === kakao.maps.services.Status.OK && kdocs.length) {
+                _byCoord(kdocs[0].x, kdocs[0].y);
+              } else { applySearch(''); }
+            });
+          }
+        });
       } else {
         applySearch('');
       }
@@ -8262,79 +8242,60 @@
       var q = (document.getElementById('ndSearch').value || '').trim();
       if (!q) { toast('검색어를 입력하세요', 'err'); return; }
       if (!ndMapInited) { ndInitMap(); }
-      var kakaoKey = localStorage.getItem('gdsp_kakao') || '';
-      if (!kakaoKey) {
-        // 서버에서 자동으로 받아서 재시도
-        ndGetKakaoKey(function(k){
-          if(k){ localStorage.setItem('gdsp_kakao', k); ndDoSearch(); }
-          else { toast('카카오 API 키를 설정에서 입력하세요', 'err'); }
-        });
-        return;
+      // ⭐ REST 키 불필요 - 지도 SDK 내장 검색 (JS키로 인증, 지도가 뜨면 검색도 됨)
+      if (!(window.kakao && kakao.maps && kakao.maps.services)) {
+        toast('지도 로딩 중... 잠시 후 다시 시도하세요', 'err'); return;
       }
-      // 시/군/구 없이 동/리만 입력 시 화성시 자동 붙임
       var hasCity = /시$|군$|구$|도$/.test(q.split(' ')[0]);
       var searchAddr = hasCity ? q : '화성시 ' + q;
-      // 카카오 주소검색 → 좌표+PNU
-      fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(searchAddr) + '&size=5', {
-        headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
-      })
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        var docs = d && d.documents;
-        if (!docs || !docs.length) {
-          // 원래 입력어로 재시도
-          return fetch('https://dapi.kakao.com/v2/local/search/address.json?query=' + encodeURIComponent(q) + '&size=5', {
-            headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
-          }).then(function(r2){ return r2.json(); }).then(function(d2){
-            var docs2 = d2 && d2.documents;
-            if (!docs2 || !docs2.length) {
-              // 키워드 fallback
-              return fetch('https://dapi.kakao.com/v2/local/search/keyword.json?query=' + encodeURIComponent(q) + '&size=1', {
-                headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
-              }).then(function(r3){ return r3.json(); }).then(function(d3){
-                var doc = d3 && d3.documents && d3.documents[0];
-                if (!doc) throw new Error('not found');
-                return ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, q, kakaoKey);
-              });
-            }
-            var doc = docs2[0];
-            var addr = doc.address;
-            if (addr && addr.b_code) {
-              var pnu = addr.b_code + (addr.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
-              ndApplySearch(parseFloat(doc.x), parseFloat(doc.y), addr.address_name || q, pnu);
-            } else {
-              ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, q, kakaoKey);
-            }
-          });
-        }
-        var doc = docs[0];
+      var gc = ndGeocoder || new kakao.maps.services.Geocoder();
+      ndGeocoder = gc;
+
+      function applyDoc(doc, label){
         var addr = doc.address;
         if (addr && addr.b_code) {
           var pnu = addr.b_code + (addr.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
-          ndApplySearch(parseFloat(doc.x), parseFloat(doc.y), addr.address_name || searchAddr, pnu);
+          ndApplySearch(parseFloat(doc.x), parseFloat(doc.y), addr.address_name || label, pnu);
         } else {
-          ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, searchAddr, kakaoKey);
+          ndDoSearchByCoord(parseFloat(doc.x), parseFloat(doc.y), q, label);
         }
-      })
-      .catch(function(){ toast('검색 결과 없음', 'err'); });
+      }
+
+      gc.addressSearch(searchAddr, function(res, status){
+        if (status === kakao.maps.services.Status.OK && res.length) { applyDoc(res[0], searchAddr); return; }
+        // 원래 입력어로 재시도
+        gc.addressSearch(q, function(res2, st2){
+          if (st2 === kakao.maps.services.Status.OK && res2.length) { applyDoc(res2[0], q); return; }
+          // 키워드 검색 fallback (장소명 등)
+          var ps = new kakao.maps.services.Places();
+          ps.keywordSearch(searchAddr, function(res3, st3){
+            if (st3 === kakao.maps.services.Status.OK && res3.length) {
+              ndDoSearchByCoord(parseFloat(res3[0].x), parseFloat(res3[0].y), q, q);
+            } else { toast('검색 결과 없음', 'err'); }
+          });
+        });
+      });
     }
 
-    function ndDoSearchByCoord(lng, lat, q, searchAddr, kakaoKey) {
-      fetch('https://dapi.kakao.com/v2/local/geo/coord2address.json?x=' + lng + '&y=' + lat + '&input_coord=WGS84', {
-        headers: { 'Authorization': 'KakaoAK ' + kakaoKey }
-      })
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        var addr = d && d.documents && d.documents[0] && d.documents[0].address;
-        var pnu = '';
-        var jibun = searchAddr;
-        if (addr && addr.b_code) {
-          pnu = addr.b_code + '0' + String(parseInt(addr.main_address_no)||0).padStart(4,'0') + String(parseInt(addr.sub_address_no)||0).padStart(4,'0');
-          jibun = addr.address_name || searchAddr;
+    function ndDoSearchByCoord(lng, lat, q, searchAddr) {
+      var gc = ndGeocoder || new kakao.maps.services.Geocoder();
+      ndGeocoder = gc;
+      gc.coord2RegionCode(lng, lat, function(regions, st){
+        var b = '';
+        if (st === kakao.maps.services.Status.OK) {
+          var bT = (regions || []).filter(function(r){ return r.region_type === 'B'; })[0];
+          if (bT) b = bT.code;
         }
-        ndApplySearch(lng, lat, jibun, pnu);
-      })
-      .catch(function(){ ndApplySearch(lng, lat, searchAddr, ''); });
+        gc.coord2Address(lng, lat, function(res, st2){
+          var pnu = '', jibun = searchAddr;
+          if (st2 === kakao.maps.services.Status.OK && res[0] && res[0].address) {
+            var a = res[0].address;
+            jibun = a.address_name || searchAddr;
+            if (b) pnu = b + (a.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(a.main_address_no)||0).padStart(4,'0') + String(parseInt(a.sub_address_no)||0).padStart(4,'0');
+          }
+          ndApplySearch(lng, lat, jibun, pnu);
+        });
+      });
     }
 
     // ✨ 새 함수 (2026-06-02): 건축물대장 상세보기 - popup_download.html bld 탭을 새 탭으로
