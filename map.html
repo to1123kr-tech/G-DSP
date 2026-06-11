@@ -786,7 +786,7 @@ function initVwMap() {
 
   window._olMap = new ol.Map({
     target: 'olMap',
-    layers: [vwSatLayer, window._olContourLayer, window._olCadLineLayer, window._olCadLayer, window._olHighlightLayer],
+    layers: [vwSatLayer, window._olContourLayer, window._olCadLineLayer, window._olHighlightLayer],
     view: new ol.View({
       center: ol.proj.fromLonLat([currentLng, currentLat]),
       zoom: 17,
@@ -925,11 +925,11 @@ function _removeWmsTileset(key) {
 
 function toggleCadastral(on) {
   if (!VWORLD_KEY) { toast('VWorld 키 필요', 'err'); return; }
-  if (window._olCadLayer) {
-    window._olCadLayer.setVisible(on);
-  }
   if (window._olCadLineLayer) {
     window._olCadLineLayer.setVisible(on);
+  }
+  if (window._olCadLayer) {
+    window._olCadLayer.setVisible(false); // 편집지적도는 배경 칙칙해서 미사용
   }
   toast(on ? '지적선+지번 ON' : '지적선+지번 OFF');
 }
