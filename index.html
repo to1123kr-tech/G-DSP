@@ -6141,7 +6141,7 @@
     document.getElementById('loginPw').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
     // mainSearch 엔터는 hdrSearch()로 통합 (위에서 처리)
     function toggleCat(el, catId) { var isOn = el.classList.contains('on'); el.classList.toggle('on', !isOn); var sub = document.getElementById(catId); if (sub) sub.classList.toggle('on', !isOn); }
-    function showView(name, el) { document.querySelectorAll('.nav-item').forEach(function (i) { i.classList.remove('on') }); if (el) el.classList.add('on'); document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('on') }); var v = document.getElementById('view-' + name); if (v) v.classList.add('on'); if (name === 'geo') setTimeout(initKakaoOnGeoView, 80); if (name === 'con') renderCon(''); if (name === 'jideok') setTimeout(initJdCanvas, 100); if (name === 'rcp') renderRcp(); if (name === 'hist') renderHist(); }
+    function showView(name, el) { document.querySelectorAll('.nav-item').forEach(function (i) { i.classList.remove('on') }); if (el) el.classList.add('on'); document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('on') }); var v = document.getElementById('view-' + name); if (v) v.classList.add('on'); if (name === 'geo') { setTimeout(initKakaoOnGeoView, 80); setTimeout(function(){ try{ if(ndMap&&ndMap.updateSize) ndMap.updateSize(); }catch(e){} }, 300); } if (name === 'con') renderCon(''); if (name === 'jideok') setTimeout(initJdCanvas, 100); if (name === 'rcp') renderRcp(); if (name === 'hist') renderHist(); }
     // switchMap → 카카오 API로 대체
     function closeSettings() { showView("dash"); } function doSearch() {
       var q = document.getElementById('mainSearch').value.trim();
@@ -8316,13 +8316,16 @@
 
     function ndApplySearch(lng, lat, jibun, pnu) {
       // ✨ 버그 수정 (2026-06-02): 새 필지 검색 시 이전 건축물 정보 초기화
-      // 새 필지에 건물이 없을 때 이전 데이터가 그대로 남는 문제 해결
       ['ndInfoUse','ndInfoFloor','ndInfoBldArea','ndInfoTotArea','ndInfoBcr','ndInfoFar','ndInfoYear','ndBldOwner',
        'ndRcUse','ndRcBcr','ndRcFar','gBcr','gFar','bUse','bFloor','bArea','bBcArea','bYear','rcUse','rcBcr','rcFar',
        'bldOwner','gBldOwner','ndInfoOwner'].forEach(function(id){
         var el = document.getElementById(id);
         if (el) el.textContent = '-';
       });
+      // ⭐ 지도 컨테이너 크기 재계산 (숨겨진 div 후 표시 시 크기 0 문제 해결)
+      setTimeout(function(){
+        try{ if(ndMap && ndMap.updateSize) ndMap.updateSize(); }catch(e){}
+      }, 100);
       
       // ⭐ 검색은 지도 이동 필요 (클릭과 달리 먼 곳을 찾는 것이므로)
       if (ndMap && ndMap.getView) {
