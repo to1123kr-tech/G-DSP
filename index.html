@@ -7690,25 +7690,30 @@
       if (ndVwKey) { cb(ndVwKey); return; }
       var saved = localStorage.getItem('gdsp_vworld');
       if (saved) { ndVwKey = saved; cb(ndVwKey); return; }
+      var VW_FALLBACK = '16B90D39-90BB-3197-987A-54983A46F250';
       fetch('/api/vworld/key')
         .then(function(r){ return r.json(); })
-        .then(function(d){ if(d.key){ ndVwKey = d.key; cb(ndVwKey); } else cb(''); })
-        .catch(function(){ cb(''); });
+        .then(function(d){ ndVwKey = d.key || VW_FALLBACK; cb(ndVwKey); })
+        .catch(function(){ ndVwKey = VW_FALLBACK; cb(ndVwKey); });
     }
 
     // ⭐ 카카오 REST API 키 서버에서 자동 로드 (모든 PC에서 설정 없이 작동)
+    var KAKAO_FALLBACK_KEY = '0f432d6e8470eed32f947e3c7db146b9';
     function ndGetKakaoKey(cb) {
       var saved = localStorage.getItem('gdsp_kakao');
       if (saved) { cb(saved); return; }
       fetch('/api/kakao/key')
         .then(function(r){ return r.json(); })
         .then(function(d){
-          if(d.key){
-            localStorage.setItem('gdsp_kakao', d.key); // 캐시 저장
-            cb(d.key);
-          } else cb('');
+          var k = d.key || KAKAO_FALLBACK_KEY;
+          localStorage.setItem('gdsp_kakao', k); // 캐시 저장
+          cb(k);
         })
-        .catch(function(){ cb(''); });
+        .catch(function(){
+          // 서버 실패해도 fallback으로 무조건 작동
+          localStorage.setItem('gdsp_kakao', KAKAO_FALLBACK_KEY);
+          cb(KAKAO_FALLBACK_KEY);
+        });
     }
 
     // 페이지 로드 시 카카오 키 자동 세팅
