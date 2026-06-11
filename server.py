@@ -662,6 +662,59 @@ def wfs_area():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/cad-box')
+def cad_box():
+    """화면 영역(bbox)의 필지들을 GeoJSON으로 반환 (빨간 지적선+지번 그리기용).
+    파라미터: minx,miny,maxx,maxy (경위도 EPSG:4326) 또는 lng,lat(+span)"""
+    try:
+        minx = request.args.get('minx', type=float)
+        miny = request.args.get('miny', type=float)
+        maxx = request.args.get('maxx', type=float)
+        maxy = request.args.get('maxy', type=float)
+        # lng/lat만 온 경우 작은 박스 자동 생성
+        if minx is None or maxx is None:
+            lng = request.args.get('lng', type=float)
+            lat = request.args.get('lat', type=float)
+            if lng is None or lat is None:
+                return jsonify({"error": "bbox 또는 lng/lat 필요"}), 400
+            span = request.args.get('span', default=0.0025, type=float)
+            minx, maxx = lng - span, lng + span
+            miny, maxy = lat - span, lat + span
+        size = request.args.get('size', default=200, type=int)
+        # VWorld data API - geomFilter BOX (EPSG:4326)
+        params = {
+            "service": "data", "request": "GetFeature", "version": "2.0",
+            "data": "LP_PA_CBND_BUBUN", "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
+            "format": "json", "size": str(size), "page": "1",
+            "geometry": "true", "attribute": "true", "crs": "EPSG:4326",
+            "geomFilter": f"BOX({minx},{miny},{maxx},{maxy})"
+        }
+        r = req.get("https://api.vworld.kr/req/data", params=params,
+                    headers={"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}, timeout=30)
+        data = r.json()
+        features = data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", [])
+        out = []
+        for f in features:
+            props = f.get("properties", {}) or {}
+            # 지번: jibun 우선, 없으면 bonbun-bubun 조합
+            jibun = props.get("jibun") or ""
+            if not jibun:
+                bon = props.get("bonbun") or props.get("BONBUN") or ""
+                bu = props.get("bubun") or props.get("BUBUN") or ""
+                if bon:
+                    jibun = str(int(bon)) if str(bon).isdigit() else str(bon)
+                    if bu and str(bu) not in ("0", "0000", ""):
+                        try: jibun += "-" + str(int(bu))
+                        except: jibun += "-" + str(bu)
+            out.append({
+                "type": "Feature",
+                "geometry": f.get("geometry"),
+                "properties": {"jibun": jibun}
+            })
+        return jsonify({"type": "FeatureCollection", "features": out})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/vworld/key')
 @app.route('/api/vworld-key')
 def vworld_key_endpoint():
