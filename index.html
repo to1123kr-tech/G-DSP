@@ -5512,7 +5512,12 @@
       toast('삭제됐습니다');
     }
     // 크롤링 서버 주소 (server.py 실행 시)
-    var CRAWL_SERVER = localStorage.getItem('gdsp_crawl_server') || 'http://localhost:5050';
+    var CRAWL_SERVER = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+    // ⭐ localhost 오염 자동 정리
+    if(CRAWL_SERVER.indexOf('localhost') !== -1 || CRAWL_SERVER.indexOf('168.107.15.68') !== -1){
+      CRAWL_SERVER = 'https://168-107-15-68.nip.io';
+      localStorage.setItem('gdsp_crawl_server', CRAWL_SERVER);
+    }
     var crawlAvailable = false; // 서버 연결 여부
 
     // 서버 연결 확인
@@ -6435,7 +6440,7 @@
     }
     function saveCrawlServer() {
       var el = document.getElementById('crawlServerUrl');
-      var url = (el && el.value.trim()) || 'http://localhost:5050';
+      var url = (el && el.value.trim()) || 'https://168-107-15-68.nip.io';
       url = url.replace(/\/+$/, '');
       CRAWL_SERVER = url;
       localStorage.setItem('gdsp_crawl_server', url);
@@ -6467,7 +6472,7 @@
       var pw = localStorage.getItem('gdsp_ngiiPw'); if (pw) { var e = document.getElementById('ngiiPw'); if (e) e.value = pw; }
       var cs = localStorage.getItem('gdsp_crawl_server');
       if (cs) { CRAWL_SERVER = cs; var ce = document.getElementById('crawlServerUrl'); if (ce) ce.value = cs; }
-      else { var ce = document.getElementById('crawlServerUrl'); if (ce) ce.value = 'http://localhost:5050'; }
+      else { var ce = document.getElementById('crawlServerUrl'); if (ce) ce.value = 'https://168-107-15-68.nip.io'; }
       setTimeout(function () {
         checkCrawlServer(function (ok) {
           var st = document.getElementById('crawlSt');
