@@ -5085,7 +5085,7 @@
               💻 <b>내 컴퓨터에서 실행</b>: <code
                 style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid var(--line2);font-size:12px">http://localhost:5050</code><br>
               ☁️ <b>오라클 서버</b>: <code
-                style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid var(--line2);font-size:12px">http://168.107.15.68:5050</code><br>
+                style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid var(--line2);font-size:12px">https://168-107-15-68.nip.io</code><br>
               <span style="color:var(--gold);font-size:11px">※ 서버가 연결되어야 ↻갱신 버튼이 실제로 작동합니다</span>
             </div>
             <div class="api-row2">
@@ -5700,7 +5700,7 @@
     }
     // API 프록시 함수 (CORS 우회)
     function proxyFetch(url) {
-      var proxyBase = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+      var proxyBase = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
       return fetch(proxyBase + '/api/proxy?url=' + encodeURIComponent(url));
     }
     function openPopup(file) {
@@ -5723,7 +5723,7 @@
 
     // ── 인터넷등기소 소유자 조회 ──
     function fetchIrosOwner(jibun) {
-      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
       // 모든 소유구분 칸 즉시 "조회중..." 표시 (이전 데이터 클리어)
       ['ndInfoOwner', 'bldOwner', 'ndBldOwner', 'gBldOwner'].forEach(function(id){
         var el = document.getElementById(id);
@@ -7663,7 +7663,7 @@
     // 하위 호환용
     var ndMap = null, ndMapInited = false, ndMapType = 'normal', ndCadOn = false, ndMarker = null;
 
-    var GDSP_SERVER = 'http://168.107.15.68:5050';
+    var GDSP_SERVER = 'https://168-107-15-68.nip.io';
 
     // VWorld 키 Oracle 서버에서 받아오기
     function ndGetVwKey(cb) {
@@ -7738,6 +7738,21 @@
         setTimeout(function(){ if(window.kakao && window.kakao.maps && !ndGeocoder) ndGeocoder = new kakao.maps.services.Geocoder(); }, 1000);
       }
     }
+
+    // ⭐ 페이지 로드 시 메인 지도 자동 초기화 (검색 없이도 지도가 뜨게)
+    (function(){
+      function _autoInitNdMap(){
+        if (ndMapInited) return;
+        var c = document.getElementById('ndKakaoMap');
+        if (!c) { setTimeout(_autoInitNdMap, 400); return; }
+        try { ndInitMap(); } catch(e) { setTimeout(_autoInitNdMap, 600); }
+      }
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(_autoInitNdMap, 300);
+      } else {
+        document.addEventListener('DOMContentLoaded', function(){ setTimeout(_autoInitNdMap, 300); });
+      }
+    })();
 
     function ndAddCadastralWMS(key) {
       if (!ndVwMap) return;
@@ -7836,6 +7851,7 @@
           _ndT = setTimeout(ndLoadCadastral, 150);
         });
         setTimeout(function(){ try{ ndMap.updateSize(); }catch(e){} }, 200);
+        setTimeout(function(){ try{ ndMap.updateSize(); }catch(e){} }, 1200);
 
         var em=document.getElementById('ndMapEmpty');
         if(em) em.style.display='none';
@@ -8046,7 +8062,7 @@
     // 토지이용 정보 - Oracle 서버 /api/landinfo 경유 (ned API)
     function ndCallLandApi(pnu, lng, lat) {
       if (!pnu || pnu.length < 19) return;
-      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
       fetch(PROXY + '/api/landinfo?pnu=' + pnu)
         .then(function(r){ return r.json(); })
         .then(function(d){
@@ -8075,7 +8091,7 @@
 
         // VWorld 용도지역 조회 (Oracle 프록시)
     function ndCallVwYongdo(lng, lat) {
-      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
       var d = 0.001;
       var bbox = (lng-d) + ',' + (lat-d) + ',' + (lng+d) + ',' + (lat+d);
       var url = PROXY + '/api/vworld?path=req/data&service=data&request=GetFeature'
@@ -8523,7 +8539,7 @@
         if (nameEl && nameEl.value.trim()) { ndLinks[i].name = nameEl.value.trim(); return; }
         // 로딩 표시
         if (nameEl) { nameEl.placeholder = '가져오는 중...'; nameEl.disabled = true; }
-        var proxy = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+        var proxy = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
         fetch(proxy + '/api/fetch-title?url=' + encodeURIComponent(url), { signal: AbortSignal.timeout(4000) })
           .then(function (r) { return r.json(); })
           .then(function (d) {
@@ -8583,7 +8599,7 @@
     // - 오늘/누적 방문자: Oracle 서버 집계 (없으면 로컬 추정)
     // ══════════════════════════════════════
     (function () {
-      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
       var TODAY = new Date().toISOString().slice(0, 10);
 
       // 내 방문횟수 (로컬 누적)
@@ -8780,7 +8796,7 @@
         // 로딩 표시
         if (nameEl) { nameEl.placeholder = '가져오는 중...'; nameEl.disabled = true; }
 
-        var proxy = localStorage.getItem('gdsp_crawl_server') || 'http://168.107.15.68:5050';
+        var proxy = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
 
         fetch(proxy + '/api/fetch-title?url=' + encodeURIComponent(url), { signal: AbortSignal.timeout(4000) })
           .then(function (r) { return r.json(); })
