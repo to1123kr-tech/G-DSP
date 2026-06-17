@@ -640,20 +640,22 @@ def eum_proxy():
 
 
 # ============================================================
-# 수치지형도 R12 변환 엔드포인트
-#  - popup_dxf.html(도면·변환 탭)의 /api/convert-dxf 호출을 처리
-#  - mode='analysis': E/F/G 계열만 (경사도+수계 공용)
-#  - mode='original': 전체 레이어
-#  - LWPOLYLINE -> R12 POLYLINE 변환 + 등고선 elevation(z) 보존
+# 수치지형도 R12 변환 엔드포인트 (v2 — 빈화면/속도 개선)
+#  - popup_dxf.html(도면·변환 탭)의 /api/convert-dxf 호출 처리
+#  - mode='analysis': E/F/G 계열만 (경사도+수계 공용) / 'original': 전체
+#  - LWPOLYLINE -> R12 POLYLINE, 등고선 elevation은 3D 폴리라인 z로 보존
 #  - 엔티티가 실제 들어간 레이어만 테이블 생성 (유령 레이어 잔재 제거)
 #  - INSERT z(표고점 실제표고) 보존
+#  - ★ VPORT + EXTMIN/MAX 설정: 캐드에서 열자마자 도면이 보이게 (빈 화면 방지)
 #
 #  > server.py 의 @app.route("/api/health") 바로 위에 붙여넣으세요.
-#    (Flask, request, make_response, jsonify, ezdxf, io 는 이미 import 되어 있음)
+#    (Flask, request, make_response, send_file, jsonify, ezdxf, io 이미 import됨)
+#    추가로 맨 위 import에 `import re` 가 필요합니다 (없으면 한 줄 추가).
 # ============================================================
+import re as _re_ngii
 
 _NGII_ANALYSIS_FIRST = {'E', 'F', 'G'}
-_NGII_EXCLUDE_PREFIX = ('F003', 'F004')  # 보조 지형선(절벽/단차) - 분석 불필요
+_NGII_EXCLUDE_PREFIX = ('F003', 'F004')
 
 
 def _ngii_is_analysis_layer(name):
@@ -664,83 +666,11 @@ def _ngii_is_analysis_layer(name):
     return name[0].upper() in _NGII_ANALYSIS_FIRST
 
 
-def _ngii_copy_entity(e, target, layer):
-    """엔티티를 R12 호환으로 복사. LWPOLYLINE은 POLYLINE으로 바꾸고
-       elevation을 정점 z에 심는다. 성공 시 True."""
-    t = e.dxftype()
-    color = e.dxf.color if e.dxf.hasattr('color') else 256
-    try:
-        if t == 'LWPOLYLINE':
-            pts = [(p[0], p[1]) for p in e.get_points('xy')]
-            if len(pts) < 2:
-                return False
-            elev = float(e.dxf.elevation or 0.0)
-            pl = target.add_polyline2d(pts, dxfattribs={'layer': layer, 'color': color})
-            if e.closed:
-                pl.close(True)
-            if elev:  # 등고선 높이 보존
-                for v in pl.vertices:
-                    loc = v.dxf.location
-                    v.dxf.location = (loc.x, loc.y, elev)
-            return True
-
-        if t == 'POLYLINE':
-            pts, zlist = [], []
-            for v in e.vertices:
-                loc = v.dxf.location
-                pts.append((loc.x, loc.y))
-                zlist.append(loc.z)
-            if len(pts) < 2:
-                return False
-            pl = target.add_polyline2d(pts, dxfattribs={'layer': layer, 'color': color})
-            if e.is_closed:
-                pl.close(True)
-            if any(abs(z) > 1e-9 for z in zlist):
-                for v, z in zip(pl.vertices, zlist):
-                    loc = v.dxf.location
-                    v.dxf.location = (loc.x, loc.y, z)
-            return True
-
-        if t == 'LINE':
-            target.add_line(e.dxf.start, e.dxf.end, dxfattribs={'layer': layer, 'color': color})
-            return True
-
-        if t == 'POINT':
-            target.add_point(e.dxf.location, dxfattribs={'layer': layer, 'color': color})
-            return True
-
-        if t == 'CIRCLE':
-            target.add_circle(e.dxf.center, e.dxf.radius, dxfattribs={'layer': layer, 'color': color})
-            return True
-
-        if t == 'ARC':
-            target.add_arc(e.dxf.center, e.dxf.radius, e.dxf.start_angle, e.dxf.end_angle,
-                           dxfattribs={'layer': layer, 'color': color})
-            return True
-
-        if t == 'TEXT':
-            target.add_text(e.dxf.text,
-                            dxfattribs={'layer': layer, 'color': color,
-                                        'height': e.dxf.height,
-                                        'insert': (e.dxf.insert.x, e.dxf.insert.y),
-                                        'rotation': e.dxf.get('rotation', 0)})
-            return True
-
-        if t == 'MTEXT':  # R12엔 MTEXT 없음 -> TEXT 다운그레이드
-            target.add_text((e.text or '').split('\n')[0],
-                            dxfattribs={'layer': layer, 'color': color,
-                                        'height': e.dxf.char_height,
-                                        'insert': (e.dxf.insert.x, e.dxf.insert.y)})
-            return True
-
-        if t == 'INSERT':  # 표고점 심볼 등 - z(실제표고) 보존
-            target.add_blockref(e.dxf.name,
-                                (e.dxf.insert.x, e.dxf.insert.y, e.dxf.insert.z),
-                                dxfattribs={'layer': layer, 'color': color})
-            return True
-    except Exception:
-        return False
-    return False
+def _ngii_fix_extents(txt, varname, x, y):
+    """저장된 R12 텍스트에서 $EXTMIN/$EXTMAX의 1e+20 더미값을 실제값으로 치환."""
+    pat = _re_ngii.compile(
+        r'(\$' + varname + r'\s*\n\s*10\s*\n)[^\n]*(\n\s*20\s*\n)[^\n]*(\n\s*30\s*\n)[^\n]*')
+    return pat.sub(lambda m: f"{m.group(1)}{x}{m.group(2)}{y}{m.group(3)}0.0", txt)
 
 
 @app.route("/api/convert-dxf", methods=["POST", "OPTIONS"])
@@ -772,18 +702,16 @@ def convert_dxf():
     src_ver = doc.dxfversion
     msp = doc.modelspace()
 
-    # 살릴 레이어 결정
     all_layers = {e.dxf.layer for e in msp if e.dxf.hasattr('layer')}
     if mode == "analysis":
         target_layers = {n for n in all_layers if _ngii_is_analysis_layer(n)}
     else:
         target_layers = {n for n in all_layers if n not in ('0', 'Defpoints')}
 
-    # 새 R12 문서
     new = ezdxf.new('R12', setup=True)
     nmsp = new.modelspace()
 
-    # 사용 블록 복사 (대상 레이어 INSERT가 참조하는 것만)
+    # 사용 블록 복사
     used_blocks = set()
     for e in msp:
         if e.dxftype() == 'INSERT' and e.dxf.layer in target_layers:
@@ -794,24 +722,111 @@ def convert_dxf():
                 src_block = doc.blocks.get(bname)
                 nb = new.blocks.new(name=bname)
                 for be in src_block:
-                    _ngii_copy_entity(be, nb, be.dxf.layer if be.dxf.hasattr('layer') else '0')
+                    _ngii_copy_block_entity(be, nb)
             except Exception:
                 pass
 
-    # 엔티티 복사 + 실제 사용된 레이어만 기록 (유령 레이어 방지 핵심)
+    # 엔티티 복사 + 좌표범위 누적 + 실제 사용 레이어 기록
     used_layers = set()
     copied = skipped = 0
+    minx = miny = 1e18
+    maxx = maxy = -1e18
+
+    def _upd(x, y):
+        nonlocal minx, miny, maxx, maxy
+        if x < minx: minx = x
+        if x > maxx: maxx = x
+        if y < miny: miny = y
+        if y > maxy: maxy = y
+
     for e in msp:
         lay = e.dxf.layer if e.dxf.hasattr('layer') else '0'
         if lay not in target_layers:
             continue
-        if _ngii_copy_entity(e, nmsp, lay):
-            used_layers.add(lay)
-            copied += 1
-        else:
+        t = e.dxftype()
+        color = e.dxf.color if e.dxf.hasattr('color') else 256
+        try:
+            if t == 'LWPOLYLINE':
+                pts = [(p[0], p[1]) for p in e.get_points('xy')]
+                if len(pts) < 2:
+                    skipped += 1; continue
+                elev = float(e.dxf.elevation or 0.0)
+                if elev:  # 등고선: z 보존 위해 3D 폴리라인
+                    nmsp.add_polyline3d([(x, y, elev) for x, y in pts],
+                                        dxfattribs={'layer': lay, 'color': color})
+                else:
+                    pl = nmsp.add_polyline2d(pts, dxfattribs={'layer': lay, 'color': color})
+                    if e.closed:
+                        pl.close(True)
+                for x, y in pts: _upd(x, y)
+                used_layers.add(lay); copied += 1
+
+            elif t == 'POLYLINE':
+                pts = [(v.dxf.location.x, v.dxf.location.y) for v in e.vertices]
+                zlist = [v.dxf.location.z for v in e.vertices]
+                if len(pts) < 2:
+                    skipped += 1; continue
+                if any(abs(z) > 1e-9 for z in zlist):
+                    nmsp.add_polyline3d([(x, y, z) for (x, y), z in zip(pts, zlist)],
+                                        dxfattribs={'layer': lay, 'color': color})
+                else:
+                    pl = nmsp.add_polyline2d(pts, dxfattribs={'layer': lay, 'color': color})
+                    if e.is_closed:
+                        pl.close(True)
+                for x, y in pts: _upd(x, y)
+                used_layers.add(lay); copied += 1
+
+            elif t == 'LINE':
+                s, en = e.dxf.start, e.dxf.end
+                nmsp.add_line(s, en, dxfattribs={'layer': lay, 'color': color})
+                _upd(s.x, s.y); _upd(en.x, en.y)
+                used_layers.add(lay); copied += 1
+
+            elif t == 'POINT':
+                p = e.dxf.location
+                nmsp.add_point(p, dxfattribs={'layer': lay, 'color': color})
+                _upd(p.x, p.y); used_layers.add(lay); copied += 1
+
+            elif t == 'CIRCLE':
+                c = e.dxf.center; r = e.dxf.radius
+                nmsp.add_circle(c, r, dxfattribs={'layer': lay, 'color': color})
+                _upd(c.x - r, c.y - r); _upd(c.x + r, c.y + r)
+                used_layers.add(lay); copied += 1
+
+            elif t == 'ARC':
+                c = e.dxf.center
+                nmsp.add_arc(c, e.dxf.radius, e.dxf.start_angle, e.dxf.end_angle,
+                             dxfattribs={'layer': lay, 'color': color})
+                _upd(c.x, c.y); used_layers.add(lay); copied += 1
+
+            elif t == 'TEXT':
+                ip = e.dxf.insert
+                nmsp.add_text(e.dxf.text,
+                              dxfattribs={'layer': lay, 'color': color,
+                                          'height': e.dxf.height,
+                                          'insert': (ip.x, ip.y),
+                                          'rotation': e.dxf.get('rotation', 0)})
+                _upd(ip.x, ip.y); used_layers.add(lay); copied += 1
+
+            elif t == 'MTEXT':
+                ip = e.dxf.insert
+                nmsp.add_text((e.text or '').split('\n')[0],
+                              dxfattribs={'layer': lay, 'color': color,
+                                          'height': e.dxf.char_height,
+                                          'insert': (ip.x, ip.y)})
+                _upd(ip.x, ip.y); used_layers.add(lay); copied += 1
+
+            elif t == 'INSERT':
+                ip = e.dxf.insert
+                nmsp.add_blockref(e.dxf.name, (ip.x, ip.y, ip.z),
+                                  dxfattribs={'layer': lay, 'color': color})
+                _upd(ip.x, ip.y); used_layers.add(lay); copied += 1
+            else:
+                skipped += 1
+        except Exception:
             skipped += 1
 
-    # 실제 엔티티가 들어간 레이어만 테이블에 정의
+    # 실제 엔티티가 들어간 레이어만 테이블 정의
     for lay in used_layers:
         if lay in new.layers:
             continue
@@ -821,10 +836,23 @@ def convert_dxf():
         except Exception:
             new.layers.add(name=lay)
 
-    # 직렬화 -> 응답
+    # ★ 캐드에서 열자마자 보이게: 뷰포트 설정
+    if maxx > minx:
+        try:
+            new.set_modelspace_vport(height=(maxy - miny) * 1.05,
+                                     center=((minx + maxx) / 2, (miny + maxy) / 2))
+        except Exception:
+            pass
+
+    # 직렬화
     buf = io.StringIO()
     new.write(buf)
-    out_bytes = io.BytesIO(buf.getvalue().encode('utf-8'))
+    txt = buf.getvalue()
+    # EXTMIN/MAX 더미값 치환
+    if maxx > minx:
+        txt = _ngii_fix_extents(txt, 'EXTMIN', minx, miny)
+        txt = _ngii_fix_extents(txt, 'EXTMAX', maxx, maxy)
+    out_bytes = io.BytesIO(txt.encode('utf-8'))
 
     logger.info(f"[CONVERT] {f.filename} {src_ver}->R12 mode={mode} "
                 f"layers={len(used_layers)} copied={copied} skipped={skipped}")
@@ -839,6 +867,38 @@ def convert_dxf():
     resp.headers['X-Copied-Entities'] = str(copied)
     resp.headers['Access-Control-Expose-Headers'] = 'X-Src-Version, X-Kept-Layers, X-Copied-Entities'
     return resp
+
+
+def _ngii_copy_block_entity(e, target):
+    """블록 정의 내부 엔티티 복사 (R12 호환)."""
+    t = e.dxftype()
+    lay = e.dxf.layer if e.dxf.hasattr('layer') else '0'
+    color = e.dxf.color if e.dxf.hasattr('color') else 256
+    try:
+        if t == 'LWPOLYLINE':
+            pts = [(p[0], p[1]) for p in e.get_points('xy')]
+            if len(pts) < 2: return
+            pl = target.add_polyline2d(pts, dxfattribs={'layer': lay, 'color': color})
+            if e.closed: pl.close(True)
+        elif t == 'POLYLINE':
+            pts = [(v.dxf.location.x, v.dxf.location.y) for v in e.vertices]
+            if len(pts) < 2: return
+            target.add_polyline2d(pts, dxfattribs={'layer': lay, 'color': color})
+        elif t == 'LINE':
+            target.add_line(e.dxf.start, e.dxf.end, dxfattribs={'layer': lay, 'color': color})
+        elif t == 'CIRCLE':
+            target.add_circle(e.dxf.center, e.dxf.radius, dxfattribs={'layer': lay, 'color': color})
+        elif t == 'ARC':
+            target.add_arc(e.dxf.center, e.dxf.radius, e.dxf.start_angle, e.dxf.end_angle,
+                           dxfattribs={'layer': lay, 'color': color})
+        elif t == 'POINT':
+            target.add_point(e.dxf.location, dxfattribs={'layer': lay, 'color': color})
+        elif t == 'TEXT':
+            ip = e.dxf.insert
+            target.add_text(e.dxf.text, dxfattribs={'layer': lay, 'color': color,
+                            'height': e.dxf.height, 'insert': (ip.x, ip.y)})
+    except Exception:
+        pass
 
 
 @app.route('/api/health')
