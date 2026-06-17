@@ -8,7 +8,7 @@ G-DSP Flask Server v3.0
 from flask import Flask, request, jsonify, send_file, send_from_directory, make_response
 from flask_cors import CORS
 from flask_caching import Cache
-import requests as req, ezdxf, io, logging, math, json, os, time
+import requests as req, ezdxf, io, logging, math, json, os, time, re
 import xml.etree.ElementTree as ET
 from ezdxf.enums import TextEntityAlignment
 from pyproj import Transformer
@@ -683,21 +683,23 @@ def convert_dxf():
         return jsonify({"error": "파일이 없습니다"}), 400
     mode = request.form.get("mode", "analysis")
 
-    # 원본 읽기 (인코딩 자동 대응)
+    # 원본 읽기 (recover.read = 인코딩 무관 + 손상 파일 복구)
     raw = f.read()
     doc = None
-    for enc in ("utf-8", "cp949", "euc-kr", "latin-1"):
-        try:
-            doc = ezdxf.read(io.StringIO(raw.decode(enc)))
-            break
-        except Exception:
-            continue
+    try:
+        from ezdxf import recover
+        doc, _auditor = recover.read(io.BytesIO(raw))
+    except Exception:
+        # 폴백: 텍스트 디코드 후 읽기
+        for enc in ("utf-8", "cp949", "euc-kr", "latin-1"):
+            try:
+                doc = ezdxf.read(io.StringIO(raw.decode(enc)))
+                if sum(1 for _ in doc.modelspace()) > 0:
+                    break
+            except Exception:
+                continue
     if doc is None:
-        try:
-            from ezdxf import recover
-            doc, _ = recover.read(io.BytesIO(raw))
-        except Exception as ex:
-            return jsonify({"error": f"DXF를 읽을 수 없습니다: {ex}"}), 400
+        return jsonify({"error": "DXF를 읽을 수 없습니다"}), 400
 
     src_ver = doc.dxfversion
     msp = doc.modelspace()
