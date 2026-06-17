@@ -639,6 +639,208 @@ def eum_proxy():
         return jsonify({"error": str(e)}), 500
 
 
+# ============================================================
+# 수치지형도 R12 변환 엔드포인트
+#  - popup_dxf.html(도면·변환 탭)의 /api/convert-dxf 호출을 처리
+#  - mode='analysis': E/F/G 계열만 (경사도+수계 공용)
+#  - mode='original': 전체 레이어
+#  - LWPOLYLINE -> R12 POLYLINE 변환 + 등고선 elevation(z) 보존
+#  - 엔티티가 실제 들어간 레이어만 테이블 생성 (유령 레이어 잔재 제거)
+#  - INSERT z(표고점 실제표고) 보존
+#
+#  > server.py 의 @app.route("/api/health") 바로 위에 붙여넣으세요.
+#    (Flask, request, make_response, jsonify, ezdxf, io 는 이미 import 되어 있음)
+# ============================================================
+
+_NGII_ANALYSIS_FIRST = {'E', 'F', 'G'}
+_NGII_EXCLUDE_PREFIX = ('F003', 'F004')  # 보조 지형선(절벽/단차) - 분석 불필요
+
+
+def _ngii_is_analysis_layer(name):
+    if not name or name in ('0', 'Defpoints'):
+        return False
+    if any(name.startswith(p) for p in _NGII_EXCLUDE_PREFIX):
+        return False
+    return name[0].upper() in _NGII_ANALYSIS_FIRST
+
+
+def _ngii_copy_entity(e, target, layer):
+    """엔티티를 R12 호환으로 복사. LWPOLYLINE은 POLYLINE으로 바꾸고
+       elevation을 정점 z에 심는다. 성공 시 True."""
+    t = e.dxftype()
+    color = e.dxf.color if e.dxf.hasattr('color') else 256
+    try:
+        if t == 'LWPOLYLINE':
+            pts = [(p[0], p[1]) for p in e.get_points('xy')]
+            if len(pts) < 2:
+                return False
+            elev = float(e.dxf.elevation or 0.0)
+            pl = target.add_polyline2d(pts, dxfattribs={'layer': layer, 'color': color})
+            if e.closed:
+                pl.close(True)
+            if elev:  # 등고선 높이 보존
+                for v in pl.vertices:
+                    loc = v.dxf.location
+                    v.dxf.location = (loc.x, loc.y, elev)
+            return True
+
+        if t == 'POLYLINE':
+            pts, zlist = [], []
+            for v in e.vertices:
+                loc = v.dxf.location
+                pts.append((loc.x, loc.y))
+                zlist.append(loc.z)
+            if len(pts) < 2:
+                return False
+            pl = target.add_polyline2d(pts, dxfattribs={'layer': layer, 'color': color})
+            if e.is_closed:
+                pl.close(True)
+            if any(abs(z) > 1e-9 for z in zlist):
+                for v, z in zip(pl.vertices, zlist):
+                    loc = v.dxf.location
+                    v.dxf.location = (loc.x, loc.y, z)
+            return True
+
+        if t == 'LINE':
+            target.add_line(e.dxf.start, e.dxf.end, dxfattribs={'layer': layer, 'color': color})
+            return True
+
+        if t == 'POINT':
+            target.add_point(e.dxf.location, dxfattribs={'layer': layer, 'color': color})
+            return True
+
+        if t == 'CIRCLE':
+            target.add_circle(e.dxf.center, e.dxf.radius, dxfattribs={'layer': layer, 'color': color})
+            return True
+
+        if t == 'ARC':
+            target.add_arc(e.dxf.center, e.dxf.radius, e.dxf.start_angle, e.dxf.end_angle,
+                           dxfattribs={'layer': layer, 'color': color})
+            return True
+
+        if t == 'TEXT':
+            target.add_text(e.dxf.text,
+                            dxfattribs={'layer': layer, 'color': color,
+                                        'height': e.dxf.height,
+                                        'insert': (e.dxf.insert.x, e.dxf.insert.y),
+                                        'rotation': e.dxf.get('rotation', 0)})
+            return True
+
+        if t == 'MTEXT':  # R12엔 MTEXT 없음 -> TEXT 다운그레이드
+            target.add_text((e.text or '').split('\n')[0],
+                            dxfattribs={'layer': layer, 'color': color,
+                                        'height': e.dxf.char_height,
+                                        'insert': (e.dxf.insert.x, e.dxf.insert.y)})
+            return True
+
+        if t == 'INSERT':  # 표고점 심볼 등 - z(실제표고) 보존
+            target.add_blockref(e.dxf.name,
+                                (e.dxf.insert.x, e.dxf.insert.y, e.dxf.insert.z),
+                                dxfattribs={'layer': layer, 'color': color})
+            return True
+    except Exception:
+        return False
+    return False
+
+
+@app.route("/api/convert-dxf", methods=["POST", "OPTIONS"])
+def convert_dxf():
+    if request.method == "OPTIONS":
+        return make_response("", 204)
+
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "파일이 없습니다"}), 400
+    mode = request.form.get("mode", "analysis")
+
+    # 원본 읽기 (인코딩 자동 대응)
+    raw = f.read()
+    doc = None
+    for enc in ("utf-8", "cp949", "euc-kr", "latin-1"):
+        try:
+            doc = ezdxf.read(io.StringIO(raw.decode(enc)))
+            break
+        except Exception:
+            continue
+    if doc is None:
+        try:
+            from ezdxf import recover
+            doc, _ = recover.read(io.BytesIO(raw))
+        except Exception as ex:
+            return jsonify({"error": f"DXF를 읽을 수 없습니다: {ex}"}), 400
+
+    src_ver = doc.dxfversion
+    msp = doc.modelspace()
+
+    # 살릴 레이어 결정
+    all_layers = {e.dxf.layer for e in msp if e.dxf.hasattr('layer')}
+    if mode == "analysis":
+        target_layers = {n for n in all_layers if _ngii_is_analysis_layer(n)}
+    else:
+        target_layers = {n for n in all_layers if n not in ('0', 'Defpoints')}
+
+    # 새 R12 문서
+    new = ezdxf.new('R12', setup=True)
+    nmsp = new.modelspace()
+
+    # 사용 블록 복사 (대상 레이어 INSERT가 참조하는 것만)
+    used_blocks = set()
+    for e in msp:
+        if e.dxftype() == 'INSERT' and e.dxf.layer in target_layers:
+            used_blocks.add(e.dxf.name)
+    for bname in used_blocks:
+        if bname in doc.blocks and bname not in new.blocks:
+            try:
+                src_block = doc.blocks.get(bname)
+                nb = new.blocks.new(name=bname)
+                for be in src_block:
+                    _ngii_copy_entity(be, nb, be.dxf.layer if be.dxf.hasattr('layer') else '0')
+            except Exception:
+                pass
+
+    # 엔티티 복사 + 실제 사용된 레이어만 기록 (유령 레이어 방지 핵심)
+    used_layers = set()
+    copied = skipped = 0
+    for e in msp:
+        lay = e.dxf.layer if e.dxf.hasattr('layer') else '0'
+        if lay not in target_layers:
+            continue
+        if _ngii_copy_entity(e, nmsp, lay):
+            used_layers.add(lay)
+            copied += 1
+        else:
+            skipped += 1
+
+    # 실제 엔티티가 들어간 레이어만 테이블에 정의
+    for lay in used_layers:
+        if lay in new.layers:
+            continue
+        try:
+            sl = doc.layers.get(lay)
+            new.layers.add(name=lay, color=(sl.color or 7))
+        except Exception:
+            new.layers.add(name=lay)
+
+    # 직렬화 -> 응답
+    buf = io.StringIO()
+    new.write(buf)
+    out_bytes = io.BytesIO(buf.getvalue().encode('utf-8'))
+
+    logger.info(f"[CONVERT] {f.filename} {src_ver}->R12 mode={mode} "
+                f"layers={len(used_layers)} copied={copied} skipped={skipped}")
+
+    base = (f.filename or "drawing").rsplit('.', 1)[0]
+    suffix = "_R12" if mode == "original" else "_분석용"
+    resp = make_response(send_file(
+        out_bytes, mimetype='application/dxf',
+        as_attachment=True, download_name=f"{base}{suffix}.dxf"))
+    resp.headers['X-Src-Version'] = src_ver
+    resp.headers['X-Kept-Layers'] = str(len(used_layers))
+    resp.headers['X-Copied-Entities'] = str(copied)
+    resp.headers['Access-Control-Expose-Headers'] = 'X-Src-Version, X-Kept-Layers, X-Copied-Entities'
+    return resp
+
+
 @app.route('/api/health')
 def health():
     return jsonify({"status": "ok", "message": "G-DSP 서버 실행 중", "version": "3.0", "ok": True})
