@@ -46,6 +46,11 @@
   .btn-ghost{background:var(--panel2);color:var(--tx2);border-color:var(--line)}
   .btn-ghost:hover{color:var(--tx);border-color:#2b3c5c}
   .btn:disabled{opacity:.4;cursor:not-allowed}
+  .thr{flex:1;padding:7px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--tx3);font-size:12px;font-weight:700;cursor:pointer}
+  .thr.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent}
+  .btn-ghost.active{color:#06121f;background:linear-gradient(135deg,#34d399,#0ea5e9);border-color:transparent}
+  .num{width:100%;margin-top:3px;padding:6px 7px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--tx);font-size:13px}
 
   .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .stat{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
@@ -93,6 +98,15 @@
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   #toast.err{border-color:#7f1d1d;background:#1a0e0e}
   #toast.ok{border-color:#1f3d33}
+
+  /* ── 드롭 오버레이 ── */
+  .droplay{position:fixed;inset:14px;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+    background:rgba(8,15,28,.86);backdrop-filter:blur(4px);border:3px dashed var(--accent);border-radius:18px;color:var(--accent);pointer-events:none}
+  .droplay.on{display:flex}
+  .droplay .ic{font-size:46px;animation:bob 1.1s ease-in-out infinite}
+  .droplay .t{font-size:18px;font-weight:800}
+  .droplay .s{font-size:13px;color:var(--tx2)}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
 </style>
 </head>
 <body>
@@ -125,11 +139,75 @@
     </div>
 
     <div class="sec">
+      <h3>허가지선 (산지전용예정지)</h3>
+      <button class="btn btn-ghost" id="btnPermit" disabled onclick="togglePermit()">✏️ 허가지선 그리기</button>
+      <div id="permitInfo" style="display:none;margin-top:9px">
+        <div class="stat full"><div class="v" id="permitArea">–</div><div class="k">신청 면적</div></div>
+        <button class="btn btn-ghost" onclick="clearPermit()" style="margin-top:8px;font-size:12px;padding:7px">지우고 다시 그리기</button>
+      </div>
+      <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.5">꼭짓점 클릭 → <b style="color:var(--tx2)">더블클릭</b>으로 완료</div>
+    </div>
+
+    <div class="sec">
       <h3>인식 결과</h3>
       <div class="info-grid">
         <div class="stat"><div class="v" id="nCont">–</div><div class="k">등고선</div></div>
         <div class="stat"><div class="v" id="nSurv">–</div><div class="k">표고점</div></div>
         <div class="stat full"><div class="v" id="zRange">–</div><div class="k">표고 범위 (m)</div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3>분석</h3>
+      <button class="btn btn-ghost" id="btnTIN" disabled onclick="runTIN()">△ TIN 생성</button>
+      <div id="tinResult" style="display:none;margin-top:10px">
+        <div class="stat full"><div class="v" id="nTri">–</div><div class="k">삼각형 (TIN)</div></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:9px;cursor:pointer">
+          <input type="checkbox" id="tinToggle" checked onchange="S.showTIN=this.checked;render()"> 삼각망 보기
+        </label>
+      </div>
+      <button class="btn btn-ghost" id="btnDEM" disabled onclick="runDEM()" style="margin-top:9px">▦ DEM 생성 (음영기복)</button>
+      <div id="demResult" style="display:none;margin-top:10px">
+        <div class="stat full"><div class="v" id="demSize">–</div><div class="k">격자 (10m)</div></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:9px;cursor:pointer">
+          <input type="checkbox" id="demToggle" checked onchange="S.showDEM=this.checked;render()"> 음영기복 보기
+        </label>
+        <button class="btn btn-ghost" id="btn3D" onclick="open3D()" style="margin-top:9px">🧊 3D 입체 보기</button>
+      </div>
+      <button class="btn btn-ghost" id="btnFlow" disabled onclick="runFlow()" style="margin-top:9px">💧 흐름·하천 분석 (D8)</button>
+      <div id="flowResult" style="display:none;margin-top:10px">
+        <div class="stat full" style="margin-bottom:8px"><div class="v" id="streamLen">–</div><div class="k">하천 셀 (누적≥임계)</div></div>
+        <div style="display:flex;gap:6px;margin-bottom:9px">
+          <button class="thr on" id="thr5" onclick="setThr(5)">5ha 기본</button>
+          <button class="thr" id="thr1" onclick="setThr(1)">1ha 정밀</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);cursor:pointer">
+          <input type="checkbox" id="streamToggle" checked onchange="S.showStreams=this.checked;render()"> 하천망 보기
+        </label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3>유역 · 유출량</h3>
+      <button class="btn btn-ghost" id="btnPour" disabled onclick="togglePour()">📍 유역 추출 (유출구 클릭)</button>
+      <div id="wsPanel" style="display:none;margin-top:10px">
+        <div class="stat full"><div class="v" id="wsArea">–</div><div class="k">유역 면적</div></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:9px;cursor:pointer">
+          <input type="checkbox" id="wsToggle" checked onchange="S.showWS=this.checked;render()"> 유역·능선 보기
+        </label>
+        <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+          <div style="font-size:11px;color:var(--tx3);margin-bottom:9px">합리식 <b style="color:var(--tx2)">Q = 0.2778·C·I·A</b></div>
+          <div style="display:flex;gap:8px;margin-bottom:9px">
+            <label style="flex:1;font-size:10.5px;color:var(--tx3)">유출계수 C (산지 0.4~0.6)
+              <input type="number" class="num" id="inC" value="0.5" step="0.05" min="0" max="1" oninput="computeQ()"></label>
+            <label style="flex:1;font-size:10.5px;color:var(--tx3)">강우강도 I (mm/hr·100년)
+              <input type="number" class="num" id="inI" value="100" step="1" min="0" oninput="computeQ()"></label>
+          </div>
+          <div class="stat full" style="text-align:center">
+            <div class="v" id="qOut" style="color:var(--accent)">–</div>
+            <div class="k" id="qFormula">유출량 Q</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -140,6 +218,9 @@
       <div class="lg"><span class="sw" style="border-color:#94a3b8;border-top-width:1.6px"></span>계곡선 (굵게)</div>
       <div class="lg"><span class="sw" style="border-color:#5b7290"></span>주곡선</div>
       <div class="lg"><span class="swx">✕</span>표고점 (+표고값)</div>
+      <div class="lg"><span class="sw" style="border-color:#38a0eb;border-top-width:2px"></span>하천망</div>
+      <div class="lg"><span class="sw" style="border-color:#34d399;border-top-width:2px"></span>능선선 (유역경계)</div>
+      <div class="lg"><span class="sw" style="border-color:#f472b6;border-top-width:2px;border-top-style:dashed"></span>허가지선</div>
     </div>
 
     <div class="sec pipe">
@@ -161,10 +242,12 @@
       <button class="tbtn" title="화면 맞춤" onclick="fitView()">⤢</button>
       <button class="tbtn" title="확대" onclick="zoomBy(1.25)">＋</button>
       <button class="tbtn" title="축소" onclick="zoomBy(1/1.25)">－</button>
+      <button class="tbtn" title="PNG로 저장" onclick="exportPNG()">📷</button>
+      <button class="tbtn" title="PDF 보고서" onclick="exportPDF()">📄</button>
     </div>
     <div class="empty" id="empty">
       <div class="big">🗺️</div>
-      <div class="t">수치지형도 DXF를 열면 등고선과 표고점이 표시됩니다</div>
+      <div class="t">수치지형도 DXF를 열거나, 여기로 <b style="color:var(--accent)">끌어다 놓으세요</b></div>
     </div>
     <div class="statusbar" id="sbar" style="display:none">
       <span><b id="sbName">–</b></span>
@@ -175,7 +258,26 @@
   </div>
 </main>
 
+<div id="d3dlay" style="display:none;position:fixed;inset:0;z-index:80;background:#06080f">
+  <canvas id="d3dcanvas" style="display:block;width:100%;height:100%"></canvas>
+  <div id="d3dmsg" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#9fb0c8;font-size:14px"></div>
+  <div style="position:absolute;top:12px;left:14px;color:#9fb0c8;font-size:12px;background:rgba(11,18,32,.7);padding:7px 11px;border-radius:8px;pointer-events:none">드래그=회전 · 휠=확대</div>
+  <button onclick="close3D()" style="position:absolute;top:12px;right:14px;width:40px;height:40px;border-radius:10px;background:rgba(17,26,46,.92);border:1px solid #1e2b45;color:#e8eef7;font-size:18px;cursor:pointer">✕</button>
+</div>
+
+<div class="droplay" id="droplay">
+  <div class="ic">⬇</div>
+  <div class="t">여기에 DXF를 놓으세요</div>
+  <div class="s">수치지형도 _분석용.dxf</div>
+</div>
+
 <div id="toast"></div>
+
+<script>/* d3-delaunay 내장 (오프라인 작동) */
+// https://github.com/d3/d3-delaunay v6.0.4 Copyright 2018-2021 Observable, Inc., 2021 Mapbox
+!function(t,i){"object"==typeof exports&&"undefined"!=typeof module?i(exports):"function"==typeof define&&define.amd?define(["exports"],i):i((t="undefined"!=typeof globalThis?globalThis:t||self).d3=t.d3||{})}(this,(function(t){"use strict";const i=134217729;function e(t,i,e,n,s){let l,h,r,o,a=i[0],c=n[0],u=0,f=0;c>a==c>-a?(l=a,a=i[++u]):(l=c,c=n[++f]);let _=0;if(u<t&&f<e)for(c>a==c>-a?(h=a+l,r=l-(h-a),a=i[++u]):(h=c+l,r=l-(h-c),c=n[++f]),l=h,0!==r&&(s[_++]=r);u<t&&f<e;)c>a==c>-a?(h=l+a,o=h-l,r=l-(h-o)+(a-o),a=i[++u]):(h=l+c,o=h-l,r=l-(h-o)+(c-o),c=n[++f]),l=h,0!==r&&(s[_++]=r);for(;u<t;)h=l+a,o=h-l,r=l-(h-o)+(a-o),a=i[++u],l=h,0!==r&&(s[_++]=r);for(;f<e;)h=l+c,o=h-l,r=l-(h-o)+(c-o),c=n[++f],l=h,0!==r&&(s[_++]=r);return 0===l&&0!==_||(s[_++]=l),_}function n(t){return new Float64Array(t)}const s=n(4),l=n(8),h=n(12),r=n(16),o=n(4);function a(t,n,a,c,u,f){const _=(n-f)*(a-u),d=(t-u)*(c-f),g=_-d;if(0===_||0===d||_>0!=d>0)return g;const y=Math.abs(_+d);return Math.abs(g)>=33306690738754716e-32*y?g:-function(t,n,a,c,u,f,_){let d,g,y,m,x,p,w,v,b,T,M,A,k,$,P,S,I,z;const F=t-u,U=a-u,K=n-f,L=c-f;$=F*L,p=i*F,w=p-(p-F),v=F-w,p=i*L,b=p-(p-L),T=L-b,P=v*T-($-w*b-v*b-w*T),S=K*U,p=i*K,w=p-(p-K),v=K-w,p=i*U,b=p-(p-U),T=U-b,I=v*T-(S-w*b-v*b-w*T),M=P-I,x=P-M,s[0]=P-(M+x)+(x-I),A=$+M,x=A-$,k=$-(A-x)+(M-x),M=k-S,x=k-M,s[1]=k-(M+x)+(x-S),z=A+M,x=z-A,s[2]=A-(z-x)+(M-x),s[3]=z;let j=function(t,i){let e=i[0];for(let n=1;n<t;n++)e+=i[n];return e}(4,s),H=22204460492503146e-32*_;if(j>=H||-j>=H)return j;if(x=t-F,d=t-(F+x)+(x-u),x=a-U,y=a-(U+x)+(x-u),x=n-K,g=n-(K+x)+(x-f),x=c-L,m=c-(L+x)+(x-f),0===d&&0===g&&0===y&&0===m)return j;if(H=11093356479670487e-47*_+33306690738754706e-32*Math.abs(j),j+=F*m+L*d-(K*y+U*g),j>=H||-j>=H)return j;$=d*L,p=i*d,w=p-(p-d),v=d-w,p=i*L,b=p-(p-L),T=L-b,P=v*T-($-w*b-v*b-w*T),S=g*U,p=i*g,w=p-(p-g),v=g-w,p=i*U,b=p-(p-U),T=U-b,I=v*T-(S-w*b-v*b-w*T),M=P-I,x=P-M,o[0]=P-(M+x)+(x-I),A=$+M,x=A-$,k=$-(A-x)+(M-x),M=k-S,x=k-M,o[1]=k-(M+x)+(x-S),z=A+M,x=z-A,o[2]=A-(z-x)+(M-x),o[3]=z;const E=e(4,s,4,o,l);$=F*m,p=i*F,w=p-(p-F),v=F-w,p=i*m,b=p-(p-m),T=m-b,P=v*T-($-w*b-v*b-w*T),S=K*y,p=i*K,w=p-(p-K),v=K-w,p=i*y,b=p-(p-y),T=y-b,I=v*T-(S-w*b-v*b-w*T),M=P-I,x=P-M,o[0]=P-(M+x)+(x-I),A=$+M,x=A-$,k=$-(A-x)+(M-x),M=k-S,x=k-M,o[1]=k-(M+x)+(x-S),z=A+M,x=z-A,o[2]=A-(z-x)+(M-x),o[3]=z;const C=e(E,l,4,o,h);$=d*m,p=i*d,w=p-(p-d),v=d-w,p=i*m,b=p-(p-m),T=m-b,P=v*T-($-w*b-v*b-w*T),S=g*y,p=i*g,w=p-(p-g),v=g-w,p=i*y,b=p-(p-y),T=y-b,I=v*T-(S-w*b-v*b-w*T),M=P-I,x=P-M,o[0]=P-(M+x)+(x-I),A=$+M,x=A-$,k=$-(A-x)+(M-x),M=k-S,x=k-M,o[1]=k-(M+x)+(x-S),z=A+M,x=z-A,o[2]=A-(z-x)+(M-x),o[3]=z;const N=e(C,h,4,o,r);return r[N-1]}(t,n,a,c,u,f,y)}const c=Math.pow(2,-52),u=new Uint32Array(512);class f{static from(t,i=x,e=p){const n=t.length,s=new Float64Array(2*n);for(let l=0;l<n;l++){const n=t[l];s[2*l]=i(n),s[2*l+1]=e(n)}return new f(s)}constructor(t){const i=t.length>>1;if(i>0&&"number"!=typeof t[0])throw new Error("Expected coords to contain numbers.");this.coords=t;const e=Math.max(2*i-5,0);this._triangles=new Uint32Array(3*e),this._halfedges=new Int32Array(3*e),this._hashSize=Math.ceil(Math.sqrt(i)),this._hullPrev=new Uint32Array(i),this._hullNext=new Uint32Array(i),this._hullTri=new Uint32Array(i),this._hullHash=new Int32Array(this._hashSize).fill(-1),this._ids=new Uint32Array(i),this._dists=new Float64Array(i),this.update()}update(){const{coords:t,_hullPrev:i,_hullNext:e,_hullTri:n,_hullHash:s}=this,l=t.length>>1;let h=1/0,r=1/0,o=-1/0,u=-1/0;for(let i=0;i<l;i++){const e=t[2*i],n=t[2*i+1];e<h&&(h=e),n<r&&(r=n),e>o&&(o=e),n>u&&(u=n),this._ids[i]=i}const f=(h+o)/2,d=(r+u)/2;let m,x,p,w=1/0;for(let i=0;i<l;i++){const e=_(f,d,t[2*i],t[2*i+1]);e<w&&(m=i,w=e)}const v=t[2*m],b=t[2*m+1];w=1/0;for(let i=0;i<l;i++){if(i===m)continue;const e=_(v,b,t[2*i],t[2*i+1]);e<w&&e>0&&(x=i,w=e)}let T=t[2*x],M=t[2*x+1],A=1/0;for(let i=0;i<l;i++){if(i===m||i===x)continue;const e=g(v,b,T,M,t[2*i],t[2*i+1]);e<A&&(p=i,A=e)}let k=t[2*p],$=t[2*p+1];if(A===1/0){for(let i=0;i<l;i++)this._dists[i]=t[2*i]-t[0]||t[2*i+1]-t[1];y(this._ids,this._dists,0,l-1);const i=new Uint32Array(l);let e=0;for(let t=0,n=-1/0;t<l;t++){const s=this._ids[t];this._dists[s]>n&&(i[e++]=s,n=this._dists[s])}return this.hull=i.subarray(0,e),this.triangles=new Uint32Array(0),void(this.halfedges=new Uint32Array(0))}if(a(v,b,T,M,k,$)<0){const t=x,i=T,e=M;x=p,T=k,M=$,p=t,k=i,$=e}const P=function(t,i,e,n,s,l){const h=e-t,r=n-i,o=s-t,a=l-i,c=h*h+r*r,u=o*o+a*a,f=.5/(h*a-r*o);return{x:t+(a*c-r*u)*f,y:i+(h*u-o*c)*f}}(v,b,T,M,k,$);this._cx=P.x,this._cy=P.y;for(let i=0;i<l;i++)this._dists[i]=_(t[2*i],t[2*i+1],P.x,P.y);y(this._ids,this._dists,0,l-1),this._hullStart=m;let S=3;e[m]=i[p]=x,e[x]=i[m]=p,e[p]=i[x]=m,n[m]=0,n[x]=1,n[p]=2,s.fill(-1),s[this._hashKey(v,b)]=m,s[this._hashKey(T,M)]=x,s[this._hashKey(k,$)]=p,this.trianglesLen=0,this._addTriangle(m,x,p,-1,-1,-1);for(let l,h,r=0;r<this._ids.length;r++){const o=this._ids[r],u=t[2*o],f=t[2*o+1];if(r>0&&Math.abs(u-l)<=c&&Math.abs(f-h)<=c)continue;if(l=u,h=f,o===m||o===x||o===p)continue;let _=0;for(let t=0,i=this._hashKey(u,f);t<this._hashSize&&(_=s[(i+t)%this._hashSize],-1===_||_===e[_]);t++);_=i[_];let d,g=_;for(;d=e[g],a(u,f,t[2*g],t[2*g+1],t[2*d],t[2*d+1])>=0;)if(g=d,g===_){g=-1;break}if(-1===g)continue;let y=this._addTriangle(g,o,e[g],-1,-1,n[g]);n[o]=this._legalize(y+2),n[g]=y,S++;let w=e[g];for(;d=e[w],a(u,f,t[2*w],t[2*w+1],t[2*d],t[2*d+1])<0;)y=this._addTriangle(w,o,d,n[o],-1,n[w]),n[o]=this._legalize(y+2),e[w]=w,S--,w=d;if(g===_)for(;d=i[g],a(u,f,t[2*d],t[2*d+1],t[2*g],t[2*g+1])<0;)y=this._addTriangle(d,o,g,-1,n[g],n[d]),this._legalize(y+2),n[d]=y,e[g]=g,S--,g=d;this._hullStart=i[o]=g,e[g]=i[w]=o,e[o]=w,s[this._hashKey(u,f)]=o,s[this._hashKey(t[2*g],t[2*g+1])]=g}this.hull=new Uint32Array(S);for(let t=0,i=this._hullStart;t<S;t++)this.hull[t]=i,i=e[i];this.triangles=this._triangles.subarray(0,this.trianglesLen),this.halfedges=this._halfedges.subarray(0,this.trianglesLen)}_hashKey(t,i){return Math.floor(function(t,i){const e=t/(Math.abs(t)+Math.abs(i));return(i>0?3-e:1+e)/4}(t-this._cx,i-this._cy)*this._hashSize)%this._hashSize}_legalize(t){const{_triangles:i,_halfedges:e,coords:n}=this;let s=0,l=0;for(;;){const h=e[t],r=t-t%3;if(l=r+(t+2)%3,-1===h){if(0===s)break;t=u[--s];continue}const o=h-h%3,a=r+(t+1)%3,c=o+(h+2)%3,f=i[l],_=i[t],g=i[a],y=i[c];if(d(n[2*f],n[2*f+1],n[2*_],n[2*_+1],n[2*g],n[2*g+1],n[2*y],n[2*y+1])){i[t]=y,i[h]=f;const n=e[c];if(-1===n){let i=this._hullStart;do{if(this._hullTri[i]===c){this._hullTri[i]=t;break}i=this._hullPrev[i]}while(i!==this._hullStart)}this._link(t,n),this._link(h,e[l]),this._link(l,c);const r=o+(h+1)%3;s<u.length&&(u[s++]=r)}else{if(0===s)break;t=u[--s]}}return l}_link(t,i){this._halfedges[t]=i,-1!==i&&(this._halfedges[i]=t)}_addTriangle(t,i,e,n,s,l){const h=this.trianglesLen;return this._triangles[h]=t,this._triangles[h+1]=i,this._triangles[h+2]=e,this._link(h,n),this._link(h+1,s),this._link(h+2,l),this.trianglesLen+=3,h}}function _(t,i,e,n){const s=t-e,l=i-n;return s*s+l*l}function d(t,i,e,n,s,l,h,r){const o=t-h,a=i-r,c=e-h,u=n-r,f=s-h,_=l-r,d=c*c+u*u,g=f*f+_*_;return o*(u*g-d*_)-a*(c*g-d*f)+(o*o+a*a)*(c*_-u*f)<0}function g(t,i,e,n,s,l){const h=e-t,r=n-i,o=s-t,a=l-i,c=h*h+r*r,u=o*o+a*a,f=.5/(h*a-r*o),_=(a*c-r*u)*f,d=(h*u-o*c)*f;return _*_+d*d}function y(t,i,e,n){if(n-e<=20)for(let s=e+1;s<=n;s++){const n=t[s],l=i[n];let h=s-1;for(;h>=e&&i[t[h]]>l;)t[h+1]=t[h--];t[h+1]=n}else{let s=e+1,l=n;m(t,e+n>>1,s),i[t[e]]>i[t[n]]&&m(t,e,n),i[t[s]]>i[t[n]]&&m(t,s,n),i[t[e]]>i[t[s]]&&m(t,e,s);const h=t[s],r=i[h];for(;;){do{s++}while(i[t[s]]<r);do{l--}while(i[t[l]]>r);if(l<s)break;m(t,s,l)}t[e+1]=t[l],t[l]=h,n-s+1>=l-e?(y(t,i,s,n),y(t,i,e,l-1)):(y(t,i,e,l-1),y(t,i,s,n))}}function m(t,i,e){const n=t[i];t[i]=t[e],t[e]=n}function x(t){return t[0]}function p(t){return t[1]}const w=1e-6;class v{constructor(){this._x0=this._y0=this._x1=this._y1=null,this._=""}moveTo(t,i){this._+=`M${this._x0=this._x1=+t},${this._y0=this._y1=+i}`}closePath(){null!==this._x1&&(this._x1=this._x0,this._y1=this._y0,this._+="Z")}lineTo(t,i){this._+=`L${this._x1=+t},${this._y1=+i}`}arc(t,i,e){const n=(t=+t)+(e=+e),s=i=+i;if(e<0)throw new Error("negative radius");null===this._x1?this._+=`M${n},${s}`:(Math.abs(this._x1-n)>w||Math.abs(this._y1-s)>w)&&(this._+="L"+n+","+s),e&&(this._+=`A${e},${e},0,1,1,${t-e},${i}A${e},${e},0,1,1,${this._x1=n},${this._y1=s}`)}rect(t,i,e,n){this._+=`M${this._x0=this._x1=+t},${this._y0=this._y1=+i}h${+e}v${+n}h${-e}Z`}value(){return this._||null}}class b{constructor(){this._=[]}moveTo(t,i){this._.push([t,i])}closePath(){this._.push(this._[0].slice())}lineTo(t,i){this._.push([t,i])}value(){return this._.length?this._:null}}class T{constructor(t,[i,e,n,s]=[0,0,960,500]){if(!((n=+n)>=(i=+i)&&(s=+s)>=(e=+e)))throw new Error("invalid bounds");this.delaunay=t,this._circumcenters=new Float64Array(2*t.points.length),this.vectors=new Float64Array(2*t.points.length),this.xmax=n,this.xmin=i,this.ymax=s,this.ymin=e,this._init()}update(){return this.delaunay.update(),this._init(),this}_init(){const{delaunay:{points:t,hull:i,triangles:e},vectors:n}=this;let s,l;const h=this.circumcenters=this._circumcenters.subarray(0,e.length/3*2);for(let n,r,o=0,a=0,c=e.length;o<c;o+=3,a+=2){const c=2*e[o],u=2*e[o+1],f=2*e[o+2],_=t[c],d=t[c+1],g=t[u],y=t[u+1],m=t[f],x=t[f+1],p=g-_,w=y-d,v=m-_,b=x-d,T=2*(p*b-w*v);if(Math.abs(T)<1e-9){if(void 0===s){s=l=0;for(const e of i)s+=t[2*e],l+=t[2*e+1];s/=i.length,l/=i.length}const e=1e9*Math.sign((s-_)*b-(l-d)*v);n=(_+m)/2-e*b,r=(d+x)/2+e*v}else{const t=1/T,i=p*p+w*w,e=v*v+b*b;n=_+(b*i-w*e)*t,r=d+(p*e-v*i)*t}h[a]=n,h[a+1]=r}let r,o,a,c=i[i.length-1],u=4*c,f=t[2*c],_=t[2*c+1];n.fill(0);for(let e=0;e<i.length;++e)c=i[e],r=u,o=f,a=_,u=4*c,f=t[2*c],_=t[2*c+1],n[r+2]=n[u]=a-_,n[r+3]=n[u+1]=f-o}render(t){const i=null==t?t=new v:void 0,{delaunay:{halfedges:e,inedges:n,hull:s},circumcenters:l,vectors:h}=this;if(s.length<=1)return null;for(let i=0,n=e.length;i<n;++i){const n=e[i];if(n<i)continue;const s=2*Math.floor(i/3),h=2*Math.floor(n/3),r=l[s],o=l[s+1],a=l[h],c=l[h+1];this._renderSegment(r,o,a,c,t)}let r,o=s[s.length-1];for(let i=0;i<s.length;++i){r=o,o=s[i];const e=2*Math.floor(n[o]/3),a=l[e],c=l[e+1],u=4*r,f=this._project(a,c,h[u+2],h[u+3]);f&&this._renderSegment(a,c,f[0],f[1],t)}return i&&i.value()}renderBounds(t){const i=null==t?t=new v:void 0;return t.rect(this.xmin,this.ymin,this.xmax-this.xmin,this.ymax-this.ymin),i&&i.value()}renderCell(t,i){const e=null==i?i=new v:void 0,n=this._clip(t);if(null===n||!n.length)return;i.moveTo(n[0],n[1]);let s=n.length;for(;n[0]===n[s-2]&&n[1]===n[s-1]&&s>1;)s-=2;for(let t=2;t<s;t+=2)n[t]===n[t-2]&&n[t+1]===n[t-1]||i.lineTo(n[t],n[t+1]);return i.closePath(),e&&e.value()}*cellPolygons(){const{delaunay:{points:t}}=this;for(let i=0,e=t.length/2;i<e;++i){const t=this.cellPolygon(i);t&&(t.index=i,yield t)}}cellPolygon(t){const i=new b;return this.renderCell(t,i),i.value()}_renderSegment(t,i,e,n,s){let l;const h=this._regioncode(t,i),r=this._regioncode(e,n);0===h&&0===r?(s.moveTo(t,i),s.lineTo(e,n)):(l=this._clipSegment(t,i,e,n,h,r))&&(s.moveTo(l[0],l[1]),s.lineTo(l[2],l[3]))}contains(t,i,e){return(i=+i)==i&&(e=+e)==e&&this.delaunay._step(t,i,e)===t}*neighbors(t){const i=this._clip(t);if(i)for(const e of this.delaunay.neighbors(t)){const t=this._clip(e);if(t)t:for(let n=0,s=i.length;n<s;n+=2)for(let l=0,h=t.length;l<h;l+=2)if(i[n]===t[l]&&i[n+1]===t[l+1]&&i[(n+2)%s]===t[(l+h-2)%h]&&i[(n+3)%s]===t[(l+h-1)%h]){yield e;break t}}}_cell(t){const{circumcenters:i,delaunay:{inedges:e,halfedges:n,triangles:s}}=this,l=e[t];if(-1===l)return null;const h=[];let r=l;do{const e=Math.floor(r/3);if(h.push(i[2*e],i[2*e+1]),r=r%3==2?r-2:r+1,s[r]!==t)break;r=n[r]}while(r!==l&&-1!==r);return h}_clip(t){if(0===t&&1===this.delaunay.hull.length)return[this.xmax,this.ymin,this.xmax,this.ymax,this.xmin,this.ymax,this.xmin,this.ymin];const i=this._cell(t);if(null===i)return null;const{vectors:e}=this,n=4*t;return this._simplify(e[n]||e[n+1]?this._clipInfinite(t,i,e[n],e[n+1],e[n+2],e[n+3]):this._clipFinite(t,i))}_clipFinite(t,i){const e=i.length;let n,s,l,h,r=null,o=i[e-2],a=i[e-1],c=this._regioncode(o,a),u=0;for(let f=0;f<e;f+=2)if(n=o,s=a,o=i[f],a=i[f+1],l=c,c=this._regioncode(o,a),0===l&&0===c)h=u,u=0,r?r.push(o,a):r=[o,a];else{let i,e,f,_,d;if(0===l){if(null===(i=this._clipSegment(n,s,o,a,l,c)))continue;[e,f,_,d]=i}else{if(null===(i=this._clipSegment(o,a,n,s,c,l)))continue;[_,d,e,f]=i,h=u,u=this._edgecode(e,f),h&&u&&this._edge(t,h,u,r,r.length),r?r.push(e,f):r=[e,f]}h=u,u=this._edgecode(_,d),h&&u&&this._edge(t,h,u,r,r.length),r?r.push(_,d):r=[_,d]}if(r)h=u,u=this._edgecode(r[0],r[1]),h&&u&&this._edge(t,h,u,r,r.length);else if(this.contains(t,(this.xmin+this.xmax)/2,(this.ymin+this.ymax)/2))return[this.xmax,this.ymin,this.xmax,this.ymax,this.xmin,this.ymax,this.xmin,this.ymin];return r}_clipSegment(t,i,e,n,s,l){const h=s<l;for(h&&([t,i,e,n,s,l]=[e,n,t,i,l,s]);;){if(0===s&&0===l)return h?[e,n,t,i]:[t,i,e,n];if(s&l)return null;let r,o,a=s||l;8&a?(r=t+(e-t)*(this.ymax-i)/(n-i),o=this.ymax):4&a?(r=t+(e-t)*(this.ymin-i)/(n-i),o=this.ymin):2&a?(o=i+(n-i)*(this.xmax-t)/(e-t),r=this.xmax):(o=i+(n-i)*(this.xmin-t)/(e-t),r=this.xmin),s?(t=r,i=o,s=this._regioncode(t,i)):(e=r,n=o,l=this._regioncode(e,n))}}_clipInfinite(t,i,e,n,s,l){let h,r=Array.from(i);if((h=this._project(r[0],r[1],e,n))&&r.unshift(h[0],h[1]),(h=this._project(r[r.length-2],r[r.length-1],s,l))&&r.push(h[0],h[1]),r=this._clipFinite(t,r))for(let i,e=0,n=r.length,s=this._edgecode(r[n-2],r[n-1]);e<n;e+=2)i=s,s=this._edgecode(r[e],r[e+1]),i&&s&&(e=this._edge(t,i,s,r,e),n=r.length);else this.contains(t,(this.xmin+this.xmax)/2,(this.ymin+this.ymax)/2)&&(r=[this.xmin,this.ymin,this.xmax,this.ymin,this.xmax,this.ymax,this.xmin,this.ymax]);return r}_edge(t,i,e,n,s){for(;i!==e;){let e,l;switch(i){case 5:i=4;continue;case 4:i=6,e=this.xmax,l=this.ymin;break;case 6:i=2;continue;case 2:i=10,e=this.xmax,l=this.ymax;break;case 10:i=8;continue;case 8:i=9,e=this.xmin,l=this.ymax;break;case 9:i=1;continue;case 1:i=5,e=this.xmin,l=this.ymin}n[s]===e&&n[s+1]===l||!this.contains(t,e,l)||(n.splice(s,0,e,l),s+=2)}return s}_project(t,i,e,n){let s,l,h,r=1/0;if(n<0){if(i<=this.ymin)return null;(s=(this.ymin-i)/n)<r&&(h=this.ymin,l=t+(r=s)*e)}else if(n>0){if(i>=this.ymax)return null;(s=(this.ymax-i)/n)<r&&(h=this.ymax,l=t+(r=s)*e)}if(e>0){if(t>=this.xmax)return null;(s=(this.xmax-t)/e)<r&&(l=this.xmax,h=i+(r=s)*n)}else if(e<0){if(t<=this.xmin)return null;(s=(this.xmin-t)/e)<r&&(l=this.xmin,h=i+(r=s)*n)}return[l,h]}_edgecode(t,i){return(t===this.xmin?1:t===this.xmax?2:0)|(i===this.ymin?4:i===this.ymax?8:0)}_regioncode(t,i){return(t<this.xmin?1:t>this.xmax?2:0)|(i<this.ymin?4:i>this.ymax?8:0)}_simplify(t){if(t&&t.length>4){for(let i=0;i<t.length;i+=2){const e=(i+2)%t.length,n=(i+4)%t.length;(t[i]===t[e]&&t[e]===t[n]||t[i+1]===t[e+1]&&t[e+1]===t[n+1])&&(t.splice(e,2),i-=2)}t.length||(t=null)}return t}}const M=2*Math.PI,A=Math.pow;function k(t){return t[0]}function $(t){return t[1]}function P(t,i,e){return[t+Math.sin(t+i)*e,i+Math.cos(t-i)*e]}class S{static from(t,i=k,e=$,n){return new S("length"in t?function(t,i,e,n){const s=t.length,l=new Float64Array(2*s);for(let h=0;h<s;++h){const s=t[h];l[2*h]=i.call(n,s,h,t),l[2*h+1]=e.call(n,s,h,t)}return l}(t,i,e,n):Float64Array.from(function*(t,i,e,n){let s=0;for(const l of t)yield i.call(n,l,s,t),yield e.call(n,l,s,t),++s}(t,i,e,n)))}constructor(t){this._delaunator=new f(t),this.inedges=new Int32Array(t.length/2),this._hullIndex=new Int32Array(t.length/2),this.points=this._delaunator.coords,this._init()}update(){return this._delaunator.update(),this._init(),this}_init(){const t=this._delaunator,i=this.points;if(t.hull&&t.hull.length>2&&function(t){const{triangles:i,coords:e}=t;for(let t=0;t<i.length;t+=3){const n=2*i[t],s=2*i[t+1],l=2*i[t+2];if((e[l]-e[n])*(e[s+1]-e[n+1])-(e[s]-e[n])*(e[l+1]-e[n+1])>1e-10)return!1}return!0}(t)){this.collinear=Int32Array.from({length:i.length/2},((t,i)=>i)).sort(((t,e)=>i[2*t]-i[2*e]||i[2*t+1]-i[2*e+1]));const t=this.collinear[0],e=this.collinear[this.collinear.length-1],n=[i[2*t],i[2*t+1],i[2*e],i[2*e+1]],s=1e-8*Math.hypot(n[3]-n[1],n[2]-n[0]);for(let t=0,e=i.length/2;t<e;++t){const e=P(i[2*t],i[2*t+1],s);i[2*t]=e[0],i[2*t+1]=e[1]}this._delaunator=new f(i)}else delete this.collinear;const e=this.halfedges=this._delaunator.halfedges,n=this.hull=this._delaunator.hull,s=this.triangles=this._delaunator.triangles,l=this.inedges.fill(-1),h=this._hullIndex.fill(-1);for(let t=0,i=e.length;t<i;++t){const i=s[t%3==2?t-2:t+1];-1!==e[t]&&-1!==l[i]||(l[i]=t)}for(let t=0,i=n.length;t<i;++t)h[n[t]]=t;n.length<=2&&n.length>0&&(this.triangles=new Int32Array(3).fill(-1),this.halfedges=new Int32Array(3).fill(-1),this.triangles[0]=n[0],l[n[0]]=1,2===n.length&&(l[n[1]]=0,this.triangles[1]=n[1],this.triangles[2]=n[1]))}voronoi(t){return new T(this,t)}*neighbors(t){const{inedges:i,hull:e,_hullIndex:n,halfedges:s,triangles:l,collinear:h}=this;if(h){const i=h.indexOf(t);return i>0&&(yield h[i-1]),void(i<h.length-1&&(yield h[i+1]))}const r=i[t];if(-1===r)return;let o=r,a=-1;do{if(yield a=l[o],o=o%3==2?o-2:o+1,l[o]!==t)return;if(o=s[o],-1===o){const i=e[(n[t]+1)%e.length];return void(i!==a&&(yield i))}}while(o!==r)}find(t,i,e=0){if((t=+t)!=t||(i=+i)!=i)return-1;const n=e;let s;for(;(s=this._step(e,t,i))>=0&&s!==e&&s!==n;)e=s;return s}_step(t,i,e){const{inedges:n,hull:s,_hullIndex:l,halfedges:h,triangles:r,points:o}=this;if(-1===n[t]||!o.length)return(t+1)%(o.length>>1);let a=t,c=A(i-o[2*t],2)+A(e-o[2*t+1],2);const u=n[t];let f=u;do{let n=r[f];const u=A(i-o[2*n],2)+A(e-o[2*n+1],2);if(u<c&&(c=u,a=n),f=f%3==2?f-2:f+1,r[f]!==t)break;if(f=h[f],-1===f){if(f=s[(l[t]+1)%s.length],f!==n&&A(i-o[2*f],2)+A(e-o[2*f+1],2)<c)return f;break}}while(f!==u);return a}render(t){const i=null==t?t=new v:void 0,{points:e,halfedges:n,triangles:s}=this;for(let i=0,l=n.length;i<l;++i){const l=n[i];if(l<i)continue;const h=2*s[i],r=2*s[l];t.moveTo(e[h],e[h+1]),t.lineTo(e[r],e[r+1])}return this.renderHull(t),i&&i.value()}renderPoints(t,i){void 0!==i||t&&"function"==typeof t.moveTo||(i=t,t=null),i=null==i?2:+i;const e=null==t?t=new v:void 0,{points:n}=this;for(let e=0,s=n.length;e<s;e+=2){const s=n[e],l=n[e+1];t.moveTo(s+i,l),t.arc(s,l,i,0,M)}return e&&e.value()}renderHull(t){const i=null==t?t=new v:void 0,{hull:e,points:n}=this,s=2*e[0],l=e.length;t.moveTo(n[s],n[s+1]);for(let i=1;i<l;++i){const s=2*e[i];t.lineTo(n[s],n[s+1])}return t.closePath(),i&&i.value()}hullPolygon(){const t=new b;return this.renderHull(t),t.value()}renderTriangle(t,i){const e=null==i?i=new v:void 0,{points:n,triangles:s}=this,l=2*s[t*=3],h=2*s[t+1],r=2*s[t+2];return i.moveTo(n[l],n[l+1]),i.lineTo(n[h],n[h+1]),i.lineTo(n[r],n[r+1]),i.closePath(),e&&e.value()}*trianglePolygons(){const{triangles:t}=this;for(let i=0,e=t.length/3;i<e;++i)yield this.trianglePolygon(i)}trianglePolygon(t){const i=new b;return this.renderTriangle(t,i),i.value()}}t.Delaunay=S,t.Voronoi=T,Object.defineProperty(t,"__esModule",{value:!0})}));
+
+</script>
 
 <script>
 /* =========================================================
@@ -187,11 +289,24 @@
 
 var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 var S={ contours:[], surveys:[], polys:[],
+        triList:[], showTIN:true,
+        dem:null, showDEM:true, hillCanvas:null,
+        flow:null, streamMask:null, streamHa:5, showStreams:true,
+        watershed:null, wsCanvas:null, wsSegs:null, showWS:true, mode:'pan', dnX:0, dnY:0,
+        permit:null, permitDraw:null, ghostXY:null,
         bounds:null, scale:1, ox:0, oy:0,
         zmin:0, zmax:0, isDown:false, lastM:null, name:'' };
 
 /* ---------- 폴리곤 면적 ---------- */
 function polyArea(pts){var a=0;for(var i=0,n=pts.length;i<n;i++){var j=(i+1)%n;a+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;}return Math.abs(a)/2;}
+
+/* ---------- 레이어 분류 (매뉴얼 표5·표6) ----------
+   등고선: 주곡선 F0017111 / 계곡선 F0017114 / (오목지) 주곡선 F0017121 / 간곡선 F0017122
+   표고점: 표고점 F0027217 / 삼각점 H0027311 / 수준점 H0027312 */
+function isContourLayer(lay){ lay=(lay||'').toUpperCase();
+  return lay==='F0017111'||lay==='F0017114'||lay==='F0017121'||lay==='F0017122'; }
+function isElevLayer(lay){ lay=(lay||'').toUpperCase();
+  return lay==='F0027217'||lay==='H0027311'||lay==='H0027312'; }
 
 /* ---------- DXF 파서 (검증 완료) ---------- */
 function parseDXF(text){
@@ -220,13 +335,13 @@ function parseDXF(text){
           var s=cur.zs.slice().sort(function(a,b){return a-b;}); elev=s[s.length>>1]; // 중앙값
         }
         var ent={layer:cur.layer,elev:elev,pts:cur.pts,closed:!!(cur.flags&1)};
-        if(lay==='F0017111'||lay==='F0017114') contours.push(ent);
+        if(isContourLayer(lay)) contours.push(ent);
         var f=cur.pts[0],l=cur.pts[cur.pts.length-1];
         var closed=(cur.flags&1)||(Math.hypot(f.x-l.x,f.y-l.y)<5);
-        if(closed&&cur.pts.length>=3&&lay!=='F0017111'&&lay!=='F0017114')
+        if(closed&&cur.pts.length>=3&&!isContourLayer(lay))
           polys.push({layer:cur.layer,pts:cur.pts,area:polyArea(cur.pts)});
       }
-    } else if(cur.type==='INSERT'&&(cur.layer||'').toUpperCase()==='F0027217'){
+    } else if(cur.type==='INSERT'&&isElevLayer(cur.layer)){
       surveys.push({x:cur.ix,y:cur.iy,z:(cur.iz||0),val:null});
     } else if(cur.type==='TEXT'&&(cur.layer||'').toUpperCase()==='F0027132'){
       var m=/^[\d.]+/.exec((cur.text||'').trim());
@@ -278,9 +393,10 @@ function parseDXF(text){
   return {contours:contours,surveys:surveys,polys:polys};
 }
 
-/* ---------- 파일 열기 ---------- */
-document.getElementById('file').addEventListener('change',function(e){
-  var f=e.target.files[0]; if(!f) return;
+/* ---------- 파일 열기 (버튼 + 드래그앤드롭 공용) ---------- */
+function loadDXFFile(f){
+  if(!f) return;
+  if(!/\.dxf$/i.test(f.name||'')){ toast('DXF 파일만 열 수 있어요','err'); return; }
   S.name=f.name;
   var rd=new FileReader();
   rd.onload=function(){
@@ -294,8 +410,19 @@ document.getElementById('file').addEventListener('change',function(e){
   };
   rd.onerror=function(){ toast('파일을 읽지 못했어요','err'); };
   rd.readAsText(f);
-  e.target.value='';
-});
+}
+document.getElementById('file').addEventListener('change',function(e){ loadDXFFile(e.target.files[0]); e.target.value=''; });
+
+/* 드래그앤드롭 (창 어디에 놓아도 불러옴) */
+(function(){
+  var lay=document.getElementById('droplay'), depth=0;
+  function hasFile(e){ return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types||[],'Files')>=0; }
+  window.addEventListener('dragenter',function(e){ if(!hasFile(e))return; e.preventDefault(); depth++; lay.classList.add('on'); });
+  window.addEventListener('dragover', function(e){ if(!hasFile(e))return; e.preventDefault(); });
+  window.addEventListener('dragleave',function(e){ e.preventDefault(); depth--; if(depth<=0){ depth=0; lay.classList.remove('on'); } });
+  window.addEventListener('drop',     function(e){ e.preventDefault(); depth=0; lay.classList.remove('on');
+    var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) loadDXFFile(f); });
+})();
 
 function applyParsed(r){
   S.contours=r.contours; S.surveys=r.surveys; S.polys=r.polys;
@@ -321,6 +448,32 @@ function applyParsed(r){
   document.getElementById('hint').style.display='';
   document.getElementById('tools').style.display='';
   document.getElementById('sbar').style.display='';
+
+  // TIN 초기화 + 버튼 활성 + 파이프 리셋
+  S.triList=[]; S.showTIN=true;
+  S.dem=null; S.hillCanvas=null; S.showDEM=true;
+  S.flow=null; S.streamMask=null; S.streamHa=5; S.showStreams=true;
+  S.watershed=null; S.wsCanvas=null; S.wsSegs=null; S.showWS=true; S.mode='pan';
+  document.getElementById('btnTIN').disabled=false;
+  document.getElementById('btnDEM').disabled=true;
+  document.getElementById('btnFlow').disabled=true;
+  document.getElementById('btnPour').disabled=true;
+  var bp=document.getElementById('btnPour'); bp.classList.remove('active'); bp.textContent='📍 유역 추출 (유출구 클릭)';
+  document.getElementById('tinResult').style.display='none';
+  document.getElementById('demResult').style.display='none';
+  document.getElementById('flowResult').style.display='none';
+  document.getElementById('wsPanel').style.display='none';
+  document.getElementById('p1').className='pi cur';
+  document.getElementById('p2').className='pi';
+  document.getElementById('p3').className='pi';
+  document.getElementById('p4').className='pi';
+  document.getElementById('p5').className='pi';
+  document.getElementById('p6').className='pi';
+  S.permit=null; S.permitDraw=null; S.ghostXY=null;
+  document.getElementById('btnPermit').disabled=false;
+  document.getElementById('permitInfo').style.display='none';
+  var bpm=document.getElementById('btnPermit'); bpm.classList.remove('active'); bpm.textContent='✏️ 허가지선 그리기';
+  cv.style.cursor='grab';
 
   computeBounds();
   resize();
@@ -367,14 +520,22 @@ function s2w(x,y){ return {x:(x-S.ox)/S.scale, y:(cv.height-y-S.oy)/S.scale}; }
 function evWorld(e){ var r=cv.getBoundingClientRect(); return s2w(e.clientX-r.left, e.clientY-r.top); }
 
 /* ---------- 마우스 (팬/줌/좌표) ---------- */
-cv.addEventListener('mousedown',function(e){ S.isDown=true; S.lastM={x:e.clientX,y:e.clientY}; cv.classList.add('grabbing'); });
+cv.addEventListener('mousedown',function(e){ S.isDown=true; S.lastM={x:e.clientX,y:e.clientY}; S.dnX=e.clientX; S.dnY=e.clientY; cv.classList.add('grabbing'); });
 window.addEventListener('mousemove',function(e){
   if(S.bounds){ var w=evWorld(e); document.getElementById('sbXY').textContent='X '+w.x.toFixed(1)+'  Y '+w.y.toFixed(1); }
+  if(S.mode==='permit' && S.permitDraw){ S.ghostXY=evWorld(e); render(); return; }
   if(!S.isDown) return;
   S.ox+=e.clientX-S.lastM.x; S.oy-=e.clientY-S.lastM.y;
   S.lastM={x:e.clientX,y:e.clientY}; render();
 });
 window.addEventListener('mouseup',function(){ S.isDown=false; cv.classList.remove('grabbing'); });
+cv.addEventListener('click',function(e){
+  if(Math.abs(e.clientX-S.dnX)+Math.abs(e.clientY-S.dnY) > 5) return; // 드래그면 무시
+  var w=evWorld(e);
+  if(S.mode==='pour'){ pickOutlet(w.x, w.y); }
+  else if(S.mode==='permit' && S.permitDraw){ S.permitDraw.push({x:w.x,y:w.y}); render(); }
+});
+cv.addEventListener('dblclick',function(e){ e.preventDefault(); if(S.mode==='permit') finishPermit(); });
 cv.addEventListener('wheel',function(e){
   e.preventDefault();
   var r=cv.getBoundingClientRect();
@@ -397,6 +558,40 @@ function render(){
   if(!S.bounds) return;
   var zr=(S.zmax-S.zmin)||1;
 
+  // DEM 음영기복 (가장 아래 배경)
+  if(S.dem && S.showDEM && S.hillCanvas){
+    var d=S.dem;
+    var x0=d.minX, x1=d.minX+(d.cols-1)*d.cell, y0=d.minY, y1=d.minY+(d.rows-1)*d.cell;
+    var tl=w2s({x:x0,y:y1}), br=w2s({x:x1,y:y0});
+    ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(S.hillCanvas, tl.x, tl.y, br.x-tl.x, br.y-tl.y);
+  }
+
+  // 유역 채움 (반투명 하늘색)
+  if(S.watershed && S.showWS && S.wsCanvas){
+    var w=S.watershed;
+    var wx0=w.minX, wx1=w.minX+(w.cols-1)*w.cell, wy0=w.minY, wy1=w.minY+(w.rows-1)*w.cell;
+    var wtl=w2s({x:wx0,y:wy1}), wbr=w2s({x:wx1,y:wy0});
+    ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(S.wsCanvas, wtl.x, wtl.y, wbr.x-wtl.x, wbr.y-wtl.y);
+    ctx.imageSmoothingEnabled=true;
+  }
+
+  // TIN 삼각망 (등고선 아래 · 한 번에 stroke = 빠름)
+  if(S.showTIN && S.triList.length){
+    ctx.strokeStyle='rgba(96,165,210,0.22)';
+    ctx.lineWidth=0.5;
+    ctx.beginPath();
+    for(var ti=0;ti<S.triList.length;ti++){
+      var tr=S.triList[ti];
+      var a=w2s(tr.p0), b=w2s(tr.p1), c=w2s(tr.p2);
+      if((a.x<0&&b.x<0&&c.x<0)||(a.x>cv.width&&b.x>cv.width&&c.x>cv.width)||
+         (a.y<0&&b.y<0&&c.y<0)||(a.y>cv.height&&b.y>cv.height&&c.y>cv.height)) continue;
+      ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.closePath();
+    }
+    ctx.stroke();
+  }
+
   // 등고선
   S.contours.forEach(function(c){
     var t=(c.elev-S.zmin)/zr;
@@ -414,6 +609,58 @@ function render(){
   });
   ctx.globalAlpha=1;
 
+  // 하천망 (흐름누적 ≥ 임계 → 하류로 선)
+  if(S.flow && S.showStreams && S.streamMask){
+    var fl=S.flow, sm=S.streamMask.mask;
+    ctx.strokeStyle='rgba(56,160,235,0.95)'; ctx.lineCap='round';
+    ctx.lineWidth=Math.max(1, S.scale*fl.cell*0.28);
+    ctx.beginPath();
+    for(var si=0;si<sm.length;si++){
+      if(!sm[si]) continue;
+      var code=fl.fdir[si]; if(code<=0) continue;
+      var d=_step(code); if(!d) continue;
+      var c=si%fl.cols, r=(si/fl.cols)|0;
+      var a=w2s({x:fl.minX+c*fl.cell, y:fl.minY+r*fl.cell});
+      var b=w2s({x:fl.minX+(c+d[0])*fl.cell, y:fl.minY+(r+d[1])*fl.cell});
+      ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+    }
+    ctx.stroke(); ctx.lineCap='butt';
+  }
+
+  // 능선선 (유역 경계 · 초록)
+  if(S.watershed && S.showWS && S.wsSegs){
+    ctx.strokeStyle='#34d399'; ctx.lineWidth=Math.max(1.5, S.scale*1.0); ctx.lineJoin='round';
+    ctx.beginPath();
+    for(var gi=0;gi<S.wsSegs.length;gi++){
+      var sg=S.wsSegs[gi];
+      var ga=w2s({x:sg[0],y:sg[1]}), gb=w2s({x:sg[2],y:sg[3]});
+      ctx.moveTo(ga.x,ga.y); ctx.lineTo(gb.x,gb.y);
+    }
+    ctx.stroke();
+  }
+
+  // 허가지선 (분홍 점선 · 산지전용예정지)
+  if(S.permit && S.permit.length>=3){
+    ctx.save();
+    ctx.fillStyle='rgba(244,114,182,0.10)'; ctx.strokeStyle='#f472b6';
+    ctx.lineWidth=Math.max(1.6,S.scale*1.0); ctx.setLineDash([8,5]); ctx.lineJoin='round';
+    ctx.beginPath();
+    for(var qi=0;qi<S.permit.length;qi++){ var s=w2s(S.permit[qi]); if(qi===0)ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  if(S.mode==='permit' && S.permitDraw && S.permitDraw.length){
+    ctx.save();
+    ctx.strokeStyle='#f472b6'; ctx.lineWidth=2; ctx.lineJoin='round';
+    ctx.beginPath();
+    for(var qi=0;qi<S.permitDraw.length;qi++){ var s=w2s(S.permitDraw[qi]); if(qi===0)ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y); }
+    if(S.ghostXY){ var g=w2s(S.ghostXY); ctx.setLineDash([5,4]); ctx.lineTo(g.x,g.y); }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#f472b6';
+    for(var qi=0;qi<S.permitDraw.length;qi++){ var s=w2s(S.permitDraw[qi]); ctx.beginPath(); ctx.arc(s.x,s.y,3,0,6.283); ctx.fill(); }
+    ctx.restore();
+  }
+
   // 표고점
   var showVal=S.scale>1.2;
   ctx.font='10px sans-serif';
@@ -427,6 +674,485 @@ function render(){
     ctx.stroke();
     if(showVal && sv.val!=null){ ctx.fillStyle='#fbbf24'; ctx.fillText(sv.val.toFixed(1), p.x+5, p.y-4); }
   }
+}
+
+/* ---------- TIN 생성 (등고선 z + 표고점 z → Delaunay) ---------- */
+function buildTIN(){
+  var pts=[];
+  S.contours.forEach(function(c){ for(var k=0;k<c.pts.length;k++){ pts.push({x:c.pts[k].x,y:c.pts[k].y,z:c.elev}); } });
+  S.surveys.forEach(function(s){ pts.push({x:s.x,y:s.y,z:(s.z||0)}); });
+  if(pts.length<3){ S.triList=[]; return 0; }
+  var coords=new Float64Array(pts.length*2);
+  for(var i=0;i<pts.length;i++){ coords[2*i]=pts[i].x; coords[2*i+1]=pts[i].y; }
+  var del=new d3.Delaunay(coords), tris=del.triangles, triList=[];
+  for(var t=0;t<tris.length;t+=3){
+    var p0=pts[tris[t]], p1=pts[tris[t+1]], p2=pts[tris[t+2]];
+    var ax=p1.x-p0.x, ay=p1.y-p0.y, bx=p2.x-p0.x, by=p2.y-p0.y;
+    if(Math.abs(ax*by-ay*bx)<0.1) continue;        // 면적 0(일직선) 제거
+    triList.push({p0:p0,p1:p1,p2:p2,
+      minX:Math.min(p0.x,p1.x,p2.x), maxX:Math.max(p0.x,p1.x,p2.x),
+      minY:Math.min(p0.y,p1.y,p2.y), maxY:Math.max(p0.y,p1.y,p2.y)});
+  }
+  S.triList=triList;
+  return triList.length;
+}
+
+function runTIN(){
+  if(!S.contours.length && !S.surveys.length){ toast('먼저 DXF를 여세요','err'); return; }
+  var n=buildTIN();
+  if(!n){ toast('TIN을 만들 점이 부족해요','err'); return; }
+  S.showTIN=true;
+  document.getElementById('nTri').textContent=n.toLocaleString();
+  document.getElementById('tinResult').style.display='';
+  document.getElementById('tinToggle').checked=true;
+  document.getElementById('p1').className='pi done';
+  document.getElementById('p2').className='pi cur';
+  document.getElementById('btnDEM').disabled=false;
+  render();
+  toast('TIN 생성 완료 · 삼각형 '+n.toLocaleString()+'개','ok');
+}
+
+/* ---------- DEM 생성 (TIN을 격자로 래스터화 · 무게중심 보간) ---------- */
+function buildDEM(cell){
+  cell = cell||10;
+  if(!S.triList.length) return null;
+  var b=S.bounds;
+  var cols=Math.max(1, Math.ceil((b.maxX-b.minX)/cell)+1);
+  var rows=Math.max(1, Math.ceil((b.maxY-b.minY)/cell)+1);
+  var z=new Float32Array(cols*rows); z.fill(NaN);
+  for(var ti=0;ti<S.triList.length;ti++){
+    var t=S.triList[ti], p0=t.p0,p1=t.p1,p2=t.p2;
+    var c0=Math.max(0,Math.floor((t.minX-b.minX)/cell)), c1=Math.min(cols-1,Math.ceil((t.maxX-b.minX)/cell));
+    var r0=Math.max(0,Math.floor((t.minY-b.minY)/cell)), r1=Math.min(rows-1,Math.ceil((t.maxY-b.minY)/cell));
+    var x0=p0.x,y0=p0.y,x1=p1.x,y1=p1.y,x2=p2.x,y2=p2.y;
+    var den=(y1-y2)*(x0-x2)+(x2-x1)*(y0-y2);
+    if(Math.abs(den)<1e-9) continue;
+    for(var r=r0;r<=r1;r++){
+      var py=b.minY+r*cell;
+      for(var c=c0;c<=c1;c++){
+        var px=b.minX+c*cell;
+        var aa=((y1-y2)*(px-x2)+(x2-x1)*(py-y2))/den;
+        if(aa<-0.001||aa>1.001) continue;
+        var bb=((y2-y0)*(px-x2)+(x0-x2)*(py-y2))/den;
+        if(bb<-0.001||bb>1.001) continue;
+        var cc=1-aa-bb;
+        if(cc<-0.001) continue;
+        z[r*cols+c]=aa*p0.z+bb*p1.z+cc*p2.z;
+      }
+    }
+  }
+  return {cell:cell, cols:cols, rows:rows, minX:b.minX, minY:b.minY, z:z};
+}
+
+/* 음영기복 → 오프스크린 캔버스 (이미지 행0 = 북/상단) */
+function buildHillshade(dem){
+  var cols=dem.cols, rows=dem.rows, z=dem.z, cell=dem.cell;
+  var off=document.createElement('canvas'); off.width=cols; off.height=rows;
+  var octx=off.getContext('2d'), img=octx.createImageData(cols,rows), d=img.data;
+  var az=315*Math.PI/180, zen=(90-45)*Math.PI/180;
+  var cosZen=Math.cos(zen), sinZen=Math.sin(zen);
+  for(var r=0;r<rows;r++){
+    for(var c=0;c<cols;c++){
+      var here=z[r*cols+c];
+      var ir=(rows-1-r);             // 위쪽이 북(maxY)
+      var o=(ir*cols+c)*4;
+      if(here!==here){ d[o+3]=0; continue; }   // NaN=투명(범위 밖)
+      var zl=z[r*cols+(c>0?c-1:c)], zrr=z[r*cols+(c<cols-1?c+1:c)];
+      var zd=z[(r>0?r-1:r)*cols+c], zu=z[(r<rows-1?r+1:r)*cols+c];
+      if(zl!==zl)zl=here; if(zrr!==zrr)zrr=here; if(zd!==zd)zd=here; if(zu!==zu)zu=here;
+      var dzdx=(zrr-zl)/(2*cell), dzdy=(zu-zd)/(2*cell);
+      var slope=Math.atan(Math.sqrt(dzdx*dzdx+dzdy*dzdy));
+      var aspect=Math.atan2(dzdy,-dzdx);
+      var ill=cosZen*Math.cos(slope)+sinZen*Math.sin(slope)*Math.cos(az-aspect);
+      if(ill<0)ill=0;
+      var g=Math.round(40+ill*185);
+      d[o]=g; d[o+1]=g; d[o+2]=Math.min(255,g+6); d[o+3]=255;
+    }
+  }
+  octx.putImageData(img,0,0);
+  return off;
+}
+
+function runDEM(){
+  if(!S.triList.length){ toast('먼저 TIN을 생성하세요','err'); return; }
+  var dem=buildDEM(10);
+  if(!dem){ toast('DEM 생성 실패','err'); return; }
+  S.dem=dem; S.hillCanvas=buildHillshade(dem); S.showDEM=true;
+  document.getElementById('demSize').textContent=dem.cols+'×'+dem.rows;
+  document.getElementById('demResult').style.display='';
+  document.getElementById('demToggle').checked=true;
+  // TIN 메쉬는 끄고 음영기복을 깔끔하게
+  S.showTIN=false; var tg=document.getElementById('tinToggle'); if(tg) tg.checked=false;
+  document.getElementById('p2').className='pi done';
+  document.getElementById('p3').className='pi cur';
+  document.getElementById('btnFlow').disabled=false;
+  render();
+  toast('DEM 음영기복 완료 · 격자 '+dem.cols+'×'+dem.rows,'ok');
+}
+
+/* ============================================================
+   M2/M3: 흐름(D8) · 하천 — 우선순위 범람(Priority-Flood)
+   웅덩이 메우기 + 흐름방향(평지/스필 자동) + 누적 한 번에.
+   방향코드: 동1 남동2 남4 남서8 서16 북서32 북64 북동128 (행 r+ = 북)
+   ============================================================ */
+function MinHeap(){ this.a=[]; }
+MinHeap.prototype.push=function(it){ var a=this.a; a.push(it); var i=a.length-1;
+  while(i>0){ var p=(i-1)>>1; if(a[p][0]<=a[i][0])break; var t=a[p];a[p]=a[i];a[i]=t; i=p; } };
+MinHeap.prototype.pop=function(){ var a=this.a, top=a[0], last=a.pop();
+  if(a.length){ a[0]=last; var i=0,n=a.length; for(;;){ var l=2*i+1,rr=l+1,s=i;
+    if(l<n&&a[l][0]<a[s][0])s=l; if(rr<n&&a[rr][0]<a[s][0])s=rr; if(s===i)break; var t=a[s];a[s]=a[i];a[i]=t; i=s; } }
+  return top; };
+MinHeap.prototype.size=function(){ return this.a.length; };
+
+var _NB=[[1,0,1],[1,-1,2],[0,-1,4],[-1,-1,8],[-1,0,16],[-1,1,32],[0,1,64],[1,1,128]]; // dc,dr,코드(현재→이웃)
+function _opp(code){ return code<=8 ? code<<4 : code>>4; }   // 반대방향
+function _step(code){ switch(code){case 1:return[1,0];case 2:return[1,-1];case 4:return[0,-1];case 8:return[-1,-1];
+  case 16:return[-1,0];case 32:return[-1,1];case 64:return[0,1];case 128:return[1,1];} return null; }
+
+function computeFlow(dem){
+  var cols=dem.cols, rows=dem.rows, z=dem.z, N=cols*rows;
+  var filled=new Float32Array(N), fdir=new Int16Array(N), done=new Uint8Array(N), heap=new MinHeap();
+  for(var i=0;i<N;i++) fdir[i]=-1;
+  // 경계/NaN 인접 셀 = 유출 시드
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    var idx=r*cols+c, v=z[idx];
+    if(v!==v){ done[idx]=1; filled[idx]=NaN; fdir[idx]=0; continue; }
+    var edge=(r===0||c===0||r===rows-1||c===cols-1);
+    if(!edge){ for(var k=0;k<8;k++){ var zz=z[(r+_NB[k][1])*cols+(c+_NB[k][0])]; if(zz!==zz){edge=true;break;} } }
+    if(edge){ heap.push([v,idx]); done[idx]=1; filled[idx]=v; fdir[idx]=0; }
+  }
+  // 범람 (낮은 곳부터 처리 → 이웃의 흐름방향 = 처리된 더 낮은/같은 셀 쪽)
+  while(heap.size()){
+    var top=heap.pop(), ci=top[1], cz=filled[ci], cr=(ci/cols)|0, cc=ci%cols;
+    for(var k=0;k<8;k++){
+      var nc=cc+_NB[k][0], nr=cr+_NB[k][1];
+      if(nc<0||nr<0||nc>=cols||nr>=rows) continue;
+      var ni=nr*cols+nc; if(done[ni]) continue;
+      var nz=z[ni]; if(nz!==nz){ done[ni]=1; continue; }
+      var fz=nz>cz?nz:cz;                 // 웅덩이면 cz까지 채움
+      filled[ni]=fz; done[ni]=1; fdir[ni]=_opp(_NB[k][2]); heap.push([fz,ni]);
+    }
+  }
+  // 흐름누적 (위상정렬=Kahn → 평지에도 상류먼저 보장, 물 보존)
+  var acc=new Float64Array(N), indeg=new Int32Array(N), down=new Int32Array(N);
+  for(var i=0;i<N;i++){ down[i]=-1; if(filled[i]===filled[i]) acc[i]=1; }
+  for(var i=0;i<N;i++){
+    if(filled[i]!==filled[i]) continue;
+    var code=fdir[i]; if(code<=0) continue;
+    var d=_step(code), nc=(i%cols)+d[0], nr=((i/cols)|0)+d[1];
+    if(nc<0||nr<0||nc>=cols||nr>=rows) continue;
+    var ni=nr*cols+nc; if(filled[ni]!==filled[ni]) continue;
+    down[i]=ni; indeg[ni]++;
+  }
+  var q=[], qh=0;
+  for(var i=0;i<N;i++){ if(filled[i]===filled[i] && indeg[i]===0) q.push(i); }
+  while(qh<q.length){
+    var idx=q[qh++], ni=down[idx];
+    if(ni>=0){ acc[ni]+=acc[idx]; if(--indeg[ni]===0) q.push(ni); }
+  }
+  return {filled:filled, fdir:fdir, acc:acc, cols:cols, rows:rows, cell:dem.cell, minX:dem.minX, minY:dem.minY};
+}
+
+function buildStreams(flow, ha){
+  var thr=(ha*10000)/(flow.cell*flow.cell);  // ha → 셀 개수
+  var N=flow.cols*flow.rows, m=new Uint8Array(N), cnt=0;
+  for(var i=0;i<N;i++){ if(flow.acc[i]>=thr){ m[i]=1; cnt++; } }
+  return {mask:m, thr:thr, count:cnt};
+}
+
+function runFlow(){
+  if(!S.dem){ toast('먼저 DEM을 생성하세요','err'); return; }
+  var t0=Date.now();
+  S.flow=computeFlow(S.dem);
+  var sm=buildStreams(S.flow, S.streamHa);
+  S.streamMask=sm;
+  S.showStreams=true;
+  document.getElementById('streamLen').textContent=sm.count.toLocaleString();
+  document.getElementById('flowResult').style.display='';
+  document.getElementById('streamToggle').checked=true;
+  document.getElementById('p3').className='pi done';
+  document.getElementById('p4').className='pi done';
+  document.getElementById('p5').className='pi cur';
+  document.getElementById('btnPour').disabled=false;
+  render();
+  toast('흐름·하천 분석 완료 · '+((Date.now()-t0)/1000).toFixed(1)+'초','ok');
+}
+
+function setThr(ha){
+  if(!S.flow) return;
+  S.streamHa=ha;
+  document.getElementById('thr5').className='thr'+(ha===5?' on':'');
+  document.getElementById('thr1').className='thr'+(ha===1?' on':'');
+  S.streamMask=buildStreams(S.flow, ha);
+  document.getElementById('streamLen').textContent=S.streamMask.count.toLocaleString();
+  render();
+}
+
+/* ============================================================
+   M3: 유역 추출 (유출구 → 상류 집수역) + 능선선(경계)
+   M4: 합리식 유출량
+   ============================================================ */
+function delineate(flow, px, py){
+  var cols=flow.cols, rows=flow.rows, fdir=flow.fdir, cell=flow.cell, acc=flow.acc, filled=flow.filled;
+  var c=Math.round((px-flow.minX)/cell), r=Math.round((py-flow.minY)/cell);
+  if(c<0||r<0||c>=cols||r>=rows) return null;
+  // 가까운 고누적 셀로 스냅(반경 4셀) → 클릭이 하천 옆이면 하천으로
+  var bi=r*cols+c, ba=(acc[bi]||0);
+  for(var dr=-4;dr<=4;dr++)for(var dc=-4;dc<=4;dc++){
+    var cc=c+dc, rr=r+dr; if(cc<0||rr<0||cc>=cols||rr>=rows) continue;
+    var ii=rr*cols+cc; if(filled[ii]===filled[ii] && acc[ii]>ba){ ba=acc[ii]; bi=ii; }
+  }
+  if(filled[bi]!==filled[bi]) return null;
+  var RB=[[1,0,16],[1,-1,32],[0,-1,64],[-1,-1,128],[-1,0,1],[-1,1,2],[0,1,4],[1,1,8]]; // 이웃이 현재로 흐르는 코드
+  var mask=new Uint8Array(cols*rows), stack=[bi], cnt=0; mask[bi]=1;
+  while(stack.length){
+    var i=stack.pop(); cnt++;
+    var ci=i%cols, ri=(i/cols)|0;
+    for(var k=0;k<8;k++){
+      var nc=ci+RB[k][0], nr=ri+RB[k][1];
+      if(nc<0||nr<0||nc>=cols||nr>=rows) continue;
+      var ni=nr*cols+nc; if(mask[ni]) continue;
+      if(fdir[ni]===RB[k][2]){ mask[ni]=1; stack.push(ni); }
+    }
+  }
+  return {mask:mask, count:cnt, outlet:bi, cols:cols, rows:rows, cell:cell, minX:flow.minX, minY:flow.minY, areaM2:cnt*cell*cell};
+}
+
+function wsFillCanvas(ws){
+  var cols=ws.cols, rows=ws.rows, m=ws.mask;
+  var off=document.createElement('canvas'); off.width=cols; off.height=rows;
+  var octx=off.getContext('2d'), img=octx.createImageData(cols,rows), d=img.data;
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    if(!m[r*cols+c]) continue;
+    var o=((rows-1-r)*cols+c)*4;
+    d[o]=56; d[o+1]=189; d[o+2]=248; d[o+3]=64;   // 하늘색 반투명
+  }
+  octx.putImageData(img,0,0); return off;
+}
+
+function wsBoundary(ws){
+  var cols=ws.cols, rows=ws.rows, m=ws.mask, cell=ws.cell, ox=ws.minX, oy=ws.minY, segs=[];
+  function on(c,r){ return c>=0&&r>=0&&c<cols&&r<rows&&m[r*cols+c]; }
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    if(!m[r*cols+c]) continue;
+    var x0=ox+(c-0.5)*cell, x1=ox+(c+0.5)*cell, y0=oy+(r-0.5)*cell, y1=oy+(r+0.5)*cell;
+    if(!on(c+1,r)) segs.push([x1,y0,x1,y1]);
+    if(!on(c-1,r)) segs.push([x0,y0,x0,y1]);
+    if(!on(c,r+1)) segs.push([x0,y1,x1,y1]);
+    if(!on(c,r-1)) segs.push([x0,y0,x1,y0]);
+  }
+  return segs;
+}
+
+function pickOutlet(px,py){
+  if(!S.flow){ toast('먼저 흐름 분석을 하세요','err'); return; }
+  var ws=delineate(S.flow, px, py);
+  if(!ws || ws.count<3){ toast('유역을 못 잡았어요. 하천 쪽을 클릭해 보세요','err'); return; }
+  S.watershed=ws; S.wsCanvas=wsFillCanvas(ws); S.wsSegs=wsBoundary(ws); S.showWS=true;
+  var ha=ws.areaM2/1e4, km2=ws.areaM2/1e6;
+  document.getElementById('wsArea').textContent=ha.toFixed(1)+' ha ('+km2.toFixed(3)+' km²)';
+  document.getElementById('wsPanel').style.display='';
+  document.getElementById('wsToggle').checked=true;
+  document.getElementById('p5').className='pi done';
+  document.getElementById('p6').className='pi cur';
+  computeQ();
+  render();
+  toast('유역 추출 완료 · '+ha.toFixed(1)+' ha','ok');
+}
+
+function computeQ(){
+  if(!S.watershed) return;
+  var C=parseFloat(document.getElementById('inC').value)||0;
+  var I=parseFloat(document.getElementById('inI').value)||0;
+  var Akm2=S.watershed.areaM2/1e6;
+  var Q=0.2778*C*I*Akm2;
+  document.getElementById('qOut').textContent=Q.toFixed(2)+' m³/s';
+  document.getElementById('qFormula').textContent='0.2778 × '+C+' × '+I+' × '+Akm2.toFixed(3);
+}
+
+function togglePour(){
+  S.mode=(S.mode==='pour')?'pan':'pour';
+  var btn=document.getElementById('btnPour');
+  if(S.mode==='pour'){
+    S.permitDraw=null; S.ghostXY=null;
+    var bpm=document.getElementById('btnPermit'); bpm.classList.remove('active'); bpm.textContent='✏️ 허가지선 그리기';
+    btn.textContent='클릭 대기중… (끄기)'; btn.classList.add('active'); cv.style.cursor='crosshair'; toast('하천 하류 끝(유출구)을 클릭하세요');
+  } else { btn.textContent='📍 유역 추출 (유출구 클릭)'; btn.classList.remove('active'); cv.style.cursor='grab'; }
+  render();
+}
+
+/* ---------- 허가지선 그리기 (산지전용예정지) ---------- */
+function togglePermit(){
+  if(!S.bounds){ toast('먼저 DXF를 여세요','err'); return; }
+  S.mode=(S.mode==='permit')?'pan':'permit';
+  var b=document.getElementById('btnPermit');
+  if(S.mode==='permit'){
+    S.permitDraw=[]; S.ghostXY=null;
+    var bp=document.getElementById('btnPour'); bp.classList.remove('active'); bp.textContent='📍 유역 추출 (유출구 클릭)';
+    b.classList.add('active'); b.textContent='그리는 중… 더블클릭 완료 (취소)'; cv.style.cursor='crosshair'; toast('꼭짓점을 클릭, 더블클릭으로 완료');
+  } else { S.permitDraw=null; S.ghostXY=null; b.classList.remove('active'); b.textContent='✏️ 허가지선 그리기'; cv.style.cursor='grab'; }
+  render();
+}
+function finishPermit(){
+  var pts=S.permitDraw||[];
+  while(pts.length>=2){ var a=pts[pts.length-1],b=pts[pts.length-2]; if(Math.hypot(a.x-b.x,a.y-b.y) < 4/S.scale) pts.pop(); else break; }
+  if(pts.length<3){ toast('꼭짓점을 3개 이상 찍어주세요','err'); return; }
+  S.permit=pts.slice();
+  var A=polyArea(S.permit);
+  document.getElementById('permitArea').textContent=(A/1e4).toFixed(2)+' ha';
+  document.getElementById('permitInfo').style.display='';
+  S.mode='pan'; S.permitDraw=null; S.ghostXY=null;
+  var bb=document.getElementById('btnPermit'); bb.classList.remove('active'); bb.textContent='✏️ 허가지선 그리기';
+  cv.style.cursor='grab'; render();
+  toast('허가지선 완성 · '+(A/1e4).toFixed(2)+' ha','ok');
+}
+function clearPermit(){
+  S.permit=null; S.permitDraw=null; S.ghostXY=null;
+  document.getElementById('permitInfo').style.display='none';
+  if(S.mode==='permit') togglePermit();
+  render();
+}
+
+/* ---------- PNG 내보내기 (현재 화면 캡쳐) ---------- */
+function exportPNG(){
+  if(!S.bounds){ toast('먼저 DXF를 여세요','err'); return; }
+  try{
+    var a=document.createElement('a');
+    a.href=cv.toDataURL('image/png');
+    a.download=(S.name?S.name.replace(/\.dxf$/i,''):'수계분석')+'_화면.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('PNG 저장됨','ok');
+  }catch(e){ toast('PNG 저장 실패','err'); }
+}
+
+/* ---------- PDF 보고서 (도면 + 제원표 → 브라우저 인쇄→PDF) ---------- */
+function exportPDF(){
+  if(!S.bounds){ toast('먼저 DXF를 여세요','err'); return; }
+  var img=cv.toDataURL('image/png');
+  var rows=[];
+  rows.push(['도면', S.name||'-']);
+  rows.push(['표고 범위', S.zmin.toFixed(1)+' ~ '+S.zmax.toFixed(1)+' m']);
+  if(S.permit) rows.push(['허가지선(신청) 면적', (polyArea(S.permit)/1e4).toFixed(2)+' ha']);
+  if(S.streamMask) rows.push(['하천 정의 임계', S.streamHa+' ha']);
+  if(S.watershed){
+    var ha=S.watershed.areaM2/1e4, km2=S.watershed.areaM2/1e6;
+    var C=parseFloat(document.getElementById('inC').value)||0, I=parseFloat(document.getElementById('inI').value)||0;
+    var Q=0.2778*C*I*km2;
+    rows.push(['유역 면적', ha.toFixed(2)+' ha ('+km2.toFixed(3)+' km²)']);
+    rows.push(['유출계수 C', String(C)]);
+    rows.push(['강우강도 I (100년 빈도)', I+' mm/hr']);
+    rows.push(['첨두 유출량 Q', '<b class="q">'+Q.toFixed(2)+' m³/s</b>']);
+  }
+  var today=new Date().toLocaleDateString('ko-KR');
+  var tr=rows.map(function(r){ return '<tr><th>'+r[0]+'</th><td>'+r[1]+'</td></tr>'; }).join('');
+  var html='<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>산지유역 분석 결과</title>'
+    +'<style>body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;margin:28px;color:#111}'
+    +'h1{font-size:20px;border-bottom:2px solid #0ea5e9;padding-bottom:8px;margin:0 0 6px}'
+    +'.meta{color:#666;font-size:12px;margin:0 0 14px}'
+    +'img{width:100%;border:1px solid #ccc;border-radius:6px;margin:8px 0}'
+    +'table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}'
+    +'th,td{border:1px solid #ccc;padding:8px 10px;text-align:left}'
+    +'th{background:#f1f5f9;width:38%;font-weight:600}'
+    +'.q{font-size:15px;color:#0369a1}'
+    +'.note{font-size:11px;color:#888;margin-top:14px;line-height:1.6}'
+    +'.btn{padding:9px 16px;background:#0ea5e9;color:#fff;border:0;border-radius:8px;font-size:14px;cursor:pointer;margin-bottom:14px}'
+    +'@media print{.noprint{display:none}body{margin:0}}'
+    +'</style></head><body>'
+    +'<button class="btn noprint" onclick="window.print()">🖨 PDF로 저장 / 인쇄</button>'
+    +'<h1>산지유역 분석 결과</h1>'
+    +'<div class="meta">재해위험성 검토의견서 · 합리식 유출량 (D8 격자 방식) · 작성일 '+today+'</div>'
+    +'<img src="'+img+'">'
+    +'<table>'+tr+'</table>'
+    +'<div class="note">※ Q = 0.2778 · C · I · A (합리식). 유역은 수치지형도 등고선·표고점으로 만든 DEM의 D8 흐름분석으로 자동 추출하였습니다. 결과는 검토자 확인 후 사용하시기 바랍니다.</div>'
+    +'</body></html>';
+  var w=window.open('','_blank');
+  if(!w){ toast('팝업이 차단됐어요. 팝업 허용 후 다시.','err'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+  toast('보고서 창 열림 · 인쇄→PDF로 저장','ok');
+}
+
+/* ---------- 3D 입체 보기 (three.js CDN 지연로드) ---------- */
+function demPositions(dem, exag){
+  var cols=dem.cols, rows=dem.rows, z=dem.z, cell=dem.cell;
+  var zmin=Infinity,zmax=-Infinity;
+  for(var i=0;i<z.length;i++){ var v=z[i]; if(v===v){ if(v<zmin)zmin=v; if(v>zmax)zmax=v; } }
+  if(zmin===Infinity){ zmin=0; zmax=1; }
+  var w=(cols-1)*cell, h=(rows-1)*cell, pos=new Float32Array(cols*rows*3);
+  for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){
+    var i=r*cols+c, v=z[i]; if(v!==v) v=zmin;
+    var o=i*3;
+    pos[o]=c*cell - w/2;
+    pos[o+1]=(v-zmin)*exag;
+    pos[o+2]=-(r*cell - h/2);
+  }
+  return {pos:pos, w:w, h:h, zmin:zmin, zmax:zmax};
+}
+function gridIndices(cols, rows){
+  var idx=[];
+  for(var r=0;r<rows-1;r++)for(var c=0;c<cols-1;c++){
+    var a=r*cols+c, b=a+1, d=a+cols, e=d+1;
+    idx.push(a,d,b, b,d,e);
+  }
+  return idx;
+}
+var _three=null;
+function ensureThree(cb){
+  if(typeof THREE!=='undefined'){ cb(true); return; }
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  s.onload=function(){ cb(typeof THREE!=='undefined'); };
+  s.onerror=function(){ cb(false); };
+  document.head.appendChild(s);
+}
+function open3D(){
+  if(!S.dem){ toast('먼저 DEM을 생성하세요','err'); return; }
+  document.getElementById('d3dlay').style.display='';
+  document.getElementById('d3dmsg').textContent='3D 불러오는 중…';
+  ensureThree(function(ok){
+    if(!ok){ document.getElementById('d3dmsg').textContent='3D 라이브러리 로드 실패 — 네트워크/차단 확인'; return; }
+    document.getElementById('d3dmsg').textContent='';
+    try{ init3DScene(); }catch(e){ document.getElementById('d3dmsg').textContent='3D 표시 오류: '+e.message; }
+  });
+}
+function close3D(){
+  document.getElementById('d3dlay').style.display='none';
+  if(_three){
+    if(_three.raf) cancelAnimationFrame(_three.raf);
+    if(_three.onResize) window.removeEventListener('resize',_three.onResize);
+    if(_three.onUp) window.removeEventListener('mouseup',_three.onUp);
+    if(_three.renderer) _three.renderer.dispose();
+    _three=null;
+  }
+}
+function init3DScene(){
+  var lay=document.getElementById('d3dlay'), canvas=document.getElementById('d3dcanvas');
+  var W=lay.clientWidth||800, H=lay.clientHeight||600, dem=S.dem, exag=2.2;
+  var hp=demPositions(dem, exag);
+  var geo=new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(hp.pos,3));
+  geo.setIndex(gridIndices(dem.cols, dem.rows));
+  geo.computeVertexNormals();
+  var mesh=new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:0x59657d, side:THREE.DoubleSide}));
+  var scene=new THREE.Scene(); scene.background=new THREE.Color(0x06080f); scene.add(mesh);
+  var dir=new THREE.DirectionalLight(0xffffff,0.95); dir.position.set(-1,1.4,0.6); scene.add(dir);
+  scene.add(new THREE.AmbientLight(0x556070,0.55));
+  var camera=new THREE.PerspectiveCamera(45, W/H, 1, 1e7);
+  var renderer=new THREE.WebGLRenderer({canvas:canvas, antialias:true});
+  renderer.setPixelRatio(window.devicePixelRatio||1); renderer.setSize(W,H,false);
+  var ext=Math.max(hp.w,hp.h), rad=ext*1.1, theta=0.7, phi=0.95;
+  var tgt=new THREE.Vector3(0,(hp.zmax-hp.zmin)*exag*0.3,0);
+  function cam(){ camera.position.set(tgt.x+rad*Math.sin(phi)*Math.sin(theta), tgt.y+rad*Math.cos(phi), tgt.z+rad*Math.sin(phi)*Math.cos(theta)); camera.lookAt(tgt); }
+  cam();
+  var drag=false,lx=0,ly=0;
+  canvas.onmousedown=function(e){ drag=true; lx=e.clientX; ly=e.clientY; };
+  canvas.onmousemove=function(e){ if(!drag)return; theta-=(e.clientX-lx)*0.006; phi=Math.max(0.15,Math.min(Math.PI-0.15, phi-(e.clientY-ly)*0.006)); lx=e.clientX; ly=e.clientY; cam(); };
+  canvas.onwheel=function(e){ e.preventDefault(); rad*=(e.deltaY>0?1.1:0.9); rad=Math.max(ext*0.2,Math.min(ext*4,rad)); cam(); };
+  var onUp=function(){ drag=false; };
+  var onResize=function(){ var w=lay.clientWidth,h=lay.clientHeight; camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h,false); };
+  window.addEventListener('mouseup', onUp);
+  window.addEventListener('resize', onResize);
+  _three={renderer:renderer, raf:0, onResize:onResize, onUp:onUp};
+  (function loop(){ _three.raf=requestAnimationFrame(loop); renderer.render(scene,camera); })();
 }
 
 /* ---------- 토스트 ---------- */
