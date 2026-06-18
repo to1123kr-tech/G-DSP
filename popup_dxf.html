@@ -398,6 +398,7 @@ function fmtSize(b) {
 // 탭 1: 수치지형도변환 (R12)
 // ============================================================
 var ngiiFiles = [];
+var ngiiConverting = false;
 var ngiiDrop = document.getElementById('ngiiDrop');
 var ngiiInput = document.getElementById('ngiiInput');
 var ngiiList = document.getElementById('ngiiList');
@@ -459,55 +460,62 @@ function ngiiRender(){
 }
 
 async function ngiiConvert(mode){
+  if (ngiiConverting) return;            // 중복 실행 방지 (느릴 때 버튼 재클릭 대비)
+  ngiiConverting = true;
   ngiiBtnOriginal.disabled = true;
   ngiiBtnAnalysis.disabled = true;
   ngiiProgress.classList.add('on');
 
-  for (var i = 0; i < ngiiFiles.length; i++) {
-    if (ngiiFiles[i].status === 'done') continue;
-    ngiiFiles[i].status = 'prog'; ngiiRender();
-    ngiiFill.style.width = Math.round((i / ngiiFiles.length) * 100) + '%';
+  try {
+    for (var i = 0; i < ngiiFiles.length; i++) {
+      var item = ngiiFiles[i];           // 객체를 한 번만 잡아둠 (await 중 배열 변경돼도 안전)
+      if (!item || item.status === 'done') continue;
+      item.status = 'prog'; ngiiRender();
+      ngiiFill.style.width = Math.round((i / ngiiFiles.length) * 100) + '%';
 
-    try {
-      var fd = new FormData();
-      fd.append('file', ngiiFiles[i].file);
-      fd.append('mode', mode);
+      try {
+        var fd = new FormData();
+        fd.append('file', item.file);
+        fd.append('mode', mode);
 
-      var res = await fetch('/api/convert-dxf', { method: 'POST', body: fd });
-      if (!res.ok) {
-        var err = await res.json();
-        throw new Error(err.error || '서버 오류');
+        var res = await fetch('/api/convert-dxf', { method: 'POST', body: fd });
+        if (!res.ok) {
+          var err = await res.json();
+          throw new Error(err.error || '서버 오류');
+        }
+
+        var srcVer = res.headers.get('X-Src-Version') || '?';
+        var keptLayers = res.headers.get('X-Kept-Layers') || '?';
+        var copied = res.headers.get('X-Copied-Entities') || '?';
+        item.stats = srcVer + ' → R12 · 레이어 ' + keptLayers + ' · 객체 ' + copied;
+
+        var blob = await res.blob();
+        var suffix = mode === 'original' ? '_R12' : '_분석용';
+        var outName = item.file.name.replace(/\.dxf$/i, suffix + '.dxf');
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = outName; a.click();
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+
+        item.status = 'done';
+      } catch (e) {
+        console.error(e);
+        item.status = 'fail';
+        item.stats = e.message;
       }
-
-      var srcVer = res.headers.get('X-Src-Version') || '?';
-      var keptLayers = res.headers.get('X-Kept-Layers') || '?';
-      var copied = res.headers.get('X-Copied-Entities') || '?';
-      ngiiFiles[i].stats = srcVer + ' → R12 · 레이어 ' + keptLayers + ' · 객체 ' + copied;
-
-      var blob = await res.blob();
-      var suffix = mode === 'original' ? '_R12' : '_분석용';
-      var outName = ngiiFiles[i].file.name.replace(/\.dxf$/i, suffix + '.dxf');
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url; a.download = outName; a.click();
-      setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
-
-      ngiiFiles[i].status = 'done';
-    } catch (e) {
-      console.error(e);
-      ngiiFiles[i].status = 'fail';
-      ngiiFiles[i].stats = e.message;
+      ngiiRender();
     }
-    ngiiRender();
-  }
 
-  ngiiFill.style.width = '100%';
-  setTimeout(function(){
-    ngiiProgress.classList.remove('on');
-    ngiiFill.style.width = '0%';
-  }, 1000);
-  ngiiUpdateBtns();
-  toast('변환 완료', 'ok');
+    ngiiFill.style.width = '100%';
+    setTimeout(function(){
+      ngiiProgress.classList.remove('on');
+      ngiiFill.style.width = '0%';
+    }, 1000);
+    toast('변환 완료', 'ok');
+  } finally {
+    ngiiConverting = false;
+    ngiiUpdateBtns();
+  }
 }
 
 ngiiBtnOriginal.addEventListener('click', function(){ ngiiConvert('original'); });
