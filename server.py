@@ -683,19 +683,48 @@ def convert_dxf():
         return jsonify({"error": "파일이 없습니다"}), 400
     mode = request.form.get("mode", "analysis")
 
-    # 원본 읽기 (recover.read = 인코딩 무관 + 손상 파일 복구)
+    # 원본 읽기 (속도/메모리 최적화 하이브리드)
+    #  1) ezdxf.readfile(임시파일): 빠르고 메모리 적게 씀(1GB 서버 스왑 방지).
+    #     $DWGCODEPAGE로 인코딩 자동결정(cp949 포함) → 한글 안 깨짐.
+    #  2) recover.read: readfile 실패/빈결과일 때만. 손상파일 복구(느리지만 안전).
+    #  3) 텍스트 디코드: 최후 폴백.
     raw = f.read()
     doc = None
+    import tempfile as _tempfile_ngii
+    import os as _os_ngii
+    _tmp_ngii = None
     try:
-        from ezdxf import recover
-        doc, _auditor = recover.read(io.BytesIO(raw))
+        with _tempfile_ngii.NamedTemporaryFile(suffix='.dxf', delete=False) as _tf:
+            _tf.write(raw)
+            _tmp_ngii = _tf.name
+        doc = ezdxf.readfile(_tmp_ngii)
+        if sum(1 for _ in doc.modelspace()) == 0:
+            doc = None  # 빈 결과 → 폴백
     except Exception:
-        # 폴백: 텍스트 디코드 후 읽기
+        doc = None
+    finally:
+        if _tmp_ngii:
+            try:
+                _os_ngii.unlink(_tmp_ngii)
+            except Exception:
+                pass
+    if doc is None:
+        # 폴백1: recover (손상파일 복구 + 인코딩 무관)
+        try:
+            from ezdxf import recover
+            doc, _auditor = recover.read(io.BytesIO(raw))
+            if sum(1 for _ in doc.modelspace()) == 0:
+                doc = None
+        except Exception:
+            doc = None
+    if doc is None:
+        # 폴백2: 텍스트 디코드 후 읽기
         for enc in ("utf-8", "cp949", "euc-kr", "latin-1"):
             try:
                 doc = ezdxf.read(io.StringIO(raw.decode(enc)))
                 if sum(1 for _ in doc.modelspace()) > 0:
                     break
+                doc = None
             except Exception:
                 continue
     if doc is None:
