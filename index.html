@@ -4454,8 +4454,12 @@
           </div>
           <!-- 지도 영역 (캔버스 + 안내) -->
           <div id="jdMapArea" style="position:relative;background:#030810;overflow:hidden;cursor:crosshair">
-            <iframe id="jdMapIframe" src="https://map.ngii.go.kr/ms/map/NlipMap.do"
-              style="position:absolute;inset:0;width:100%;height:100%;border:none;z-index:2" allowfullscreen></iframe>
+            <!-- 국토정보플랫폼은 보안정책(CSP frame-ancestors 'self')으로 iframe 임베드 불가 → 새 탭 안내 -->
+            <div style="position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px;pointer-events:none">
+              <div style="font-size:34px">🔒</div>
+              <div style="font-size:13px;color:var(--txt2);font-weight:700;line-height:1.5">국토정보플랫폼은 보안 정책상<br>이 화면 안에 띄울 수 없습니다</div>
+              <div style="font-size:11px;color:var(--txt3);line-height:1.5">아래 <b style="color:var(--blue)">국토정보플랫폼 열기</b> 버튼으로<br>새 탭에서 이용하세요</div>
+            </div>
             <!-- 선택 영역 오버레이 -->
             <canvas id="jdCanvas"
               style="position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:all"></canvas>
