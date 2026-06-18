@@ -932,6 +932,290 @@ def _ngii_copy_block_entity(e, target):
         pass
 
 
+# ============================================================
+#  산e랑 공간정보 변환 (DXF 폴리라인 → SHP/GPX)
+#  - popup_dxf.html "산e랑" 탭의 /api/sanrang/list, /api/sanrang/convert 처리
+#  - 원본 데스크톱앱(산e랑_변환기_v1.1) 로직 흡수:
+#    쓰레기좌표 제거(5σ) + 중복 폴리라인 제거(85% 겹침) + 면적순 정렬
+#  - LWPOLYLINE + POLYLINE(2D) 둘 다 인식 (R12 변환본 호환)
+#  - 디스크 출력 대신 메모리(BytesIO)에서 처리 → HTTP 응답으로 반환
+#  - pyshp(shapefile)는 SHP 변환 함수 안에서 import (미설치여도 서버는 정상 기동)
+# ============================================================
+import zipfile as _zip_san
+
+_SAN_PRJ = {
+    "EPSG:5185": 'PROJCS["KGD2002 / West Belt 2010",GEOGCS["GCS_KGD2002",DATUM["Korean_Geodetic_Datum_2002",SPHEROID["GRS 1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",38],PARAMETER["central_meridian",125],PARAMETER["scale_factor",1],PARAMETER["false_easting",200000],PARAMETER["false_northing",600000],UNIT["metre",1]]',
+    "EPSG:5186": 'PROJCS["KGD2002 / Central Belt 2010",GEOGCS["GCS_KGD2002",DATUM["Korean_Geodetic_Datum_2002",SPHEROID["GRS 1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",38],PARAMETER["central_meridian",127],PARAMETER["scale_factor",1],PARAMETER["false_easting",200000],PARAMETER["false_northing",600000],UNIT["metre",1]]',
+    "EPSG:5187": 'PROJCS["KGD2002 / East Belt 2010",GEOGCS["GCS_KGD2002",DATUM["Korean_Geodetic_Datum_2002",SPHEROID["GRS 1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",38],PARAMETER["central_meridian",129],PARAMETER["scale_factor",1],PARAMETER["false_easting",200000],PARAMETER["false_northing",600000],UNIT["metre",1]]',
+    "EPSG:5188": 'PROJCS["KGD2002 / East Sea Belt 2010",GEOGCS["GCS_KGD2002",DATUM["Korean_Geodetic_Datum_2002",SPHEROID["GRS 1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",38],PARAMETER["central_meridian",131],PARAMETER["scale_factor",1],PARAMETER["false_easting",200000],PARAMETER["false_northing",600000],UNIT["metre",1]]',
+}
+
+
+def _san_remove_junk(coords):
+    """쓰레기 좌표 제거: TM 정상범위(abs>=1000)로 통계 세우고 5σ 밖 이상치 제거."""
+    if len(coords) < 4:
+        return coords
+    pts = coords[:-1] if coords[0] == coords[-1] else list(coords)
+    ref = [(x, y) for x, y in pts if abs(x) >= 1000 and abs(y) >= 1000]
+    if len(ref) < 3:
+        return coords
+    cx = sum(x for x, y in ref) / len(ref)
+    cy = sum(y for x, y in ref) / len(ref)
+    sx = math.sqrt(sum((x - cx) ** 2 for x, y in ref) / len(ref)) or 1.0
+    sy = math.sqrt(sum((y - cy) ** 2 for x, y in ref) / len(ref)) or 1.0
+    TH = 5.0
+    cleaned = [(x, y) for x, y in pts
+               if abs(x - cx) <= TH * sx and abs(y - cy) <= TH * sy]
+    if len(cleaned) < 3:
+        return coords
+    if cleaned[0] != cleaned[-1]:
+        cleaned.append(cleaned[0])
+    return cleaned
+
+
+def _san_make_sig(coords, precision=1):
+    return frozenset(
+        (round(x, precision), round(y, precision))
+        for x, y in (coords[:-1] if coords[0] == coords[-1] else coords)
+    )
+
+
+def _san_deduplicate(polylines, precision=1):
+    """중복 폴리라인 제거: 정상좌표 집합 85%+ 겹치면 유효좌표 적은 쪽 제거."""
+    sigs = [_san_make_sig(p["coords"], precision) for p in polylines]
+    remove = set()
+    n = len(polylines)
+
+    def valid_n(p):
+        return sum(1 for x, y in p["coords"][:-1]
+                   if abs(x) >= 1000 and abs(y) >= 1000)
+
+    for i in range(n):
+        if i in remove:
+            continue
+        for j in range(i + 1, n):
+            if j in remove:
+                continue
+            si, sj = sigs[i], sigs[j]
+            smaller = si if len(si) <= len(sj) else sj
+            larger = sj if len(si) <= len(sj) else si
+            overlap = len(smaller & larger) / max(len(smaller), 1)
+            if overlap >= 0.85:
+                if valid_n(polylines[i]) >= valid_n(polylines[j]):
+                    remove.add(j)
+                else:
+                    remove.add(i)
+                    break
+    return [p for idx, p in enumerate(polylines) if idx not in remove]
+
+
+def _san_shoelace(coords):
+    area = 0.0
+    for i in range(len(coords) - 1):
+        x1, y1 = coords[i]
+        x2, y2 = coords[i + 1]
+        area += x1 * y2 - x2 * y1
+    return abs(area) / 2.0
+
+
+def _san_read_doc(raw):
+    """업로드 bytes → ezdxf 문서 (readfile 우선, recover 폴백)."""
+    import tempfile
+    doc, tmp = None, None
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.dxf', delete=False) as tf:
+            tf.write(raw); tmp = tf.name
+        doc = ezdxf.readfile(tmp)
+        if sum(1 for _ in doc.modelspace()) == 0:
+            doc = None
+    except Exception:
+        doc = None
+    finally:
+        if tmp:
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
+    if doc is None:
+        try:
+            from ezdxf import recover
+            doc, _au = recover.read(io.BytesIO(raw))
+            if sum(1 for _ in doc.modelspace()) == 0:
+                doc = None
+        except Exception:
+            doc = None
+    if doc is None:
+        for enc in ("utf-8", "cp949", "euc-kr", "latin-1"):
+            try:
+                doc = ezdxf.read(io.StringIO(raw.decode(enc)))
+                if sum(1 for _ in doc.modelspace()) > 0:
+                    break
+                doc = None
+            except Exception:
+                continue
+    return doc
+
+
+def _san_get_polylines(doc):
+    """DXF → LWPOLYLINE+POLYLINE 추출 → 쓰레기제거 → 중복제거 → 면적 내림차순."""
+    msp = doc.modelspace()
+    result = []
+    for e in msp:
+        t = e.dxftype()
+        if t == "LWPOLYLINE":
+            raw = [(p[0], p[1]) for p in e.get_points("xy")]
+        elif t == "POLYLINE":
+            try:
+                raw = [(v.dxf.location.x, v.dxf.location.y) for v in e.vertices]
+            except Exception:
+                continue
+        else:
+            continue
+        if len(raw) < 3:
+            continue
+        coords = _san_remove_junk(raw)
+        if coords[0] != coords[-1]:
+            coords = list(coords) + [coords[0]]
+        layer = getattr(e.dxf, "layer", "0")
+        result.append({
+            "coords": coords,
+            "area": _san_shoelace(coords),
+            "n": len(coords) - 1,
+            "layer": layer,
+        })
+    if not result:
+        raise Exception("DXF에서 폴리라인을 찾을 수 없습니다.")
+    result.sort(key=lambda x: x["area"], reverse=True)
+    return _san_deduplicate(result)
+
+
+def _san_make_shp_zip(coords_list, epsg):
+    """선택 폴리곤들 → 단일 shp(폴리곤 여러 레코드) + prj → zip bytes."""
+    import shapefile  # pyshp (미설치 시 ImportError → 라우트에서 안내)
+    shp_io, shx_io, dbf_io = io.BytesIO(), io.BytesIO(), io.BytesIO()
+    w = shapefile.Writer(shp=shp_io, shx=shx_io, dbf=dbf_io,
+                         shapeType=shapefile.POLYGON)
+    w.field("id", "N")
+    for i, coords in enumerate(coords_list):
+        w.poly([[list(pt) for pt in coords]])
+        w.record(i + 1)
+    w.close()
+    prj = _SAN_PRJ.get(epsg, _SAN_PRJ["EPSG:5186"])
+    zbuf = io.BytesIO()
+    with _zip_san.ZipFile(zbuf, "w", _zip_san.ZIP_DEFLATED) as z:
+        z.writestr("공간정보.shp", shp_io.getvalue())
+        z.writestr("공간정보.shx", shx_io.getvalue())
+        z.writestr("공간정보.dbf", dbf_io.getvalue())
+        z.writestr("공간정보.prj", prj.encode("utf-8"))
+    return zbuf.getvalue()
+
+
+def _san_make_gpx(coords_list, epsg):
+    """선택 폴리곤들 → GPX(트랙 여러개, GDAL 3.10.2 형식) bytes. EPSG:4326 변환."""
+    t = Transformer.from_crs(epsg, "EPSG:4326", always_xy=True)
+    all_latlon = []
+    for coords in coords_list:
+        ll = []
+        for x, y in coords:
+            lon, lat = t.transform(x, y)
+            ll.append((lat, lon))
+        all_latlon.append(ll)
+    pts = [p for ll in all_latlon for p in ll]
+    min_lat = min(p[0] for p in pts); max_lat = max(p[0] for p in pts)
+    min_lon = min(p[1] for p in pts); max_lon = max(p[1] for p in pts)
+    lines = ['<?xml version="1.0"?>']
+    lines.append('<gpx version="1.1" creator="GDAL 3.10.2" '
+                 'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+                 'xmlns:ogr="http://osgeo.org/gdal" '
+                 'xmlns="http://www.topografix.com/GPX/1/1" '
+                 'xsi:schemaLocation="http://www.topografix.com/GPX/1/1 '
+                 'http://www.topografix.com/GPX/1/1/gpx.xsd">')
+    lines.append('<metadata>')
+    lines.append('<bounds minlat="%.15f" minlon="%.15f" maxlat="%.15f" maxlon="%.15f"/>'
+                 % (min_lat, min_lon, max_lat, max_lon))
+    lines.append('</metadata>')
+    for ll in all_latlon:
+        lines.append('<trk>')
+        lines.append('  <trkseg>')
+        for lat, lon in ll:
+            lines.append('    <trkpt lat="%.15f" lon="%.15f">' % (lat, lon))
+            lines.append('    </trkpt>')
+        lines.append('  </trkseg>')
+        lines.append('</trk>')
+    lines.append('</gpx>')
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+@app.route("/api/sanrang/list", methods=["POST", "OPTIONS"])
+def sanrang_list():
+    if request.method == "OPTIONS":
+        return make_response("", 204)
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "파일이 없습니다"}), 400
+    try:
+        doc = _san_read_doc(f.read())
+        if doc is None:
+            return jsonify({"error": "DXF를 읽을 수 없습니다"}), 400
+        polys = _san_get_polylines(doc)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    out = [{"idx": i, "area": round(p["area"], 1), "n": p["n"], "layer": p["layer"]}
+           for i, p in enumerate(polys)]
+    return jsonify({"polylines": out})
+
+
+@app.route("/api/sanrang/convert", methods=["POST", "OPTIONS"])
+def sanrang_convert():
+    if request.method == "OPTIONS":
+        return make_response("", 204)
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "파일이 없습니다"}), 400
+    epsg = request.form.get("epsg", "EPSG:5186")
+    fmt = request.form.get("format", "shp")
+    idx_raw = request.form.get("indices", "")
+    try:
+        indices = [int(x) for x in idx_raw.split(",") if x.strip() != ""]
+    except ValueError:
+        return jsonify({"error": "잘못된 선택 정보"}), 400
+    if not indices:
+        return jsonify({"error": "변환할 폴리라인을 선택하세요"}), 400
+    try:
+        doc = _san_read_doc(f.read())
+        if doc is None:
+            return jsonify({"error": "DXF를 읽을 수 없습니다"}), 400
+        polys = _san_get_polylines(doc)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    sel = [polys[i]["coords"] for i in indices if 0 <= i < len(polys)]
+    if not sel:
+        return jsonify({"error": "선택한 폴리라인을 찾을 수 없습니다"}), 400
+    try:
+        if fmt == "gpx":
+            data = _san_make_gpx(sel, epsg)
+            resp = make_response(send_file(
+                io.BytesIO(data), mimetype="application/gpx+xml",
+                as_attachment=True, download_name="공간정보.gpx"))
+        else:
+            data = _san_make_shp_zip(sel, epsg)
+            resp = make_response(send_file(
+                io.BytesIO(data), mimetype="application/zip",
+                as_attachment=True, download_name="공간정보.zip"))
+        logger.info(f"[SANRANG] convert fmt={fmt} epsg={epsg} zones={len(sel)}")
+        return resp
+    except ImportError:
+        return jsonify({"error": "서버에 pyshp 미설치 — 'pip install pyshp' 필요"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/favicon.ico')
+def favicon():
+    # 브라우저 자동요청 — 아이콘 없음(204)으로 404 콘솔에러 제거
+    return ("", 204)
+
+
 @app.route('/api/health')
 def health():
     return jsonify({"status": "ok", "message": "G-DSP 서버 실행 중", "version": "3.0", "ok": True})
