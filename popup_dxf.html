@@ -293,6 +293,24 @@ select {
         </label>
       </div>
 
+      <div class="section-title">처리 방식</div>
+      <div class="mode-grid">
+        <label class="mode-card on" data-merge="merge">
+          <input type="radio" name="sanMerge" value="merge" checked>
+          <div>
+            <div class="mode-title">📄 하나로 합치기</div>
+            <div class="mode-sub">여러 구역을<br>파일 1개로</div>
+          </div>
+        </label>
+        <label class="mode-card" data-merge="individual">
+          <input type="radio" name="sanMerge" value="individual">
+          <div>
+            <div class="mode-title">📂 개별로 나누기</div>
+            <div class="mode-sub">구역마다 따로<br>(zip로 묶음)</div>
+          </div>
+        </label>
+      </div>
+
       <div class="dropzone" id="sanDrop">
         <div class="ic">📂</div>
         <div class="lb">DXF 파일을 드래그하거나 클릭</div>
@@ -315,6 +333,7 @@ select {
       <div class="progress" id="sanProgress"><div class="progress-fill" id="sanFill"></div></div>
 
       <button class="btn-main" id="sanBtn" disabled>⬇ 선택 폴리라인 변환 다운로드</button>
+      <button class="btn-main" id="sanPreviewBtn" disabled style="margin-top:8px;background:var(--card);color:var(--txt2);border:1px solid var(--line2)">🗺 결과 보기 (지도)</button>
 
       <div class="info-box">
         <b>ℹ️ 변환 정보</b><br>
@@ -521,6 +540,7 @@ var sanPolylines = [];
 var sanDrop = document.getElementById('sanDrop');
 var sanInput = document.getElementById('sanInput');
 var sanBtn = document.getElementById('sanBtn');
+var sanPreviewBtn = document.getElementById('sanPreviewBtn');
 var sanProgress = document.getElementById('sanProgress');
 var sanFill = document.getElementById('sanFill');
 
@@ -596,6 +616,7 @@ function sanSelectAll(check){
 function sanUpdateBtn(){
   var n = document.querySelectorAll('.san-poly-chk:checked').length;
   sanBtn.disabled = (n === 0);
+  sanPreviewBtn.disabled = (n === 0);
   sanBtn.textContent = n > 0
     ? '⬇ ' + n + '개 폴리라인 변환 다운로드'
     : '⬇ 선택 폴리라인 변환 다운로드';
@@ -612,6 +633,7 @@ sanBtn.addEventListener('click', async function(){
   var indices = [].map.call(checked, function(c){ return c.value; }).join(',');
   var epsg = document.getElementById('sanEpsg').value;
   var fmt = document.querySelector('input[name="sanFmt"]:checked').value;
+  var merge = document.querySelector('input[name="sanMerge"]:checked').value;
 
   sanBtn.disabled = true;
   sanProgress.classList.add('on');
@@ -623,6 +645,7 @@ sanBtn.addEventListener('click', async function(){
     fd.append('epsg', epsg);
     fd.append('format', fmt);
     fd.append('indices', indices);
+    fd.append('merge', merge);
 
     sanFill.style.width = '60%';
 
@@ -634,7 +657,7 @@ sanBtn.addEventListener('click', async function(){
 
     var blob = await res.blob();
     var baseName = sanFile.name.replace(/\.dxf$/i, '_변환');
-    var ext = fmt === 'shp' ? '.zip' : '.gpx';
+    var ext = (merge === 'merge' && fmt === 'gpx') ? '.gpx' : '.zip';
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = baseName + ext; a.click();
@@ -653,6 +676,78 @@ sanBtn.addEventListener('click', async function(){
     sanBtn.disabled = false;
   }
 });
+
+sanPreviewBtn.addEventListener('click', async function(){
+  if (!sanFile) return;
+  var checked = document.querySelectorAll('.san-poly-chk:checked');
+  if (checked.length === 0) { toast('표시할 폴리라인을 선택하세요', 'err'); return; }
+  var indices = [].map.call(checked, function(c){ return c.value; }).join(',');
+  var epsg = document.getElementById('sanEpsg').value;
+
+  sanPreviewBtn.disabled = true;
+  var prevLabel = sanPreviewBtn.textContent;
+  sanPreviewBtn.textContent = '지도 준비 중...';
+  try {
+    var fd = new FormData();
+    fd.append('file', sanFile);
+    fd.append('epsg', epsg);
+    fd.append('indices', indices);
+    var res = await fetch('/api/sanrang/preview', { method: 'POST', body: fd });
+    if (!res.ok) { var err = await res.json(); throw new Error(err.error || '서버 오류'); }
+    var data = await res.json();
+    sanOpenPreviewMap(data.polygons || []);
+  } catch (e) {
+    console.error(e);
+    toast('❌ ' + e.message, 'err');
+  } finally {
+    sanPreviewBtn.textContent = prevLabel;
+    sanPreviewBtn.disabled = false;
+  }
+});
+
+function sanOpenPreviewMap(polygons){
+  if (!polygons.length) { toast('표시할 폴리곤이 없습니다', 'err'); return; }
+  var colors = ["#4f8ef7","#34d399","#f7c94f","#f87171","#a78bfa","#fb923c","#22d3ee","#e879f9","#a3e635","#f43f5e"];
+  var totalPts = polygons.reduce(function(s,p){ return s + p.length; }, 0);
+  var coordsJson = JSON.stringify(polygons);
+  var colorsJson = JSON.stringify(colors);
+  var html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>산e랑 공간정보 결과확인</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{background:#0f1117;font-family:sans-serif}#map{height:100vh}
+#info{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:rgba(15,17,23,.92);color:#e8eaf0;padding:10px 22px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid #2e3347;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+#legend{position:fixed;bottom:24px;left:16px;background:rgba(15,17,23,.92);color:#e8eaf0;padding:14px 18px;border-radius:12px;font-size:12px;border:1px solid #2e3347;z-index:999;max-height:60vh;overflow-y:auto}
+#legend h4{font-size:11px;color:#6b7280;letter-spacing:1px;margin-bottom:8px}
+.leg-item{display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer}.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
+</style></head><body>
+<div id="info">산e랑 결과확인 · 구역 <span style="color:#4f8ef7">${polygons.length}</span>개 · 총 꼭짓점 <span style="color:#f7c94f">${totalPts}</span>개</div>
+<div id="legend"><h4>구역 목록</h4><div id="leg-items"></div></div>
+<div id="map"></div>
+<script>
+var allCoords=${coordsJson};
+var colors=${colorsJson};
+var map=L.map("map",{zoomControl:true}).setView(allCoords[0][0],15);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);
+var allPolys=[],legEl=document.getElementById("leg-items");
+allCoords.forEach(function(coords,idx){
+  var col=colors[idx%colors.length];
+  var poly=L.polygon(coords,{color:col,weight:2.5,fillColor:col,fillOpacity:0.12}).addTo(map);
+  poly.bindTooltip("구역"+(idx+1),{permanent:false,direction:"center"});
+  allPolys.push(poly);
+  coords.forEach(function(c,i){ if(i===coords.length-1)return; L.circleMarker(c,{radius:3.5,color:col,fillColor:col,fillOpacity:1,weight:1}).addTo(map); });
+  var item=document.createElement("div"); item.className="leg-item";
+  item.innerHTML='<span class="dot" style="background:'+col+'"></span><span>구역'+(idx+1)+' ('+(coords.length-1)+'꼭짓점)</span>';
+  item.onclick=function(){ map.fitBounds(poly.getBounds(),{padding:[40,40]}); };
+  legEl.appendChild(item);
+});
+var group=L.featureGroup(allPolys); map.fitBounds(group.getBounds(),{padding:[40,40]});
+<\/script></body></html>`;
+  var w = window.open('', '_blank');
+  if (!w) { toast('팝업이 차단됐어요 — 팝업 허용 후 다시 시도하세요', 'err'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
 
 </script>
 </body>
