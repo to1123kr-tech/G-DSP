@@ -1089,24 +1089,51 @@ def _san_get_polylines(doc):
     return _san_deduplicate(result)
 
 
-def _san_make_shp_zip(coords_list, epsg):
-    """선택 폴리곤들 → 단일 shp(폴리곤 여러 레코드) + prj → zip bytes."""
-    import shapefile  # pyshp (미설치 시 ImportError → 라우트에서 안내)
+def _san_make_shp_one(coords, epsg):
+    """폴리곤 1개 → {shp,shx,dbf,prj} 바이트."""
+    import shapefile
     shp_io, shx_io, dbf_io = io.BytesIO(), io.BytesIO(), io.BytesIO()
     w = shapefile.Writer(shp=shp_io, shx=shx_io, dbf=dbf_io,
                          shapeType=shapefile.POLYGON)
     w.field("id", "N")
-    for i, coords in enumerate(coords_list):
-        w.poly([[list(pt) for pt in coords]])
-        w.record(i + 1)
+    w.poly([[list(pt) for pt in coords]])
+    w.record(1)
     w.close()
-    prj = _SAN_PRJ.get(epsg, _SAN_PRJ["EPSG:5186"])
+    return {"shp": shp_io.getvalue(), "shx": shx_io.getvalue(),
+            "dbf": dbf_io.getvalue(),
+            "prj": _SAN_PRJ.get(epsg, _SAN_PRJ["EPSG:5186"]).encode("utf-8")}
+
+
+def _san_make_shp_zip(coords_list, epsg, merge=True):
+    """폴리곤들 → SHP zip bytes.
+    merge=True : 한 shp 안에 폴리곤 여러개 (공간정보.*)
+    merge=False: 구역별 따로 (공간정보_1.*, 공간정보_2.* ...)
+    """
+    import shapefile  # pyshp (미설치 시 ImportError → 라우트에서 안내)
     zbuf = io.BytesIO()
     with _zip_san.ZipFile(zbuf, "w", _zip_san.ZIP_DEFLATED) as z:
-        z.writestr("공간정보.shp", shp_io.getvalue())
-        z.writestr("공간정보.shx", shx_io.getvalue())
-        z.writestr("공간정보.dbf", dbf_io.getvalue())
-        z.writestr("공간정보.prj", prj.encode("utf-8"))
+        if merge:
+            shp_io, shx_io, dbf_io = io.BytesIO(), io.BytesIO(), io.BytesIO()
+            w = shapefile.Writer(shp=shp_io, shx=shx_io, dbf=dbf_io,
+                                 shapeType=shapefile.POLYGON)
+            w.field("id", "N")
+            for i, coords in enumerate(coords_list):
+                w.poly([[list(pt) for pt in coords]])
+                w.record(i + 1)
+            w.close()
+            prj = _SAN_PRJ.get(epsg, _SAN_PRJ["EPSG:5186"]).encode("utf-8")
+            z.writestr("공간정보.shp", shp_io.getvalue())
+            z.writestr("공간정보.shx", shx_io.getvalue())
+            z.writestr("공간정보.dbf", dbf_io.getvalue())
+            z.writestr("공간정보.prj", prj)
+        else:
+            for i, coords in enumerate(coords_list):
+                base = "공간정보" if len(coords_list) == 1 else "공간정보_%d" % (i + 1)
+                parts = _san_make_shp_one(coords, epsg)
+                z.writestr(base + ".shp", parts["shp"])
+                z.writestr(base + ".shx", parts["shx"])
+                z.writestr(base + ".dbf", parts["dbf"])
+                z.writestr(base + ".prj", parts["prj"])
     return zbuf.getvalue()
 
 
@@ -1165,6 +1192,29 @@ def sanrang_list():
     return jsonify({"polylines": out})
 
 
+def _san_make_gpx_zip(coords_list, epsg):
+    """구역별 GPX 따로 → zip bytes (공간정보_1.gpx ...)."""
+    zbuf = io.BytesIO()
+    with _zip_san.ZipFile(zbuf, "w", _zip_san.ZIP_DEFLATED) as z:
+        for i, coords in enumerate(coords_list):
+            base = "공간정보" if len(coords_list) == 1 else "공간정보_%d" % (i + 1)
+            z.writestr(base + ".gpx", _san_make_gpx([coords], epsg))
+    return zbuf.getvalue()
+
+
+def _san_selected_latlon(coords_list, epsg):
+    """선택 폴리곤들 → [[[lat,lon],...], ...] (미리보기 지도용)."""
+    t = Transformer.from_crs(epsg, "EPSG:4326", always_xy=True)
+    out = []
+    for coords in coords_list:
+        ring = []
+        for x, y in coords:
+            lon, lat = t.transform(x, y)
+            ring.append([lat, lon])
+        out.append(ring)
+    return out
+
+
 @app.route("/api/sanrang/convert", methods=["POST", "OPTIONS"])
 def sanrang_convert():
     if request.method == "OPTIONS":
@@ -1174,6 +1224,7 @@ def sanrang_convert():
         return jsonify({"error": "파일이 없습니다"}), 400
     epsg = request.form.get("epsg", "EPSG:5186")
     fmt = request.form.get("format", "shp")
+    merge = request.form.get("merge", "merge") != "individual"   # 기본 합치기
     idx_raw = request.form.get("indices", "")
     try:
         indices = [int(x) for x in idx_raw.split(",") if x.strip() != ""]
@@ -1193,21 +1244,57 @@ def sanrang_convert():
         return jsonify({"error": "선택한 폴리라인을 찾을 수 없습니다"}), 400
     try:
         if fmt == "gpx":
-            data = _san_make_gpx(sel, epsg)
-            resp = make_response(send_file(
-                io.BytesIO(data), mimetype="application/gpx+xml",
-                as_attachment=True, download_name="공간정보.gpx"))
+            if merge:
+                data = _san_make_gpx(sel, epsg)
+                resp = make_response(send_file(
+                    io.BytesIO(data), mimetype="application/gpx+xml",
+                    as_attachment=True, download_name="공간정보.gpx"))
+            else:
+                data = _san_make_gpx_zip(sel, epsg)
+                resp = make_response(send_file(
+                    io.BytesIO(data), mimetype="application/zip",
+                    as_attachment=True, download_name="공간정보_gpx.zip"))
         else:
-            data = _san_make_shp_zip(sel, epsg)
+            data = _san_make_shp_zip(sel, epsg, merge=merge)
             resp = make_response(send_file(
                 io.BytesIO(data), mimetype="application/zip",
                 as_attachment=True, download_name="공간정보.zip"))
-        logger.info(f"[SANRANG] convert fmt={fmt} epsg={epsg} zones={len(sel)}")
+        logger.info("[SANRANG] convert fmt=%s merge=%s epsg=%s zones=%d"
+                    % (fmt, merge, epsg, len(sel)))
         return resp
     except ImportError:
         return jsonify({"error": "서버에 pyshp 미설치 — 'pip install pyshp' 필요"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/sanrang/preview", methods=["POST", "OPTIONS"])
+def sanrang_preview():
+    if request.method == "OPTIONS":
+        return make_response("", 204)
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "파일이 없습니다"}), 400
+    epsg = request.form.get("epsg", "EPSG:5186")
+    idx_raw = request.form.get("indices", "")
+    try:
+        indices = [int(x) for x in idx_raw.split(",") if x.strip() != ""]
+    except ValueError:
+        return jsonify({"error": "잘못된 선택 정보"}), 400
+    try:
+        doc = _san_read_doc(f.read())
+        if doc is None:
+            return jsonify({"error": "DXF를 읽을 수 없습니다"}), 400
+        polys = _san_get_polylines(doc)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    if indices:
+        sel = [polys[i]["coords"] for i in indices if 0 <= i < len(polys)]
+    else:
+        sel = [p["coords"] for p in polys]
+    if not sel:
+        return jsonify({"error": "표시할 폴리라인이 없습니다"}), 400
+    return jsonify({"polygons": _san_selected_latlon(sel, epsg)})
 
 
 @app.route('/favicon.ico')
