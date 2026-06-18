@@ -245,11 +245,7 @@ select {
       <div class="file-list" id="ngiiList"></div>
       <div class="progress" id="ngiiProgress"><div class="progress-fill" id="ngiiFill"></div></div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px">
-        <button class="btn-main" id="ngiiBtnOriginal" disabled style="margin-top:0;background:var(--blue2)">
-          ⬇ 원본 다운<br>
-          <span style="font-size:11px;font-weight:400;opacity:0.85">모든 레이어 유지</span>
-        </button>
+      <div style="margin-top:16px">
         <button class="btn-main" id="ngiiBtnAnalysis" disabled style="margin-top:0">
           ⬇ 분석용 다운<br>
           <span style="font-size:11px;font-weight:400;opacity:0.85">등고선·표고점·하천·수계만</span>
@@ -402,7 +398,6 @@ var ngiiConverting = false;
 var ngiiDrop = document.getElementById('ngiiDrop');
 var ngiiInput = document.getElementById('ngiiInput');
 var ngiiList = document.getElementById('ngiiList');
-var ngiiBtnOriginal = document.getElementById('ngiiBtnOriginal');
 var ngiiBtnAnalysis = document.getElementById('ngiiBtnAnalysis');
 var ngiiProgress = document.getElementById('ngiiProgress');
 var ngiiFill = document.getElementById('ngiiFill');
@@ -441,7 +436,6 @@ function ngiiRemove(idx){
 
 function ngiiUpdateBtns(){
   var disabled = ngiiFiles.length === 0;
-  ngiiBtnOriginal.disabled = disabled;
   ngiiBtnAnalysis.disabled = disabled;
 }
 
@@ -462,7 +456,6 @@ function ngiiRender(){
 async function ngiiConvert(mode){
   if (ngiiConverting) return;            // 중복 실행 방지 (느릴 때 버튼 재클릭 대비)
   ngiiConverting = true;
-  ngiiBtnOriginal.disabled = true;
   ngiiBtnAnalysis.disabled = true;
   ngiiProgress.classList.add('on');
 
@@ -518,7 +511,6 @@ async function ngiiConvert(mode){
   }
 }
 
-ngiiBtnOriginal.addEventListener('click', function(){ ngiiConvert('original'); });
 ngiiBtnAnalysis.addEventListener('click', function(){ ngiiConvert('analysis'); });
 
 // ============================================================
