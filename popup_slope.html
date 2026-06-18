@@ -2,747 +2,1782 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>G-DSP — 경사도 분석</title>
-<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
+<title>G-DSP 경사도 검토</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
-/* ── G-DSP 헤더 변수 ── */
 :root{
-  --gdsp-bg:#0a0e1a;
-  --gdsp-hdr:#0d1628;
-  --gdsp-blue:#2563eb;
-  --gdsp-green:#00ff9f;
-  --gdsp-cyan:#00d4ff;
-  /* FlowFree 변수 */
-  --bg:#0a0e1a;--panel:#111827;--panel2:#1a2235;--border:#1e3a5f;
-  --accent:#00d4ff;--accent2:#00ff9f;--accent3:#ff6b35;
-  --text:#e2e8f0;--dim:#64748b;
+  --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --line:#1e2a44;
+  --txt:#e2e8f0; --dim:#64748b; --pri:#3b82f6; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444;
 }
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
-button,input,select{font:inherit;cursor:pointer;}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Malgun Gothic','맑은 고딕',sans-serif}
+body{background:var(--bg);color:var(--txt);height:100vh;overflow:hidden;display:flex;flex-direction:column}
 
-/* ── G-DSP 헤더 ── */
-.gdsp-hdr{
-  height:52px;display:flex;align-items:center;gap:12px;padding:0 16px;
-  background:linear-gradient(90deg,#050c18,#0a1628,#050c18);
-  border-bottom:2px solid transparent;
-  border-image:linear-gradient(90deg,#0a0e1a,#00d4ff,#00ff9f,#0a0e1a) 1;
-  flex-shrink:0;position:relative;overflow:hidden;
-}
-.gdsp-hdr::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(0,212,255,.04),transparent);animation:hshine 4s ease-in-out infinite;}
-@keyframes hshine{0%,100%{transform:translateX(-100%)}50%{transform:translateX(100%)}}
-.gdsp-logo{font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:900;letter-spacing:2px;background:linear-gradient(90deg,#00d4ff,#00ff9f);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-.gdsp-sep{width:1px;height:18px;background:#1e3a5f;flex-shrink:0;}
-.gdsp-title{font-size:13px;font-weight:700;color:var(--text);}
-.gdsp-sub{font-size:10px;color:var(--dim);}
+/* 헤더 */
+.hdr{height:46px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
+.hdr .logo{font-weight:900;font-size:15px;color:var(--pri);letter-spacing:1px}
+.hdr .ttl{font-size:13px;font-weight:700}
+.hdr .sp{flex:1}
+.hdr .stat{font-size:11px;color:var(--dim)}
 
-/* 검색창 */
-.gdsp-search{
-  flex:1;max-width:440px;height:34px;display:flex;
-  background:rgba(255,255,255,.05);border:1px solid var(--border);
-  border-radius:8px;overflow:hidden;transition:.15s;
-}
-.gdsp-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,212,255,.15);}
-.gs-lbl{padding:0 10px;display:flex;align-items:center;font-size:10px;font-weight:700;color:var(--accent);border-right:1px solid var(--border);white-space:nowrap;background:rgba(0,212,255,.05);}
-.gs-inp{flex:1;height:100%;padding:0 10px;border:none;outline:none;background:transparent;font-size:12px;color:var(--text);}
-.gs-inp::placeholder{color:var(--dim);font-size:11px;}
-.gs-btn{height:100%;padding:0 14px;background:linear-gradient(135deg,#1a57f0,#00d4ff);color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;}
+/* 본문 */
+.main{flex:1;display:flex;overflow:hidden}
 
-/* 상태 */
-.gdsp-stat{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);display:flex;gap:14px;}
-.gdsp-stat b{color:var(--accent2);}
-.gdsp-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
-.gdsp-btn{height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--dim);font-size:10px;font-weight:700;cursor:pointer;transition:.15s;}
-.gdsp-btn:hover{border-color:var(--accent);color:var(--accent);}
-.gdsp-btn.close{border-color:rgba(239,68,68,.3);color:#ef4444;}
-.gdsp-btn.close:hover{background:rgba(239,68,68,.1);}
+/* 좌측 패널 */
+.side{width:240px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.sec{padding:12px 14px;border-bottom:1px solid var(--line)}
+.sec-t{font-size:10px;color:var(--dim);letter-spacing:1.5px;margin-bottom:8px;font-weight:700}
 
-/* ── 레이아웃 — 3분할 ── */
-.app{display:flex;flex:1;overflow:hidden;}
+/* 드롭존 */
+.drop{border:2px dashed var(--line);border-radius:10px;padding:22px 10px;text-align:center;cursor:pointer;transition:.15s;font-size:12px;color:var(--dim)}
+.drop:hover,.drop.on{border-color:var(--pri);color:var(--pri);background:rgba(59,130,246,.06)}
+.drop .big{font-size:22px;margin-bottom:6px}
 
-/* 좌: DXF 컨트롤 */
-.lp{width:240px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
-.lscroll{overflow-y:auto;flex:1;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
-.sec{border-bottom:1px solid var(--border);padding:11px 13px;}
-.sec-title{font-size:10px;font-weight:700;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px;}
-.upz{border:2px dashed var(--border);border-radius:7px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(0,212,255,.03);}
-.upz:hover,.upz.over{border-color:var(--accent);background:rgba(0,212,255,.08);}
-.upz .ico{font-size:20px;margin-bottom:4px;}
-.upz p{font-size:11px;color:var(--dim);line-height:1.5;}
-.upz strong{color:var(--accent);font-size:12px;}
-#fi{display:none;}
-.btn{display:flex;align-items:center;gap:6px;width:100%;padding:7px 11px;border:1px solid var(--border);border-radius:5px;background:var(--panel2);color:var(--text);font-size:12px;cursor:pointer;transition:all .15s;margin-bottom:5px;}
-.btn:last-child{margin-bottom:0;}
-.btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.07);}
-.btn.pri{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.1);}
-.togrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
-.togrow:last-child{margin-bottom:0;}
-.toglabel{font-size:12px;}
-.tog{width:34px;height:18px;background:#374151;border-radius:9px;cursor:pointer;transition:background .2s;position:relative;flex-shrink:0;}
-.tog.on{background:var(--accent);}
-.tog::after{content:'';position:absolute;top:3px;left:3px;width:12px;height:12px;background:#fff;border-radius:50%;transition:left .2s;}
-.tog.on::after{left:19px;}
-.slrow{margin-bottom:7px;}
-.slrow label{font-size:11px;color:var(--dim);display:flex;justify-content:space-between;margin-bottom:3px;}
-.slrow label span{color:var(--accent);font-family:'JetBrains Mono',monospace;}
-input[type=range]{width:100%;-webkit-appearance:none;height:4px;background:var(--border);border-radius:2px;outline:none;}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;background:var(--accent);border-radius:50%;cursor:pointer;}
-.litem{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:4px;font-size:11px;margin-bottom:3px;background:var(--panel2);}
-.ldot{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
-.lname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.lcnt{color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:10px;}
-.pbar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:7px;display:none;}
-.pfill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width .3s;width:0%;}
-.legbox{margin-top:6px;}
-.legstrip{display:flex;height:11px;border-radius:3px;overflow:hidden;margin:3px 0;}
-.leglabel{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);font-family:'JetBrains Mono',monospace;}
+/* 감지 현황 */
+.det{display:flex;flex-direction:column;gap:6px}
+.det-row{display:flex;align-items:center;gap:8px;font-size:12px;padding:7px 9px;background:var(--panel2);border-radius:7px;border:1px solid var(--line)}
+.det-row .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex-shrink:0}
+.det-row.ok .dot{background:var(--ok)}
+.det-row .nm{flex:1}
+.det-row .ct{color:var(--dim);font-size:11px}
+.det-row.ok .ct{color:var(--ok);font-weight:700}
 
-/* 가운데: 카카오지도 */
-.map-panel{width:340px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);background:#050810;}
-.map-hdr{height:34px;display:flex;align-items:center;padding:0 10px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:var(--dim);letter-spacing:1px;flex-shrink:0;}
-.map-hdr-btns{margin-left:auto;display:flex;gap:4px;}
-.map-hdr-btn{height:22px;padding:0 8px;border-radius:4px;border:1px solid var(--border);background:var(--panel2);color:var(--dim);font-size:10px;cursor:pointer;transition:.15s;}
-.map-hdr-btn:hover{border-color:var(--accent);color:var(--accent);}
-.map-hdr-btn.on{background:rgba(0,212,255,.12);border-color:var(--accent);color:var(--accent);}
-#kakaoMapDiv{flex:1;width:100%;}
-.map-info{height:54px;border-top:1px solid var(--border);padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);line-height:1.9;flex-shrink:0;}
-.map-info span{color:var(--accent2);}
+/* 버튼 */
+.btn{width:100%;padding:11px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:.15s}
+.btn-pri{background:var(--pri);color:#fff}
+.btn-pri:hover{background:#2563eb}
+.btn-pri:disabled{background:var(--line);color:var(--dim);cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--dim);border:1px solid var(--line);font-size:11px;padding:8px}
+.btn-ghost:hover{color:var(--txt);border-color:var(--dim)}
 
-/* 우: 분석 캔버스 */
-.ca{flex:1;position:relative;overflow:hidden;background:#050810;}
-#mc{position:absolute;top:0;left:0;}
-.ca-drop{position:absolute;inset:0;background:rgba(0,212,255,0.08);border:3px dashed var(--accent);display:none;align-items:center;justify-content:center;z-index:20;pointer-events:none;}
-.ca-drop.active{display:flex;}
-.ca-drop-inner{text-align:center;color:var(--accent);}
-.ca-drop-inner .drop-ico{font-size:48px;animation:dropbounce .7s ease-in-out infinite alternate;}
-@keyframes dropbounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
-.empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:var(--dim);pointer-events:none;}
-.empty .eico{font-size:44px;margin-bottom:12px;opacity:.25;}
-.empty h2{font-size:15px;font-weight:500;margin-bottom:6px;color:#475569;}
-.empty p{font-size:11px;line-height:1.7;color:#334155;}
-.tbar{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:5px;background:rgba(10,14,26,.92);border:1px solid var(--border);border-radius:9px;padding:6px 10px;backdrop-filter:blur(8px);z-index:10;}
-.tb{padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--dim);transition:all .15s;display:flex;align-items:center;gap:4px;}
-.tb:hover{color:var(--text);border-color:var(--border);}
-.tb.act{background:rgba(0,212,255,.15);border-color:var(--accent);color:var(--accent);}
-.minfo{position:absolute;top:10px;right:10px;background:rgba(10,14,26,.88);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);z-index:10;line-height:1.9;backdrop-filter:blur(6px);}
-.minfo span{color:var(--accent);}
+/* 캔버스 영역 */
+.cv-wrap{flex:1;position:relative;background:#070d18}
+canvas{position:absolute;inset:0;cursor:grab}
+canvas.grabbing{cursor:grabbing}
 
-/* 우하단: 단면 분석 패널 */
-.rp{width:260px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
-.rphead{padding:8px 12px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--dim);text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;}
-.badge{font-size:9px;padding:1px 5px;background:var(--panel2);border:1px solid var(--border);border-radius:3px;font-family:'JetBrains Mono',monospace;color:var(--dim);}
-#sc{background:#050810;display:block;}
-.sinfo{padding:8px 12px;font-size:11px;color:var(--dim);border-top:1px solid var(--border);font-family:'JetBrains Mono',monospace;line-height:1.8;}
-.sinfo span{color:var(--accent2);}
-.usage-box{margin:8px 12px 0;border:1px solid var(--border);border-radius:8px;background:rgba(26,34,53,.6);padding:9px 12px;}
-.usage-box-title{font-size:10px;font-weight:700;color:var(--dim);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:7px;}
-.usage-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;font-size:11px;color:var(--text);}
-.step-num{width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,#ff6b35,#f59e0b);color:#050810;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
-.usage-step em{display:block;font-style:normal;color:var(--dim);font-size:10px;margin-top:1px;}
+/* 캔버스 우상단 도구 */
+.cv-tools{position:absolute;top:12px;right:12px;display:flex;gap:6px;z-index:5}
+.cv-tools button{width:34px;height:34px;border:1px solid var(--line);background:var(--panel);color:var(--txt);border-radius:8px;cursor:pointer;font-size:15px}
+.cv-tools button:hover{border-color:var(--pri);color:var(--pri)}
 
-/* 알림 */
-.notif{position:fixed;top:60px;right:16px;background:var(--panel);border:1px solid var(--accent);border-radius:7px;padding:10px 16px;font-size:13px;z-index:100;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+/* 토스트 */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--panel);border:1px solid var(--pri);color:var(--txt);padding:10px 20px;border-radius:9px;font-size:12px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;z-index:99;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.err{border-color:var(--err)}
+
+/* 빈 화면 안내 */
+.empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--dim);gap:10px;pointer-events:none}
+.empty .ico{font-size:42px;opacity:.4}
+.empty .tx{font-size:13px}
+
+/* 범례 (좌하단) */
+.legend{position:absolute;left:12px;bottom:12px;background:rgba(17,26,46,.92);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:11px;display:none;z-index:5}
+.legend .lg-row{display:flex;align-items:center;gap:7px;margin:3px 0}
+.legend .sw{width:18px;height:3px;border-radius:2px}
+.legend .swd{width:10px;height:10px;border-radius:50%;font-size:9px;display:flex;align-items:center;justify-content:center}
+
+/* 우측 결과 패널 */
+.result{width:220px;background:var(--panel);border-left:1px solid var(--line);display:none;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.avg-box{background:var(--panel2);border-radius:10px;padding:14px 12px;text-align:center;border:1px solid var(--line);margin-bottom:8px}
+.avg-num{font-size:32px;font-weight:900;letter-spacing:-1px;line-height:1}
+.avg-unit{font-size:11px;color:var(--dim);margin-top:3px}
+.slope-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-top:7px}
+.bin-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.04)}
+.bin-row:last-child{border-bottom:none}
+.bin-bar-wrap{flex:1;background:var(--panel2);border-radius:3px;height:6px;overflow:hidden}
+.bin-bar{height:100%;border-radius:3px;transition:width .4s}
+.bin-lbl{width:52px;color:var(--dim)}
+.bin-val{width:44px;text-align:right;color:var(--txt)}
+.result-info{font-size:10px;color:var(--dim);line-height:1.7;margin-top:4px}
 </style>
 </head>
 <body>
 
-<!-- G-DSP 헤더 -->
-<div class="gdsp-hdr">
-  <span class="gdsp-logo">G-DSP</span>
-  <div class="gdsp-sep"></div>
-  <span class="gdsp-title">📐 경사도 분석</span>
-  <span class="gdsp-sub" style="margin-left:6px">DXF 등고선 → TIN 삼각망 → 경사도</span>
+<div class="hdr">
+  <span class="logo">G-DSP</span>
+  <span class="ttl">경사도 검토 <span style="font-size:10px;color:var(--dim);font-weight:400">(오토슬럼프 호환 엔진)</span></span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px">v4 · 자동맞춤+DXF출력</span>
+  <span class="sp"></span>
+  <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
+</div>
 
-  <div class="gdsp-search" style="margin-left:16px">
-    <div class="gs-lbl">🔍 지번검색</div>
-    <input class="gs-inp" id="mapSearch" placeholder="화성시 지번 입력 (예: 남양읍 남양리 123)" onkeydown="if(event.key==='Enter')doMapSearch()">
-    <button class="gs-btn" onclick="doMapSearch()">이동</button>
+<div class="main">
+  <!-- 좌측 패널 -->
+  <div class="side">
+    <div class="sec">
+      <div class="sec-t">① 파일</div>
+      <div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
+        <div class="big">📂</div>
+        DXF를 끌어다 놓거나<br>클릭해서 선택
+      </div>
+      <input type="file" id="fileIn" accept=".dxf" style="display:none">
+    </div>
+
+    <div class="sec">
+      <div class="sec-t">② 자동 감지</div>
+      <div class="det">
+        <div class="det-row" id="detCont"><div class="dot"></div><div class="nm">등고선</div><div class="ct">-</div></div>
+        <div class="det-row" id="detSurv"><div class="dot"></div><div class="nm">표고점</div><div class="ct">-</div></div>
+        <div class="det-row" id="detPermit"><div class="dot"></div><div class="nm">허가지선</div><div class="ct">-</div></div>
+      </div>
+      <button class="btn btn-ghost" id="btnRepick" onclick="startRepick()" style="margin-top:7px;display:none">허가지선 다시 잡기</button>
+      <div id="repickHint" style="font-size:10px;color:var(--warn);margin-top:6px;line-height:1.5;display:none">
+        지도에서 올바른 외곽선을 클릭<br>겹친 후보는 같은 자리 다시 클릭으로 전환
+      </div>
+      <button class="btn btn-pri" id="btnRepickOk" onclick="confirmRepick()" style="margin-top:6px;display:none;background:var(--ok)">이 선으로 확정</button>
+    </div>
+
+    <div class="sec">
+      <div class="sec-t">③ 분석</div>
+      <button class="btn btn-pri" id="btnRun" disabled onclick="runAnalysis()">경사도 분석 실행</button>
+      <div style="font-size:10px;color:var(--dim);margin-top:7px;line-height:1.6">
+        TIN 생성 → 10m 격자 → 면적가중 평균<br>오토슬럼프와 동일 방식
+      </div>
+    </div>
+
+    <div class="sec" id="cutSec" style="display:none">
+      <div class="sec-t">④ 절단선 (영역 제외)</div>
+      <button class="btn btn-pri" id="btnDrawCut" onclick="startDrawCut()" style="background:#3b82f6;margin-bottom:6px">✂ 절단선 그리기</button>
+      <div id="cutHint" style="font-size:10px;color:var(--dim);line-height:1.6;margin-bottom:6px">
+        경계 위에서 시작 → 점 클릭 →<br>경계 밖에서 더블클릭으로 종료
+      </div>
+      <div id="cutCtrl" style="display:none">
+        <div style="font-size:11px;color:var(--txt);margin-bottom:6px;line-height:1.6">
+          선을 끌거나 <b>방향키</b>로 이동<br>
+          <span style="color:var(--dim)">Shift+방향키 = 0.5m</span>
+        </div>
+        <div style="display:flex;gap:4px;margin-bottom:6px">
+          <button class="btn btn-ghost" onclick="nudgeCut(0,1)" style="padding:6px">↑</button>
+          <button class="btn btn-ghost" onclick="nudgeCut(0,-1)" style="padding:6px">↓</button>
+          <button class="btn btn-ghost" onclick="nudgeCut(-1,0)" style="padding:6px">←</button>
+          <button class="btn btn-ghost" onclick="nudgeCut(1,0)" style="padding:6px">→</button>
+        </div>
+        <div style="border-top:1px solid var(--line);margin:8px 0;padding-top:8px">
+          <div style="font-size:11px;color:var(--txt);margin-bottom:6px;line-height:1.5">
+            <b>목표 경사도 자동 맞춤</b><br>
+            <span style="color:var(--dim)">목표각을 넣으면 선을 자동으로 밀어<br>그 각도가 되는 위치를 찾습니다</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:11px;white-space:nowrap">목표각</span>
+            <input type="number" id="targetAngle" placeholder="예: 14.5" min="0" max="90" step="0.1"
+              style="flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:12px;width:50px">
+            <span style="font-size:11px;color:var(--dim)">°</span>
+          </div>
+          <button class="btn btn-primary" onclick="autoFit()" style="padding:7px;font-size:12px;width:100%">⊙ 자동 맞춤 실행</button>
+          <div id="autoFitInfo" style="font-size:10px;margin-top:6px;line-height:1.5;display:none"></div>
+        </div>
+        <button class="btn btn-ghost" onclick="cancelCut()" style="color:var(--err);border-color:var(--err)">절단선 취소</button>
+      </div>
+    </div>
+
+    <div class="sec" style="border-bottom:none;margin-top:auto">
+      <button class="btn btn-ghost" onclick="resetAll()">처음부터 다시</button>
+    </div>
   </div>
 
-  <div class="gdsp-stat" style="margin-left:12px">
-    <div id="statZ">Z: <b>-</b></div>
-    <div id="statTris">삼각형: <b>0</b></div>
-    <div id="statSlope">최대경사: <b>0%</b></div>
+  <!-- 캔버스 -->
+  <div class="cv-wrap" id="cvWrap">
+    <canvas id="cv"></canvas>
+    <div class="empty" id="empty">
+      <div class="ico">⛰️</div>
+      <div class="tx">DXF를 올리면 등고선과 허가지선이 표시됩니다</div>
+    </div>
+    <div class="cv-tools">
+      <button onclick="zoomBy(1.3)" title="확대">＋</button>
+      <button onclick="zoomBy(1/1.3)" title="축소">－</button>
+      <button onclick="fitView()" title="화면 맞춤">⛶</button>
+    </div>
+    <div class="legend" id="legend">
+      <div class="lg-row"><div class="sw" style="background:#ef4444;height:3px"></div>허가지선</div>
+      <div class="lg-row"><div class="sw" style="background:#475569"></div>등고선 (주곡선)</div>
+      <div class="lg-row"><div class="sw" style="background:#94a3b8;height:2px"></div>등고선 (계곡선)</div>
+      <div class="lg-row"><div class="swd" style="color:#fbbf24">✕</div>표고점</div>
+      <div style="height:4px;border-top:1px solid var(--line);margin:4px 0"></div>
+      <div class="lg-row"><div class="sw" style="background:#22c55e;height:10px;border-radius:2px;opacity:.7"></div>&lt;15° 적합</div>
+      <div class="lg-row"><div class="sw" style="background:#f59e0b;height:10px;border-radius:2px;opacity:.7"></div>15~20°</div>
+      <div class="lg-row"><div class="sw" style="background:#f97316;height:10px;border-radius:2px;opacity:.7"></div>20~25°</div>
+      <div class="lg-row"><div class="sw" style="background:#ef4444;height:10px;border-radius:2px;opacity:.7"></div>&gt;25° 부적합</div>
+    </div>
   </div>
 
-  <div class="gdsp-right">
-    <button class="gdsp-btn close" onclick="window.close()">✕ 닫기</button>
+  <!-- 우측 결과 패널 -->
+  <div class="result" id="resultPanel">
+    <div class="sec">
+      <div class="sec-t">분석 결과</div>
+      <div class="avg-box">
+        <div class="avg-num" id="avgNum">—</div>
+        <div class="avg-unit">평균 경사도 (°)</div>
+        <div><span class="slope-badge" id="slopeBadge">—</span></div>
+      </div>
+      <div class="result-info" id="resultInfo"></div>
+    </div>
+    <div class="sec">
+      <div class="sec-t">면적 보정</div>
+      <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:7px">
+        대장(공부)면적을 넣으면 면적표가<br>그 값에 맞게 환산됩니다 (경사도 불변)
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--txt);white-space:nowrap">대장면적</span>
+        <input type="number" id="daejangArea" placeholder="캐드 실측" min="0" step="0.01"
+          oninput="onDaejangInput()"
+          style="flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:12px;width:60px">
+        <span style="font-size:11px;color:var(--dim)">㎡</span>
+      </div>
+      <div id="corrInfo" style="font-size:10px;color:var(--ok);margin-top:6px;line-height:1.5;display:none"></div>
+      <button class="btn btn-ghost" id="btnResetArea" onclick="resetDaejang()" style="margin-top:6px;padding:6px;font-size:10px;display:none">캐드 실측면적으로 되돌리기</button>
+    </div>
+    <div class="sec" style="flex:1">
+      <div class="sec-t">구간별 면적</div>
+      <div id="binTable"></div>
+    </div>
+    <div class="sec" style="border-bottom:none">
+      <button class="btn btn-primary" onclick="exportDXF()" style="margin-bottom:6px;width:100%">DXF 저장 (오토 스타일)</button>
+      <button class="btn btn-ghost" onclick="exportPNG()" style="width:100%">PNG 저장</button>
+    </div>
   </div>
 </div>
 
-<!-- 3분할 레이아웃 -->
-<div class="app">
+<div id="toast"></div>
 
-  <!-- 좌: DXF 컨트롤 패널 -->
-  <div class="lp">
-    <div class="lscroll">
-      <div class="sec">
-        <div class="sec-title">Data Input</div>
-        <div class="upz" id="upz">
-          <div class="ico">📁</div>
-          <strong>CAD DXF 업로드</strong>
-          <p>수치지형도 등고선 데이터<br>드래그하거나 클릭</p>
-        </div>
-        <input type="file" id="fi" multiple accept=".dxf">
-        <div class="pbar" id="pb"><div class="pfill" id="pf"></div></div>
-      </div>
+<script>/* d3-delaunay 내장 (오프라인 작동) */
+// https://github.com/d3/d3-delaunay v6.0.4 Copyright 2018-2021 Observable, Inc., 2021 Mapbox
+!function(t,i){"object"==typeof exports&&"undefined"!=typeof module?i(exports):"function"==typeof define&&define.amd?define(["exports"],i):i((t="undefined"!=typeof globalThis?globalThis:t||self).d3=t.d3||{})}(this,(function(t){"use strict";const i=134217729;function e(t,i,e,n,s){let l,h,r,o,a=i[0],c=n[0],u=0,f=0;c>a==c>-a?(l=a,a=i[++u]):(l=c,c=n[++f]);let _=0;if(u<t&&f<e)for(c>a==c>-a?(h=a+l,r=l-(h-a),a=i[++u]):(h=c+l,r=l-(h-c),c=n[++f]),l=h,0!==r&&(s[_++]=r);u<t&&f<e;)c>a==c>-a?(h=l+a,o=h-l,r=l-(h-o)+(a-o),a=i[++u]):(h=l+c,o=h-l,r=l-(h-o)+(c-o),c=n[++f]),l=h,0!==r&&(s[_++]=r);for(;u<t;)h=l+a,o=h-l,r=l-(h-o)+(a-o),a=i[++u],l=h,0!==r&&(s[_++]=r);for(;f<e;)h=l+c,o=h-l,r=l-(h-o)+(c-o),c=n[++f],l=h,0!==r&&(s[_++]=r);return 0===l&&0!==_||(s[_++]=l),_}function n(t){return new Float64Array(t)}const s=n(4),l=n(8),h=n(12),r=n(16),o=n(4);function a(t,n,a,c,u,f){const _=(n-f)*(a-u),d=(t-u)*(c-f),g=_-d;if(0===_||0===d||_>0!=d>0)return g;const y=Math.abs(_+d);return Math.abs(g)>=33306690738754716e-32*y?g:-function(t,n,a,c,u,f,_){let d,g,y,m,x,p,w,v,b,T,M,A,k,$,P,S,I,z;const F=t-u,U=a-u,K=n-f,L=c-f;$=F*L,p=i*F,w=p-(p-F),v=F-w,p=i*L,b=p-(p-L),T=L-b,P=v*T-($-w*b-v*b-w*T),S=K*U,p=i*K,w=p-(p-K),v=K-w,p=i*U,b=p-(p-U),T=U-b,I=v*T-(S-w*b-v*b-w*T),M=P-I,x=P-M,s[0]=P-(M+x)+(x-I),A=$+M,x=A-$,k=$-(A-x)+(M-x),M=k-S,x=k-M,s[1]=k-(M+x)+(x-S),z=A+M,x=z-A,s[2]=A-(z-x)+(M-x),s[3]=z;let j=function(t,i){let e=i[0];for(let n=1;n<t;n++)e+=i[n];return e}(4,s),H=22204460492503146e-32*_;if(j>=H||-j>=H)return j;if(x=t-F,d=t-(F+x)+(x-u),x=a-U,y=a-(U+x)+(x-u),x=n-K,g=n-(K+x)+(x-f),x=c-L,m=c-(L+x)+(x-f),0===d&&0===g&&0===y&&0===m)return j;if(H=11093356479670487e-47*_+33306690738754706e-32*Math.abs(j),j+=F*m+L*d-(K*y+U*g),j>=H||-j>=H)return j;$=d*L,p=i*d,w=p-(p-d),v=d-w,p=i*L,b=p-(p-L),T=L-b,P=v*T-($-w*b-v*b-w*T),S=g*U,p=i*g,w=p-(p-g),v=g-w,p=i*U,b=p-(p-U),T=U-b,I=v*T-(S-w*b-v*b-w*T),M=P-I,x=P-M,o[0]=P-(M+x)+(x-I),A=$+M,x=A-$,k=$-(A-x)+(M-x),M=k-S,x=k-M,o[1]=k-(M+x)+(x-S),z=A+M,x=z-A,o[2]=A-(z-x)+(M-x),o[3]=z;const E=e(4,s,4,o,l);$=F*m,p=i*F,w=p-(p-F),v=F-w,p=i*m,b=p-(p-m),T=m-b,P=v*T-($-w*b-v*b-w*T),S=K*y,p=i*K,w=p-(p-K),v=K-w,p=i*y,b=p-(p-y),T=y-b,I=v*T-(S-w*b-v*b-w*T),M=P-I,x=P-M,o[0]=P-(M+x)+(x-I),A=$+M,x=A-$,k=$-(A-x)+(M-x),M=k-S,x=k-M,o[1]=k-(M+x)+(x-S),z=A+M,x=z-A,o[2]=A-(z-x)+(M-x),o[3]=z;const C=e(E,l,4,o,h);$=d*m,p=i*d,w=p-(p-d),v=d-w,p=i*m,b=p-(p-m),T=m-b,P=v*T-($-w*b-v*b-w*T),S=g*y,p=i*g,w=p-(p-g),v=g-w,p=i*y,b=p-(p-y),T=y-b,I=v*T-(S-w*b-v*b-w*T),M=P-I,x=P-M,o[0]=P-(M+x)+(x-I),A=$+M,x=A-$,k=$-(A-x)+(M-x),M=k-S,x=k-M,o[1]=k-(M+x)+(x-S),z=A+M,x=z-A,o[2]=A-(z-x)+(M-x),o[3]=z;const N=e(C,h,4,o,r);return r[N-1]}(t,n,a,c,u,f,y)}const c=Math.pow(2,-52),u=new Uint32Array(512);class f{static from(t,i=x,e=p){const n=t.length,s=new Float64Array(2*n);for(let l=0;l<n;l++){const n=t[l];s[2*l]=i(n),s[2*l+1]=e(n)}return new f(s)}constructor(t){const i=t.length>>1;if(i>0&&"number"!=typeof t[0])throw new Error("Expected coords to contain numbers.");this.coords=t;const e=Math.max(2*i-5,0);this._triangles=new Uint32Array(3*e),this._halfedges=new Int32Array(3*e),this._hashSize=Math.ceil(Math.sqrt(i)),this._hullPrev=new Uint32Array(i),this._hullNext=new Uint32Array(i),this._hullTri=new Uint32Array(i),this._hullHash=new Int32Array(this._hashSize).fill(-1),this._ids=new Uint32Array(i),this._dists=new Float64Array(i),this.update()}update(){const{coords:t,_hullPrev:i,_hullNext:e,_hullTri:n,_hullHash:s}=this,l=t.length>>1;let h=1/0,r=1/0,o=-1/0,u=-1/0;for(let i=0;i<l;i++){const e=t[2*i],n=t[2*i+1];e<h&&(h=e),n<r&&(r=n),e>o&&(o=e),n>u&&(u=n),this._ids[i]=i}const f=(h+o)/2,d=(r+u)/2;let m,x,p,w=1/0;for(let i=0;i<l;i++){const e=_(f,d,t[2*i],t[2*i+1]);e<w&&(m=i,w=e)}const v=t[2*m],b=t[2*m+1];w=1/0;for(let i=0;i<l;i++){if(i===m)continue;const e=_(v,b,t[2*i],t[2*i+1]);e<w&&e>0&&(x=i,w=e)}let T=t[2*x],M=t[2*x+1],A=1/0;for(let i=0;i<l;i++){if(i===m||i===x)continue;const e=g(v,b,T,M,t[2*i],t[2*i+1]);e<A&&(p=i,A=e)}let k=t[2*p],$=t[2*p+1];if(A===1/0){for(let i=0;i<l;i++)this._dists[i]=t[2*i]-t[0]||t[2*i+1]-t[1];y(this._ids,this._dists,0,l-1);const i=new Uint32Array(l);let e=0;for(let t=0,n=-1/0;t<l;t++){const s=this._ids[t];this._dists[s]>n&&(i[e++]=s,n=this._dists[s])}return this.hull=i.subarray(0,e),this.triangles=new Uint32Array(0),void(this.halfedges=new Uint32Array(0))}if(a(v,b,T,M,k,$)<0){const t=x,i=T,e=M;x=p,T=k,M=$,p=t,k=i,$=e}const P=function(t,i,e,n,s,l){const h=e-t,r=n-i,o=s-t,a=l-i,c=h*h+r*r,u=o*o+a*a,f=.5/(h*a-r*o);return{x:t+(a*c-r*u)*f,y:i+(h*u-o*c)*f}}(v,b,T,M,k,$);this._cx=P.x,this._cy=P.y;for(let i=0;i<l;i++)this._dists[i]=_(t[2*i],t[2*i+1],P.x,P.y);y(this._ids,this._dists,0,l-1),this._hullStart=m;let S=3;e[m]=i[p]=x,e[x]=i[m]=p,e[p]=i[x]=m,n[m]=0,n[x]=1,n[p]=2,s.fill(-1),s[this._hashKey(v,b)]=m,s[this._hashKey(T,M)]=x,s[this._hashKey(k,$)]=p,this.trianglesLen=0,this._addTriangle(m,x,p,-1,-1,-1);for(let l,h,r=0;r<this._ids.length;r++){const o=this._ids[r],u=t[2*o],f=t[2*o+1];if(r>0&&Math.abs(u-l)<=c&&Math.abs(f-h)<=c)continue;if(l=u,h=f,o===m||o===x||o===p)continue;let _=0;for(let t=0,i=this._hashKey(u,f);t<this._hashSize&&(_=s[(i+t)%this._hashSize],-1===_||_===e[_]);t++);_=i[_];let d,g=_;for(;d=e[g],a(u,f,t[2*g],t[2*g+1],t[2*d],t[2*d+1])>=0;)if(g=d,g===_){g=-1;break}if(-1===g)continue;let y=this._addTriangle(g,o,e[g],-1,-1,n[g]);n[o]=this._legalize(y+2),n[g]=y,S++;let w=e[g];for(;d=e[w],a(u,f,t[2*w],t[2*w+1],t[2*d],t[2*d+1])<0;)y=this._addTriangle(w,o,d,n[o],-1,n[w]),n[o]=this._legalize(y+2),e[w]=w,S--,w=d;if(g===_)for(;d=i[g],a(u,f,t[2*d],t[2*d+1],t[2*g],t[2*g+1])<0;)y=this._addTriangle(d,o,g,-1,n[g],n[d]),this._legalize(y+2),n[d]=y,e[g]=g,S--,g=d;this._hullStart=i[o]=g,e[g]=i[w]=o,e[o]=w,s[this._hashKey(u,f)]=o,s[this._hashKey(t[2*g],t[2*g+1])]=g}this.hull=new Uint32Array(S);for(let t=0,i=this._hullStart;t<S;t++)this.hull[t]=i,i=e[i];this.triangles=this._triangles.subarray(0,this.trianglesLen),this.halfedges=this._halfedges.subarray(0,this.trianglesLen)}_hashKey(t,i){return Math.floor(function(t,i){const e=t/(Math.abs(t)+Math.abs(i));return(i>0?3-e:1+e)/4}(t-this._cx,i-this._cy)*this._hashSize)%this._hashSize}_legalize(t){const{_triangles:i,_halfedges:e,coords:n}=this;let s=0,l=0;for(;;){const h=e[t],r=t-t%3;if(l=r+(t+2)%3,-1===h){if(0===s)break;t=u[--s];continue}const o=h-h%3,a=r+(t+1)%3,c=o+(h+2)%3,f=i[l],_=i[t],g=i[a],y=i[c];if(d(n[2*f],n[2*f+1],n[2*_],n[2*_+1],n[2*g],n[2*g+1],n[2*y],n[2*y+1])){i[t]=y,i[h]=f;const n=e[c];if(-1===n){let i=this._hullStart;do{if(this._hullTri[i]===c){this._hullTri[i]=t;break}i=this._hullPrev[i]}while(i!==this._hullStart)}this._link(t,n),this._link(h,e[l]),this._link(l,c);const r=o+(h+1)%3;s<u.length&&(u[s++]=r)}else{if(0===s)break;t=u[--s]}}return l}_link(t,i){this._halfedges[t]=i,-1!==i&&(this._halfedges[i]=t)}_addTriangle(t,i,e,n,s,l){const h=this.trianglesLen;return this._triangles[h]=t,this._triangles[h+1]=i,this._triangles[h+2]=e,this._link(h,n),this._link(h+1,s),this._link(h+2,l),this.trianglesLen+=3,h}}function _(t,i,e,n){const s=t-e,l=i-n;return s*s+l*l}function d(t,i,e,n,s,l,h,r){const o=t-h,a=i-r,c=e-h,u=n-r,f=s-h,_=l-r,d=c*c+u*u,g=f*f+_*_;return o*(u*g-d*_)-a*(c*g-d*f)+(o*o+a*a)*(c*_-u*f)<0}function g(t,i,e,n,s,l){const h=e-t,r=n-i,o=s-t,a=l-i,c=h*h+r*r,u=o*o+a*a,f=.5/(h*a-r*o),_=(a*c-r*u)*f,d=(h*u-o*c)*f;return _*_+d*d}function y(t,i,e,n){if(n-e<=20)for(let s=e+1;s<=n;s++){const n=t[s],l=i[n];let h=s-1;for(;h>=e&&i[t[h]]>l;)t[h+1]=t[h--];t[h+1]=n}else{let s=e+1,l=n;m(t,e+n>>1,s),i[t[e]]>i[t[n]]&&m(t,e,n),i[t[s]]>i[t[n]]&&m(t,s,n),i[t[e]]>i[t[s]]&&m(t,e,s);const h=t[s],r=i[h];for(;;){do{s++}while(i[t[s]]<r);do{l--}while(i[t[l]]>r);if(l<s)break;m(t,s,l)}t[e+1]=t[l],t[l]=h,n-s+1>=l-e?(y(t,i,s,n),y(t,i,e,l-1)):(y(t,i,e,l-1),y(t,i,s,n))}}function m(t,i,e){const n=t[i];t[i]=t[e],t[e]=n}function x(t){return t[0]}function p(t){return t[1]}const w=1e-6;class v{constructor(){this._x0=this._y0=this._x1=this._y1=null,this._=""}moveTo(t,i){this._+=`M${this._x0=this._x1=+t},${this._y0=this._y1=+i}`}closePath(){null!==this._x1&&(this._x1=this._x0,this._y1=this._y0,this._+="Z")}lineTo(t,i){this._+=`L${this._x1=+t},${this._y1=+i}`}arc(t,i,e){const n=(t=+t)+(e=+e),s=i=+i;if(e<0)throw new Error("negative radius");null===this._x1?this._+=`M${n},${s}`:(Math.abs(this._x1-n)>w||Math.abs(this._y1-s)>w)&&(this._+="L"+n+","+s),e&&(this._+=`A${e},${e},0,1,1,${t-e},${i}A${e},${e},0,1,1,${this._x1=n},${this._y1=s}`)}rect(t,i,e,n){this._+=`M${this._x0=this._x1=+t},${this._y0=this._y1=+i}h${+e}v${+n}h${-e}Z`}value(){return this._||null}}class b{constructor(){this._=[]}moveTo(t,i){this._.push([t,i])}closePath(){this._.push(this._[0].slice())}lineTo(t,i){this._.push([t,i])}value(){return this._.length?this._:null}}class T{constructor(t,[i,e,n,s]=[0,0,960,500]){if(!((n=+n)>=(i=+i)&&(s=+s)>=(e=+e)))throw new Error("invalid bounds");this.delaunay=t,this._circumcenters=new Float64Array(2*t.points.length),this.vectors=new Float64Array(2*t.points.length),this.xmax=n,this.xmin=i,this.ymax=s,this.ymin=e,this._init()}update(){return this.delaunay.update(),this._init(),this}_init(){const{delaunay:{points:t,hull:i,triangles:e},vectors:n}=this;let s,l;const h=this.circumcenters=this._circumcenters.subarray(0,e.length/3*2);for(let n,r,o=0,a=0,c=e.length;o<c;o+=3,a+=2){const c=2*e[o],u=2*e[o+1],f=2*e[o+2],_=t[c],d=t[c+1],g=t[u],y=t[u+1],m=t[f],x=t[f+1],p=g-_,w=y-d,v=m-_,b=x-d,T=2*(p*b-w*v);if(Math.abs(T)<1e-9){if(void 0===s){s=l=0;for(const e of i)s+=t[2*e],l+=t[2*e+1];s/=i.length,l/=i.length}const e=1e9*Math.sign((s-_)*b-(l-d)*v);n=(_+m)/2-e*b,r=(d+x)/2+e*v}else{const t=1/T,i=p*p+w*w,e=v*v+b*b;n=_+(b*i-w*e)*t,r=d+(p*e-v*i)*t}h[a]=n,h[a+1]=r}let r,o,a,c=i[i.length-1],u=4*c,f=t[2*c],_=t[2*c+1];n.fill(0);for(let e=0;e<i.length;++e)c=i[e],r=u,o=f,a=_,u=4*c,f=t[2*c],_=t[2*c+1],n[r+2]=n[u]=a-_,n[r+3]=n[u+1]=f-o}render(t){const i=null==t?t=new v:void 0,{delaunay:{halfedges:e,inedges:n,hull:s},circumcenters:l,vectors:h}=this;if(s.length<=1)return null;for(let i=0,n=e.length;i<n;++i){const n=e[i];if(n<i)continue;const s=2*Math.floor(i/3),h=2*Math.floor(n/3),r=l[s],o=l[s+1],a=l[h],c=l[h+1];this._renderSegment(r,o,a,c,t)}let r,o=s[s.length-1];for(let i=0;i<s.length;++i){r=o,o=s[i];const e=2*Math.floor(n[o]/3),a=l[e],c=l[e+1],u=4*r,f=this._project(a,c,h[u+2],h[u+3]);f&&this._renderSegment(a,c,f[0],f[1],t)}return i&&i.value()}renderBounds(t){const i=null==t?t=new v:void 0;return t.rect(this.xmin,this.ymin,this.xmax-this.xmin,this.ymax-this.ymin),i&&i.value()}renderCell(t,i){const e=null==i?i=new v:void 0,n=this._clip(t);if(null===n||!n.length)return;i.moveTo(n[0],n[1]);let s=n.length;for(;n[0]===n[s-2]&&n[1]===n[s-1]&&s>1;)s-=2;for(let t=2;t<s;t+=2)n[t]===n[t-2]&&n[t+1]===n[t-1]||i.lineTo(n[t],n[t+1]);return i.closePath(),e&&e.value()}*cellPolygons(){const{delaunay:{points:t}}=this;for(let i=0,e=t.length/2;i<e;++i){const t=this.cellPolygon(i);t&&(t.index=i,yield t)}}cellPolygon(t){const i=new b;return this.renderCell(t,i),i.value()}_renderSegment(t,i,e,n,s){let l;const h=this._regioncode(t,i),r=this._regioncode(e,n);0===h&&0===r?(s.moveTo(t,i),s.lineTo(e,n)):(l=this._clipSegment(t,i,e,n,h,r))&&(s.moveTo(l[0],l[1]),s.lineTo(l[2],l[3]))}contains(t,i,e){return(i=+i)==i&&(e=+e)==e&&this.delaunay._step(t,i,e)===t}*neighbors(t){const i=this._clip(t);if(i)for(const e of this.delaunay.neighbors(t)){const t=this._clip(e);if(t)t:for(let n=0,s=i.length;n<s;n+=2)for(let l=0,h=t.length;l<h;l+=2)if(i[n]===t[l]&&i[n+1]===t[l+1]&&i[(n+2)%s]===t[(l+h-2)%h]&&i[(n+3)%s]===t[(l+h-1)%h]){yield e;break t}}}_cell(t){const{circumcenters:i,delaunay:{inedges:e,halfedges:n,triangles:s}}=this,l=e[t];if(-1===l)return null;const h=[];let r=l;do{const e=Math.floor(r/3);if(h.push(i[2*e],i[2*e+1]),r=r%3==2?r-2:r+1,s[r]!==t)break;r=n[r]}while(r!==l&&-1!==r);return h}_clip(t){if(0===t&&1===this.delaunay.hull.length)return[this.xmax,this.ymin,this.xmax,this.ymax,this.xmin,this.ymax,this.xmin,this.ymin];const i=this._cell(t);if(null===i)return null;const{vectors:e}=this,n=4*t;return this._simplify(e[n]||e[n+1]?this._clipInfinite(t,i,e[n],e[n+1],e[n+2],e[n+3]):this._clipFinite(t,i))}_clipFinite(t,i){const e=i.length;let n,s,l,h,r=null,o=i[e-2],a=i[e-1],c=this._regioncode(o,a),u=0;for(let f=0;f<e;f+=2)if(n=o,s=a,o=i[f],a=i[f+1],l=c,c=this._regioncode(o,a),0===l&&0===c)h=u,u=0,r?r.push(o,a):r=[o,a];else{let i,e,f,_,d;if(0===l){if(null===(i=this._clipSegment(n,s,o,a,l,c)))continue;[e,f,_,d]=i}else{if(null===(i=this._clipSegment(o,a,n,s,c,l)))continue;[_,d,e,f]=i,h=u,u=this._edgecode(e,f),h&&u&&this._edge(t,h,u,r,r.length),r?r.push(e,f):r=[e,f]}h=u,u=this._edgecode(_,d),h&&u&&this._edge(t,h,u,r,r.length),r?r.push(_,d):r=[_,d]}if(r)h=u,u=this._edgecode(r[0],r[1]),h&&u&&this._edge(t,h,u,r,r.length);else if(this.contains(t,(this.xmin+this.xmax)/2,(this.ymin+this.ymax)/2))return[this.xmax,this.ymin,this.xmax,this.ymax,this.xmin,this.ymax,this.xmin,this.ymin];return r}_clipSegment(t,i,e,n,s,l){const h=s<l;for(h&&([t,i,e,n,s,l]=[e,n,t,i,l,s]);;){if(0===s&&0===l)return h?[e,n,t,i]:[t,i,e,n];if(s&l)return null;let r,o,a=s||l;8&a?(r=t+(e-t)*(this.ymax-i)/(n-i),o=this.ymax):4&a?(r=t+(e-t)*(this.ymin-i)/(n-i),o=this.ymin):2&a?(o=i+(n-i)*(this.xmax-t)/(e-t),r=this.xmax):(o=i+(n-i)*(this.xmin-t)/(e-t),r=this.xmin),s?(t=r,i=o,s=this._regioncode(t,i)):(e=r,n=o,l=this._regioncode(e,n))}}_clipInfinite(t,i,e,n,s,l){let h,r=Array.from(i);if((h=this._project(r[0],r[1],e,n))&&r.unshift(h[0],h[1]),(h=this._project(r[r.length-2],r[r.length-1],s,l))&&r.push(h[0],h[1]),r=this._clipFinite(t,r))for(let i,e=0,n=r.length,s=this._edgecode(r[n-2],r[n-1]);e<n;e+=2)i=s,s=this._edgecode(r[e],r[e+1]),i&&s&&(e=this._edge(t,i,s,r,e),n=r.length);else this.contains(t,(this.xmin+this.xmax)/2,(this.ymin+this.ymax)/2)&&(r=[this.xmin,this.ymin,this.xmax,this.ymin,this.xmax,this.ymax,this.xmin,this.ymax]);return r}_edge(t,i,e,n,s){for(;i!==e;){let e,l;switch(i){case 5:i=4;continue;case 4:i=6,e=this.xmax,l=this.ymin;break;case 6:i=2;continue;case 2:i=10,e=this.xmax,l=this.ymax;break;case 10:i=8;continue;case 8:i=9,e=this.xmin,l=this.ymax;break;case 9:i=1;continue;case 1:i=5,e=this.xmin,l=this.ymin}n[s]===e&&n[s+1]===l||!this.contains(t,e,l)||(n.splice(s,0,e,l),s+=2)}return s}_project(t,i,e,n){let s,l,h,r=1/0;if(n<0){if(i<=this.ymin)return null;(s=(this.ymin-i)/n)<r&&(h=this.ymin,l=t+(r=s)*e)}else if(n>0){if(i>=this.ymax)return null;(s=(this.ymax-i)/n)<r&&(h=this.ymax,l=t+(r=s)*e)}if(e>0){if(t>=this.xmax)return null;(s=(this.xmax-t)/e)<r&&(l=this.xmax,h=i+(r=s)*n)}else if(e<0){if(t<=this.xmin)return null;(s=(this.xmin-t)/e)<r&&(l=this.xmin,h=i+(r=s)*n)}return[l,h]}_edgecode(t,i){return(t===this.xmin?1:t===this.xmax?2:0)|(i===this.ymin?4:i===this.ymax?8:0)}_regioncode(t,i){return(t<this.xmin?1:t>this.xmax?2:0)|(i<this.ymin?4:i>this.ymax?8:0)}_simplify(t){if(t&&t.length>4){for(let i=0;i<t.length;i+=2){const e=(i+2)%t.length,n=(i+4)%t.length;(t[i]===t[e]&&t[e]===t[n]||t[i+1]===t[e+1]&&t[e+1]===t[n+1])&&(t.splice(e,2),i-=2)}t.length||(t=null)}return t}}const M=2*Math.PI,A=Math.pow;function k(t){return t[0]}function $(t){return t[1]}function P(t,i,e){return[t+Math.sin(t+i)*e,i+Math.cos(t-i)*e]}class S{static from(t,i=k,e=$,n){return new S("length"in t?function(t,i,e,n){const s=t.length,l=new Float64Array(2*s);for(let h=0;h<s;++h){const s=t[h];l[2*h]=i.call(n,s,h,t),l[2*h+1]=e.call(n,s,h,t)}return l}(t,i,e,n):Float64Array.from(function*(t,i,e,n){let s=0;for(const l of t)yield i.call(n,l,s,t),yield e.call(n,l,s,t),++s}(t,i,e,n)))}constructor(t){this._delaunator=new f(t),this.inedges=new Int32Array(t.length/2),this._hullIndex=new Int32Array(t.length/2),this.points=this._delaunator.coords,this._init()}update(){return this._delaunator.update(),this._init(),this}_init(){const t=this._delaunator,i=this.points;if(t.hull&&t.hull.length>2&&function(t){const{triangles:i,coords:e}=t;for(let t=0;t<i.length;t+=3){const n=2*i[t],s=2*i[t+1],l=2*i[t+2];if((e[l]-e[n])*(e[s+1]-e[n+1])-(e[s]-e[n])*(e[l+1]-e[n+1])>1e-10)return!1}return!0}(t)){this.collinear=Int32Array.from({length:i.length/2},((t,i)=>i)).sort(((t,e)=>i[2*t]-i[2*e]||i[2*t+1]-i[2*e+1]));const t=this.collinear[0],e=this.collinear[this.collinear.length-1],n=[i[2*t],i[2*t+1],i[2*e],i[2*e+1]],s=1e-8*Math.hypot(n[3]-n[1],n[2]-n[0]);for(let t=0,e=i.length/2;t<e;++t){const e=P(i[2*t],i[2*t+1],s);i[2*t]=e[0],i[2*t+1]=e[1]}this._delaunator=new f(i)}else delete this.collinear;const e=this.halfedges=this._delaunator.halfedges,n=this.hull=this._delaunator.hull,s=this.triangles=this._delaunator.triangles,l=this.inedges.fill(-1),h=this._hullIndex.fill(-1);for(let t=0,i=e.length;t<i;++t){const i=s[t%3==2?t-2:t+1];-1!==e[t]&&-1!==l[i]||(l[i]=t)}for(let t=0,i=n.length;t<i;++t)h[n[t]]=t;n.length<=2&&n.length>0&&(this.triangles=new Int32Array(3).fill(-1),this.halfedges=new Int32Array(3).fill(-1),this.triangles[0]=n[0],l[n[0]]=1,2===n.length&&(l[n[1]]=0,this.triangles[1]=n[1],this.triangles[2]=n[1]))}voronoi(t){return new T(this,t)}*neighbors(t){const{inedges:i,hull:e,_hullIndex:n,halfedges:s,triangles:l,collinear:h}=this;if(h){const i=h.indexOf(t);return i>0&&(yield h[i-1]),void(i<h.length-1&&(yield h[i+1]))}const r=i[t];if(-1===r)return;let o=r,a=-1;do{if(yield a=l[o],o=o%3==2?o-2:o+1,l[o]!==t)return;if(o=s[o],-1===o){const i=e[(n[t]+1)%e.length];return void(i!==a&&(yield i))}}while(o!==r)}find(t,i,e=0){if((t=+t)!=t||(i=+i)!=i)return-1;const n=e;let s;for(;(s=this._step(e,t,i))>=0&&s!==e&&s!==n;)e=s;return s}_step(t,i,e){const{inedges:n,hull:s,_hullIndex:l,halfedges:h,triangles:r,points:o}=this;if(-1===n[t]||!o.length)return(t+1)%(o.length>>1);let a=t,c=A(i-o[2*t],2)+A(e-o[2*t+1],2);const u=n[t];let f=u;do{let n=r[f];const u=A(i-o[2*n],2)+A(e-o[2*n+1],2);if(u<c&&(c=u,a=n),f=f%3==2?f-2:f+1,r[f]!==t)break;if(f=h[f],-1===f){if(f=s[(l[t]+1)%s.length],f!==n&&A(i-o[2*f],2)+A(e-o[2*f+1],2)<c)return f;break}}while(f!==u);return a}render(t){const i=null==t?t=new v:void 0,{points:e,halfedges:n,triangles:s}=this;for(let i=0,l=n.length;i<l;++i){const l=n[i];if(l<i)continue;const h=2*s[i],r=2*s[l];t.moveTo(e[h],e[h+1]),t.lineTo(e[r],e[r+1])}return this.renderHull(t),i&&i.value()}renderPoints(t,i){void 0!==i||t&&"function"==typeof t.moveTo||(i=t,t=null),i=null==i?2:+i;const e=null==t?t=new v:void 0,{points:n}=this;for(let e=0,s=n.length;e<s;e+=2){const s=n[e],l=n[e+1];t.moveTo(s+i,l),t.arc(s,l,i,0,M)}return e&&e.value()}renderHull(t){const i=null==t?t=new v:void 0,{hull:e,points:n}=this,s=2*e[0],l=e.length;t.moveTo(n[s],n[s+1]);for(let i=1;i<l;++i){const s=2*e[i];t.lineTo(n[s],n[s+1])}return t.closePath(),i&&i.value()}hullPolygon(){const t=new b;return this.renderHull(t),t.value()}renderTriangle(t,i){const e=null==i?i=new v:void 0,{points:n,triangles:s}=this,l=2*s[t*=3],h=2*s[t+1],r=2*s[t+2];return i.moveTo(n[l],n[l+1]),i.lineTo(n[h],n[h+1]),i.lineTo(n[r],n[r+1]),i.closePath(),e&&e.value()}*trianglePolygons(){const{triangles:t}=this;for(let i=0,e=t.length/3;i<e;++i)yield this.trianglePolygon(i)}trianglePolygon(t){const i=new b;return this.renderTriangle(t,i),i.value()}}t.Delaunay=S,t.Voronoi=T,Object.defineProperty(t,"__esModule",{value:!0})}));
 
-      <div class="sec">
-        <div class="sec-title">Analysis Control</div>
-        <div class="slrow">
-          <label>샘플링 밀도 <span id="valS">3,000</span></label>
-          <input type="range" id="slS" min="500" max="8000" step="100" value="3000">
-        </div>
-        <button class="btn pri" id="btnRun">⚡ 삼각망 엔진 가동</button>
-      </div>
-
-      <div class="sec">
-        <div class="sec-title">Visualization</div>
-        <div class="togrow"><div class="toglabel">삼각망 (TIN)</div><div class="tog" id="togTIN"></div></div>
-        <div class="togrow"><div class="toglabel">등고선 (Contour)</div><div class="tog on" id="togCon"></div></div>
-        <div class="togrow"><div class="toglabel">경사도 (Slope)</div><div class="tog on" id="togSlp"></div></div>
-        <div class="togrow"><div class="toglabel">물흐름 (Flow)</div><div class="tog on" id="togFlw"></div></div>
-        <div class="legbox" id="legSlp">
-          <div class="leglabel"><span>0%</span><span>Slope</span><span>50%+</span></div>
-          <div class="legstrip" style="background:linear-gradient(90deg,#00ff9f,#ffff00,#ff6b35,#ef4444)"></div>
-        </div>
-      </div>
-
-      <div class="sec">
-        <div class="sec-title">Export</div>
-        <button class="btn" id="btnExpDXF">📤 DXF로 내보내기</button>
-        <button class="btn" id="btnExpPNG">🖼️ PNG 저장</button>
-      </div>
-
-      <div class="sec">
-        <div class="sec-title">Layers</div>
-        <div id="layerList"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 가운데: 카카오지도 -->
-  <div class="map-panel">
-    <div class="map-hdr">
-      🗺 카카오 지도
-      <div class="map-hdr-btns">
-        <button class="map-hdr-btn on" id="mpNormal" onclick="setMapType('normal',this)">일반</button>
-        <button class="map-hdr-btn" id="mpSkyview" onclick="setMapType('skyview',this)">위성</button>
-        <button class="map-hdr-btn" id="mpCadastral" onclick="toggleCadastral(this)">지적도</button>
-      </div>
-    </div>
-    <div id="kakaoMapDiv" style="flex:1;width:100%"></div>
-    <div class="map-info">
-      지번: <span id="mapJibun">검색 후 표시</span><br>
-      좌표: <span id="mapCoord">—</span>
-    </div>
-  </div>
-
-  <!-- 우: 분석 캔버스 -->
-  <div class="ca" id="ca">
-    <canvas id="mc"></canvas>
-    <div class="ca-drop" id="caDrop">
-      <div class="ca-drop-inner">
-        <div class="drop-ico">📥</div>
-        <p>파일을 놓아서 업로드</p>
-      </div>
-    </div>
-    <div class="empty" id="emp">
-      <div class="eico">📐</div>
-      <h2>경사도 분석 대기 중</h2>
-      <p>DXF 파일(수치지형도 등고선)을 업로드하면<br>삼각망 기반 경사도 분석이 시작됩니다.</p>
-    </div>
-    <div class="tbar">
-      <button class="tb act" data-t="pan">🖐️ 이동/확대</button>
-      <button class="tb" data-t="sec">📏 단면 분석</button>
-      <button class="tb" data-t="ins">🔍 정밀 검사</button>
-    </div>
-    <div class="minfo" id="minfo" style="display:none">
-      Elevation: <span id="minE">-</span> ~ <span id="maxE">-</span><br>
-      Coordinate: <span id="curX">-</span>, <span id="curY">-</span><br>
-      Current Z: <span id="curZ">-</span>
-    </div>
-  </div>
-
-  <!-- 우측 패널: 단면 분석 -->
-  <div class="rp">
-    <div class="rphead">Profile Analysis <div class="badge">LIVE</div></div>
-    <canvas id="sc"></canvas>
-    <div class="sinfo">
-      Distance: <span id="sDist">-</span>m<br>
-      Height: <span id="sHeight">-</span>m<br>
-      Avg Slope: <span id="sSlope">-</span>%
-    </div>
-    <div style="flex:1;overflow-y:auto;padding:0 0 8px">
-      <div class="usage-box" style="margin-top:8px">
-        <div class="usage-box-title">분석 가이드</div>
-        <div class="usage-step"><div class="step-num">1</div><div><strong>지번 검색</strong><em>위 검색창에서 지번으로 지도 이동</em></div></div>
-        <div class="usage-step"><div class="step-num">2</div><div><strong>DXF 업로드</strong><em>수치지형도 등고선 파일 선택</em></div></div>
-        <div class="usage-step"><div class="step-num">3</div><div><strong>엔진 가동</strong><em>삼각망 생성 후 경사도 분석</em></div></div>
-        <div class="usage-step"><div class="step-num">4</div><div><strong>단면 분석</strong><em>툴바에서 단면 도구로 측정</em></div></div>
-      </div>
-
-      <!-- 경사도 빠른 계산 -->
-      <div style="margin:8px 12px 0;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:rgba(0,212,255,.03)">
-        <div class="usage-box-title" style="margin-bottom:8px">⚡ 빠른 경사도 계산</div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-          <span style="font-size:11px;color:var(--dim);width:50px">높이차</span>
-          <input type="number" id="slopeH" placeholder="m" style="flex:1;height:26px;padding:0 7px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;outline:none" oninput="calcQuickSlope()">
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-          <span style="font-size:11px;color:var(--dim);width:50px">수평거리</span>
-          <input type="number" id="slopeL" placeholder="m" style="flex:1;height:26px;padding:0 7px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;outline:none" oninput="calcQuickSlope()">
-        </div>
-        <div id="slopeResult" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim);min-height:32px;background:rgba(0,0,0,.2);border-radius:5px;padding:6px 8px">입력 후 자동 계산</div>
-      </div>
-    </div>
-  </div>
-
-</div>
-<div class="notif" id="notif"></div>
+</script>
 
 <script>
-// ── 카카오 지도 ──────────────────────────────────
-var kakaoMap = null, kakaoGeocoder = null, kakaoMarker = null;
-var cadastralLayer = null, cadastralOn = false;
+'use strict';
+/* ============================================================
+   G-DSP 경사도 검토 — 1단계: DXF 로드 + 자동감지 + 표시
+   오토슬럼프 호환 엔진 (2026-06-12 역공학 검증 사양)
+   - 허가지선: 닫힌 폴리곤, 면적비 3배 규칙으로 외곽선 제외
+   - 등고선: F0017111(주곡선)/F0017114(계곡선), elevation 속성
+   - 표고점: INSERT F0027217 좌표 + 30m 내 TEXT F0027132 값
+   ============================================================ */
 
-function initKakaoMap(){
-  if(!window.kakao||!window.kakao.maps){ setTimeout(initKakaoMap, 300); return; }
-  var container = document.getElementById('kakaoMapDiv');
-  if(!container) return;
-  var options = {center: new kakao.maps.LatLng(37.2055, 126.8317), level: 5};
-  kakaoMap = new kakao.maps.Map(container, options);
-  kakaoGeocoder = new kakao.maps.services.Geocoder();
-  kakaoMarker = new kakao.maps.Marker();
-  kakaoMarker.setMap(kakaoMap);
-  kakao.maps.event.addListener(kakaoMap, 'click', function(e){
-    var lat = e.latLng.getLat(), lng = e.latLng.getLng();
-    document.getElementById('mapCoord').textContent = lat.toFixed(5)+', '+lng.toFixed(5);
-  });
-}
-
-function doMapSearch(){
-  var q = document.getElementById('mapSearch').value.trim();
-  if(!q){ notify('지번을 입력하세요', 'warn'); return; }
-  if(!kakaoGeocoder){ notify('지도 초기화 중...', 'warn'); return; }
-  var searchQ = q.includes('화성') ? q : '화성시 ' + q;
-  kakaoGeocoder.addressSearch(searchQ, function(result, status){
-    if(status === kakao.maps.services.Status.OK){
-      var lat = parseFloat(result[0].y), lng = parseFloat(result[0].x);
-      var pos = new kakao.maps.LatLng(lat, lng);
-      kakaoMap.setCenter(pos);
-      kakaoMap.setLevel(3);
-      kakaoMarker.setPosition(pos);
-      document.getElementById('mapJibun').textContent = searchQ;
-      document.getElementById('mapCoord').textContent = lat.toFixed(5)+', '+lng.toFixed(5);
-      notify('✓ 지도 이동: '+searchQ);
-    } else {
-      notify('주소를 찾을 수 없습니다', 'warn');
-    }
-  });
-}
-
-function setMapType(type, btn){
-  if(!kakaoMap) return;
-  document.querySelectorAll('.map-hdr-btn').forEach(function(b){ if(b.id!=='mpCadastral') b.classList.remove('on'); });
-  btn.classList.add('on');
-  if(type === 'normal') kakaoMap.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
-  else if(type === 'skyview') kakaoMap.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
-}
-
-function toggleCadastral(btn){
-  if(!kakaoMap) return;
-  cadastralOn = !cadastralOn;
-  btn.classList.toggle('on', cadastralOn);
-  if(cadastralOn){
-    kakaoMap.addOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-  } else {
-    kakaoMap.removeOverlayMapTypeId(kakao.maps.MapTypeId.USE_DISTRICT);
-  }
-}
-
-// ── 빠른 경사도 계산 ──────────────────────────────
-function calcQuickSlope(){
-  var H = parseFloat(document.getElementById('slopeH').value);
-  var L = parseFloat(document.getElementById('slopeL').value);
-  var res = document.getElementById('slopeResult');
-  if(!H || !L || L <= 0){ res.textContent = '입력 후 자동 계산'; res.style.color = 'var(--dim)'; return; }
-  var pct = (H/L)*100;
-  var deg = Math.atan(H/L)*180/Math.PI;
-  var ratio = Math.round(L/H*10)/10;
-  var ok = deg <= 15;
-  res.innerHTML = '<span style="font-size:14px;font-weight:700;color:'+(ok?'#00ff9f':'#ff6b35')+'">'+pct.toFixed(1)+'%</span>'
-    +' <span style="color:var(--dim)">| '+deg.toFixed(2)+'° | 1:'+ratio+'</span><br>'
-    +'<span style="font-size:10px;color:'+(ok?'#00ff9f':'#ff6b35')+'">산지전용 15° 기준 '+(ok?'✓ 적합':'✗ 초과')+'</span>';
-}
-
-// ── FlowFree 분석 엔진 ────────────────────────────
 var S = {
-  contours:[],tinPts:[],tris:[],arrows:[],sections:[],layers:{},rawLines:[],srcLines:[],textPoints:[],
-  bounds:null,scale:1,ox:0,oy:0,tool:'pan',vis:{tin:false,con:true,slp:true,flw:true},
-  isDown:false,lastM:{x:0,y:0},secS:null,secE:null,zSamples:[],density:3000
+  fileName: null,
+  contours: [],   // {layer, elev, pts:[{x,y}], closed}
+  surveys: [],    // {x, y, val}  (val=표시용 실제 표고)
+  permit: null,   // {pts:[{x,y}], layer, area}
+  allPolys: [],   // 허가지선 후보 (닫힌 폴리곤 전부)
+  bounds: null,
+  // 분석 결과 (2단계)
+  gridCells: [],  // {minX,maxX,minY,maxY, slope, overlapArea}
+  avgSlope: null,
+  bins: null,     // 9개 구간 [0-5,5-10,...,40+]
+  totalArea: 0,
+  daejangArea: null, // 대장(공부)면적 — 사용자 입력. null이면 캐드 실측 사용
+  // TIN 캐시 (한 번만 계산, 절단선 이동 시 재사용)
+  triList: null,  // [{p0,p1,p2,slope,minX,maxX,minY,maxY}]
+  // 절단선 (3단계)
+  effectivePermit: null, // 잘린 새 경계 (닫힌 폴리곤) — DXF 출력용
+  cut: null,      // {pts:[{x,y}], baseP ts:[...], removeSide:'A'|'B', offset:{dx,dy}}
+                  // pts=현재 위치(평행이동 반영), basePts=원본 그린 위치
+  mode: 'view',   // 'view' | 'drawCut' | 'pickSide' | 'moveCut' | 'repick'
+  drawPts: [],    // 그리는 중 임시 점들
+  ghostPt: null,  // 그리는 중 마우스 위치 (고무줄 미리보기)
+  hoverSide: null,// pickSide 모드에서 마우스 올린 조각
+  cutPieces: null,// {A:[...], B:[...]} 두 조각 폴리곤 (pickSide/이동 시)
+  selCut: false,  // 절단선 전체 선택 상태(이동 가능)
+  hoverPoly: null,// repick 모드에서 마우스 올린 후보 폴리곤 인덱스
+  // 뷰
+  scale: 1, ox: 0, oy: 0,
+  isDown: false, lastM: null
 };
-var mc=document.getElementById('mc'),ctx=mc.getContext('2d');
-var sc=document.getElementById('sc'),sctx=sc.getContext('2d');
 
-window.onload=function(){
-  resize();
-  window.onresize=resize;
-  initUI();
-  initKakaoMap();
-  requestAnimationFrame(loop);
-};
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
 
-function resize(){
-  var ca=document.getElementById('ca');
-  mc.width=ca.clientWidth; mc.height=ca.clientHeight;
-  sc.width=document.querySelector('.rp').clientWidth;
-  sc.height=140;
-  if(S.bounds) fitView();
+/* ---------------- 유틸 ---------------- */
+function toast(msg, type){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type==='err' ? ' err' : '');
+  clearTimeout(t._tm);
+  t._tm = setTimeout(function(){ t.className=''; }, 2600);
+}
+function polyArea(pts){
+  var a = 0;
+  for(var i=0;i<pts.length;i++){
+    var j=(i+1)%pts.length;
+    a += pts[i].x*pts[j].y - pts[j].x*pts[i].y;
+  }
+  return Math.abs(a)/2;
 }
 
-function initUI(){
-  var upz=document.getElementById('upz'),fi=document.getElementById('fi');
-  upz.onclick=function(){fi.click();};
-  fi.onchange=function(e){handleFiles(e.target.files);};
-  document.getElementById('slS').oninput=function(e){
-    S.density=parseInt(e.target.value);
-    document.getElementById('valS').textContent=S.density.toLocaleString();
+/* ---------------- DXF 파서 ---------------- */
+function parseDXF(text){
+  var lines = text.split(/\r\n|\n/);
+  var contours=[], surveys=[], texts=[], polys=[];
+  var i=0, n=lines.length;
+
+  // 코드/값 페어 순회
+  function next(){ 
+    if(i>=n-1) return null;
+    var code = parseInt(lines[i].trim(),10);
+    var val = lines[i+1];
+    i+=2;
+    return {c:code, v:val};
+  }
+
+  // ENTITIES 섹션 찾기
+  var inEnt=false;
+  while(i<n-1){
+    var p = next();
+    if(!p) break;
+    if(p.c===2 && p.v.trim()==='ENTITIES'){ inEnt=true; break; }
+  }
+  if(!inEnt){ throw new Error('ENTITIES 섹션 없음'); }
+
+  var cur=null; // 현재 엔티티
+  function flush(){
+    if(!cur) return;
+    if(cur.type==='LWPOLYLINE' && cur.pts.length>=2){
+      var lay=(cur.layer||'').toUpperCase();
+      var ent={layer:cur.layer, elev:cur.elev||0, pts:cur.pts, closed:!!(cur.flags&1)};
+      // 등고선
+      if(lay==='F0017111'||lay==='F0017114'){
+        contours.push(ent);
+      }
+      // 닫힌 폴리곤 후보 (첫=끝 근접도 닫힘 취급)
+      var f=cur.pts[0], l=cur.pts[cur.pts.length-1];
+      var closed = (cur.flags&1) || (Math.hypot(f.x-l.x,f.y-l.y)<5);
+      if(closed && cur.pts.length>=3 && lay!=='F0017111' && lay!=='F0017114'){
+        polys.push({layer:cur.layer, pts:cur.pts, area:polyArea(cur.pts)});
+      }
+    }
+    else if(cur.type==='INSERT' && (cur.layer||'').toUpperCase()==='F0027217'){
+      surveys.push({x:cur.ix, y:cur.iy, z:(cur.iz||0), val:null});
+    }
+    else if(cur.type==='TEXT' && (cur.layer||'').toUpperCase()==='F0027132'){
+      var m=/^[\d.]+/.exec((cur.text||'').trim());
+      if(m) texts.push({x:cur.ix, y:cur.iy, val:parseFloat(m[0])});
+    }
+    cur=null;
+  }
+
+  while(i<n-1){
+    var p = next();
+    if(!p) break;
+    if(p.c===0){
+      var t=p.v.trim();
+      flush();
+      if(t==='ENDSEC') break;
+      if(t==='LWPOLYLINE') cur={type:t, pts:[], flags:0, elev:0, _px:null};
+      else if(t==='INSERT'||t==='TEXT') cur={type:t};
+      else cur=null;
+      continue;
+    }
+    if(!cur) continue;
+    var v=p.v;
+    switch(p.c){
+      case 8: cur.layer=v.trim(); break;
+      case 38: if(cur.type==='LWPOLYLINE') cur.elev=parseFloat(v)||0; break;
+      case 70: if(cur.type==='LWPOLYLINE') cur.flags=parseInt(v,10)||0; break;
+      case 10:
+        if(cur.type==='LWPOLYLINE'){ cur._px=parseFloat(v); }
+        else { cur.ix=parseFloat(v); }
+        break;
+      case 20:
+        if(cur.type==='LWPOLYLINE' && cur._px!==null){
+          cur.pts.push({x:cur._px, y:parseFloat(v)});
+          cur._px=null;
+        } else { cur.iy=parseFloat(v); }
+        break;
+      case 30:
+        // INSERT/TEXT 의 z좌표 (표고점 INSERT의 실제 표고)
+        if(cur.type==='INSERT'||cur.type==='TEXT') cur.iz=parseFloat(v);
+        break;
+      case 1: if(cur.type==='TEXT') cur.text=v; break;
+    }
+  }
+  flush();
+
+  // 표고점에 값 매칭 (30m 내 가장 가까운 텍스트 — 표시용)
+  surveys.forEach(function(s){
+    var best=null, bd=1e18;
+    texts.forEach(function(t){
+      var d=Math.hypot(t.x-s.x, t.y-s.y);
+      if(d<bd){ bd=d; best=t; }
+    });
+    if(best && bd<30) s.val=best.val;
+  });
+
+  return {contours:contours, surveys:surveys, polys:polys};
+}
+
+/* ---------------- 허가지선 자동 감지 ----------------
+   오늘 검증된 규칙: 닫힌 폴리곤들 중 면적 정렬,
+   1위가 2위의 3배 이상이면 1위는 도면 외곽선 → 2위 선택 */
+function detectPermit(polys){
+  if(!polys.length) return null;
+  var sorted = polys.slice().sort(function(a,b){ return b.area-a.area; });
+  if(sorted.length>=2 && sorted[0].area/sorted[1].area>3){
+    return sorted[1];
+  }
+  return sorted[0];
+}
+
+/* ---------------- 파일 로드 ---------------- */
+function loadFile(file){
+  if(!/\.dxf$/i.test(file.name)){ toast('DXF 파일만 가능해요','err'); return; }
+  document.getElementById('hdrStat').textContent='읽는 중...';
+  var fr=new FileReader();
+  fr.onload=function(){
+    var text;
+    try{ text=new TextDecoder('utf-8',{fatal:true}).decode(fr.result); }
+    catch(e){ text=new TextDecoder('euc-kr').decode(fr.result); }
+    try{
+      var r=parseDXF(text);
+      applyParsed(file.name, r);
+    }catch(err){
+      toast('파싱 실패: '+err.message,'err');
+      document.getElementById('hdrStat').textContent='오류';
+    }
   };
-  document.getElementById('btnRun').onclick=runAnalysis;
-  ['tin','con','slp','flw'].forEach(function(k){
-    var el=document.getElementById('tog'+k.charAt(0).toUpperCase()+k.slice(1));
-    el.onclick=function(){
-      S.vis[k]=!S.vis[k];
-      el.classList.toggle('on',S.vis[k]);
-      if(k==='slp') document.getElementById('legSlp').style.opacity=S.vis[k]?1:0.3;
-    };
-  });
-  document.querySelectorAll('.tb').forEach(function(b){
-    b.onclick=function(){
-      document.querySelectorAll('.tb').forEach(function(x){x.classList.remove('act');});
-      b.classList.add('act'); S.tool=b.dataset.t;
-      if(S.tool!=='sec'){S.secS=null;S.secE=null;clearSection();}
-    };
-  });
-  mc.onmousedown=onDown;
-  window.onmousemove=onMove;
-  window.onmouseup=onUp;
-  mc.onwheel=onWheel;
-  var cad=document.getElementById('ca');
-  cad.ondragover=function(e){e.preventDefault();document.getElementById('caDrop').classList.add('active');};
-  cad.ondragleave=function(){document.getElementById('caDrop').classList.remove('active');};
-  cad.ondrop=function(e){e.preventDefault();document.getElementById('caDrop').classList.remove('active');handleFiles(e.dataTransfer.files);};
-  document.getElementById('btnExpPNG').onclick=exportPNG;
-  document.getElementById('btnExpDXF').onclick=exportDXF;
+  fr.readAsArrayBuffer(file);
 }
 
-function handleFiles(files){
-  if(!files.length) return;
-  notify('파일 분석 중...');
-  var pb=document.getElementById('pb'),pf=document.getElementById('pf');
-  pb.style.display='block';pf.style.width='10%';
-  var allContours=[],allLayers={},allRaw=[],allSrc=[];
-  var done=0;
-  for(var i=0;i<files.length;i++){
-    var reader=new FileReader();
-    reader.onload=(function(f){
-      return function(e){
-        var res=parseDXFBytes(e.target.result);
-        allContours=allContours.concat(res.contours);
-        allRaw=allRaw.concat(res.rawLines);
-        allSrc=allSrc.concat(res.srcLines);
-        for(var k in res.layers) allLayers[k]=(allLayers[k]||[]).concat(res.layers[k]);
-        done++;
-        pf.style.width=(done/files.length*100)+'%';
-        if(done===files.length){
-          S.contours=allContours;S.layers=allLayers;S.rawLines=allRaw;S.srcLines=allSrc;
-          setTimeout(function(){
-            pb.style.display='none';
-            if(S.contours.length||S.rawLines.length) runAnalysis();
-            else notify('유효한 등고선 데이터를 찾지 못했습니다','warn');
-          },300);
-        }
-      };
-    })(files[i]);
-    reader.readAsArrayBuffer(files[i]);
+function applyParsed(name, r){
+  S.fileName=name;
+  S.contours=r.contours;
+  S.surveys=r.surveys;
+  S.allPolys=r.polys;
+  S.permit=detectPermit(r.polys);
+  // 새 도면이므로 이전 분석/절단선 캐시 비움
+  S.triList=null; S.effectivePermit=null; S.cut=null; S.cutPieces=null;
+  S.gridCells=[]; S.mode='view'; S.drawPts=[]; S.ghostPt=null; S.selCut=false; S.hoverSide=null;
+  S.daejangArea=null;
+  var daIn=document.getElementById('daejangArea'); if(daIn) daIn.value='';
+  var ci=document.getElementById('corrInfo'); if(ci) ci.style.display='none';
+  var rb=document.getElementById('btnResetArea'); if(rb) rb.style.display='none';
+  document.getElementById('cutSec').style.display='none';
+  document.getElementById('cutCtrl').style.display='none';
+  document.getElementById('resultPanel').style.display='none';
+
+  // 감지 현황 UI
+  setDet('detCont', r.contours.length>0, r.contours.length+'개');
+  setDet('detSurv', r.surveys.length>0, r.surveys.length+'개');
+  if(S.permit){
+    setDet('detPermit', true, Math.round(S.permit.area).toLocaleString()+'㎡');
+  } else {
+    setDet('detPermit', false, '없음');
   }
+
+  // 바운드 계산 (허가지선 중심으로, 없으면 전체)
+  computeBounds();
+  fitView();
+  document.getElementById('empty').style.display='none';
+  document.getElementById('legend').style.display='block';
+  document.getElementById('btnRun').disabled = !(S.contours.length && S.permit);
+  // 후보 폴리곤이 2개 이상이면 재선택 버튼 노출
+  document.getElementById('btnRepick').style.display = (S.allPolys && S.allPolys.length>=1) ? 'block' : 'none';
+  document.getElementById('hdrStat').textContent =
+    name + ' · 등고선 ' + S.contours.length + ' · 표고점 ' + S.surveys.length;
+
+  if(!S.permit) toast('허가지선(닫힌 폴리곤)을 못 찾았어요','err');
+  else if(!S.contours.length) toast('등고선(F0017111/F0017114)이 없어요','err');
+  else toast('자동 감지 완료 — 분석 실행을 눌러주세요');
+  render();
 }
 
-function parseDXFBytes(buffer){
-  var text;
-  var encodings=['euc-kr','cp949','utf-8'];
-  for(var ei=0;ei<encodings.length;ei++){
-    try{var dec=new TextDecoder(encodings[ei],{fatal:true});text=dec.decode(buffer);break;}catch(e){}
-  }
-  if(!text) text=new TextDecoder('utf-8',{fatal:false}).decode(buffer);
-  return parseDXFText(text);
+function setDet(id, ok, txt){
+  var el=document.getElementById(id);
+  el.className='det-row'+(ok?' ok':'');
+  el.querySelector('.ct').textContent=txt;
 }
 
-function parseDXFText(text){
-  var lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
-  var contours=[],layers={},rawLines=[];
-  var i=0;
-  function sf(s){var v=parseFloat(s);return isNaN(v)?null:v;}
-  function validCoord(x,y){return x!==null&&y!==null&&(Math.abs(x)>100||Math.abs(y)>100);}
-  var LAYER_INTERVAL={'B0014112':50,'B0014116':50,'B0014111':10,'B0014113':10,'B0014117':10,'B0014118':5,'B0014114':5,'B0014119':5};
-  function addEntity(layer,elev,pts,hasElev){
-    if(!pts||pts.length<2) return;
-    if(!validCoord(pts[0].x,pts[0].y)) return;
-    if(!layers[layer]) layers[layer]=[];
-    layers[layer].push({elev:elev,pts:pts,hasElev:!!hasElev});
-    rawLines.push({layer:layer,elev:elev,pts:pts,hasElev:!!hasElev});
-    if(hasElev&&elev!==0) contours.push({elev:elev,pts:pts,layer:layer});
+function computeBounds(){
+  var minX=1e18,minY=1e18,maxX=-1e18,maxY=-1e18;
+  function eat(p){ if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; }
+  if(S.permit){
+    S.permit.pts.forEach(eat);
+    // 허가지선 주변 80m 여유로 보기 좋게
+    var pad=80;
+    minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
+  } else {
+    S.contours.forEach(function(c){ c.pts.forEach(eat); });
   }
-  while(i<lines.length-1){
-    var code=lines[i].trim();i++;
-    var val=(i<lines.length)?lines[i].trim():'';i++;
-    if(code==='0'&&(val==='LWPOLYLINE'||val==='POLYLINE')){
-      var layer='0',elev=0,hasElev=false,pts=[],cx=null,cy=null;
-      while(i<lines.length-1){
-        var c2=lines[i].trim();if(c2==='0') break;
-        var v2=(i+1<lines.length)?lines[i+1].trim():'';i+=2;
-        if(c2==='8') layer=v2;
-        else if(c2==='38'||c2==='30'){var fe=sf(v2);if(fe!==null){elev=fe;hasElev=true;}}
-        else if(c2==='10'){if(cx!==null&&cy!==null)pts.push({x:cx,y:cy});cx=sf(v2);}
-        else if(c2==='20') cy=sf(v2);
-      }
-      if(cx!==null&&cy!==null) pts.push({x:cx,y:cy});
-      addEntity(layer,elev,pts,hasElev);
-    }
-  }
-  var textPoints=[];i=0;
-  while(i<lines.length-1){
-    var tc=lines[i].trim();i++;var tv=(i<lines.length)?lines[i].trim():'';i++;
-    if(tc==='0'&&(tv==='TEXT'||tv==='MTEXT')){
-      var tx=null,ty=null,tstr='',tlay='';
-      while(i<lines.length-1){
-        var tc2=lines[i].trim();if(tc2==='0') break;
-        var tv2=(i+1<lines.length)?lines[i+1].trim():'';i+=2;
-        if(tc2==='10') tx=sf(tv2);else if(tc2==='20') ty=sf(tv2);
-        else if(tc2==='1') tstr=tv2;else if(tc2==='8') tlay=tv2;
-      }
-      if(tx!==null&&ty!==null&&tstr&&validCoord(tx,ty)){
-        var numMatch=tstr.match(/([0-9]+(?:\.[0-9]+)?)/);
-        if(numMatch){var numVal=parseFloat(numMatch[1]);if(isFinite(numVal)&&numVal>=1)textPoints.push({x:tx,y:ty,val:numVal,layer:tlay});}
-      }
-    }
-  }
-  S.textPoints=(S.textPoints||[]).concat(textPoints);
-  if(textPoints.length>0){
-    for(var lname in layers){
-      var interval=LAYER_INTERVAL[lname];if(!interval) continue;
-      layers[lname].forEach(function(item){
-        if(item.hasElev&&item.elev!==0) return;
-        var wSum=0,vSum=0;
-        textPoints.forEach(function(tp){
-          var minD2=Infinity;
-          for(var pi=0;pi<item.pts.length;pi+=Math.max(1,Math.floor(item.pts.length/8))){
-            var d2=Math.pow(item.pts[pi].x-tp.x,2)+Math.pow(item.pts[pi].y-tp.y,2);
-            if(d2<minD2) minD2=d2;
-          }
-          if(minD2<1){wSum=1;vSum=tp.val;return;}
-          var w=1/minD2;wSum+=w;vSum+=w*tp.val;
-        });
-        if(wSum>0){
-          var snapped=Math.round((vSum/wSum)/interval)*interval;
-          item.elev=snapped;item.hasElev=true;
-          contours.push({elev:snapped,pts:item.pts,layer:lname});
-        }
-      });
-    }
-  }
-  return{contours:contours,layers:layers,rawLines:rawLines,srcLines:lines};
+  S.bounds={minX:minX,minY:minY,maxX:maxX,maxY:maxY};
 }
 
-function runAnalysis(){
-  if(!S.contours.length&&!S.rawLines.length){notify('데이터가 없습니다','warn');return;}
-  var allXs=[],allYs=[];
-  S.rawLines.forEach(function(r){r.pts.forEach(function(p){allXs.push(p.x);allYs.push(p.y);});});
-  var pts=[],zSamples=[];
-  var totalLen=0;
-  S.contours.forEach(function(c){for(var i=0;i<c.pts.length-1;i++)totalLen+=dist(c.pts[i],c.pts[i+1]);});
-  var sampleDist=Math.max(totalLen/S.density,0.5);
-  S.contours.forEach(function(c){
-    var acc=0;pts.push({x:c.pts[0].x,y:c.pts[0].y,z:c.elev});zSamples.push({x:c.pts[0].x,y:c.pts[0].y,z:c.elev});
-    for(var i=1;i<c.pts.length;i++){
-      var d=dist(c.pts[i-1],c.pts[i]);acc+=d;
-      if(acc>=sampleDist){pts.push({x:c.pts[i].x,y:c.pts[i].y,z:c.elev});zSamples.push({x:c.pts[i].x,y:c.pts[i].y,z:c.elev});acc=0;}
-      else if(acc>=sampleDist*0.3) zSamples.push({x:c.pts[i].x,y:c.pts[i].y,z:c.elev});
-    }
-  });
-  if(S.contours.length>1){
-    for(var ci=0;ci<S.contours.length-1;ci++){
-      var c1=S.contours[ci],c2=S.contours[ci+1];
-      if(Math.abs(c1.elev-c2.elev)>0.1){
-        var cx1=0,cy1=0,cx2=0,cy2=0;
-        c1.pts.forEach(function(p){cx1+=p.x;cy1+=p.y;});cx1/=c1.pts.length;cy1/=c1.pts.length;
-        c2.pts.forEach(function(p){cx2+=p.x;cy2+=p.y;});cx2/=c2.pts.length;cy2/=c2.pts.length;
-        var midZ=(c1.elev+c2.elev)/2;
-        for(var k=1;k<4;k++){var t=k/4;pts.push({x:cx1+(cx2-cx1)*t,y:cy1+(cy2-cy1)*t,z:midZ});}
-      }
-    }
-  }
-  S.textPoints.forEach(function(tp){zSamples.push({x:tp.x,y:tp.y,z:tp.val});if(tp.layer==='_SURVEY_PT'||tp.layer==='F0011111')pts.push({x:tp.x,y:tp.y,z:tp.val});});
-  var seen={},clean=[];
-  pts.forEach(function(p){var k=p.x.toFixed(1)+','+p.y.toFixed(1);if(!seen[k]){seen[k]=1;clean.push(p);}});
-  S.tinPts=clean;S.zSamples=zSamples;
-  var zs=clean.map(function(p){return p.z;});
-  S.bounds={minX:Math.min.apply(null,allXs),maxX:Math.max.apply(null,allXs),minY:Math.min.apply(null,allYs),maxY:Math.max.apply(null,allYs),minZ:Math.min.apply(null,zs),maxZ:Math.max.apply(null,zs)};
-  document.getElementById('minE').textContent=S.bounds.minZ.toFixed(1)+'m';
-  document.getElementById('maxE').textContent=S.bounds.maxZ.toFixed(1)+'m';
-  document.getElementById('emp').style.display='none';
-  document.getElementById('minfo').style.display='block';
-  notify('정밀 삼각망 생성 중...');
-  setTimeout(function(){S.tris=bowyer(S.tinPts);calculateSlopes();updateLayerList();fitView();notify('분석 완료!');},50);
+/* ---------------- 뷰 (줌/팬) ---------------- */
+function resize(){
+  var w=document.getElementById('cvWrap');
+  cv.width=w.clientWidth; cv.height=w.clientHeight;
+  render();
 }
-
-function bowyer(pts){
-  var n=pts.length,b=S.bounds,d=Math.max(b.maxX-b.minX,b.maxY-b.minY)*20;
-  var mx=(b.minX+b.maxX)/2,my=(b.minY+b.maxY)/2;
-  var all=pts.concat([{x:mx-d,y:my-d,z:0},{x:mx,y:my+d*2,z:0},{x:mx+d*2,y:my-d,z:0}]);
-  var s0=n,s1=n+1,s2=n+2;
-  var tris=[{a:s0,b:s1,c:s2,del:false}];
-  for(var i=0;i<n;i++){
-    var p=all[i],edges=[];
-    for(var j=0;j<tris.length;j++){var t=tris[j];if(t.del)continue;if(inCirc(all[t.a],all[t.b],all[t.c],p)){t.del=true;edges.push([t.a,t.b],[t.b,t.c],[t.c,t.a]);}}
-    var edgeCount={};
-    edges.forEach(function(e){var k=Math.min(e[0],e[1])+"_"+Math.max(e[0],e[1]);edgeCount[k]=(edgeCount[k]||0)+1;});
-    edges.forEach(function(e){var k=Math.min(e[0],e[1])+"_"+Math.max(e[0],e[1]);if(edgeCount[k]===1)tris.push({a:e[0],b:e[1],c:i,del:false});});
-  }
-  for(var ci=0;ci<S.contours.length;ci++){
-    var c=S.contours[ci];
-    for(var pi=0;pi<c.pts.length-1;pi++){
-      var idx1=findPt(pts,c.pts[pi]),idx2=findPt(pts,c.pts[pi+1]);
-      if(idx1>=0&&idx2>=0&&idx1!==idx2) insertConstraint(tris,all,idx1,idx2);
-    }
-  }
-  var avgNND=(b.maxX-b.minX+b.maxY-b.minY)/2/Math.sqrt(n),maxEdge=avgNND*25;
-  return tris.filter(function(t){
-    if(t.del||t.a>=n||t.b>=n||t.c>=n) return false;
-    var Pa=all[t.a],Pb=all[t.b],Pc=all[t.c];
-    return dist(Pa,Pb)<maxEdge&&dist(Pb,Pc)<maxEdge&&dist(Pc,Pa)<maxEdge;
-  });
-}
-
-function insertConstraint(tris,pts,ai,bi){
-  if(edgeExists(tris,ai,bi)) return;
-  var iter=0,A=pts[ai],B=pts[bi];
-  while(!edgeExists(tris,ai,bi)&&iter<300){
-    iter++;var flipped=false;
-    for(var ti=0;ti<tris.length;ti++){
-      if(tris[ti].del) continue;
-      var t=tris[ti],verts=[t.a,t.b,t.c];
-      for(var ei=0;ei<3;ei++){
-        var u=verts[ei],v=verts[(ei+1)%3];
-        if(u===ai||u===bi||v===ai||v===bi) continue;
-        if(!segsIntersect(A,B,pts[u],pts[v])) continue;
-        var adj=-1;
-        for(var tj=0;tj<tris.length;tj++){if(tj===ti||tris[tj].del)continue;var tv=tris[tj];if((tv.a===u||tv.b===u||tv.c===u)&&(tv.a===v||tv.b===v||tv.c===v)){adj=tj;break;}}
-        if(adj<0) continue;
-        var wa=tris[adj],w3=-1,w4=-1;
-        [wa.a,wa.b,wa.c].forEach(function(x){if(x!==u&&x!==v)w3=x;});
-        [t.a,t.b,t.c].forEach(function(x){if(x!==u&&x!==v)w4=x;});
-        if(w3<0||w4<0) continue;
-        if(orient2(pts[u],pts[w3],pts[v])*orient2(pts[u],pts[w4],pts[v])>=0) continue;
-        tris[ti].del=true;tris[adj].del=true;
-        var nt1={a:u,b:w3,c:w4,del:false},nt2={a:v,b:w4,c:w3,del:false};
-        if(orient2(pts[nt1.a],pts[nt1.b],pts[nt1.c])<0){var tmp=nt1.b;nt1.b=nt1.c;nt1.c=tmp;}
-        if(orient2(pts[nt2.a],pts[nt2.b],pts[nt2.c])<0){var tmp=nt2.b;nt2.b=nt2.c;nt2.c=tmp;}
-        tris.push(nt1,nt2);flipped=true;break;
-      }
-      if(flipped) break;
-    }
-    if(!flipped) break;
-  }
-}
-
-function calculateSlopes(){
-  var maxS=0;S.arrows=[];
-  S.tris.forEach(function(t){
-    var p1=S.tinPts[t.a],p2=S.tinPts[t.b],p3=S.tinPts[t.c];
-    var ux=p2.x-p1.x,uy=p2.y-p1.y,uz=p2.z-p1.z;
-    var vx=p3.x-p1.x,vy=p3.y-p1.y,vz=p3.z-p1.z;
-    var nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
-    if(Math.abs(nz)<1e-6){t.slope=0;return;}
-    var sx=-nx/nz,sy=-ny/nz,slope=Math.sqrt(sx*sx+sy*sy);
-    t.slope=slope;if(slope>maxS)maxS=slope;
-    if(Math.random()>0.8){var mx=(p1.x+p2.x+p3.x)/3,my=(p1.y+p2.y+p3.y)/3;if(slope>0.01)S.arrows.push({x:mx,y:my,dx:sx/slope,dy:sy/slope});}
-  });
-  document.getElementById('statTris').innerHTML='삼각형: <b>'+S.tris.length.toLocaleString()+'</b>';
-  document.getElementById('statSlope').innerHTML='최대경사: <b>'+(maxS*100).toFixed(1)+'%</b>';
-}
-
-function loop(){render();requestAnimationFrame(loop);}
-function render(){
-  ctx.clearRect(0,0,mc.width,mc.height);
+function fitView(){
   if(!S.bounds) return;
-  if(S.vis.slp){S.tris.forEach(function(t){var p1=w2s(S.tinPts[t.a]),p2=w2s(S.tinPts[t.b]),p3=w2s(S.tinPts[t.c]);var s=Math.min(t.slope*2,1);ctx.fillStyle='hsla('+(120-s*120)+',70%,50%,0.4)';ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.fill();});}
-  if(S.vis.tin){ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=0.5;S.tris.forEach(function(t){var p1=w2s(S.tinPts[t.a]),p2=w2s(S.tinPts[t.b]),p3=w2s(S.tinPts[t.c]);ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.closePath();ctx.stroke();});}
-  if(S.vis.con){ctx.lineWidth=1;S.contours.forEach(function(c){var t=(c.elev-S.bounds.minZ)/(S.bounds.maxZ-S.bounds.minZ||1);ctx.strokeStyle='hsla('+(240-t*240)+',80%,60%,0.8)';ctx.beginPath();c.pts.forEach(function(p,i){var s=w2s(p);if(i===0)ctx.moveTo(s.x,s.y);else ctx.lineTo(s.x,s.y);});ctx.stroke();});}
-  if(S.vis.flw){ctx.strokeStyle='rgba(56,189,248,0.6)';ctx.lineWidth=1;S.arrows.forEach(function(a){var s=w2s(a);ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x+a.dx*10,s.y-a.dy*10);ctx.stroke();});}
-  if(S.secS&&S.secE){var p1=w2s(S.secS),p2=w2s(S.secE);ctx.strokeStyle='#38bdf8';ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();ctx.setLineDash([]);}
+  var b=S.bounds, pad=40;
+  var dx=b.maxX-b.minX, dy=b.maxY-b.minY;
+  S.scale=Math.min((cv.width-pad*2)/(dx||1),(cv.height-pad*2)/(dy||1));
+  S.ox=(cv.width-dx*S.scale)/2 - b.minX*S.scale;
+  S.oy=(cv.height-dy*S.scale)/2 - b.minY*S.scale;
+  render();
+}
+function zoomBy(f){
+  var cx=cv.width/2, cy=cv.height/2;
+  zoomAt(cx,cy,f);
+}
+function zoomAt(sx,sy,f){
+  var w=s2w(sx,sy);
+  S.scale*=f;
+  S.ox=sx-w.x*S.scale;
+  S.oy=(cv.height-sy)-w.y*S.scale;
+  render();
+}
+function w2s(p){ return {x:p.x*S.scale+S.ox, y:cv.height-(p.y*S.scale+S.oy)}; }
+function s2w(x,y){ return {x:(x-S.ox)/S.scale, y:(cv.height-y-S.oy)/S.scale}; }
+
+/* 화면좌표 → 월드좌표 헬퍼 (이벤트용) */
+function evWorld(e){
+  var r=cv.getBoundingClientRect();
+  return s2w(e.clientX-r.left, e.clientY-r.top);
 }
 
-function dist(p1,p2){return Math.sqrt(Math.pow(p1.x-p2.x,2)+Math.pow(p1.y-p2.y,2));}
-function w2s(p){return{x:p.x*S.scale+S.ox,y:mc.height-(p.y*S.scale+S.oy)};}
-function s2w(x,y){return{x:(x-S.ox)/S.scale,y:(mc.height-y-S.oy)/S.scale};}
-function findPt(pts,p){for(var i=0;i<pts.length;i++){if(Math.abs(pts[i].x-p.x)<0.1&&Math.abs(pts[i].y-p.y)<0.1)return i;}return -1;}
-function inCirc(A,B,C,P){var ax=A.x-P.x,ay=A.y-P.y,bx=B.x-P.x,by=B.y-P.y,cx=C.x-P.x,cy=C.y-P.y;var det=(ax*ax+ay*ay)*(bx*cy-by*cx)-(bx*bx+by*by)*(ax*cy-ay*cx)+(cx*cx+cy*cy)*(ax*by-ay*bx);var area=(B.x-A.x)*(C.y-A.y)-(B.y-A.y)*(C.x-A.x);return area>0?det>1e-7:det<-1e-7;}
-function orient2(A,B,C){return(B.x-A.x)*(C.y-A.y)-(B.y-A.y)*(C.x-A.x);}
-function segsIntersect(A,B,C,D){var f1=orient2(A,B,C),f2=orient2(A,B,D),f3=orient2(C,D,A),f4=orient2(C,D,B);return((f1>0&&f2<0)||(f1<0&&f2>0))&&((f3>0&&f4<0)||(f3<0&&f4>0));}
-function edgeExists(tris,ai,bi){for(var i=0;i<tris.length;i++){var t=tris[i];if(t.del)continue;if((t.a===ai&&t.b===bi)||(t.b===ai&&t.a===bi)||(t.b===ai&&t.c===bi)||(t.c===ai&&t.b===bi)||(t.a===ai&&t.c===bi)||(t.c===ai&&t.a===bi))return true;}return false;}
-function fitView(){var b=S.bounds,pad=60,sw=mc.width-pad*2,sh=mc.height-pad*2;var dx=b.maxX-b.minX,dy=b.maxY-b.minY;S.scale=Math.min(sw/(dx||1),sh/(dy||1));S.ox=(mc.width-dx*S.scale)/2-b.minX*S.scale;S.oy=(mc.height-dy*S.scale)/2-b.minY*S.scale;}
-function notify(msg,type){var n=document.getElementById('notif');n.textContent=msg;n.style.display='block';n.style.borderColor=type==='warn'?'#ef4444':'#00d4ff';setTimeout(function(){n.style.display='none';},3000);}
-function updateLayerList(){var h='';for(var k in S.layers)h+='<div class="litem"><div class="ldot" style="background:#00d4ff"></div><div class="lname">'+k+'</div><div class="lcnt">'+S.layers[k].length+'</div></div>';document.getElementById('layerList').innerHTML=h;}
-function onDown(e){var rect=mc.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;S.isDown=true;S.lastM={x:x,y:y};if(S.tool==='sec'){S.secS=s2w(x,y);S.secE=null;}}
-function onMove(e){
-  var rect=mc.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
-  if(S.isDown){
-    if(S.tool==='pan'){S.ox+=x-S.lastM.x;S.oy-=y-S.lastM.y;S.lastM={x:x,y:y};}
-    else if(S.tool==='sec'){S.secE=s2w(x,y);updateSection();}
+cv.addEventListener('mousedown',function(e){
+  var w=evWorld(e);
+  // 절단선 이동 모드: 선 근처를 누르면 드래그 시작
+  if(S.mode==='moveCut' && S.cut){
+    var near=false, thr=8/S.scale;
+    for(var i=0;i<S.cut.pts.length-1;i++){
+      if(distToSeg(w, S.cut.pts[i], S.cut.pts[i+1])<thr){ near=true; break; }
+    }
+    if(near){
+      S.draggingCut=true; S.lastW=w;
+      cv.style.cursor='grabbing';
+      return;
+    }
   }
-  if(S.bounds){
-    var wp=s2w(x,y);
-    document.getElementById('curX').textContent=wp.x.toFixed(1);
-    document.getElementById('curY').textContent=wp.y.toFixed(1);
-    var bZ=0,bD=50/S.scale;
-    S.tinPts.forEach(function(p){var d=dist(p,wp);if(d<bD){bD=d;bZ=p.z;}});
-    document.getElementById('curZ').textContent=bZ?bZ.toFixed(2)+'m':'-';
-    document.getElementById('statZ').innerHTML='Z: <b>'+(bZ?bZ.toFixed(1):'-')+'m</b>';
+  // 기본: 화면 팬
+  S.isDown=true; S.lastM={x:e.clientX,y:e.clientY};
+  cv.classList.add('grabbing');
+});
+
+window.addEventListener('mousemove',function(e){
+  // 절단선 그리는 중: 마우스 위치를 고무줄로 미리보기
+  if(S.mode==='drawCut' && S.drawPts.length){
+    S.ghostPt=evWorld(e);
+    render();
+    return;
+  }
+  // 절단선 드래그
+  if(S.draggingCut && S.cut){
+    var w=evWorld(e);
+    moveCutBy(w.x-S.lastW.x, w.y-S.lastW.y);
+    S.lastW=w;
+    previewCut();
+    return;
+  }
+  // 조각 선택 모드: 마우스 올린 조각 하이라이트
+  if(S.mode==='pickSide' && S.cutPieces){
+    var wp=evWorld(e);
+    var inA=pointInPoly(wp,S.cutPieces.A), inB=pointInPoly(wp,S.cutPieces.B);
+    var hs = (inA&&!inB)?'A':(inB&&!inA)?'B':null;
+    if(hs!==S.hoverSide){ S.hoverSide=hs; render(); }
+    return;
+  }
+  // 재선택 모드: 마우스 올린 후보 폴리곤 하이라이트 (순환 인덱스와 무관, 미리보기용)
+  if(S.mode==='repick'){
+    var wr=evWorld(e);
+    var list=polysAt(wr.x, wr.y);
+    var hp = list.length ? list[0] : -1;
+    if(hp!==S.hoverPoly){ S.hoverPoly=hp; render(); }
+    return;
+  }
+  // 화면 팬
+  if(!S.isDown) return;
+  S.ox+=e.clientX-S.lastM.x;
+  S.oy-=e.clientY-S.lastM.y;
+  S.lastM={x:e.clientX,y:e.clientY};
+  render();
+});
+
+window.addEventListener('mouseup',function(){
+  if(S.draggingCut){
+    S.draggingCut=false;
+    cv.style.cursor='move';
+    // 손 떼면 확정값(오토) 재계산
+    document.getElementById('avgNum').style.opacity='1';
+    applyCut();
+  }
+  S.isDown=false; cv.classList.remove('grabbing');
+});
+
+/* 클릭(그리기 점 추가 / 조각 선택 / 허가지선 재선택) */
+cv.addEventListener('click',function(e){
+  if(S.dragMoved){ S.dragMoved=false; return; }
+  var w=evWorld(e);
+  if(S.mode==='drawCut'){ addDrawPt(w.x, w.y); }
+  else if(S.mode==='pickSide'){ pickSide(w.x, w.y); }
+  else if(S.mode==='repick'){ pickPermit(w.x, w.y); }
+});
+
+/* 더블클릭 = 그리기 종료 */
+cv.addEventListener('dblclick',function(e){
+  e.preventDefault();
+  if(S.mode==='drawCut'){
+    // 더블클릭은 click 2번을 유발 → 마지막 중복점 제거
+    if(S.drawPts.length>=2){
+      var a=S.drawPts[S.drawPts.length-1], b=S.drawPts[S.drawPts.length-2];
+      if(Math.hypot(a.x-b.x,a.y-b.y) < 3/S.scale) S.drawPts.pop();
+    }
+    finishDrawCut();
+  }
+});
+
+/* 방향키 미세이동 */
+window.addEventListener('keydown',function(e){
+  if(S.mode!=='moveCut'||!S.cut) return;
+  var fine=e.shiftKey, handled=true;
+  if(e.key==='ArrowUp') nudgeCut(0,1,fine);
+  else if(e.key==='ArrowDown') nudgeCut(0,-1,fine);
+  else if(e.key==='ArrowLeft') nudgeCut(-1,0,fine);
+  else if(e.key==='ArrowRight') nudgeCut(1,0,fine);
+  else handled=false;
+  if(handled) e.preventDefault();
+});
+
+cv.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var r=cv.getBoundingClientRect();
+  zoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.15:1/1.15);
+},{passive:false});
+
+/* ---------------- 렌더 ---------------- */
+function render(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if(!S.bounds) return;
+
+  // ── 분석 결과 격자 (등고선 아래에 그려서 등고선이 위에 보임)
+  if(S.gridCells && S.gridCells.length){
+    S.gridCells.forEach(function(cell){
+      var tl=w2s({x:cell.minX,y:cell.maxY});
+      var br=w2s({x:cell.maxX,y:cell.minY});
+      var w=br.x-tl.x, h=br.y-tl.y;
+      if(w<0.3||h<0.3) return;
+      ctx.fillStyle=slopeColor(cell.slope, 0.55);
+      ctx.fillRect(tl.x,tl.y,w,h);
+    });
+  }
+
+  // ── 등고선 (Z 그라데이션: 낮음=어두운 청회 → 높음=밝은 회)
+  var zmin=1e18,zmax=-1e18;
+  S.contours.forEach(function(c){ if(c.elev<zmin)zmin=c.elev; if(c.elev>zmax)zmax=c.elev; });
+  var zr=(zmax-zmin)||1;
+
+  S.contours.forEach(function(c){
+    var t=(c.elev-zmin)/zr;
+    var isIndex=(c.layer||'').toUpperCase()==='F0017114'; // 계곡선=굵게
+    var g=Math.round(70+110*t);
+    ctx.strokeStyle='rgb('+g+','+(g+8)+','+(g+22)+')';
+    ctx.lineWidth=isIndex?1.6:0.8;
+    ctx.beginPath();
+    c.pts.forEach(function(p,idx){
+      var s=w2s(p);
+      if(idx===0)ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y);
+    });
+    if(c.closed)ctx.closePath();
+    ctx.stroke();
+  });
+
+  // ── 표고점 (✕ + 값)
+  ctx.font='10px sans-serif';
+  S.surveys.forEach(function(s){
+    var p=w2s(s);
+    if(p.x<-20||p.x>cv.width+20||p.y<-20||p.y>cv.height+20)return;
+    ctx.strokeStyle='#fbbf24';
+    ctx.lineWidth=1.4;
+    ctx.beginPath();
+    ctx.moveTo(p.x-4,p.y-4);ctx.lineTo(p.x+4,p.y+4);
+    ctx.moveTo(p.x+4,p.y-4);ctx.lineTo(p.x-4,p.y+4);
+    ctx.stroke();
+    if(s.val!==null && S.scale>1.2){
+      ctx.fillStyle='#fbbf24';
+      ctx.fillText(s.val.toFixed(1), p.x+6, p.y-5);
+    }
+  });
+
+  // ── 허가지선 (빨강 굵게, 격자 위에)
+  if(S.permit){
+    ctx.strokeStyle='#ef4444';
+    ctx.lineWidth=2.4;
+    ctx.beginPath();
+    S.permit.pts.forEach(function(p,idx){
+      var s=w2s(p);
+      if(idx===0)ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    if(!S.gridCells || !S.gridCells.length){
+      ctx.fillStyle='rgba(239,68,68,.05)';
+      ctx.fill();
+    }
+  }
+
+  // ── 격자 경계선 (분석 후)
+  if(S.gridCells && S.gridCells.length){
+    ctx.strokeStyle='rgba(255,255,255,0.08)';
+    ctx.lineWidth=0.5;
+    S.gridCells.forEach(function(cell){
+      var tl=w2s({x:cell.minX,y:cell.maxY});
+      var br=w2s({x:cell.maxX,y:cell.minY});
+      ctx.strokeRect(tl.x,tl.y,br.x-tl.x,br.y-tl.y);
+    });
+  }
+
+  // ── 제외 영역 빗금 (조각 선택/이동 시)
+  if(S.cutPieces && S.cut){
+    var removePoly=null, keepPoly=null;
+    if(S.cut.removeSide){
+      removePoly = (S.cut.removeSide==='A')?S.cutPieces.A:S.cutPieces.B;
+      keepPoly   = (S.cut.removeSide==='A')?S.cutPieces.B:S.cutPieces.A;
+    } else if(S.mode==='pickSide' && S.hoverSide){
+      removePoly = (S.hoverSide==='A')?S.cutPieces.A:S.cutPieces.B;
+    }
+    if(removePoly){
+      ctx.save();
+      ctx.beginPath();
+      removePoly.forEach(function(p,i){ var s=w2s(p); i===0?ctx.moveTo(s.x,s.y):ctx.lineTo(s.x,s.y); });
+      ctx.closePath();
+      ctx.fillStyle='rgba(100,116,139,0.30)';
+      ctx.fill();
+      ctx.clip();
+      // 빗금
+      ctx.strokeStyle='rgba(148,163,184,0.5)'; ctx.lineWidth=1;
+      var bb=getBounds(removePoly.map(function(p){return w2s(p);}));
+      for(var x=bb.minX-200; x<bb.maxX+200; x+=8){
+        ctx.beginPath(); ctx.moveTo(x, bb.minY-10); ctx.lineTo(x+200, bb.maxY+10); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  // ── 허가지선 재선택 모드: 모든 후보 폴리곤 윤곽 + 호버 강조
+  if(S.mode==='repick' && S.allPolys){
+    S.allPolys.forEach(function(poly,i){
+      ctx.beginPath();
+      poly.pts.forEach(function(p,idx){ var s=w2s(p); idx===0?ctx.moveTo(s.x,s.y):ctx.lineTo(s.x,s.y); });
+      ctx.closePath();
+      if(i===S.hoverPoly){
+        ctx.fillStyle='rgba(59,130,246,0.25)'; ctx.fill();
+        ctx.strokeStyle='#3b82f6'; ctx.lineWidth=3;
+      } else {
+        ctx.strokeStyle='rgba(148,163,184,0.7)'; ctx.lineWidth=1.5; ctx.setLineDash([5,4]);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+    });
+  }
+
+  // ── 절단선 그리는 중 (점선 + 점 + 고무줄 미리보기)
+  if(S.mode==='drawCut' && S.drawPts.length){
+    ctx.strokeStyle='#3b82f6'; ctx.lineWidth=2; ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    S.drawPts.forEach(function(p,i){ var s=w2s(p); i===0?ctx.moveTo(s.x,s.y):ctx.lineTo(s.x,s.y); });
+    ctx.stroke();
+    // 고무줄: 마지막 점 → 현재 마우스 (반투명)
+    if(S.ghostPt){
+      var last=w2s(S.drawPts[S.drawPts.length-1]);
+      var g=w2s(S.ghostPt);
+      ctx.strokeStyle='rgba(59,130,246,0.5)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(g.x,g.y); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    S.drawPts.forEach(function(p){
+      var s=w2s(p);
+      ctx.fillStyle='#3b82f6'; ctx.beginPath(); ctx.arc(s.x,s.y,4,0,7); ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    });
+    // 마우스 위치에 작은 표식
+    if(S.ghostPt){
+      var gp=w2s(S.ghostPt);
+      ctx.strokeStyle='rgba(59,130,246,0.7)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(gp.x,gp.y,5,0,7); ctx.stroke();
+    }
+  }
+
+  // ── 확정된 절단선 (실선 + 점, 이동 가능 상태)
+  if((S.mode==='pickSide'||S.mode==='moveCut') && S.cut){
+    ctx.strokeStyle='#3b82f6'; ctx.lineWidth=S.selCut?3:2.4;
+    ctx.beginPath();
+    S.cut.pts.forEach(function(p,i){ var s=w2s(p); i===0?ctx.moveTo(s.x,s.y):ctx.lineTo(s.x,s.y); });
+    ctx.stroke();
+    S.cut.pts.forEach(function(p){
+      var s=w2s(p);
+      ctx.fillStyle='#3b82f6'; ctx.beginPath(); ctx.arc(s.x,s.y,4,0,7); ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    });
   }
 }
-function onUp(){S.isDown=false;}
-function onWheel(e){e.preventDefault();var rect=mc.getBoundingClientRect(),mx=e.clientX-rect.left,my=e.clientY-rect.top;var wp=s2w(mx,my);S.scale*=(e.deltaY>0?0.9:1.1);S.ox=mx-wp.x*S.scale;S.oy=(mc.height-my)-wp.y*S.scale;}
-function updateSection(){
-  var d=dist(S.secS,S.secE);document.getElementById('sDist').textContent=d.toFixed(1);
-  var prof=[],minZ=Infinity,maxZ=-Infinity;
-  for(var i=0;i<=50;i++){
-    var t=i/50,wx=S.secS.x+(S.secE.x-S.secS.x)*t,wy=S.secS.y+(S.secE.y-S.secS.y)*t;
-    var bZ=0,bD=Infinity;S.zSamples.forEach(function(p){var d2=Math.pow(p.x-wx,2)+Math.pow(p.y-wy,2);if(d2<bD){bD=d2;bZ=p.z;}});
-    prof.push({d:d*t,z:bZ});if(bZ<minZ)minZ=bZ;if(bZ>maxZ)maxZ=bZ;
+
+/* ============================================================
+   2단계: 오토슬럼프 재현 엔진 (auto_engine_v4 JS 포팅)
+   ============================================================ */
+
+/* ----- 절단선 기하 (3단계, Python 검증본 포팅) ----- */
+/* 선분 교차: p1-p2 와 p3-p4. {pt,t,u} 또는 null */
+function segIntersect(p1,p2,p3,p4){
+  var x1=p1.x,y1=p1.y,x2=p2.x,y2=p2.y,x3=p3.x,y3=p3.y,x4=p4.x,y4=p4.y;
+  var d=(x2-x1)*(y4-y3)-(y2-y1)*(x4-x3);
+  if(Math.abs(d)<1e-12) return null;
+  var t=((x3-x1)*(y4-y3)-(y3-y1)*(x4-x3))/d;
+  var u=((x3-x1)*(y2-y1)-(y3-y1)*(x2-x1))/d;
+  if(t>=0&&t<=1&&u>=0&&u<=1){
+    return {pt:{x:x1+t*(x2-x1), y:y1+t*(y2-y1)}, t:t, u:u};
   }
-  document.getElementById('sHeight').textContent=(maxZ-minZ).toFixed(1);
-  document.getElementById('sSlope').textContent=d>0?((maxZ-minZ)/d*100).toFixed(1):'0';
-  drawSection(prof,minZ,maxZ,d);
+  return null;
 }
-function drawSection(p,min,max,d){
-  sctx.clearRect(0,0,sc.width,sc.height);if(p.length<2)return;
-  var pad=24,w=sc.width-pad*2,h=sc.height-pad*2,r=Math.max(max-min,1);
-  var sx=function(v){return pad+(v/d)*w;},sy=function(v){return sc.height-pad-((v-min)/r)*h;};
-  sctx.fillStyle='rgba(0,212,255,0.1)';sctx.beginPath();sctx.moveTo(sx(0),sc.height-pad);p.forEach(function(v){sctx.lineTo(sx(v.d),sy(v.z));});sctx.lineTo(sx(d),sc.height-pad);sctx.fill();
-  sctx.strokeStyle='#00d4ff';sctx.lineWidth=2;sctx.beginPath();p.forEach(function(v,i){if(i===0)sctx.moveTo(sx(v.d),sy(v.z));else sctx.lineTo(sx(v.d),sy(v.z));});sctx.stroke();
+
+/* 폴리라인 양끝을 첫/마지막 세그먼트 방향으로 길게 연장 */
+function extendPolyline(pts, factor){
+  factor = factor || 1e6;
+  var res = pts.map(function(p){return {x:p.x,y:p.y};});
+  var a,b,dx,dy,L;
+  a=pts[0]; b=pts[1];
+  dx=a.x-b.x; dy=a.y-b.y; L=Math.hypot(dx,dy)||1;
+  res[0]={x:a.x+dx/L*factor, y:a.y+dy/L*factor};
+  a=pts[pts.length-1]; b=pts[pts.length-2];
+  dx=a.x-b.x; dy=a.y-b.y; L=Math.hypot(dx,dy)||1;
+  res[res.length-1]={x:a.x+dx/L*factor, y:a.y+dy/L*factor};
+  return res;
 }
-function clearSection(){sctx.clearRect(0,0,sc.width,sc.height);['sDist','sHeight','sSlope'].forEach(function(id){document.getElementById(id).textContent='-';});}
-function exportPNG(){var link=document.createElement('a');link.download='slope_analysis.png';link.href=mc.toDataURL();link.click();}
+
+/* 닫힌 폴리곤을 연장된 절단선으로 두 조각으로 분할.
+   반환 {A:[...], B:[...]} 또는 null(교차점≠2) */
+function cutPolygon(poly, extCut){
+  var n=poly.length;
+  var hits=[];
+  for(var ei=0; ei<n; ei++){
+    var e1=poly[ei], e2=poly[(ei+1)%n];
+    for(var ci=0; ci<extCut.length-1; ci++){
+      var r=segIntersect(e1,e2,extCut[ci],extCut[ci+1]);
+      if(r){ hits.push({ei:ei, et:r.t, pt:r.pt, ci:ci, cu:r.u}); }
+    }
+  }
+  // 중복 제거(꼭짓점 근처)
+  var uniq=[];
+  hits.forEach(function(h){
+    var dup=false;
+    for(var k=0;k<uniq.length;k++){
+      if(Math.hypot(h.pt.x-uniq[k].pt.x, h.pt.y-uniq[k].pt.y)<1e-6){dup=true;break;}
+    }
+    if(!dup) uniq.push(h);
+  });
+  hits=uniq;
+  if(hits.length!==2) return null;
+
+  // cutline 진행순서로 정렬
+  hits.sort(function(a,b){ return (a.ci-b.ci)||(a.cu-b.cu); });
+  var h0=hits[0], h1=hits[1];
+
+  // cut_path: h0→h1 사이 절단선 실제 경로
+  var cutPath=[h0.pt];
+  for(var ci=h0.ci+1; ci<=h1.ci; ci++) cutPath.push(extCut[ci]);
+  cutPath.push(h1.pt);
+  var cutMid=cutPath.slice(1,cutPath.length-1);
+
+  // 조각A: h0 → (경계 정방향) → h1 → (cut_path 역방향)
+  var polyA=[h0.pt]; var ei=h0.ei, guard=0;
+  while(true){
+    if(ei===h1.ei) break;
+    var nxt=(ei+1)%n; polyA.push(poly[nxt]); ei=nxt;
+    if(++guard>n+2) break;
+  }
+  polyA.push(h1.pt);
+  for(var i=cutMid.length-1;i>=0;i--) polyA.push(cutMid[i]);
+
+  // 조각B: h1 → (경계 정방향) → h0 → (cut_path 정방향)
+  var polyB=[h1.pt]; ei=h1.ei; guard=0;
+  while(true){
+    if(ei===h0.ei) break;
+    var nxt2=(ei+1)%n; polyB.push(poly[nxt2]); ei=nxt2;
+    if(++guard>n+2) break;
+  }
+  polyB.push(h0.pt);
+  for(var j=0;j<cutMid.length;j++) polyB.push(cutMid[j]);
+
+  return {A:polyA, B:polyB};
+}
+
+/* 점이 폴리곤 내부인지 (ray casting) */
+function pointInPoly(pt, poly){
+  var inside=false, n=poly.length;
+  for(var i=0,j=n-1;i<n;j=i++){
+    var xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
+    if(((yi>pt.y)!==(yj>pt.y)) && (pt.x < (xj-xi)*(pt.y-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+
+/* 점→선분 최단거리 */
+function distToSeg(p, a, b){
+  var dx=b.x-a.x, dy=b.y-a.y;
+  var L2=dx*dx+dy*dy;
+  if(L2<1e-12) return Math.hypot(p.x-a.x, p.y-a.y);
+  var t=((p.x-a.x)*dx+(p.y-a.y)*dy)/L2;
+  t=Math.max(0,Math.min(1,t));
+  return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy));
+}
+
+/* ----- 색상/경사 유틸 ----- */
+/* 경사도 → 색상 */
+function slopeColor(deg, alpha){
+  alpha = alpha || 0.6;
+  if(deg <  15) return 'rgba(34,197,94,'+alpha+')';    // 초록
+  if(deg <  20) return 'rgba(245,158,11,'+alpha+')';   // 노랑
+  if(deg <  25) return 'rgba(249,115,22,'+alpha+')';   // 주황
+  return             'rgba(239,68,68,'+alpha+')';       // 빨강
+}
+
+/* 삼각형 경사도 (°) — 법선벡터 방법 */
+function triSlope(p0,p1,p2){
+  var ax=p1.x-p0.x, ay=p1.y-p0.y, az=p1.z-p0.z;
+  var bx=p2.x-p0.x, by=p2.y-p0.y, bz=p2.z-p0.z;
+  var nx=ay*bz-az*by, ny=az*bx-ax*bz, nz=ax*by-ay*bx;
+  if(Math.abs(nz)<1e-10) return 0;
+  return Math.atan(Math.sqrt(nx*nx+ny*ny)/Math.abs(nz))*180/Math.PI;
+}
+
+/* 폴리곤 면적 (shoelace) */
+function polyArea2(pts){
+  var a=0;
+  for(var i=0;i<pts.length;i++){
+    var j=(i+1)%pts.length;
+    a+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;
+  }
+  return Math.abs(a)/2;
+}
+
+/* 부호 있는 면적 (방향 판단) */
+function polySignedArea(pts){
+  var a=0;
+  for(var i=0;i<pts.length;i++){
+    var j=(i+1)%pts.length;
+    a+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;
+  }
+  return a/2;
+}
+
+/* CCW 방향 보장 */
+function ensureCCW(pts){
+  if(polySignedArea(pts)<0) pts.reverse();
+  return pts;
+}
+
+/* Sutherland-Hodgman 클리핑 (clipPoly = 볼록 CCW) */
+function shInside(p,a,b){
+  return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x)>=0;
+}
+function shIntersect(p1,p2,a,b){
+  var A1=p2.y-p1.y, B1=p1.x-p2.x, C1=A1*p1.x+B1*p1.y;
+  var A2=b.y-a.y,  B2=a.x-b.x,  C2=A2*a.x+B2*a.y;
+  var det=A1*B2-A2*B1;
+  if(Math.abs(det)<1e-10) return {x:p1.x,y:p1.y};
+  return {x:(C1*B2-C2*B1)/det, y:(A1*C2-A2*C1)/det};
+}
+function clipSH(subject, clip){
+  var out=subject.slice();
+  for(var i=0;i<clip.length;i++){
+    if(!out.length) return null;
+    var inp=out; out=[];
+    var A=clip[i], B=clip[(i+1)%clip.length];
+    for(var j=0;j<inp.length;j++){
+      var cur=inp[j], prv=inp[(j+inp.length-1)%inp.length];
+      if(shInside(cur,A,B)){
+        if(!shInside(prv,A,B)) out.push(shIntersect(prv,cur,A,B));
+        out.push(cur);
+      } else if(shInside(prv,A,B)){
+        out.push(shIntersect(prv,cur,A,B));
+      }
+    }
+  }
+  return out.length>=3?out:null;
+}
+
+/* bbox */
+function getBounds(pts){
+  var minX=1e18,maxX=-1e18,minY=1e18,maxY=-1e18;
+  pts.forEach(function(p){
+    if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
+    if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
+  });
+  return {minX:minX,maxX:maxX,minY:minY,maxY:maxY};
+}
+
+/* 구간 레이블 */
+var BIN_LABELS=['0~5°','5~10°','10~15°','15~20°','20~25°','25~30°','30~35°','35~40°','40°+'];
+var BIN_COLORS=['#22c55e','#4ade80','#86efac','#f59e0b','#f59e0b','#f97316','#ef4444','#ef4444','#ef4444'];
+
+/* 결과 패널 표시 */
+function showResult(avgSlope, bins, totalArea){
+  // 평균 경사도 숫자 (보정과 무관 — 항상 그대로)
+  document.getElementById('avgNum').textContent=avgSlope.toFixed(2);
+  
+  // 배지
+  var badge=document.getElementById('slopeBadge');
+  if(avgSlope<15){
+    badge.textContent='✔ 적합 (15° 미만)';
+    badge.style.background='rgba(34,197,94,.2)';
+    badge.style.color='#22c55e';
+  } else if(avgSlope<25){
+    badge.textContent='⚠ 주의 (15~25°)';
+    badge.style.background='rgba(245,158,11,.2)';
+    badge.style.color='#f59e0b';
+  } else {
+    badge.textContent='✕ 부적합 (25° 초과)';
+    badge.style.background='rgba(239,68,68,.2)';
+    badge.style.color='#ef4444';
+  }
+
+  // 보정계수: 대장면적 입력됐으면 (대장÷캐드실측), 아니면 1
+  var corr = (S.daejangArea && S.daejangArea>0) ? (S.daejangArea/totalArea) : 1;
+  var dispTotal = totalArea*corr;  // 표시용 합계
+
+  // 요약 정보
+  var info=document.getElementById('resultInfo');
+  if(corr!==1){
+    info.innerHTML='캐드 실측 <b>'+totalArea.toFixed(0)+'㎡</b><br>'
+      +'대장면적 <b style="color:var(--ok)">'+dispTotal.toFixed(0)+'㎡</b> (보정 적용)<br>'
+      +'격자 수 <b>'+S.gridCells.length+'개</b> (10×10m)';
+  } else {
+    info.innerHTML='총 면적 <b>'+totalArea.toFixed(0)+'㎡</b> (캐드 실측)<br>'
+      +'격자 수 <b>'+S.gridCells.length+'개</b> (10×10m)';
+  }
+
+  // 구간별 면적표 (보정계수 적용)
+  var dispBins = bins.map(function(a){ return a*corr; });
+  var maxBin=Math.max.apply(null,dispBins)||1;
+  var tbl=document.getElementById('binTable');
+  tbl.innerHTML='';
+  dispBins.forEach(function(area,idx){
+    var barPct=area/maxBin*100;
+    var row=document.createElement('div');
+    row.className='bin-row';
+    row.innerHTML=
+      '<div class="bin-lbl">'+BIN_LABELS[idx]+'</div>'+
+      '<div class="bin-bar-wrap"><div class="bin-bar" style="width:'+barPct.toFixed(1)+'%;background:'+BIN_COLORS[idx]+'"></div></div>'+
+      '<div class="bin-val">'+(area>0?area.toFixed(0)+'㎡':'—')+'</div>';
+    tbl.appendChild(row);
+  });
+
+  // 합계 행
+  var sumRow=document.createElement('div');
+  sumRow.className='bin-row';
+  sumRow.style.borderTop='1px solid var(--line)';
+  sumRow.style.marginTop='4px';
+  sumRow.style.paddingTop='6px';
+  sumRow.style.fontWeight='700';
+  sumRow.innerHTML='<div class="bin-lbl">계</div><div class="bin-bar-wrap"></div>'
+    +'<div class="bin-val">'+dispTotal.toFixed(0)+'㎡</div>';
+  tbl.appendChild(sumRow);
+
+  // 패널 표시 (먼저 표시해서 레이아웃 확정 후 캔버스 폭 재계산)
+  document.getElementById('resultPanel').style.display='flex';
+  fixCanvasSize();
+}
+
+/* 대장면적 입력 시 — 면적표만 즉시 환산 (재계산 불필요, 경사도 불변) */
+function onDaejangInput(){
+  var v=parseFloat(document.getElementById('daejangArea').value);
+  S.daejangArea = (v && v>0) ? v : null;
+  // 보정 정보 표시
+  var ci=document.getElementById('corrInfo');
+  var rb=document.getElementById('btnResetArea');
+  if(S.daejangArea && S.totalArea>0){
+    var corr=S.daejangArea/S.totalArea;
+    ci.textContent='보정계수 ×'+corr.toFixed(4)+' (평균경사도는 변하지 않음)';
+    ci.style.display='block';
+    rb.style.display='block';
+  } else {
+    ci.style.display='none';
+    rb.style.display='none';
+  }
+  // 면적표 다시 그리기 (현재 결과 재사용)
+  if(S.avgSlope!==null && S.bins){
+    showResult(S.avgSlope, S.bins, S.totalArea);
+  }
+}
+
+/* 대장면적 초기화 → 캐드 실측면적으로 */
+function resetDaejang(){
+  S.daejangArea=null;
+  document.getElementById('daejangArea').value='';
+  document.getElementById('corrInfo').style.display='none';
+  document.getElementById('btnResetArea').style.display='none';
+  if(S.avgSlope!==null && S.bins){
+    showResult(S.avgSlope, S.bins, S.totalArea);
+  }
+}
+
+/* 패널 표시/숨김으로 cvWrap 폭이 바뀌면 캔버스 크기를 맞추되 뷰(중심)는 유지 */
+function fixCanvasSize(){
+  var w=document.getElementById('cvWrap');
+  var newW=w.clientWidth, newH=w.clientHeight;
+  if(cv.width===newW && cv.height===newH) return;
+  // 기존 화면 중심의 월드좌표 보존
+  var wc = S.bounds ? s2w(cv.width/2, cv.height/2) : null;
+  cv.width=newW; cv.height=newH;
+  if(wc){
+    // 중심이 유지되도록 오프셋 재계산
+    S.ox = cv.width/2 - wc.x*S.scale;
+    S.oy = (cv.height - cv.height/2) - wc.y*S.scale;
+  }
+  render();
+}
+/* PNG 저장 */
+function exportPNG(){
+  var link=document.createElement('a');
+  link.download=(S.fileName||'slope')+'_경사도.png';
+  link.href=cv.toDataURL('image/png');
+  link.click();
+}
+
+/* ============================================================
+   5단계 DXF 출력 — 잘린 경계 + 격자 + 경사색 + 경사각 텍스트
+   AutoCAD R12 ASCII (가장 호환성 높음)
+   ============================================================ */
+
+/* AutoCAD Color Index: 경사 구간별 색 (초록3/노랑2/주황... 근사) */
+function slopeACI(slope){
+  if(slope<15) return 3;      // 초록
+  if(slope<20) return 2;      // 노랑
+  if(slope<25) return 30;     // 주황
+  return 1;                   // 빨강
+}
+
+function dxfHeader(){
+  return ['0','SECTION','2','HEADER','0','ENDSEC',
+          '0','SECTION','2','TABLES',
+          '0','TABLE','2','LAYER','70','6',
+          // 레이어 정의 (영문 — 캐드 호환)
+          '0','LAYER','2','PERMIT','70','0','62','5','6','CONTINUOUS',
+          '0','LAYER','2','GRID','70','0','62','8','6','CONTINUOUS',
+          '0','LAYER','2','SLOPE_FILL','70','0','62','3','6','CONTINUOUS',
+          '0','LAYER','2','SLOPE_DEG','70','0','62','7','6','CONTINUOUS',
+          '0','LAYER','2','AREA_TABLE','70','0','62','7','6','CONTINUOUS',
+          '0','ENDTAB','0','ENDSEC',
+          '0','SECTION','2','ENTITIES'];
+}
+
+function dxfPolyline(pts, layer, aci, closed){
+  var a=['0','POLYLINE','8',layer,'62',String(aci),'66','1','70',closed?'1':'0'];
+  pts.forEach(function(p){
+    a.push('0','VERTEX','8',layer,'10',p.x.toFixed(3),'20',p.y.toFixed(3),'30','0.0');
+  });
+  a.push('0','SEQEND');
+  return a;
+}
+
+/* 채워진 사각형(경사색) — SOLID 4점 */
+function dxfSolid(minX,minY,maxX,maxY, aci){
+  return ['0','SOLID','8','SLOPE_FILL','62',String(aci),
+          '10',minX.toFixed(3),'20',minY.toFixed(3),'30','0.0',
+          '11',maxX.toFixed(3),'21',minY.toFixed(3),'31','0.0',
+          '12',minX.toFixed(3),'22',maxY.toFixed(3),'32','0.0',
+          '13',maxX.toFixed(3),'23',maxY.toFixed(3),'33','0.0'];
+}
+
+function dxfText(x,y,h,txt,layer,aci){
+  return ['0','TEXT','8',layer,'62',String(aci||7),
+          '10',x.toFixed(3),'20',y.toFixed(3),'30','0.0',
+          '40',h.toFixed(3),'1',txt];
+}
+
 function exportDXF(){
-  var d='0\nSECTION\n2\nENTITIES\n';
-  S.tris.forEach(function(t){var p1=S.tinPts[t.a],p2=S.tinPts[t.b],p3=S.tinPts[t.c];d+='0\n3DFACE\n8\nTIN_SLOPE\n10\n'+p1.x+'\n20\n'+p1.y+'\n30\n'+p1.z+'\n11\n'+p2.x+'\n21\n'+p2.y+'\n31\n'+p2.z+'\n12\n'+p3.x+'\n22\n'+p3.y+'\n32\n'+p3.z+'\n13\n'+p3.x+'\n23\n'+p3.y+'\n33\n'+p3.z+'\n';});
-  d+='0\nENDSEC\n0\nEOF';
-  var blob=new Blob([d],{type:'text/plain'});var url=URL.createObjectURL(blob);var link=document.createElement('a');link.download='slope_TIN.dxf';link.href=url;link.click();
+  if(!S.gridCells||!S.gridCells.length){ toast('먼저 분석을 실행하세요','err'); return; }
+  var permitPts = S.effectivePermit ? S.effectivePermit : S.permit.pts;
+  var ent=[];
+
+  // 1) 경사색 SOLID (격자마다, 가장 아래)
+  S.gridCells.forEach(function(g){
+    ent=ent.concat(dxfSolid(g.minX,g.minY,g.maxX,g.maxY, slopeACI(g.slope)));
+  });
+  // 2) 격자 외곽선
+  S.gridCells.forEach(function(g){
+    ent=ent.concat(dxfPolyline(
+      [{x:g.minX,y:g.minY},{x:g.maxX,y:g.minY},{x:g.maxX,y:g.maxY},{x:g.minX,y:g.maxY}],
+      'GRID', 8, true));
+  });
+  // 3) 격자별 경사각 텍스트 (격자 중앙)
+  S.gridCells.forEach(function(g){
+    var cx=(g.minX+g.maxX)/2, cy=(g.minY+g.maxY)/2;
+    ent=ent.concat(dxfText(cx-2, cy-1, 1.2, g.slope.toFixed(1), 'SLOPE_DEG', 7));
+  });
+  // 4) 신청구역 경계 (빨강, 두껍게)
+  ent=ent.concat(dxfPolyline(permitPts.map(function(p){return{x:p.x,y:p.y};}), 'PERMIT', 5, true));
+
+  // 5) 면적표 (도면 우측에 텍스트로) — ASCII만 사용(캐드 호환)
+  var pb=getBounds(permitPts);
+  var tx=pb.maxX+10, ty=pb.maxY;
+  var corr=(S.daejangArea&&S.daejangArea>0)?(S.daejangArea/S.totalArea):1;
+  var dispTotal=S.totalArea*corr;
+  ent=ent.concat(dxfText(tx, ty, 3, 'AVG SLOPE = '+S.avgSlope.toFixed(2)+' deg', 'AREA_TABLE', 1));
+  ty-=6;
+  if(corr!==1){
+    ent=ent.concat(dxfText(tx, ty, 2, 'AREA(book) = '+dispTotal.toFixed(0)+' m2  (cad '+S.totalArea.toFixed(0)+')', 'AREA_TABLE', 7));
+  } else {
+    ent=ent.concat(dxfText(tx, ty, 2, 'AREA = '+S.totalArea.toFixed(0)+' m2', 'AREA_TABLE', 7));
+  }
+  ty-=8;
+  var binLabelsAscii=['0-5','5-10','10-15','15-20','20-25','25-30','30-35','35-40','40+'];
+  var binMid=[2.5,7.5,12.5,17.5,22.5,27.5,32.5,37.5,42.5];
+  S.bins.forEach(function(area,i){
+    var v=area*corr;
+    ent=ent.concat(dxfText(tx, ty, 2, binLabelsAscii[i]+' deg : '+v.toFixed(0)+' m2', 'AREA_TABLE', slopeACI(binMid[i])));
+    ty-=4;
+  });
+
+  var dxf=dxfHeader().concat(ent).concat(['0','ENDSEC','0','EOF']).join('\n');
+  var blob=new Blob([dxf],{type:'application/dxf'});
+  var link=document.createElement('a');
+  link.download=(S.fileName||'slope')+'_slope.dxf';
+  link.href=URL.createObjectURL(blob);
+  link.click();
+  setTimeout(function(){URL.revokeObjectURL(link.href);},1000);
+  toast('DXF 저장 완료');
 }
+
+/* ============================================================
+   메인 분석 함수
+   ============================================================ */
+function runAnalysis(){
+  if(!S.permit){ toast('허가지선이 감지되지 않았습니다','err'); return; }
+  if(!S.contours.length){ toast('등고선이 없습니다','err'); return; }
+  
+  document.getElementById('btnRun').textContent='계산 중…';
+  document.getElementById('btnRun').disabled=true;
+  
+  // 비동기로 돌려서 UI 블로킹 방지
+  setTimeout(function(){
+    try{
+      _runEngine();
+    } catch(e){
+      toast('오류: '+e.message,'err');
+      console.error(e);
+    } finally{
+      document.getElementById('btnRun').textContent='경사도 분석 실행';
+      document.getElementById('btnRun').disabled=false;
+    }
+  }, 30);
+}
+
+function _runEngine(){
+  /* ① TIN 점 수집 + 삼각화 (최초 1회만, 캐시) */
+  if(!S.triList){
+    buildTIN();
+  }
+  if(!S.triList || !S.triList.length){ toast('TIN 생성 실패','err'); return; }
+
+  /* ② 계산 대상 경계 결정: 절단됐으면 유효경계, 아니면 원본 */
+  var permitPts = S.effectivePermit ? S.effectivePermit : S.permit.pts;
+
+  /* ③ 격자 계산 (오토 방식) */
+  var result = computeGrid(permitPts, S.triList);
+  if(!result){ toast('유효 격자가 없습니다','err'); return; }
+
+  S.gridCells = result.gridCells;
+  S.avgSlope  = result.avgSlope;
+  S.bins      = result.bins;
+  S.totalArea = result.totalArea;
+
+  render();
+  showResult(result.avgSlope, result.bins, result.totalArea);
+  document.getElementById('legend').style.display='block';
+  document.getElementById('cutSec').style.display='block';
+  toast('분석 완료 ― 평균경사도 '+result.avgSlope.toFixed(2)+'°');
+}
+
+/* TIN 생성 (등고선 z=elev + 표고점 z=0 → Delaunay → 삼각형별 경사) */
+function buildTIN(){
+  var pts=[];
+  S.contours.forEach(function(c){
+    c.pts.forEach(function(p){ pts.push({x:p.x, y:p.y, z:c.elev}); });
+  });
+  S.surveys.forEach(function(s){ pts.push({x:s.x, y:s.y, z:(s.z||0)}); });
+  if(pts.length<3){ S.triList=[]; return; }
+
+  var coords=new Float64Array(pts.length*2);
+  for(var i=0;i<pts.length;i++){ coords[2*i]=pts[i].x; coords[2*i+1]=pts[i].y; }
+  var del=new d3.Delaunay(coords);
+  var tris=del.triangles;
+
+  var triList=[];
+  for(var t=0;t<tris.length;t+=3){
+    var p0=pts[tris[t]], p1=pts[tris[t+1]], p2=pts[tris[t+2]];
+    var ax=p1.x-p0.x, ay=p1.y-p0.y, bx=p2.x-p0.x, by=p2.y-p0.y;
+    if(Math.abs(ax*by-ay*bx)<0.1) continue;
+    triList.push({
+      p0:p0,p1:p1,p2:p2, slope:triSlope(p0,p1,p2),
+      minX:Math.min(p0.x,p1.x,p2.x), maxX:Math.max(p0.x,p1.x,p2.x),
+      minY:Math.min(p0.y,p1.y,p2.y), maxY:Math.max(p0.y,p1.y,p2.y)
+    });
+  }
+  S.triList=triList;
+}
+
+/* 격자 면적가중 경사 계산 — 경계 폴리곤과 TIN을 받아 결과 반환 */
+function computeGrid(permitPts, triList){
+  var GW=10;
+  var pb=getBounds(permitPts);
+  var gridOX=pb.minX, gridOY=pb.maxY;
+  var cols=Math.ceil((pb.maxX-pb.minX)/GW)+1;
+  var rows=Math.ceil((pb.maxY-pb.minY)/GW)+1;
+  var permitCCW=ensureCCW(permitPts.map(function(p){return{x:p.x,y:p.y};}));
+
+  var gridCells=[], totalW=0, totalA=0, bins=new Array(9).fill(0);
+
+  for(var r=0;r<rows;r++){
+    for(var c=0;c<cols;c++){
+      var cMinX=gridOX+c*GW, cMaxX=cMinX+GW;
+      var cMaxY=gridOY-r*GW,  cMinY=cMaxY-GW;
+      var cellPoly=[{x:cMinX,y:cMinY},{x:cMaxX,y:cMinY},{x:cMaxX,y:cMaxY},{x:cMinX,y:cMaxY}];
+
+      var overlapPoly=clipSH(permitCCW, cellPoly);
+      if(!overlapPoly) continue;
+      var overlapArea=polyArea2(overlapPoly);
+      if(overlapArea<0.01) continue;
+
+      var cellW=0, cellA=0;
+      for(var ti=0;ti<triList.length;ti++){
+        var tri=triList[ti];
+        if(tri.maxX<cMinX||tri.minX>cMaxX||tri.maxY<cMinY||tri.minY>cMaxY) continue;
+        var triPts=ensureCCW([{x:tri.p0.x,y:tri.p0.y},{x:tri.p1.x,y:tri.p1.y},{x:tri.p2.x,y:tri.p2.y}]);
+        var inter=clipSH(triPts, cellPoly);
+        if(!inter) continue;
+        var iA=polyArea2(inter);
+        if(iA<0.001) continue;
+        cellW+=tri.slope*iA; cellA+=iA;
+      }
+      var cellSlope=cellA>0?(cellW/cellA):0;
+      gridCells.push({minX:cMinX,maxX:cMaxX,minY:cMinY,maxY:cMaxY,slope:cellSlope,overlapArea:overlapArea});
+      totalW+=cellSlope*overlapArea; totalA+=overlapArea;
+      bins[Math.min(Math.floor(cellSlope/5),8)]+=overlapArea;
+    }
+  }
+  if(totalA<1) return null;
+  return {gridCells:gridCells, avgSlope:totalW/totalA, bins:bins, totalArea:totalA};
+}
+
+/* 빠른 평균만 계산 (드래그 중 실시간 ≈값용 — 격자 없이 가볍게) */
+function quickAvg(permitPts){
+  if(!S.triList) return null;
+  // 삼각형∩경계 면적가중 (격자 생략 = 빠름, 미세하게 다를 수 있음)
+  var permitCCW=ensureCCW(permitPts.map(function(p){return{x:p.x,y:p.y};}));
+  var totW=0, totA=0;
+  for(var ti=0;ti<S.triList.length;ti++){
+    var tri=S.triList[ti];
+    var triPts=ensureCCW([{x:tri.p0.x,y:tri.p0.y},{x:tri.p1.x,y:tri.p1.y},{x:tri.p2.x,y:tri.p2.y}]);
+    var inter=clipSH(permitCCW, triPts);
+    if(!inter) continue;
+    var iA=polyArea2(inter);
+    if(iA<0.01) continue;
+    totW+=tri.slope*iA; totA+=iA;
+  }
+  return totA>0?(totW/totA):null;
+}
+
+/* ============================================================
+   3단계: 절단선 — 그리기 / 조각 선택 / 평행이동
+   원본 허가지선(S.permit)은 절대 불변. 절단선만 움직임.
+   연장선은 계산용 가상선. 결과는 깨끗한 새 경계(effectivePermit).
+   ============================================================ */
+
+/* 절단선 그리기 시작 */
+function startDrawCut(){
+  S.mode='drawCut'; S.drawPts=[]; S.ghostPt=null;
+  S.cut=null; S.effectivePermit=null; S.cutPieces=null; S.selCut=false;
+  document.getElementById('cutHint').style.display='block';
+  document.getElementById('cutCtrl').style.display='none';
+  document.getElementById('btnDrawCut').textContent='그리는 중… (더블클릭 종료)';
+  cv.style.cursor='crosshair';
+  toast('경계를 가로지르도록 점을 찍으세요');
+  render();
+}
+
+/* 그리는 중 클릭 = 점 추가 */
+function addDrawPt(wx, wy){
+  S.drawPts.push({x:wx, y:wy});
+  render();
+}
+
+/* 그리기 종료 → 조각 분할 → 선택 모드 */
+function finishDrawCut(){
+  if(S.drawPts.length<2){
+    toast('점을 2개 이상 찍어주세요','err');
+    return;
+  }
+  // 연장 + 분할 시도
+  var ext=extendPolyline(S.drawPts);
+  var pieces=cutPolygon(S.permit.pts.map(function(p){return{x:p.x,y:p.y};}), ext);
+  if(!pieces){
+    toast('경계를 정확히 가로지르지 못했습니다. 다시 그려주세요','err');
+    S.drawPts=[]; S.ghostPt=null;
+    render();
+    return;
+  }
+  S.cut={ basePts:S.drawPts.map(function(p){return{x:p.x,y:p.y};}),
+          pts:S.drawPts.map(function(p){return{x:p.x,y:p.y};}),
+          offset:{dx:0,dy:0}, removeSide:null };
+  S.cutPieces=pieces;
+  S.mode='pickSide';
+  S.ghostPt=null;
+  document.getElementById('btnDrawCut').textContent='✂ 절단선 그리기';
+  document.getElementById('cutHint').textContent='제외할 영역을 클릭하세요';
+  cv.style.cursor='pointer';
+  toast('제외할 쪽을 클릭하세요');
+  render();
+}
+
+/* 조각 선택 (제외할 영역 클릭) */
+function pickSide(wx, wy){
+  var pt={x:wx,y:wy};
+  var inA=pointInPoly(pt, S.cutPieces.A);
+  var inB=pointInPoly(pt, S.cutPieces.B);
+  var side=null;
+  if(inA&&!inB) side='A';
+  else if(inB&&!inA) side='B';
+  else return; // 애매하면 무시
+  S.cut.removeSide=side;
+  applyCut();
+  S.mode='moveCut'; S.selCut=true;
+  document.getElementById('cutHint').style.display='none';
+  document.getElementById('cutCtrl').style.display='block';
+  cv.style.cursor='move';
+  toast('선을 끌거나 방향키로 미세조정');
+}
+
+/* 현재 절단선으로 유효경계 확정 + 경사도 재계산(확정값) */
+function applyCut(){
+  var ext=extendPolyline(S.cut.pts);
+  var pieces=cutPolygon(S.permit.pts.map(function(p){return{x:p.x,y:p.y};}), ext);
+  if(!pieces){
+    // 이동하다 경계를 벗어난 경우(자동연장 덕에 거의 없음) — 직전 상태 유지
+    toast('절단선이 경계를 벗어났습니다','err');
+    return false;
+  }
+  S.cutPieces=pieces;
+  var keep = (S.cut.removeSide==='A') ? pieces.B : pieces.A;
+  S.effectivePermit = keep;
+  // 확정값: 오토 격자 방식
+  _runEngine();
+  return true;
+}
+
+/* 드래그/방향키 이동 중 빠른 미리보기(≈값) */
+function previewCut(){
+  var ext=extendPolyline(S.cut.pts);
+  var pieces=cutPolygon(S.permit.pts.map(function(p){return{x:p.x,y:p.y};}), ext);
+  if(!pieces){ render(); return; }
+  S.cutPieces=pieces;
+  var keep=(S.cut.removeSide==='A')?pieces.B:pieces.A;
+  S.effectivePermit=keep;
+  var approx=quickAvg(keep);
+  render();
+  if(approx!==null){
+    document.getElementById('avgNum').textContent='≈'+approx.toFixed(1);
+    document.getElementById('avgNum').style.opacity='0.6';
+  }
+}
+
+/* 절단선 평행이동 (월드좌표 dx,dy) */
+function moveCutBy(dx, dy){
+  S.cut.pts=S.cut.pts.map(function(p){return{x:p.x+dx, y:p.y+dy};});
+  S.cut.offset.dx+=dx; S.cut.offset.dy+=dy;
+}
+
+/* 방향키 미세이동 (1m, Shift=0.5m) */
+function nudgeCut(ux, uy, fine){
+  if(!S.cut||S.mode!=='moveCut') return;
+  var step=fine?0.5:1;
+  moveCutBy(ux*step, uy*step);
+  previewCut();
+  // 미세이동은 멈춤 동작이라 바로 확정값 갱신
+  clearTimeout(window._cutTm);
+  window._cutTm=setTimeout(function(){
+    document.getElementById('avgNum').style.opacity='1';
+    applyCut();
+  }, 250);
+}
+
+/* 절단선 취소 → 원본 경계로 복귀 */
+function cancelCut(){
+  S.cut=null; S.effectivePermit=null; S.cutPieces=null;
+  S.selCut=false; S.mode='view'; S.drawPts=[]; S.ghostPt=null;
+  document.getElementById('cutHint').style.display='block';
+  document.getElementById('cutHint').textContent='경계 위에서 시작 → 점 클릭 → 경계 밖에서 더블클릭으로 종료';
+  document.getElementById('cutCtrl').style.display='none';
+  document.getElementById('avgNum').style.opacity='1';
+  var afi=document.getElementById('autoFitInfo'); if(afi) afi.style.display='none';
+  cv.style.cursor='grab';
+  _runEngine(); // 원본으로 재계산
+  toast('절단선 취소 — 원본 경계로 복귀');
+}
+
+/* ============================================================
+   4단계 자동 맞춤 — 목표각이 되도록 절단선을 자동 평행이동 (이진탐색)
+   ============================================================ */
+
+/* 절단선의 "제외 방향" 단위 법선벡터 구하기.
+   절단선 방향벡터에 수직인 두 후보 중, 제외할 조각(removeSide)의
+   무게중심을 향하는 쪽을 고른다. 그 방향으로 밀면 제외면적이 커진다. */
+function cutRemovalNormal(){
+  var p=S.cut.pts;
+  // 절단선 전체 방향 (첫점→끝점)
+  var dx=p[p.length-1].x-p[0].x, dy=p[p.length-1].y-p[0].y;
+  var len=Math.hypot(dx,dy)||1;
+  dx/=len; dy/=len;
+  // 수직 후보 두 개
+  var n1={x:-dy, y:dx}, n2={x:dy, y:-dx};
+  // 제외 조각 무게중심
+  var removePoly=(S.cut.removeSide==='A')?S.cutPieces.A:S.cutPieces.B;
+  var cx=0, cy=0;
+  removePoly.forEach(function(q){cx+=q.x; cy+=q.y;});
+  cx/=removePoly.length; cy/=removePoly.length;
+  // 절단선 중간점
+  var mx=0,my=0; p.forEach(function(q){mx+=q.x;my+=q.y;}); mx/=p.length; my/=p.length;
+  // 중간점→제외중심 방향
+  var tx=cx-mx, ty=cy-my;
+  // n1·t 가 양수면 n1이 제외방향
+  return (n1.x*tx+n1.y*ty >= 0) ? n1 : n2;
+}
+
+/* 주어진 평행이동량(법선방향 거리 d)에서의 평균경사도 계산 (quickAvg 사용, 빠름).
+   반환: {avg, area, keep} 또는 null(분할 실패) */
+function evalCutAt(baseP, normal, d){
+  var moved=baseP.map(function(q){return {x:q.x+normal.x*d, y:q.y+normal.y*d};});
+  var ext=extendPolyline(moved);
+  var pieces=cutPolygon(S.permit.pts.map(function(p){return{x:p.x,y:p.y};}), ext);
+  if(!pieces) return null;
+  var keep=(S.cut.removeSide==='A')?pieces.B:pieces.A;
+  if(!keep || keep.length<3) return null;
+  var a=polyArea2(keep);
+  if(a<1) return null;
+  var avg=quickAvg(keep);
+  return (avg===null)?null:{avg:avg, area:a, keep:keep, moved:moved};
+}
+
+function autoFit(){
+  if(!S.cut || S.mode!=='moveCut'){ toast('먼저 절단선을 그리고 제외할 쪽을 정하세요','err'); return; }
+  if(!S.triList){ toast('먼저 분석을 실행하세요','err'); return; }
+  var target=parseFloat(document.getElementById('targetAngle').value);
+  if(isNaN(target)||target<0||target>90){ toast('목표각을 0~90 사이로 입력하세요','err'); return; }
+
+  var info=document.getElementById('autoFitInfo');
+  info.style.display='block';
+  info.style.color='var(--dim)';
+  info.textContent='계산 중…';
+
+  var baseP=S.cut.pts.map(function(p){return{x:p.x,y:p.y};});
+  var normal=cutRemovalNormal();
+
+  // 이동 범위: 양방향. 음수=반대(제외 줄임), 양수=제외 늘림
+  var xs=S.permit.pts.map(function(p){return p.x;}), ys=S.permit.pts.map(function(p){return p.y;});
+  var diag=Math.hypot(Math.max.apply(null,xs)-Math.min.apply(null,xs),
+                      Math.max.apply(null,ys)-Math.min.apply(null,ys));
+  var dMax=diag*1.2;
+
+  // 전체 구간 [-dMax, +dMax]를 촘촘히 스캔하며 (d, avg) 샘플 수집
+  var N=120;
+  var samples=[];
+  for(var i=0;i<=N;i++){
+    var d=-dMax + (2*dMax)*i/N;
+    var r=evalCutAt(baseP, normal, d);
+    if(r) samples.push({d:d, avg:r.avg, area:r.area});
+  }
+  if(samples.length<2){ info.style.color='var(--err)'; info.textContent='유효한 절단 위치를 찾지 못했습니다'; return; }
+
+  // 인접 샘플 사이에서 목표를 끼우는 구간마다 이진탐색
+  var candidates=[];
+  for(var i=1;i<samples.length;i++){
+    var s0=samples[i-1], s1=samples[i];
+    if((s0.avg-target)*(s1.avg-target)<=0){
+      var lo=s0.d, hi=s1.d, rLo=s0.avg, bd=s1.d, ba=s1.avg;
+      for(var it=0;it<28;it++){
+        var mid=(lo+hi)/2;
+        var rm=evalCutAt(baseP,normal,mid);
+        if(!rm){ hi=mid; continue; }
+        if(Math.abs(rm.avg-target)<Math.abs(ba-target)){ ba=rm.avg; bd=mid; }
+        if((rLo-target)*(rm.avg-target)<=0){ hi=mid; } else { lo=mid; rLo=rm.avg; }
+        if(Math.abs(rm.avg-target)<0.005) break;
+      }
+      candidates.push({d:bd, avg:ba});
+    }
+  }
+
+  var chosen=null;
+  if(candidates.length>0){
+    candidates.sort(function(a,b){
+      var da=Math.abs(a.avg-target), db=Math.abs(b.avg-target);
+      if(Math.abs(da-db)>0.02) return da-db;
+      return Math.abs(a.d)-Math.abs(b.d);
+    });
+    chosen=candidates[0];
+  }
+
+  if(chosen){
+    moveCutBy(normal.x*chosen.d, normal.y*chosen.d);
+    document.getElementById('avgNum').style.opacity='1';
+    applyCut();
+    var finalAvg=S.avgSlope;
+    var dirTxt = chosen.d>=0 ? '제외 방향으로' : '반대 방향으로';
+    info.style.color='var(--ok)';
+    info.innerHTML='✔ 목표 '+target.toFixed(1)+'° → 달성 <b>'+finalAvg.toFixed(2)+'°</b><br>'
+      +'<span style="color:var(--dim)">선을 '+dirTxt+' '+Math.abs(chosen.d).toFixed(1)+'m 이동</span>';
+    toast('자동 맞춤 완료 — 평균 '+finalAvg.toFixed(2)+'°');
+    return;
+  }
+
+  // 도달 불가 — 전체 샘플 중 목표에 가장 가까운 지점으로
+  var best=samples[0];
+  for(var i=1;i<samples.length;i++){
+    if(Math.abs(samples[i].avg-target)<Math.abs(best.avg-target)) best=samples[i];
+  }
+  var loA=Math.min.apply(null,samples.map(function(s){return s.avg;}));
+  var hiA=Math.max.apply(null,samples.map(function(s){return s.avg;}));
+  moveCutBy(normal.x*best.d, normal.y*best.d);
+  document.getElementById('avgNum').style.opacity='1';
+  applyCut();
+  info.style.color='#f59e0b';
+  info.innerHTML='목표 '+target.toFixed(1)+'° 도달 불가<br>'
+    +'이 절단선으로 가능한 범위: <b>'+loA.toFixed(1)+'~'+hiA.toFixed(1)+'°</b><br>'
+    +'<span style="color:var(--dim)">가장 가까운 '+best.avg.toFixed(2)+'°로 맞춰 둠</span>';
+  toast('목표 도달 불가 — 가장 가까운 '+best.avg.toFixed(2)+'°');
+}
+
+/* ============================================================
+   허가지선 재선택 (자동감지 오인식 대응)
+   닫힌 폴리곤 후보들 중 마우스로 골라 교체
+   ============================================================ */
+function startRepick(){
+  if(!S.allPolys || !S.allPolys.length){ toast('후보 폴리곤이 없습니다','err'); return; }
+  // 진행 중이던 절단선은 초기화 (경계가 바뀌므로)
+  S.cut=null; S.effectivePermit=null; S.cutPieces=null; S.selCut=false;
+  S.gridCells=[]; S.drawPts=[]; S.ghostPt=null;
+  S.mode='repick'; S.hoverPoly=null; S._lastPick=null; S._repickCycle=0;
+  document.getElementById('repickHint').style.display='block';
+  document.getElementById('btnRepickOk').style.display='block';
+  document.getElementById('cutSec').style.display='none';
+  document.getElementById('resultPanel').style.display='none';
+  cv.style.cursor='crosshair';
+  toast('올바른 허가지선을 클릭하세요');
+  render();
+}
+
+/* repick 모드: 마우스 위치를 포함하는 후보들 (작은 것 우선 정렬) */
+function polysAt(wx, wy){
+  var pt={x:wx,y:wy}, list=[];
+  for(var i=0;i<S.allPolys.length;i++){
+    if(pointInPoly(pt, S.allPolys[i].pts)) list.push(i);
+  }
+  // 작은 면적 우선
+  list.sort(function(a,b){ return S.allPolys[a].area - S.allPolys[b].area; });
+  return list;
+}
+
+/* 호버용: 위치의 후보 1개 (현재 순환 인덱스 반영) */
+function findPolyAt(wx, wy){
+  var list=polysAt(wx, wy);
+  if(!list.length) return -1;
+  // 같은 위치를 반복 클릭하면 다음 후보로 순환
+  var k = S._repickCycle || 0;
+  return list[k % list.length];
+}
+
+/* 후보 클릭 → 허가지선 교체 (겹친 후보는 클릭마다 순환) */
+function pickPermit(wx, wy){
+  var list=polysAt(wx, wy);
+  if(!list.length){ toast('닫힌 폴리곤 위를 클릭하세요','err'); return; }
+
+  // 같은 자리 반복 클릭 감지 → 순환
+  var lp=S._lastPick;
+  if(lp && Math.hypot(wx-lp.x, wy-lp.y) < 8/S.scale && list.length>1){
+    S._repickCycle = (S._repickCycle||0) + 1;
+  } else {
+    S._repickCycle = 0;
+  }
+  S._lastPick={x:wx, y:wy};
+
+  var idx=list[S._repickCycle % list.length];
+  var chosen=S.allPolys[idx];
+  S.permit={ pts:chosen.pts.map(function(p){return{x:p.x,y:p.y};}),
+             layer:chosen.layer, area:chosen.area };
+  setDet('detPermit', true, Math.round(S.permit.area).toLocaleString()+'㎡');
+  S.hoverPoly=idx;
+  document.getElementById('btnRun').disabled = !(S.contours.length && S.permit);
+  render();
+
+  if(list.length>1){
+    toast('허가지선: '+Math.round(S.permit.area).toLocaleString()+'㎡ ('+(S._repickCycle%list.length+1)+'/'+list.length+') — 겹친 후보는 다시 클릭');
+  } else {
+    // 후보 하나뿐이면 바로 확정
+    S.mode='view'; S.hoverPoly=null; S._lastPick=null;
+    document.getElementById('repickHint').style.display='none';
+    document.getElementById('btnRepickOk').style.display='none';
+    cv.style.cursor='grab';
+    toast('허가지선 변경 — '+Math.round(S.permit.area).toLocaleString()+'㎡ · 다시 분석하세요');
+  }
+}
+
+/* 재선택 확정 (겹친 후보 중 원하는 걸 고른 뒤) */
+function confirmRepick(){
+  if(S.mode!=='repick') return;
+  S.mode='view'; S.hoverPoly=null; S._lastPick=null; S._repickCycle=0;
+  document.getElementById('repickHint').style.display='none';
+  document.getElementById('btnRepickOk').style.display='none';
+  cv.style.cursor='grab';
+  toast('허가지선 확정 — '+Math.round(S.permit.area).toLocaleString()+'㎡ · 다시 분석하세요');
+  render();
+}
+
+/* ---------------- 분석 초기화 ---------------- */
+function resetAll(){
+  S.fileName=null; S.contours=[]; S.surveys=[]; S.permit=null; S.allPolys=[]; S.bounds=null;
+  S.gridCells=[]; S.avgSlope=null; S.bins=null; S.totalArea=0;
+  S.daejangArea=null;
+  S.triList=null; S.effectivePermit=null; S.cut=null; S.cutPieces=null;
+  S.mode='view'; S.drawPts=[]; S.ghostPt=null; S.selCut=false; S.hoverSide=null; S.draggingCut=false;
+  S.hoverPoly=null; S._lastPick=null; S._repickCycle=0;
+  ['detCont','detSurv','detPermit'].forEach(function(id){ setDet(id,false,'-'); });
+  document.getElementById('btnRun').disabled=true;
+  document.getElementById('btnRun').textContent='경사도 분석 실행';
+  document.getElementById('empty').style.display='flex';
+  document.getElementById('legend').style.display='none';
+  document.getElementById('resultPanel').style.display='none';
+  document.getElementById('cutSec').style.display='none';
+  document.getElementById('cutCtrl').style.display='none';
+  document.getElementById('cutHint').style.display='block';
+  document.getElementById('btnDrawCut').textContent='✂ 절단선 그리기';
+  document.getElementById('btnRepick').style.display='none';
+  document.getElementById('repickHint').style.display='none';
+  document.getElementById('btnRepickOk').style.display='none';
+  var daIn2=document.getElementById('daejangArea'); if(daIn2) daIn2.value='';
+  var ci2=document.getElementById('corrInfo'); if(ci2) ci2.style.display='none';
+  var rb2=document.getElementById('btnResetArea'); if(rb2) rb2.style.display='none';
+  document.getElementById('avgNum').style.opacity='1';
+  cv.style.cursor='grab';
+  document.getElementById('hdrStat').textContent='DXF 파일을 올려주세요';
+  render();
+}
+
+/* ---------------- 드래그앤드롭 ---------------- */
+var drop=document.getElementById('drop');
+['dragenter','dragover'].forEach(function(ev){
+  document.body.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add('on'); });
+});
+['dragleave','drop'].forEach(function(ev){
+  document.body.addEventListener(ev,function(e){ e.preventDefault(); if(ev==='drop'||e.target===document.body)drop.classList.remove('on'); });
+});
+document.body.addEventListener('drop',function(e){
+  e.preventDefault();
+  if(e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+});
+document.getElementById('fileIn').addEventListener('change',function(){
+  if(this.files.length) loadFile(this.files[0]);
+  this.value='';
+});
+
+window.addEventListener('resize',resize);
+resize();
 </script>
 </body>
 </html>
