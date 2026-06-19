@@ -333,6 +333,12 @@
     <!-- WMS 레이어 토글 -->
     <div style="flex-shrink:0">
       <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;padding:7px 10px 3px">WMS 레이어</div>
+      <!-- 지적도 + 지번 (VWorld) -->
+      <div class="wms-row">
+        <div class="wms-dot" style="background:#f59e0b"></div>
+        <span style="flex:1">📋 지적도 + 지번</span>
+        <button class="wms-tog" id="togCadastral" onclick="toggleWmsLayer('cadastral')" title="ON/OFF"></button>
+      </div>
       <!-- 산사태위험지도 -->
       <div class="wms-row">
         <div class="wms-dot" style="background:#e24b4a"></div>
@@ -1378,6 +1384,11 @@ function toast(msg,type){
 /* 초기 사이즈 */
 resize();
 
+/* 페이지 로드 시 지도 패널 자동 열기 */
+window.addEventListener('load', function(){
+  toggleWmsPanel();
+});
+
 /* ══════════════════════════════════════════════════
    WMS 위험도 지도 패널
    ══════════════════════════════════════════════════ */
@@ -1484,23 +1495,36 @@ function toggleWmsLayer(type){
   if(isOn){
     if(_wmsLayers[type]){ _wmsLayers[type].addTo(_leafMap); return; }
     var lyr;
-    if(type==='landslide'){
-      /* serviceKey는 표준 WMS 파라미터가 아니므로 base URL에 직접 포함 */
-      var baseUrl = 'https://safemap.go.kr/openApi2/IF_0046_WMS?serviceKey='
-                    + encodeURIComponent(SAFEMAP_KEY);
-      lyr = L.tileLayer.wms(baseUrl, {
+    var VK = '16B90D39-90BB-3197-987A-54983A46F250';
+
+    if(type==='cadastral'){
+      /* VWorld 지적도 + 지번 — 연속지적도 WMS */
+      lyr = L.tileLayer.wms('https://api.vworld.kr/req/wms', {
+        key: VK,
+        domain: '168-107-15-68.nip.io',
+        layers: 'lt_c_lhsco030',
+        styles: 'lt_c_lhsco030',
+        format: 'image/png',
+        transparent: true,
+        opacity: op,
+        version: '1.3.0',
+        tiled: true
+      });
+    } else if(type==='landslide'){
+      /* 산사태위험지도 — 서버 프록시 경유 (CORS 우회) */
+      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+      lyr = L.tileLayer.wms(PROXY + '/api/safemap-wms', {
         layers: 'A2SM_SANSATAI',
         format: 'image/png',
         transparent: true,
         opacity: op,
-        version: '1.1.1',
-        crossOrigin: 'anonymous'
+        version: '1.1.1'
       });
       var errCount = 0;
       lyr.on('tileerror', function(){
         errCount++;
         if(errCount === 3){
-          toast('산사태지도 CORS 차단 → 프록시 서버 설정 필요', 'err');
+          toast('산사태지도 로드 실패 — 서버 연결 확인', 'err');
           tog.classList.remove('on');
           _leafMap.removeLayer(lyr);
           delete _wmsLayers[type];
