@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
 <style>
 :root{
   --bg:#0f1117;--bg2:#161b27;--bg3:#1e2535;
@@ -598,7 +599,11 @@ button,input,select,textarea{font:inherit;border:none;background:none;cursor:poi
 // 상수 & 전역 상태
 // ═══════════════════════════════════════════════════
 const M2PY = 3.30579;
-const VWORLD_KEY = '6E5B62F3-4A0E-3B4F-BCFB-DC65DF82C738'; // 데모키 - 실 운영시 교체
+
+// VWorld 키 — index.html/map.html 설정에서 저장한 키 우선 사용
+const VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '16B90D39-90BB-3197-987A-54983A46F250';
+// VWorld domain 파라미터 (도메인 제약 우회 — map.html과 동일)
+const VWORLD_DOMAIN = '168-107-15-68.nip.io';
 
 const S = {
   parcels: [],
@@ -637,29 +642,33 @@ function startApp(){
   document.getElementById('agreeOverlay').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   initMap();
+  initKakaoServices();
   checkRecovery();
   startAutoSave();
+  setTimeout(() => setMode('nav'), 200);
 }
 
 // ═══════════════════════════════════════════════════
 // 지도 초기화
 // ═══════════════════════════════════════════════════
 function initMap(){
-  map = L.map('map', { center:[37.5665,126.978], zoom:16, zoomControl:false, attributionControl:false });
+  map = L.map('map', { center:[37.20,126.83], zoom:17, zoomControl:false, attributionControl:false, maxZoom:21 });
 
-  // VWorld 배경
+  // VWorld 위성 배경 (domain 파라미터로 도메인 제약 우회)
   vworldLayer = L.tileLayer(
-    `https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Base/{z}/{y}/{x}.png`,
-    { maxZoom:19, opacity:1 }
+    `https://api.vworld.kr/req/wmts/1.0.0/${VWORLD_KEY}/Satellite/{z}/{y}/{x}.jpeg`,
+    { maxZoom:19, maxNativeZoom:19, opacity:1, crossOrigin:'anonymous' }
   ).addTo(map);
 
-  // VWorld 지적도 WMS
+  // VWorld 지적도 WMS (연속지적도 본번+부번, domain 파라미터 포함)
   parcelWMS = L.tileLayer.wms(
-    `https://api.vworld.kr/req/wms?KEY=${VWORLD_KEY}&`,
+    `https://api.vworld.kr/req/wms?`,
     {
-      layers: 'LP_PA_CBND_BUBUN',
+      layers: 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
+      styles: 'lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun',
       format: 'image/png', transparent: true,
       version: '1.3.0', opacity: 1,
+      key: VWORLD_KEY, domain: VWORLD_DOMAIN,
     }
   ).addTo(map);
 
@@ -701,6 +710,7 @@ function setMode(m){
 
   // 힌트
   const hints = {
+    nav:     '지도에서 필지를 클릭하면 해당 필지를 바로 불러옵니다',
     draw:    '클릭: 점 추가 | 더블클릭: 완료 | ESC / 우클릭: 취소',
     offset:  '왼쪽 패널에서 거리를 설정하고, 기준으로 쓸 분할선을 클릭하세요',
     corner:  '도로가 꺾이는 모서리 교차점을 클릭하세요',
@@ -773,6 +783,58 @@ function onClick(e){
     applyCorner(pt);
     return;
   }
+
+  if(mode === 'nav'){
+    // 지도 클릭으로 필지 직접 불러오기
+    pickParcelAt(e.latlng.lat, e.latlng.lng);
+    return;
+  }
+}
+
+// 지도 클릭 위치의 필지를 바로 불러오기
+function pickParcelAt(lat, lng){
+  toast('필지 조회 중...');
+  const cbName = 'vwPick_' + Date.now();
+  const timeout = setTimeout(() => { cleanup(); toast('필지 조회 실패','err'); }, 6000);
+  function cleanup(){ delete window[cbName]; const s=document.getElementById(cbName); if(s) s.remove(); }
+
+  window[cbName] = function(data){
+    clearTimeout(timeout); cleanup();
+    try {
+      const feats = data?.response?.result?.featureCollection?.features || [];
+      if(!feats.length){ toast('이 위치에 필지 정보가 없습니다','err'); return; }
+      let chosen = feats[0];
+      for(const f of feats){ if(pointInFeature([lng, lat], f)){ chosen = f; break; } }
+      const geom = chosen.geometry;
+      let coords = null;
+      if(geom.type === 'Polygon') coords = geom.coordinates[0].map(c => [c[1], c[0]]);
+      else if(geom.type === 'MultiPolygon') coords = geom.coordinates[0][0].map(c => [c[1], c[0]]);
+      if(!coords){ toast('필지 경계를 가져올 수 없습니다','err'); return; }
+
+      const regArea = parseFloat(chosen.properties?.lndpcl_ar || chosen.properties?.ar || 0);
+      const cadArea = polyAreaM2(coords);
+      const jibun = chosen.properties?.addr || chosen.properties?.ldnm_addr || '필지';
+
+      addParcel({
+        name: jibun,
+        pnu: chosen.properties?.pnu || '',
+        registerArea: regArea > 0 ? regArea : cadArea,
+        cadArea: cadArea,
+        polygon: coords,
+      });
+      toast(`${jibun} 추가됨`, 'ok');
+    } catch(e){ toast('필지 처리 오류','err'); }
+  };
+
+  const url = `https://api.vworld.kr/req/data?service=data&version=2.0&request=GetFeature`
+    + `&data=LP_PA_CBND_BUBUN&format=json&errorformat=json&size=10`
+    + `&geometry=true&attribute=true&crs=EPSG:4326`
+    + `&geomFilter=POINT(${lng}%20${lat})&buffer=1`
+    + `&key=${VWORLD_KEY}&domain=${VWORLD_DOMAIN}&callback=${cbName}`;
+  const script = document.createElement('script');
+  script.id = cbName; script.src = url;
+  script.onerror = () => { clearTimeout(timeout); cleanup(); toast('필지 조회 실패','err'); };
+  document.head.appendChild(script);
 }
 
 function onDbl(e){
@@ -1320,27 +1382,103 @@ function openSearchModal(){
 }
 function closeModal(){ document.getElementById('searchModal').classList.remove('show'); }
 
+let kakaoGeocoder = null, kakaoPlaces = null;
+function initKakaoServices(){
+  if(window.kakao && kakao.maps && kakao.maps.services){
+    kakaoGeocoder = new kakao.maps.services.Geocoder();
+    kakaoPlaces = new kakao.maps.services.Places();
+    return true;
+  }
+  return false;
+}
+
 async function doSearch(){
   const q = document.getElementById('searchInp').value.trim();
   if(!q) return;
   const el = document.getElementById('searchResults');
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--txt3);font-size:12px"><span class="spinner"></span> 검색 중...</div>';
 
-  try {
-    // VWorld 주소 검색 API
-    const url = `https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=epsg:4326&size=10&page=1&query=${encodeURIComponent(q)}&type=parcel&key=${VWORLD_KEY}`;
-    const res = await fetch(url);
-    const data = await res.json();
+  if(!kakaoGeocoder) initKakaoServices();
 
-    if(data.response?.status === 'OK' && data.response.result?.items?.length){
-      renderSearchResults(data.response.result.items);
-    } else {
-      // API 키 없거나 결과 없을 때 - 데모 결과 표시
-      renderSearchResultsDemo(q);
-    }
-  } catch(e) {
-    renderSearchResultsDemo(q);
+  if(!kakaoGeocoder){
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--amber);font-size:12px">카카오 지도 로딩 중... 잠시 후 다시 시도하세요</div>';
+    return;
   }
+
+  // 카카오 주소 검색 (지번/도로명 모두)
+  kakaoGeocoder.addressSearch(q, function(result, status){
+    if(status === kakao.maps.services.Status.OK && result.length){
+      renderKakaoResults(result);
+    } else {
+      // 주소 검색 실패 시 키워드 검색
+      kakaoPlaces.keywordSearch(q, function(data, st){
+        if(st === kakao.maps.services.Status.OK && data.length){
+          renderKakaoPlaceResults(data);
+        } else {
+          el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--txt3);font-size:12px">검색 결과가 없습니다<br><span style="font-size:11px">예) 화성시 남양읍 남양리 944-17</span></div>';
+        }
+      });
+    }
+  });
+}
+
+function renderKakaoResults(results){
+  const el = document.getElementById('searchResults');
+  window._kakaoResults = results;
+  el.innerHTML = results.map((r, i) => {
+    const jibun = r.address ? r.address.address_name : r.address_name;
+    const road = r.road_address ? r.road_address.address_name : '';
+    return `
+    <div class="search-item" onclick="selectKakaoResult(${i})">
+      <div class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+      <div>
+        <div class="si-name">${jibun || '주소'}</div>
+        <div class="si-area">${road || `${parseFloat(r.y).toFixed(6)}, ${parseFloat(r.x).toFixed(6)}`}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderKakaoPlaceResults(data){
+  const el = document.getElementById('searchResults');
+  window._kakaoResults = data.map(d => ({ x:d.x, y:d.y, address:{address_name:d.address_name}, road_address:d.road_address_name?{address_name:d.road_address_name}:null, place_name:d.place_name }));
+  el.innerHTML = data.map((d, i) => `
+    <div class="search-item" onclick="selectKakaoResult(${i})">
+      <div class="si-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+      <div>
+        <div class="si-name">${d.place_name || d.address_name}</div>
+        <div class="si-area">${d.address_name || ''}</div>
+      </div>
+    </div>`).join('');
+}
+
+function selectKakaoResult(i){
+  const r = window._kakaoResults[i];
+  const lat = parseFloat(r.y);
+  const lng = parseFloat(r.x);
+  const jibun = (r.address ? r.address.address_name : r.address_name) || r.place_name || '검색 필지';
+
+  document.querySelectorAll('.search-item').forEach((el,j) => el.style.background = j===i ? 'var(--bg3)' : '');
+
+  pendingParcels = [{ name: jibun, registerArea:0, cadArea:0, polygon:null, lat, lng }];
+  document.getElementById('areaInputsWrap').style.display = 'block';
+  document.getElementById('areaInputsList').innerHTML = `
+    <div style="font-size:11px;color:var(--txt3);margin-bottom:6px" id="polyStatus">
+      <span class="spinner"></span> 필지 경계 조회 중...
+    </div>
+    <div class="ir">
+      <span class="il" style="min-width:80px;font-size:11px">${jibun}</span>
+      <input class="ii" type="number" id="pi_0" placeholder="대장면적 입력" step="0.01"/>
+      <span class="iu">㎡</span>
+    </div>`;
+  document.getElementById('modalOkBtn').style.opacity = '1';
+  document.getElementById('modalOkBtn').style.pointerEvents = 'auto';
+
+  // 지도를 해당 위치로 이동
+  if(map) map.setView([lat, lng], 18);
+
+  // VWorld WFS로 실제 필지 폴리곤 조회
+  fetchParcelPolygon(lat, lng, jibun, 0);
 }
 
 function renderSearchResults(items){
@@ -1381,14 +1519,12 @@ function renderSearchResultsDemo(q){
 
 function selectDemoItem(i){
   const d = window._demoItems[i];
-  const sz = 0.0008;
-  const poly = [
-    [d.lat, d.lng], [d.lat, d.lng+sz],
-    [d.lat-sz, d.lng+sz], [d.lat-sz, d.lng],
-  ];
-  pendingParcels = [{ name: d.name, registerArea: d.area, cadArea: d.area, polygon: poly }];
+  pendingParcels = [{ name: d.name, registerArea: d.area, cadArea: d.area, polygon: null, lat: d.lat, lng: d.lng }];
   document.getElementById('areaInputsWrap').style.display = 'block';
   document.getElementById('areaInputsList').innerHTML = `
+    <div style="font-size:11px;color:var(--txt3);margin-bottom:6px" id="polyStatus">
+      <span class="spinner"></span> 필지 경계 조회 중...
+    </div>
     <div class="ir">
       <span class="il" style="min-width:80px;font-size:11px">${d.name}</span>
       <input class="ii" type="number" id="pi_0" value="${d.area}" step="0.01"/>
@@ -1396,26 +1532,150 @@ function selectDemoItem(i){
     </div>`;
   document.getElementById('modalOkBtn').style.opacity = '1';
   document.getElementById('modalOkBtn').style.pointerEvents = 'auto';
-  document.querySelectorAll('.search-item').forEach(el => el.style.background = '');
-  document.querySelectorAll('.search-item')[i].style.background = 'var(--bg3)';
+  document.querySelectorAll('.search-item').forEach((el,j) => el.style.background = j===i ? 'var(--bg3)' : '');
+  fetchParcelPolygon(d.lat, d.lng, d.name, 0);
 }
 
 function selectSearchItem(i, name, itemJson){
   const item = window._searchItems[i];
   const lat = parseFloat(item.point?.y || 37.5665);
   const lng = parseFloat(item.point?.x || 126.978);
-  const sz = 0.0008;
-  const poly = [[lat,lng],[lat,lng+sz],[lat-sz,lng+sz],[lat-sz,lng]];
-  pendingParcels = [{ name: item.title||name, registerArea:0, cadArea:0, polygon:poly }];
+
+  // 선택 표시
+  document.querySelectorAll('.search-item').forEach((el,j) => el.style.background = j===i ? 'var(--bg3)' : '');
+
+  // 대장면적 입력창 먼저 보여주기
+  const pname = item.title || name || '검색 필지';
+  pendingParcels = [{ name: pname, registerArea:0, cadArea:0, polygon:null, lat, lng, pnu: item.id }];
   document.getElementById('areaInputsWrap').style.display = 'block';
   document.getElementById('areaInputsList').innerHTML = `
+    <div style="font-size:11px;color:var(--txt3);margin-bottom:6px" id="polyStatus">
+      <span class="spinner"></span> 필지 경계 조회 중...
+    </div>
     <div class="ir">
-      <span class="il" style="min-width:80px;font-size:11px">${item.title||name}</span>
+      <span class="il" style="min-width:80px;font-size:11px">${pname}</span>
       <input class="ii" type="number" id="pi_0" placeholder="대장면적 입력" step="0.01"/>
       <span class="iu">㎡</span>
     </div>`;
   document.getElementById('modalOkBtn').style.opacity = '1';
   document.getElementById('modalOkBtn').style.pointerEvents = 'auto';
+
+  // WFS로 실제 필지 폴리곤 조회
+  fetchParcelPolygon(lat, lng, pname, 0);
+}
+
+// VWorld WFS로 실제 필지 폴리곤 가져오기
+// VWorld 데이터 API를 JSONP로 호출 (CORS 우회 — 서버 프록시 불필요)
+function fetchParcelPolygon(lat, lng, name, pendingIdx){
+  const statusEl = document.getElementById('polyStatus');
+  const cbName = 'vworldCb_' + Date.now();
+
+  // 타임아웃 — 응답 없으면 좌표 기반 추정
+  const timeout = setTimeout(() => {
+    cleanup();
+    fallbackPolygon(lat, lng, pendingIdx, statusEl);
+  }, 6000);
+
+  function cleanup(){
+    delete window[cbName];
+    const s = document.getElementById(cbName);
+    if(s) s.remove();
+  }
+
+  window[cbName] = function(data){
+    clearTimeout(timeout);
+    cleanup();
+    try {
+      const feats = data?.response?.result?.featureCollection?.features || [];
+      if(feats.length > 0){
+        // 클릭 좌표를 포함하는 필지 찾기 (없으면 첫번째)
+        let chosen = feats[0];
+        for(const f of feats){
+          if(pointInFeature([lng, lat], f)){ chosen = f; break; }
+        }
+        const geom = chosen.geometry;
+        let coords = null;
+        if(geom.type === 'Polygon') coords = geom.coordinates[0].map(c => [c[1], c[0]]);
+        else if(geom.type === 'MultiPolygon') coords = geom.coordinates[0][0].map(c => [c[1], c[0]]);
+
+        if(coords){
+          pendingParcels[pendingIdx].polygon = coords;
+          pendingParcels[pendingIdx].pnu = chosen.properties?.pnu || '';
+          // VWorld가 제공하는 실제 대장면적
+          const regArea = parseFloat(chosen.properties?.lndpcl_ar || chosen.properties?.ar || 0);
+          const cadArea = polyAreaM2(coords);
+          pendingParcels[pendingIdx].cadArea = cadArea;
+          if(regArea > 0) pendingParcels[pendingIdx].registerArea = regArea;
+
+          const jibun = chosen.properties?.addr || chosen.properties?.ldnm_addr || name;
+          if(jibun) pendingParcels[pendingIdx].name = jibun;
+
+          if(statusEl){
+            statusEl.innerHTML = regArea > 0
+              ? `✅ 필지 경계 + 대장면적 ${regArea.toFixed(1)}㎡ 로드됨`
+              : `✅ 필지 경계 로드됨 (캐드 ${cadArea.toFixed(1)}㎡)`;
+          }
+          const inp = document.getElementById('pi_'+pendingIdx);
+          if(inp) inp.value = (regArea > 0 ? regArea : cadArea).toFixed(2);
+          return;
+        }
+      }
+      fallbackPolygon(lat, lng, pendingIdx, statusEl);
+    } catch(e){
+      fallbackPolygon(lat, lng, pendingIdx, statusEl);
+    }
+  };
+
+  // VWorld 데이터 API — 연속지적도 본번 (좌표 포함 geomFilter)
+  const buffer = 5; // 미터
+  const url = `https://api.vworld.kr/req/data?service=data&version=2.0&request=GetFeature`
+    + `&data=LP_PA_CBND_BUBUN&format=json&errorformat=json&size=10`
+    + `&geometry=true&attribute=true&crs=EPSG:4326`
+    + `&geomFilter=POINT(${lng}%20${lat})`
+    + `&buffer=${buffer}`
+    + `&key=${VWORLD_KEY}&domain=${VWORLD_DOMAIN}`
+    + `&callback=${cbName}`;
+
+  const script = document.createElement('script');
+  script.id = cbName;
+  script.src = url;
+  script.onerror = () => { clearTimeout(timeout); cleanup(); fallbackPolygon(lat, lng, pendingIdx, statusEl); };
+  document.head.appendChild(script);
+}
+
+// 점이 폴리곤 안에 있는지 (ray casting)
+function pointInFeature(pt, feature){
+  const g = feature.geometry;
+  let rings = [];
+  if(g.type === 'Polygon') rings = [g.coordinates[0]];
+  else if(g.type === 'MultiPolygon') rings = g.coordinates.map(p => p[0]);
+  for(const ring of rings){
+    if(pointInRing(pt, ring)) return true;
+  }
+  return false;
+}
+function pointInRing(pt, ring){
+  let inside = false;
+  const x = pt[0], y = pt[1];
+  for(let i=0, j=ring.length-1; i<ring.length; j=i++){
+    const xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside = !inside;
+  }
+  return inside;
+}
+
+// WFS/데이터API 실패 시 좌표 기반 추정 폴리곤
+function fallbackPolygon(lat, lng, pendingIdx, statusEl){
+  if(statusEl) statusEl.innerHTML = `⚠ 실제 경계 조회 실패 — 임시 사각형 표시 (대장면적 직접 입력 권장)`;
+  const sz = 0.00018;
+  pendingParcels[pendingIdx].polygon = [
+    [lat+sz, lng-sz], [lat+sz, lng+sz],
+    [lat-sz, lng+sz], [lat-sz, lng-sz],
+  ];
+  const approxArea = polyAreaM2(pendingParcels[pendingIdx].polygon);
+  pendingParcels[pendingIdx].cadArea = approxArea;
+  const inp = document.getElementById('pi_'+pendingIdx);
+  if(inp && !inp.value) inp.value = approxArea.toFixed(2);
 }
 
 function confirmSearch(){
