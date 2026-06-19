@@ -148,7 +148,7 @@
       <!-- 작업구역 선택 -->
       <div id="cropSection" style="display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
         <div style="font-size:11px;color:var(--tx3);margin-bottom:6px">📦 작업구역 선택 (사각형)</div>
-        <button class="btn btn-ghost" id="btnCrop" onclick="toggleCrop()" style="font-size:12px">✂️ 작업구역 그리기 (2점)</button>
+        <button class="btn btn-ghost" id="btnCrop" onclick="toggleCrop()" style="font-size:12px">✂️ 작업구역 그리기</button>
         <div id="cropInfo" style="display:none;margin-top:6px">
           <div style="font-size:11px;color:#4ade80;margin-bottom:4px">✅ 작업구역 적용됨</div>
           <button class="btn btn-ghost" onclick="clearCrop()" style="font-size:11px;padding:5px">🗑 작업구역 초기화</button>
@@ -163,6 +163,8 @@
         <div style="font-size:11px;color:#fbbf24;margin-bottom:5px">📂 DXF에서 폐합선 감지됨</div>
         <div id="importPermitList"></div>
       </div>
+      <!-- 마우스로 허가지선 선택 (DXF 폴리 클릭) -->
+      <button class="btn btn-ghost" id="btnPickPermit" disabled onclick="togglePickPermit()" style="margin-bottom:6px">🖱 지도에서 허가지선 클릭 선택</button>
       <button class="btn btn-ghost" id="btnPermit" disabled onclick="togglePermit()">✏️ 허가지선 직접 그리기</button>
       <div id="permitInfo" style="display:none;margin-top:9px">
         <div class="stat full"><div class="v" id="permitArea">–</div><div class="k">신청 면적</div></div>
@@ -214,12 +216,23 @@
         </label>
         <!-- 버퍼선 -->
         <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
-          <div style="font-size:11px;color:var(--tx3);margin-bottom:6px">🔲 버퍼선 (허가지선 기준)</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="thr" onclick="setBuffer(0)">끄기</button>
-            <button class="thr" onclick="setBuffer(50)">50m</button>
-            <button class="thr" onclick="setBuffer(100)">100m</button>
-            <button class="thr" onclick="setBuffer(150)">150m</button>
+          <div style="font-size:11px;color:var(--tx3);margin-bottom:6px">🔲 버퍼선</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+            <button class="thr on" id="buf0" onclick="setBuffer(0)">끄기</button>
+            <button class="thr" id="buf50" onclick="setBuffer(50)">50m</button>
+            <button class="thr" id="buf100" onclick="setBuffer(100)">100m</button>
+            <button class="thr" id="buf150" onclick="setBuffer(150)">150m</button>
+          </div>
+          <div style="font-size:10px;color:var(--tx3);margin-bottom:4px">버퍼선 색상</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#fbbf24;cursor:pointer" onclick="setBufColor('#fbbf24')" title="노랑"></button>
+            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#22c55e;cursor:pointer" onclick="setBufColor('#22c55e')" title="초록"></button>
+            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#ef4444;cursor:pointer" onclick="setBufColor('#ef4444')" title="빨강"></button>
+            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#f472b6;cursor:pointer" onclick="setBufColor('#f472b6')" title="분홍"></button>
+            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#3b82f6;cursor:pointer" onclick="setBufColor('#3b82f6')" title="파랑"></button>
+            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#a855f7;cursor:pointer" onclick="setBufColor('#a855f7')" title="보라"></button>
+            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#ffffff;cursor:pointer" onclick="setBufColor('#ffffff')" title="흰색"></button>
+            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#000000;cursor:pointer" onclick="setBufColor('#000000')" title="검정"></button>
           </div>
           <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
             <span style="font-size:11px;color:var(--tx3)">직접입력</span>
@@ -448,9 +461,14 @@ function polyArea(pts){var a=0;for(var i=0,n=pts.length;i<n;i++){var j=(i+1)%n;a
    등고선: 주곡선 F0017111 / 계곡선 F0017114 / (오목지) 주곡선 F0017121 / 간곡선 F0017122
    표고점: 표고점 F0027217 / 삼각점 H0027311 / 수준점 H0027312 */
 function isContourLayer(lay){ lay=(lay||'').toUpperCase();
-  return lay==='F0017111'||lay==='F0017114'||lay==='F0017121'||lay==='F0017122'; }
+  /* 표준 NGII 레이어 + F0017xxx 계열 전체 + elevation이 있으면 무조건 */
+  if(/^F0017/.test(lay)) return true;
+  if(lay==='CONTOUR'||lay==='등고선'||lay==='TOPO') return true;
+  return false; }
 function isElevLayer(lay){ lay=(lay||'').toUpperCase();
-  return lay==='F0027217'||lay==='H0027311'||lay==='H0027312'; }
+  if(/^F0027|^H0027/.test(lay)) return true;
+  if(lay==='ELEV'||lay==='ELEVATION'||lay==='표고점') return true;
+  return false; }
 
 /* ---------- DXF 파서 (검증 완료) ---------- */
 function parseDXF(text){
@@ -479,17 +497,24 @@ function parseDXF(text){
           var s=cur.zs.slice().sort(function(a,b){return a-b;}); elev=s[s.length>>1]; // 중앙값
         }
         var ent={layer:cur.layer,elev:elev,pts:cur.pts,closed:!!(cur.flags&1)};
-        if(isContourLayer(lay)) contours.push(ent);
+        /* ★ 표준레이어 OR elev≠0 이면 등고선으로 처리 */
+        var isC=isContourLayer(lay)||(elev!==0&&elev>-100);
+        if(isC) contours.push(ent);
         var f=cur.pts[0],l=cur.pts[cur.pts.length-1];
         var closed=(cur.flags&1)||(Math.hypot(f.x-l.x,f.y-l.y)<5);
-        if(closed&&cur.pts.length>=3&&!isContourLayer(lay))
+        if(closed&&cur.pts.length>=3&&!isC)
           polys.push({layer:cur.layer,pts:cur.pts,area:polyArea(cur.pts)});
       }
     } else if(cur.type==='INSERT'&&isElevLayer(cur.layer)){
       surveys.push({x:cur.ix,y:cur.iy,z:(cur.iz||0),val:null});
-    } else if(cur.type==='TEXT'&&(cur.layer||'').toUpperCase()==='F0027132'){
-      var m=/^[\d.]+/.exec((cur.text||'').trim());
-      if(m) texts.push({x:cur.ix,y:cur.iy,val:parseFloat(m[0])});
+    } else if(cur.type==='TEXT'){
+      /* F0027132(표고수치) 외 F0027/H0027 계열 + 수치처럼 보이는 TEXT 모두 인식 */
+      var tlay=(cur.layer||'').toUpperCase();
+      var tm=/^[\d.]+$/.exec((cur.text||'').trim());
+      if(tm){
+        var tv=parseFloat(tm[0]);
+        if(tv>0&&tv<9999) texts.push({x:cur.ix,y:cur.iy,val:tv});
+      }
     }
     cur=null; vmode=false; vx=null;
   }
@@ -649,6 +674,7 @@ function applyParsed(r){
   document.getElementById('p6').className='pi';
   S.permit=null; S.permitDraw=null; S.ghostXY=null;
   document.getElementById('btnPermit').disabled=false;
+  var bpp=document.getElementById('btnPickPermit'); if(bpp) bpp.disabled=false;
   document.getElementById('permitInfo').style.display='none';
   var bpm=document.getElementById('btnPermit'); bpm.classList.remove('active'); bpm.textContent='✏️ 허가지선 그리기';
   cv.style.cursor='grab';
@@ -704,6 +730,12 @@ window.addEventListener('mousemove',function(e){
   if(S.mode==='section' && S.sectionPts && S.sectionPts.length===1){
     S.sectionGhost=evWorld(e); render(); return;
   }
+  if(S.mode==='crop' && S.cropPt1){
+    S.cropGhost=evWorld(e); render(); return;
+  }
+  if(S.mode==='pickPermit'){
+    updatePickHover(evWorld(e).x, evWorld(e).y); return;
+  }
   if(S.mode==='permit' && S.permitDraw){
     var wp=evWorld(e); S.ghostXY=wp; S.snapClose=false;
     if(S.permitDraw.length>=3){
@@ -723,13 +755,14 @@ cv.addEventListener('click',function(e){
   if(S.mode==='pour'){ pickOutlet(w.x, w.y); }
   else if(S.mode==='crop'){
     if(!S.cropPt1){
-      S.cropPt1=w; toast('두 번째 꼭짓점을 클릭하세요');
+      S.cropPt1=w; S.cropGhost=null; toast('두 번째 꼭짓점을 클릭하세요');
     } else {
-      S.cropPt2=w;
+      S.cropPt2=w; S.cropGhost=null;
       S.mode='pan'; cv.style.cursor='grab'; updateCropBtn();
       applyCropRect({x1:S.cropPt1.x,y1:S.cropPt1.y,x2:w.x,y2:w.y});
     }
   }
+  else if(S.mode==='pickPermit'){ pickPermitAtClick(w.x,w.y); }
   else if(S.mode==='section'){
     S.sectionPts=S.sectionPts||[];
     S.sectionPts.push({x:w.x,y:w.y});
@@ -932,17 +965,49 @@ function render(){
   if(S.cropRect){
     var cr=S.cropRect;
     var crtl=w2s({x:cr.minX,y:cr.maxY}), crbr=w2s({x:cr.maxX,y:cr.minY});
-    ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.7)'; ctx.lineWidth=2; ctx.setLineDash([10,5]);
+    ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2.5; ctx.setLineDash([12,5]);
     ctx.strokeRect(crtl.x,crtl.y,crbr.x-crtl.x,crbr.y-crtl.y); ctx.setLineDash([]);
     ctx.restore();
   }
 
-  // ★ 버퍼선 (노란 실선)
+  // ★ 작업구역 사각형 + 미리보기
+  if(S.mode==='crop' && S.cropPt1 && S.cropGhost){
+    /* 그리는 중 미리보기 */
+    var p1s=w2s(S.cropPt1), p2s=w2s(S.cropGhost);
+    ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=2;
+    ctx.setLineDash([8,4]); ctx.fillStyle='rgba(255,255,255,0.05)';
+    ctx.fillRect(Math.min(p1s.x,p2s.x),Math.min(p1s.y,p2s.y),Math.abs(p2s.x-p1s.x),Math.abs(p2s.y-p1s.y));
+    ctx.strokeRect(Math.min(p1s.x,p2s.x),Math.min(p1s.y,p2s.y),Math.abs(p2s.x-p1s.x),Math.abs(p2s.y-p1s.y));
+    ctx.setLineDash([]); ctx.restore();
+  }
+  if(S.cropRect){
+    var cr=S.cropRect;
+    var crtl=w2s({x:cr.minX,y:cr.maxY}), crbr=w2s({x:cr.maxX,y:cr.minY});
+    ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2.5; ctx.setLineDash([12,5]);
+    ctx.strokeRect(crtl.x,crtl.y,crbr.x-crtl.x,crbr.y-crtl.y); ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // ★ pickPermit 모드 - 폴리 표시 + hover
+  if(S.mode==='pickPermit' && S.polys && S.polys.length){
+    S.polys.forEach(function(p){
+      var isHov=(S.pickHover===p);
+      ctx.save();
+      ctx.strokeStyle=isHov?'#fff':'rgba(255,220,0,0.6)';
+      ctx.lineWidth=isHov?2.5:1.2; ctx.setLineDash([6,3]);
+      ctx.beginPath();
+      p.pts.forEach(function(pt,i){ var s=w2s(pt); i===0?ctx.moveTo(s.x,s.y):ctx.lineTo(s.x,s.y); });
+      ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+      ctx.restore();
+    });
+  }
+
+  // ★ 버퍼선 (색상 선택 가능)
   if(S.permit && S.permit.length>=3 && S.bufferDist>0){
     var bPts=offsetPolygon(S.permit, S.bufferDist);
     if(bPts && bPts.length>=3){
       ctx.save();
-      ctx.strokeStyle='#fbbf24'; ctx.lineWidth=Math.max(1.5,S.scale*0.8);
+      ctx.strokeStyle=_bufColor||'#fbbf24'; ctx.lineWidth=Math.max(1.5,S.scale*0.8);
       ctx.setLineDash([10,4]); ctx.lineJoin='round';
       ctx.beginPath();
       for(var bi=0;bi<bPts.length;bi++){ var bs=w2s(bPts[bi]); if(bi===0)ctx.moveTo(bs.x,bs.y); else ctx.lineTo(bs.x,bs.y); }
@@ -1561,7 +1626,8 @@ function init3DScene(){
     if(bPoly&&bPoly.length>=3){
       var bPts=bPoly.concat([bPoly[0]]).map(function(p){return tmTo3DPt(p.x,p.y,dem,hp,exag);});
       var bGeo=new THREE.BufferGeometry().setFromPoints(bPts);
-      scene.add(new THREE.Line(bGeo,new THREE.LineBasicMaterial({color:0xfbbf24})));
+      var bColor=parseInt((_bufColor||'#fbbf24').replace('#',''),16);
+      scene.add(new THREE.Line(bGeo,new THREE.LineBasicMaterial({color:bColor})));
     }
   }
 
@@ -1584,7 +1650,81 @@ function init3DScene(){
   (function loop(){ _three.raf=requestAnimationFrame(loop); renderer.render(scene,camera); })();
 }
 
-/* ══ 작업구역 선택 (사각형 클립) ══ */
+/* ══ 버퍼선 색상 ══ */
+var _bufColor='#fbbf24';
+function setBufColor(c){ _bufColor=c; render(); }
+function setBuffer(d){
+  S.bufferDist=d;
+  /* 거리 버튼 활성화 */
+  [0,50,100,150].forEach(function(v){
+    var b=document.getElementById('buf'+v); if(b) b.className='thr'+(v===d?' on':'');
+  });
+  document.getElementById('inpBufDist').value=d;
+  render();
+  toast(d>0?'버퍼선 '+d+'m 적용':'버퍼선 끔');
+}
+
+/* ══ 지도에서 허가지선 마우스 클릭 선택 ══ */
+function togglePickPermit(){
+  if(S.mode==='pickPermit'){
+    S.mode='pan'; cv.style.cursor='grab';
+    var b=document.getElementById('btnPickPermit');
+    b.classList.remove('active'); b.textContent='🖱 지도에서 허가지선 클릭 선택';
+    S.pickHover=null; render(); return;
+  }
+  if(!S.polys||!S.polys.length){ toast('DXF에 폐합선이 없어요 — 직접 그리기를 사용하세요','err'); return; }
+  S.mode='pickPermit'; S.pickHover=null;
+  cv.style.cursor='crosshair';
+  var b=document.getElementById('btnPickPermit');
+  b.classList.add('active'); b.textContent='폴리라인 클릭 선택 중… (ESC 취소)';
+  toast('허가지선으로 사용할 경계선을 클릭하세요');
+}
+function pickPermitAtClick(wx,wy){
+  if(!S.polys||!S.polys.length) return;
+  var best=null, bestDist=30/S.scale; // 30px 이내
+  S.polys.forEach(function(p){
+    var n=p.pts.length;
+    for(var i=0;i<n;i++){
+      var a=p.pts[i],b=p.pts[(i+1)%n];
+      /* 점에서 선분까지 거리 */
+      var dx=b.x-a.x, dy=b.y-a.y, l=Math.hypot(dx,dy)||1;
+      var t=Math.max(0,Math.min(1,((wx-a.x)*dx+(wy-a.y)*dy)/(l*l)));
+      var d=Math.hypot(wx-(a.x+t*dx), wy-(a.y+t*dy));
+      if(d<bestDist){ bestDist=d; best=p; }
+    }
+  });
+  if(best){
+    S.permit=best.pts.slice();
+    var A=polyArea(S.permit);
+    document.getElementById('permitArea').textContent=fmtArea(A);
+    document.getElementById('permitInfo').style.display='';
+    S.mode='pan'; cv.style.cursor='grab'; S.pickHover=null;
+    var b=document.getElementById('btnPickPermit');
+    b.classList.remove('active'); b.textContent='🖱 지도에서 허가지선 클릭 선택';
+    render();
+    toast('허가지선 선택 완료 · '+fmtArea(A),'ok');
+    if(S.dem) setTimeout(function(){ autoCalcRisk(); },200);
+  } else {
+    toast('가까운 폐합선이 없어요 — 좀 더 가까이 클릭','err');
+  }
+}
+function updatePickHover(wx,wy){
+  if(S.mode!=='pickPermit') return;
+  var best=null, bestDist=30/S.scale;
+  (S.polys||[]).forEach(function(p){
+    var n=p.pts.length;
+    for(var i=0;i<n;i++){
+      var a=p.pts[i],b=p.pts[(i+1)%n];
+      var dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy)||1;
+      var t=Math.max(0,Math.min(1,((wx-a.x)*dx+(wy-a.y)*dy)/(l*l)));
+      var d=Math.hypot(wx-(a.x+t*dx),wy-(a.y+t*dy));
+      if(d<bestDist){ bestDist=d; best=p; }
+    }
+  });
+  S.pickHover=best; render();
+}
+
+/* ══ 작업구역 toggleCrop에 미리보기 변수 ══ */
 function toggleCrop(){
   if(S.mode==='crop'){ S.mode='pan'; cv.style.cursor='grab'; updateCropBtn(); return; }
   S.mode='crop'; S.cropPt1=null; S.cropPt2=null;
@@ -1594,7 +1734,7 @@ function toggleCrop(){
 function updateCropBtn(){
   var b=document.getElementById('btnCrop');
   if(S.mode==='crop'){ b.classList.add('active'); b.textContent='클릭 대기중… (ESC 취소)'; }
-  else { b.classList.remove('active'); b.textContent='✂️ 작업구역 그리기 (2점)'; }
+  else { b.classList.remove('active'); b.textContent='✂️ 작업구역 그리기'; }
 }
 function clearCrop(){
   S.cropRect=null; S.cropPt1=null; S.cropPt2=null;
