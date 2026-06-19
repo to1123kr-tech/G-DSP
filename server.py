@@ -513,7 +513,7 @@ def vw_wms_proxy():
         return b'', 404
 
 
-SAFEMAP_KEY = "K7JMZ9N6-K7JM-K7JM-K7JMZ9N6D1"
+SAFEMAP_KEY = "K7JMZ9N6-K7JM-K7JM-K7JM-K7JMZ9N6D1"
 
 @app.route('/api/safemap-wms')
 @cache.cached(timeout=3600, query_string=True)
