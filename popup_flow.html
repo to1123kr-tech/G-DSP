@@ -1516,25 +1516,25 @@ function toggleWmsLayer(type){
       _loadCadastral();
       return;
     } else if(type==='landslide'){
-      /* 산사태위험도 — getTileUrl 오버라이드로 EPSG:4326 bbox 직접 계산
-         tileLayer.wms는 EPSG:3857 bbox 전송 → safemap 거부 */
+      /* 산사태위험도 — IF_0046_WMS 비표준 파라미터 직접 구성
+         bbox = minLng,minLat,maxLng,maxLat (EPSG:4326 경위도)
+         serviceKey는 서버 프록시에서 자동 추가 */
       var _px = PROXY;
-      var SafemapLayer = L.TileLayer.WMS.extend({
+      var SafemapLayer = L.TileLayer.extend({
         getTileUrl: function(coords) {
           var z=coords.z, x=coords.x, y=coords.y, n=Math.pow(2,z);
-          var w = x/n*360-180, e=(x+1)/n*360-180;
+          var w=x/n*360-180,        e=(x+1)/n*360-180;
           var latN=Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI;
           var latS=Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)))*180/Math.PI;
+          /* bbox = minLng,minLat,maxLng,maxLat */
           return _px+'/api/safemap-wms'
-            +'?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1'
-            +'&LAYERS=A2SM_SANSATAI&STYLES='
-            +'&FORMAT=image%2Fpng&TRANSPARENT=TRUE'
-            +'&SRS=EPSG%3A4326'
-            +'&BBOX='+w+','+latS+','+e+','+latN
-            +'&WIDTH=256&HEIGHT=256';
+            +'?srs=EPSG%3A4326'
+            +'&bbox='+w+','+latS+','+e+','+latN
+            +'&format=image%2Fpng'
+            +'&width=256&height=256&transparent=TRUE';
         }
       });
-      lyr = new SafemapLayer(_px+'/api/safemap-wms', {opacity:op, tileSize:256});
+      lyr = new SafemapLayer('', {opacity:op, tileSize:256, attribution:'산사태위험도 © 행정안전부'});
       var errCount = 0;
       lyr.on('tileerror', function(){
         errCount++;
