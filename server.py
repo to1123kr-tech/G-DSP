@@ -521,10 +521,10 @@ def safemap_wms_proxy():
     """산사태위험지도 WMS 프록시 — safemap.go.kr CORS 우회"""
     try:
         params = dict(request.args)
-        params['serviceKey'] = SAFEMAP_KEY
-        url = "https://safemap.go.kr/openApi2/IF_0046_WMS"
+        params['apikey'] = SAFEMAP_KEY          # serviceKey 아님! apikey
+        url = "https://www.safemap.go.kr/openApiService/wms/getLayerData.do"
         r = req.get(url, params=params,
-                    headers={"Referer": "https://safemap.go.kr", "User-Agent": "Mozilla/5.0"},
+                    headers={"Referer": "https://www.safemap.go.kr", "User-Agent": "Mozilla/5.0"},
                     timeout=15)
         content_type = r.headers.get('Content-Type', 'image/png')
         resp = make_response(r.content)
