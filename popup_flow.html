@@ -1498,26 +1498,33 @@ function toggleWmsLayer(type){
     var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
 
     if(type==='cadastral'){
-      /* 지적도 + 지번 — 서버 프록시 경유 (key/domain 서버에서 자동 추가) */
-      lyr = L.tileLayer.wms(PROXY + '/api/vw-wms', {
-        layers: 'lt_c_lhsco030',
-        styles: 'lt_c_lhsco030',
-        format: 'image/png',
-        transparent: true,
-        opacity: op,
-        version: '1.3.0',
-        tiled: true
-      });
+      /* 지적선+지번 — map.html과 동일한 /api/cad-box GeoJSON 방식 */
+      if(!window._cadGeoLayer){
+        window._cadGeoLayer = L.geoJSON(null, {
+          style: { color:'#ff3333', weight:1.2, fill:false, opacity:0.85 },
+          onEachFeature: function(f, layer){
+            var jibun = f.properties && f.properties.jibun;
+            if(jibun) layer.bindTooltip(jibun, {permanent:false, className:'cad-tip', direction:'center'});
+          }
+        }).addTo(_leafMap);
+        /* 라벨용 마커 레이어 */
+        window._cadLabelLayer = L.layerGroup().addTo(_leafMap);
+        /* 지도 이동/줌 시 재로드 */
+        _leafMap.on('moveend', _loadCadastral);
+      }
+      window._cadGeoLayer.setStyle({opacity: op});
+      _loadCadastral();
+      return;
     } else if(type==='landslide'){
-      /* 산사태위험지도 — 서버 프록시 경유 (CORS 우회) */
+      /* 산사태위험도 — 서버 프록시 경유 (CORS 우회)
+         공식가이드: A2SM_SANSATAI 는 styles 없음 */
       lyr = L.tileLayer.wms(PROXY + '/api/safemap-wms', {
         layers: 'A2SM_SANSATAI',
-        styles: 'A2SM_SANSATAI',
+        styles: '',
         format: 'image/png',
         transparent: true,
         exceptions: 'text/xml',
-        opacity: op,
-        version: '1.1.1'
+        opacity: op
       });
       var errCount = 0;
       lyr.on('tileerror', function(){
@@ -1544,8 +1551,60 @@ function toggleWmsLayer(type){
     }
     if(lyr){ lyr.addTo(_leafMap); _wmsLayers[type]=lyr; }
   } else {
-    if(_wmsLayers[type]){ _leafMap.removeLayer(_wmsLayers[type]); }
+    if(type === 'cadastral'){
+      if(window._cadGeoLayer){ window._cadGeoLayer.clearLayers(); }
+      if(window._cadLabelLayer){ window._cadLabelLayer.clearLayers(); }
+      _leafMap.off('moveend', _loadCadastral);
+    } else {
+      if(_wmsLayers[type]){ _leafMap.removeLayer(_wmsLayers[type]); }
+    }
   }
+}
+
+/* 지적선+지번 로드 — /api/cad-box (map.html과 동일 방식) */
+var _cadLoading = false, _cadLastKey = '';
+function _loadCadastral(){
+  var tog = document.getElementById('togCadastral');
+  if(!tog || !tog.classList.contains('on')) return;
+  if(!_leafMap || !window._cadGeoLayer) return;
+  var z = _leafMap.getZoom();
+  if(z < 15){
+    window._cadGeoLayer.clearLayers();
+    window._cadLabelLayer && window._cadLabelLayer.clearLayers();
+    return;
+  }
+  var b = _leafMap.getBounds();
+  var key = b.getWest().toFixed(4)+','+b.getSouth().toFixed(4)+','+b.getEast().toFixed(4)+','+b.getNorth().toFixed(4);
+  if(key === _cadLastKey || _cadLoading) return;
+  _cadLoading = true; _cadLastKey = key;
+  var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+  var url = PROXY+'/api/cad-box?minx='+b.getWest()+'&miny='+b.getSouth()+'&maxx='+b.getEast()+'&maxy='+b.getNorth()+'&size=1000';
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      _cadLoading = false;
+      if(!d || !d.features) return;
+      window._cadGeoLayer.clearLayers();
+      window._cadLabelLayer && window._cadLabelLayer.clearLayers();
+      window._cadGeoLayer.addData(d);
+      /* 줌 17 이상에서 지번 라벨 표시 */
+      if(z >= 17 && window._cadLabelLayer){
+        d.features.forEach(function(f){
+          if(!f.properties || !f.properties.jibun) return;
+          try{
+            var center = L.geoJSON(f).getBounds().getCenter();
+            L.marker(center,{
+              icon: L.divIcon({
+                className:'',
+                html:'<div style="font-size:10px;color:#cc0000;white-space:nowrap;font-weight:600;text-shadow:0 0 3px #fff,0 0 3px #fff">'+f.properties.jibun+'</div>',
+                iconAnchor:[0,0]
+              })
+            }).addTo(window._cadLabelLayer);
+          }catch(e){}
+        });
+      }
+    })
+    .catch(function(){ _cadLoading = false; });
 }
 
 /* 지도 검색 (Nominatim — API 키 불필요) */
