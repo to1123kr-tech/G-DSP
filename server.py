@@ -518,22 +518,30 @@ SAFEMAP_KEY = "K7JMZ9N6-K7JM-K7JM-K7JM-K7JMZ9N6D1"
 @app.route('/api/safemap-wms')
 @cache.cached(timeout=3600, query_string=True)
 def safemap_wms_proxy():
-    """산사태위험지도 WMS 프록시 — safemap.go.kr CORS 우회
-    공식가이드: http://www.safemap.go.kr/openApiService/wms/getLayerData.do?apikey=KEY
-    파라미터: layers=A2SM_SANSATAI, styles=(없음), format=image/png, transparent=true
+    """산사태위험지도 WMS 프록시
+    실제 URL: http://safemap.go.kr/openapi2/IF_0046_WMS (비표준 WMS)
+    파라미터: serviceKey, srs=EPSG:4326, bbox=minLng,minLat,maxLng,maxLat
+              format=image/png, width, height, transparent=TRUE
     """
     try:
-        params = dict(request.args)
-        params['apikey'] = SAFEMAP_KEY
-        # 공식 가이드 URL (http)
-        url = "http://www.safemap.go.kr/openApiService/wms/getLayerData.do"
+        params = {
+            'serviceKey': SAFEMAP_KEY,
+            'srs':         request.args.get('srs',         'EPSG:4326'),
+            'bbox':        request.args.get('bbox',         ''),
+            'format':      request.args.get('format',       'image/png'),
+            'width':       request.args.get('width',        '256'),
+            'height':      request.args.get('height',       '256'),
+            'transparent': request.args.get('transparent',  'TRUE'),
+        }
+        url = "http://safemap.go.kr/openapi2/IF_0046_WMS"
         r = req.get(url, params=params,
-                    headers={"Referer": "http://www.safemap.go.kr", "User-Agent": "Mozilla/5.0"},
+                    headers={"Referer": "http://safemap.go.kr", "User-Agent": "Mozilla/5.0"},
                     timeout=15)
         content_type = r.headers.get('Content-Type', 'image/png')
         resp = make_response(r.content)
         resp.headers['Content-Type'] = content_type
         resp.headers['Access-Control-Allow-Origin'] = '*'
+        logger.info(f"[safemap] {r.status_code} {content_type} {len(r.content)}bytes")
         return resp
     except Exception as e:
         logger.error(f"[safemap-wms] {e}")
