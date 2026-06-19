@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>재해·우수분석 (수계/유역)</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   :root{
@@ -107,30 +106,7 @@
   .droplay .ic{font-size:46px;animation:bob 1.1s ease-in-out infinite}
   .droplay .t{font-size:18px;font-weight:800}
   .droplay .s{font-size:13px;color:var(--tx2)}
-  /* ── WMS 지도 패널 ── */
-  #wmsPanel{display:none;flex-direction:column;width:360px;min-width:180px;max-width:75vw;
-    background:var(--panel);border-left:1px solid var(--line);position:relative;flex-shrink:0}
-  #wmsPanel.open{display:flex}
-  #wmsResizeHandle{position:absolute;left:0;top:0;bottom:0;width:6px;cursor:ew-resize;z-index:20;
-    background:transparent;transition:background .15s}
-  #wmsResizeHandle:hover{background:rgba(56,189,248,.25)}
-  #wmsResizeHandle.dragging{background:rgba(56,189,248,.4)}
-  #wmsMap{flex:1;min-height:0}
-  .wms-tog{width:36px;height:20px;border-radius:10px;background:var(--line);border:none;
-    cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
-  .wms-tog::after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;
-    border-radius:50%;background:var(--tx3);transition:.2s}
-  .wms-tog.on{background:var(--accent)}
-  .wms-tog.on::after{left:18px;background:#fff}
-  .wms-row{display:flex;align-items:center;gap:8px;padding:7px 10px;
-    border-bottom:1px solid var(--line);font-size:12px;color:var(--tx2)}
-  .wms-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
-  .wms-badge{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--panel2);
-    border:1px solid var(--line);color:var(--tx3);white-space:nowrap}
-  .bg-btn{flex:1;padding:5px;border-radius:6px;border:1px solid var(--line);
-    background:var(--panel2);color:var(--tx3);font-size:11px;cursor:pointer;font-weight:600}
-  .bg-btn.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent}
-  #btnWmsMap.active{background:var(--accent);color:#06121f;border-color:var(--accent)}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
 </style>
 </head>
 <body>
@@ -277,11 +253,7 @@
   <div class="stage">
     <canvas id="cv"></canvas>
     <div class="hint" id="hint" style="display:none">휠=확대 · 드래그=이동</div>
-    <!-- 🗺 지도 버튼: DXF 없어도 항상 표시 -->
-    <div style="position:absolute;top:12px;right:12px;z-index:10">
-      <button class="tbtn" id="btnWmsMap" title="위험도 지도 (산사태·지질)" onclick="toggleWmsPanel()">🗺</button>
-    </div>
-    <div class="tools" id="tools" style="display:none;top:58px">
+    <div class="tools" id="tools" style="display:none">
       <button class="tbtn" title="화면 맞춤" onclick="fitView()">⤢</button>
       <button class="tbtn" title="확대" onclick="zoomBy(1.25)">＋</button>
       <button class="tbtn" title="축소" onclick="zoomBy(1/1.25)">－</button>
@@ -298,86 +270,7 @@
       <span>표고점 <b id="sbSurv">0</b></span>
       <span class="cursor-xy" id="sbXY">–</span>
     </div>
-  </div><!-- /.stage -->
-
-  <!-- ── WMS 위험도 지도 패널 ─────────────────────────── -->
-  <div id="wmsPanel">
-    <!-- 리사이즈 핸들 (왼쪽 가장자리 드래그) -->
-    <div id="wmsResizeHandle"></div>
-
-    <!-- 헤더 -->
-    <div style="display:flex;align-items:center;justify-content:space-between;
-      padding:9px 12px 9px 14px;border-bottom:1px solid var(--line);background:var(--panel2);flex-shrink:0">
-      <span style="font-size:13px;font-weight:700;color:var(--tx)">🗺 위험도 지도</span>
-      <button onclick="toggleWmsPanel()" title="닫기"
-        style="background:none;border:none;color:var(--tx3);font-size:17px;cursor:pointer;line-height:1;padding:0 2px">✕</button>
-    </div>
-
-    <!-- 검색창 -->
-    <div style="display:flex;gap:5px;padding:7px 10px;border-bottom:1px solid var(--line);flex-shrink:0">
-      <input id="wmsSearchInput" type="text" placeholder="지명 · 주소 검색..."
-        style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:7px;
-          padding:6px 9px;color:var(--tx);font-size:12px;outline:none"
-        onkeydown="if(event.key==='Enter')wmsSearch()"
-        onfocus="this.style.borderColor='var(--accent)'"
-        onblur="this.style.borderColor='var(--line)'">
-      <button onclick="wmsSearch()"
-        style="background:var(--accent);border:none;border-radius:7px;padding:6px 10px;
-          color:#06121f;font-size:13px;cursor:pointer;font-weight:700;flex-shrink:0">🔍</button>
-    </div>
-    <div style="display:flex;gap:5px;padding:8px 10px;border-bottom:1px solid var(--line);flex-shrink:0">
-      <button class="bg-btn on" id="bgBase" onclick="setWmsBg('base')">일반</button>
-      <button class="bg-btn" id="bgSat"  onclick="setWmsBg('satellite')">위성</button>
-    </div>
-
-    <!-- WMS 레이어 토글 -->
-    <div style="flex-shrink:0">
-      <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;padding:7px 10px 3px">WMS 레이어</div>
-      <!-- 지적도 + 지번 (VWorld) -->
-      <div class="wms-row">
-        <div class="wms-dot" style="background:#f59e0b"></div>
-        <span style="flex:1">📋 지적도 + 지번</span>
-        <button class="wms-tog" id="togCadastral" onclick="toggleWmsLayer('cadastral')" title="ON/OFF"></button>
-      </div>
-      <!-- 산사태위험지도 -->
-      <div class="wms-row">
-        <div class="wms-dot" style="background:#e24b4a"></div>
-        <span style="flex:1">🏔 산사태위험지도</span>
-        <button class="wms-tog" id="togLandslide" onclick="toggleWmsLayer('landslide')" title="ON/OFF"></button>
-      </div>
-      <!-- 수치지질도 (키 대기) -->
-      <div class="wms-row">
-        <div class="wms-dot" style="background:#2b3c5c;border:1px dashed #3b5070"></div>
-        <span style="flex:1;color:var(--tx3)">🪨 수치지질도</span>
-        <span class="wms-badge" id="geologyBadge">키 대기</span>
-        <button class="wms-tog" id="togGeology" onclick="toggleWmsLayer('geology')" title="ON/OFF" style="display:none"></button>
-      </div>
-    </div>
-
-    <!-- 불투명도 -->
-    <div style="padding:8px 10px;border-bottom:1px solid var(--line);flex-shrink:0">
-      <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--tx3);margin-bottom:5px">
-        <span>레이어 투명도</span><span id="opVal">70%</span>
-      </div>
-      <input type="range" id="wmsOpacity" min="10" max="100" value="70"
-        style="width:100%;accent-color:var(--accent);cursor:pointer"
-        oninput="setWmsOpacity(this.value)">
-    </div>
-
-    <!-- 범례 -->
-    <div style="padding:6px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0">
-      <span style="font-size:10px;color:var(--tx3)">산사태등급</span>
-      <span style="font-size:10px;color:#e24b4a">■ 5</span>
-      <span style="font-size:10px;color:#ef9f27">■ 4</span>
-      <span style="font-size:10px;color:#eab308">■ 3</span>
-      <span style="font-size:10px;color:#22d3ee">■ 2</span>
-      <span style="font-size:10px;color:var(--tx3)">■ 1</span>
-    </div>
-
-    <!-- Leaflet 지도 -->
-    <div id="wmsMap"></div>
-  </div><!-- /#wmsPanel -->
-
+  </div>
 </main>
 
 <div id="d3dlay" style="display:none;position:fixed;inset:0;z-index:80;background:#06080f">
@@ -497,7 +390,7 @@ function parseDXF(text){
     }
     switch(p.c){
       case 8: cur.layer=v.trim(); break;
-      case 38: if(cur.type==='LWPOLYLINE') cur.elev=parseFloat(v)||0; break;
+      case 38: if(cur.type==='LWPOLYLINE'||cur.type==='POLYLINE') cur.elev=parseFloat(v)||0; break;
       case 70: if(cur.type==='LWPOLYLINE'||cur.type==='POLYLINE') cur.flags=parseInt(v,10)||0; break;
       case 10:
         if(cur.type==='LWPOLYLINE') cur._px=parseFloat(v);
@@ -553,7 +446,7 @@ function applyParsed(r){
   // 표고 범위 (등고선 + 표고점 모두)
   var zs=[];
   S.contours.forEach(function(c){ zs.push(c.elev); });
-  S.surveys.forEach(function(s){ if(s.z) zs.push(s.z); });
+  S.surveys.forEach(function(s){ var z=parseFloat(s.val)||s.z; if(z>0) zs.push(z); });
   S.zmin=zs.length?Math.min.apply(null,zs):0;
   S.zmax=zs.length?Math.max.apply(null,zs):1;
 
@@ -861,15 +754,25 @@ function render(){
 function buildTIN(){
   var pts=[];
   S.contours.forEach(function(c){ for(var k=0;k<c.pts.length;k++){ pts.push({x:c.pts[k].x,y:c.pts[k].y,z:c.elev}); } });
-  S.surveys.forEach(function(s){ pts.push({x:s.x,y:s.y,z:(s.z||0)}); });
+  /* ★ 표고점: s.val(TEXT에서 파싱한 실제 표고값) 우선, 없으면 s.z */
+  S.surveys.forEach(function(s){
+    var z=parseFloat(s.val);
+    if(!(z>0)) z=s.z||0;
+    if(z>0) pts.push({x:s.x,y:s.y,z:z});
+  });
   if(pts.length<3){ S.triList=[]; return 0; }
   var coords=new Float64Array(pts.length*2);
   for(var i=0;i<pts.length;i++){ coords[2*i]=pts[i].x; coords[2*i+1]=pts[i].y; }
   var del=new d3.Delaunay(coords), tris=del.triangles, triList=[];
+  var b=S.bounds;
+  /* ★ 긴 삼각형 제거 — 전체 범위 15% 초과하는 변 제거 */
+  var maxEdge=Math.max(b.maxX-b.minX, b.maxY-b.minY)*0.15;
   for(var t=0;t<tris.length;t+=3){
     var p0=pts[tris[t]], p1=pts[tris[t+1]], p2=pts[tris[t+2]];
     var ax=p1.x-p0.x, ay=p1.y-p0.y, bx=p2.x-p0.x, by=p2.y-p0.y;
-    if(Math.abs(ax*by-ay*bx)<0.1) continue;        // 면적 0(일직선) 제거
+    if(Math.abs(ax*by-ay*bx)<0.1) continue;
+    var e01=Math.hypot(ax,ay), e12=Math.hypot(p2.x-p1.x,p2.y-p1.y), e20=Math.hypot(-bx,-by);
+    if(Math.max(e01,e12,e20)>maxEdge) continue;  // ★ 긴 삼각형 제거
     triList.push({p0:p0,p1:p1,p2:p2,
       minX:Math.min(p0.x,p1.x,p2.x), maxX:Math.max(p0.x,p1.x,p2.x),
       minY:Math.min(p0.y,p1.y,p2.y), maxY:Math.max(p0.y,p1.y,p2.y)});
@@ -923,6 +826,29 @@ function buildDEM(cell){
     }
   }
   return {cell:cell, cols:cols, rows:rows, minX:b.minX, minY:b.minY, z:z};
+}
+
+/* ★ DEM 구멍 메우기 — NaN 셀을 이웃 평균으로 반복 채움 (최대 8회) */
+function fillDEMHoles(dem){
+  var z=dem.z, cols=dem.cols, rows=dem.rows, changed=true, iter=0;
+  while(changed && iter++<8){
+    changed=false;
+    var z2=new Float32Array(z);
+    for(var r=0;r<rows;r++){
+      for(var c=0;c<cols;c++){
+        if(z[r*cols+c]===z[r*cols+c]) continue; // NaN 아니면 스킵
+        var sum=0,cnt=0;
+        var nb=[[r-1,c],[r+1,c],[r,c-1],[r,c+1],[r-1,c-1],[r-1,c+1],[r+1,c-1],[r+1,c+1]];
+        for(var ni=0;ni<nb.length;ni++){
+          var nr=nb[ni][0],nc=nb[ni][1];
+          if(nr>=0&&nr<rows&&nc>=0&&nc<cols){var v=z[nr*cols+nc];if(v===v){sum+=v;cnt++;}}
+        }
+        if(cnt>0){z2[r*cols+c]=sum/cnt; changed=true;}
+      }
+    }
+    dem.z=z=z2;
+  }
+  return dem;
 }
 
 /* 무지개(표고) 색 — [r,g,b] */
@@ -995,6 +921,7 @@ function runDEM(){
   if(!S.triList.length){ toast('먼저 TIN을 생성하세요','err'); return; }
   var dem=buildDEM(10);
   if(!dem){ toast('DEM 생성 실패','err'); return; }
+  fillDEMHoles(dem);  // ★ 구멍 메우기
   S.dem=dem; S.hillCanvas=buildHillshade(dem, S.reliefMode); S.showDEM=true;
   document.getElementById('demSize').textContent=dem.cols+'×'+dem.rows;
   document.getElementById('demResult').style.display='';
@@ -1324,6 +1251,9 @@ function ensureThree(cb){
 }
 function open3D(){
   if(!S.dem){ toast('먼저 DEM을 생성하세요','err'); return; }
+  /* ★ WMS 지도 패널 임시 숨김 (3D 위에 겹치는 문제 방지) */
+  var wmsP=document.getElementById('wmsPanel');
+  if(wmsP){ wmsP._wasOpen=wmsP.classList.contains('open'); wmsP.classList.remove('open'); }
   document.getElementById('d3dlay').style.display='';
   document.getElementById('d3dmsg').textContent='3D 불러오는 중…';
   ensureThree(function(ok){
@@ -1341,6 +1271,9 @@ function close3D(){
     if(_three.renderer) _three.renderer.dispose();
     _three=null;
   }
+  /* ★ WMS 패널 복원 */
+  var wmsP=document.getElementById('wmsPanel');
+  if(wmsP&&wmsP._wasOpen){ wmsP.classList.add('open'); if(_leafMap) _leafMap.invalidateSize(); }
 }
 function init3DScene(){
   var lay=document.getElementById('d3dlay'), canvas=document.getElementById('d3dcanvas');
@@ -1383,336 +1316,6 @@ function toast(msg,type){
 
 /* 초기 사이즈 */
 resize();
-
-/* 페이지 로드 시 지도 패널 자동 열기 */
-window.addEventListener('load', function(){
-  toggleWmsPanel();
-});
-
-/* ══════════════════════════════════════════════════
-   WMS 위험도 지도 패널
-   ══════════════════════════════════════════════════ */
-var SAFEMAP_KEY = 'K7JMZ9N6-K7JM-K7JM-K7JMZ9N6D1';
-var KIGAM_KEY   = '';  // 수치지질도 키 발급 후 여기에 입력
-
-var _leafMap = null, _wmsOpen = false;
-var _wmsLayers = {}, _bgLayers = {}, _activeBg = 'base';
-
-/* 패널 열기/닫기 */
-function toggleWmsPanel(){
-  _wmsOpen = !_wmsOpen;
-  var panel = document.getElementById('wmsPanel');
-  var btn   = document.getElementById('btnWmsMap');
-  panel.classList.toggle('open', _wmsOpen);
-  btn.classList.toggle('active', _wmsOpen);
-  if(_wmsOpen && !_leafMap){ setTimeout(initLeafMap, 50); }
-}
-
-/* Leaflet 초기화 */
-function initLeafMap(){
-  if(_leafMap || typeof L === 'undefined') return;
-  _leafMap = L.map('wmsMap',{ zoomControl:false, attributionControl:false }).setView([36.5,127.5],10);
-  L.control.zoom({ position:'bottomright' }).addTo(_leafMap);
-
-  /* VWorld 배경지도 */
-  var VK = '16B90D39-90BB-3197-987A-54983A46F250'; // map.html 기존 키 재사용
-  _bgLayers.base = L.tileLayer(
-    'https://api.vworld.kr/req/wmts/1.0.0/'+VK+'/Base/{z}/{y}/{x}.png',
-    {maxZoom:19, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}
-  ).addTo(_leafMap);
-  _bgLayers.satellite = L.tileLayer(
-    'https://api.vworld.kr/req/wmts/1.0.0/'+VK+'/Satellite/{z}/{y}/{x}.jpeg',
-    {maxZoom:19}
-  );
-
-  /* DXF 현장 좌표로 자동 이동 */
-  centerWmsMap();
-}
-
-/* TM(EPSG:5186 GRS80 중부원점) → WGS84 근사 변환 */
-function tm5186toWgs84(E, N){
-  var a=6378137.0, f=1/298.257222101;
-  var n=f/(2-f), n2=n*n, n3=n*n2, n4=n2*n2;
-  var A=a/(1+n)*(1+n2/4+n4/64);
-  var FE=200000, FN=600000, k0=1.0, lon0=127*Math.PI/180;
-  var xi =(N-FN)/(k0*A);
-  var eta=(E-FE)/(k0*A);
-  var b1=n/2-2*n2/3+37*n3/96-n4/360;
-  var b2=n2/48+n3/15-437*n4/1440;
-  var b3=17*n3/480-37*n4/840;
-  var xiP=xi-b1*Math.sin(2*xi)*Math.cosh(2*eta)
-             -b2*Math.sin(4*xi)*Math.cosh(4*eta)
-             -b3*Math.sin(6*xi)*Math.cosh(6*eta);
-  var etaP=eta-b1*Math.cos(2*xi)*Math.sinh(2*eta)
-              -b2*Math.cos(4*xi)*Math.sinh(4*eta)
-              -b3*Math.cos(6*xi)*Math.sinh(6*eta);
-  var e2=2*f-f*f, e=Math.sqrt(e2);
-  var chi=Math.asin(Math.sin(xiP)/Math.cosh(etaP));
-  var lat=chi+(e2/2+5*e2*e2/24+e2*e2*e2/12)*Math.sin(2*chi)
-            +(7*e2*e2/48+29*e2*e2*e2/240)*Math.sin(4*chi)
-            +(7*e2*e2*e2/120)*Math.sin(6*chi);
-  var lon=lon0+Math.atan(Math.sinh(etaP)/Math.cos(xiP));
-  return [lat*180/Math.PI, lon*180/Math.PI];
-}
-
-function centerWmsMap(){
-  if(!_leafMap || !S.bounds) return;
-  var b=S.bounds;
-  var cx=(b.minX+b.maxX)/2, cy=(b.minY+b.maxY)/2;
-  var latlng;
-  /* TM좌표 판별: 한국 TM은 X≈150k~350k, Y≈200k~700k */
-  if(Math.abs(cx)>10000 && Math.abs(cy)>10000){
-    latlng = tm5186toWgs84(cx, cy);
-  } else {
-    latlng = [cy, cx]; // 이미 WGS84
-  }
-  if(latlng[0]>30 && latlng[0]<40 && latlng[1]>124 && latlng[1]<132){
-    _leafMap.setView(latlng, 14);
-  }
-  setTimeout(function(){ _leafMap && _leafMap.invalidateSize(); }, 100);
-}
-
-/* 배경지도 전환 */
-function setWmsBg(type){
-  if(!_leafMap) return;
-  if(_activeBg === type) return;
-  _leafMap.removeLayer(_bgLayers[_activeBg]);
-  _leafMap.addLayer(_bgLayers[type]);
-  /* WMS 레이어들이 배경 위에 오도록 재정렬 */
-  Object.values(_wmsLayers).forEach(function(l){ l.bringToFront(); });
-  _activeBg = type;
-  document.getElementById('bgBase').classList.toggle('on', type==='base');
-  document.getElementById('bgSat').classList.toggle('on', type==='satellite');
-}
-
-/* WMS 레이어 ON/OFF */
-function toggleWmsLayer(type){
-  if(!_leafMap){ toast('지도를 먼저 열어주세요','err'); return; }
-  var tog = document.getElementById('tog'+type.charAt(0).toUpperCase()+type.slice(1));
-  var isOn = tog.classList.toggle('on');
-  var op = parseInt(document.getElementById('wmsOpacity').value)/100;
-
-  if(isOn){
-    if(_wmsLayers[type]){ _wmsLayers[type].addTo(_leafMap); return; }
-    var lyr;
-    var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
-
-    if(type==='cadastral'){
-      /* 지적선+지번 — map.html과 동일한 /api/cad-box GeoJSON 방식 */
-      if(!window._cadGeoLayer){
-        window._cadGeoLayer = L.geoJSON(null, {
-          style: { color:'#ff3333', weight:1.2, fill:false, opacity:0.85 },
-          onEachFeature: function(f, layer){
-            var jibun = f.properties && f.properties.jibun;
-            if(jibun) layer.bindTooltip(jibun, {permanent:false, className:'cad-tip', direction:'center'});
-          }
-        }).addTo(_leafMap);
-        /* 라벨용 마커 레이어 */
-        window._cadLabelLayer = L.layerGroup().addTo(_leafMap);
-        /* 지도 이동/줌 시 재로드 */
-        _leafMap.on('moveend', _loadCadastralDebounced);
-      }
-      window._cadGeoLayer.setStyle({opacity: op});
-      _loadCadastral();
-      return;
-    } else if(type==='landslide'){
-      /* 산사태위험도 — IF_0046_WMS 비표준 파라미터 직접 구성
-         bbox = minLng,minLat,maxLng,maxLat (EPSG:4326 경위도)
-         serviceKey는 서버 프록시에서 자동 추가 */
-      var _px = PROXY;
-      var SafemapLayer = L.TileLayer.extend({
-        getTileUrl: function(coords) {
-          var z=coords.z, x=coords.x, y=coords.y, n=Math.pow(2,z);
-          var w=x/n*360-180,        e=(x+1)/n*360-180;
-          var latN=Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI;
-          var latS=Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)))*180/Math.PI;
-          /* bbox = minLng,minLat,maxLng,maxLat */
-          return _px+'/api/safemap-wms'
-            +'?srs=EPSG%3A4326'
-            +'&bbox='+w+','+latS+','+e+','+latN
-            +'&format=image%2Fpng'
-            +'&width=256&height=256&transparent=TRUE';
-        }
-      });
-      lyr = new SafemapLayer('', {opacity:op, tileSize:256, attribution:'산사태위험도 © 행정안전부', maxNativeZoom:16, maxZoom:22});
-      var errCount = 0;
-      lyr.on('tileerror', function(){
-        errCount++;
-        if(errCount === 3){
-          toast('산사태지도 로드 실패 — 서버 연결 확인', 'err');
-          tog.classList.remove('on');
-          _leafMap.removeLayer(lyr);
-          delete _wmsLayers[type];
-        }
-      });
-    } else if(type==='geology'){
-      if(!KIGAM_KEY){ toast('수치지질도 키 없음','err'); tog.classList.remove('on'); return; }
-      var geoUrl = 'https://data.kigam.re.kr/openapi/wms?key='
-                   + encodeURIComponent(KIGAM_KEY);
-      lyr = L.tileLayer.wms(geoUrl, {
-        layers: 'L_50K_Geology_Map',
-        format: 'image/png',
-        transparent: true,
-        opacity: op,
-        version: '1.1.1',
-        crossOrigin: 'anonymous'
-      });
-    }
-    if(lyr){ lyr.addTo(_leafMap); _wmsLayers[type]=lyr; }
-  } else {
-    if(type === 'cadastral'){
-      if(window._cadGeoLayer){ window._cadGeoLayer.clearLayers(); }
-      if(window._cadLabelLayer){ window._cadLabelLayer.clearLayers(); }
-      _leafMap.off('moveend', _loadCadastral);
-    } else {
-      if(_wmsLayers[type]){ _leafMap.removeLayer(_wmsLayers[type]); }
-    }
-  }
-}
-
-/* 지적선+지번 로드 — /api/cad-box (map.html과 동일 방식) */
-var _cadLoading = false, _cadLastKey = '';
-function _loadCadastral(){
-  var tog = document.getElementById('togCadastral');
-  if(!tog || !tog.classList.contains('on')) return;
-  if(!_leafMap || !window._cadGeoLayer) return;
-  var z = _leafMap.getZoom();
-  /* 줌 17 미만 — 데이터 너무 많아 표시 안 함 */
-  if(z < 17){
-    window._cadGeoLayer.clearLayers();
-    window._cadLabelLayer && window._cadLabelLayer.clearLayers();
-    return;
-  }
-  var b = _leafMap.getBounds();
-  /* bbox 크기 제한 */
-  if((b.getEast()-b.getWest()) > 0.05 || (b.getNorth()-b.getSouth()) > 0.04){
-    window._cadGeoLayer.clearLayers();
-    window._cadLabelLayer && window._cadLabelLayer.clearLayers();
-    return;
-  }
-  var key = b.getWest().toFixed(4)+','+b.getSouth().toFixed(4)+','+b.getEast().toFixed(4)+','+b.getNorth().toFixed(4);
-  if(key === _cadLastKey || _cadLoading) return;
-  _cadLoading = true; _cadLastKey = key;
-  var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
-  var url = PROXY+'/api/cad-box?minx='+b.getWest()+'&miny='+b.getSouth()+'&maxx='+b.getEast()+'&maxy='+b.getNorth()+'&size=300';
-  fetch(url)
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      _cadLoading = false;
-      if(!d || !d.features) return;
-      window._cadGeoLayer.clearLayers();
-      window._cadLabelLayer && window._cadLabelLayer.clearLayers();
-      window._cadGeoLayer.addData(d);
-      if(window._cadLabelLayer){
-        d.features.forEach(function(f){
-          if(!f.properties || !f.properties.jibun) return;
-          try{
-            var center = L.geoJSON(f).getBounds().getCenter();
-            L.marker(center,{
-              icon: L.divIcon({
-                className:'',
-                html:'<div style="font-size:10px;color:#cc0000;white-space:nowrap;font-weight:600;text-shadow:0 0 3px #fff,0 0 3px #fff">'+f.properties.jibun+'</div>',
-                iconAnchor:[0,0]
-              })
-            }).addTo(window._cadLabelLayer);
-          }catch(e){}
-        });
-      }
-    })
-    .catch(function(){ _cadLoading = false; });
-}
-var _cadDebounce;
-function _loadCadastralDebounced(){ clearTimeout(_cadDebounce); _cadDebounce=setTimeout(_loadCadastral,250); }
-
-/* 지도 검색 — Kakao 지오코딩 (한국 주소 정확) */
-function wmsSearch(){
-  var q = document.getElementById('wmsSearchInput').value.trim();
-  if(!q) return;
-  if(!_leafMap){ toast('지도를 먼저 여세요','err'); return; }
-  toast('검색 중...');
-  var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
-  fetch(PROXY + '/api/kakao-geocode?query=' + encodeURIComponent(q))
-  .then(function(r){ return r.json(); })
-  .then(function(d){
-    var docs = d && d.documents;
-    if(!docs || !docs.length){
-      /* Kakao 결과 없으면 Nominatim 폴백 */
-      return fetch('https://nominatim.openstreetmap.org/search?q='
-        + encodeURIComponent(q)+'&format=json&countrycodes=kr&limit=1',
-        {headers:{'User-Agent':'G-DSP/1.0'}})
-        .then(function(r2){ return r2.json(); })
-        .then(function(res){
-          if(!res || !res.length){ toast('검색 결과 없음','err'); return; }
-          _placeSearchMarker(parseFloat(res[0].lat), parseFloat(res[0].lon), q);
-        });
-    }
-    var doc = docs[0];
-    _placeSearchMarker(parseFloat(doc.y), parseFloat(doc.x), doc.address_name || doc.road_address_name || q);
-  })
-  .catch(function(){ toast('검색 실패','err'); });
-}
-function _placeSearchMarker(lat, lon, label){
-  _leafMap.setView([lat, lon], 17);
-  if(window._searchMarker) window._searchMarker.remove();
-  window._searchMarker = L.marker([lat, lon])
-    .addTo(_leafMap)
-    .bindPopup('<b style="font-size:12px">'+label+'</b>', {maxWidth:220})
-    .openPopup();
-  toast('📍 ' + label);
-}
-
-/* 투명도 변경 */
-function setWmsOpacity(val){
-  document.getElementById('opVal').textContent = val+'%';
-  var op = val/100;
-  Object.values(_wmsLayers).forEach(function(l){ l.setOpacity(op); });
-}
-
-/* 수치지질도 키 활성화 (외부 호출용) */
-function setKigamKey(key){
-  KIGAM_KEY = key;
-  document.getElementById('geologyBadge').style.display = 'none';
-  document.getElementById('togGeology').style.display = '';
-  toast('수치지질도 키 등록 완료 ✅','ok');
-}
-
-/* ── 리사이즈 드래그 ──────────────────────── */
-(function(){
-  var resizing=false, startX=0, startW=0;
-  var handle = document.getElementById('wmsResizeHandle');
-  var panel  = document.getElementById('wmsPanel');
-
-  handle.addEventListener('mousedown', function(e){
-    resizing=true; startX=e.clientX; startW=panel.offsetWidth;
-    handle.classList.add('dragging');
-    document.body.style.cursor='ew-resize';
-    document.body.style.userSelect='none';
-    e.preventDefault();
-  });
-  document.addEventListener('mousemove', function(e){
-    if(!resizing) return;
-    var dx = startX - e.clientX;          // 왼쪽으로 드래그 → 넓어짐
-    var nw = Math.max(180, Math.min(window.innerWidth*0.75, startW+dx));
-    panel.style.width = nw+'px';
-    if(_leafMap) _leafMap.invalidateSize();
-  });
-  document.addEventListener('mouseup', function(){
-    if(!resizing) return;
-    resizing=false;
-    handle.classList.remove('dragging');
-    document.body.style.cursor='';
-    document.body.style.userSelect='';
-    if(_leafMap) _leafMap.invalidateSize();
-  });
-})();
-
-/* DXF 로드 완료 후 지도 자동 이동 (기존 loadDXF 후 호출) */
-var _origFitView = fitView;
-fitView = function(){
-  _origFitView.apply(this, arguments);
-  if(_wmsOpen && _leafMap) setTimeout(centerWmsMap, 200);
-};
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </body>
 </html>
