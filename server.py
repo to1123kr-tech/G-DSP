@@ -518,13 +518,17 @@ SAFEMAP_KEY = "K7JMZ9N6-K7JM-K7JM-K7JM-K7JMZ9N6D1"
 @app.route('/api/safemap-wms')
 @cache.cached(timeout=3600, query_string=True)
 def safemap_wms_proxy():
-    """산사태위험지도 WMS 프록시 — safemap.go.kr CORS 우회"""
+    """산사태위험지도 WMS 프록시 — safemap.go.kr CORS 우회
+    공식가이드: http://www.safemap.go.kr/openApiService/wms/getLayerData.do?apikey=KEY
+    파라미터: layers=A2SM_SANSATAI, styles=(없음), format=image/png, transparent=true
+    """
     try:
         params = dict(request.args)
-        params['apikey'] = SAFEMAP_KEY          # serviceKey 아님! apikey
-        url = "https://www.safemap.go.kr/openApiService/wms/getLayerData.do"
+        params['apikey'] = SAFEMAP_KEY
+        # 공식 가이드 URL (http)
+        url = "http://www.safemap.go.kr/openApiService/wms/getLayerData.do"
         r = req.get(url, params=params,
-                    headers={"Referer": "https://www.safemap.go.kr", "User-Agent": "Mozilla/5.0"},
+                    headers={"Referer": "http://www.safemap.go.kr", "User-Agent": "Mozilla/5.0"},
                     timeout=15)
         content_type = r.headers.get('Content-Type', 'image/png')
         resp = make_response(r.content)
