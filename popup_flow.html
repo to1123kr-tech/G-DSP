@@ -1512,8 +1512,10 @@ function toggleWmsLayer(type){
       /* 산사태위험지도 — 서버 프록시 경유 (CORS 우회) */
       lyr = L.tileLayer.wms(PROXY + '/api/safemap-wms', {
         layers: 'A2SM_SANSATAI',
+        styles: 'A2SM_SANSATAI',
         format: 'image/png',
         transparent: true,
+        exceptions: 'text/xml',
         opacity: op,
         version: '1.1.1'
       });
