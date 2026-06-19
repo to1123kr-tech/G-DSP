@@ -1534,7 +1534,7 @@ function toggleWmsLayer(type){
             +'&width=256&height=256&transparent=TRUE';
         }
       });
-      lyr = new SafemapLayer('', {opacity:op, tileSize:256, attribution:'산사태위험도 © 행정안전부'});
+      lyr = new SafemapLayer('', {opacity:op, tileSize:256, attribution:'산사태위험도 © 행정안전부', maxNativeZoom:16, maxZoom:22});
       var errCount = 0;
       lyr.on('tileerror', function(){
         errCount++;
