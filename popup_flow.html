@@ -145,24 +145,38 @@
       <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.5">
         변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식
       </div>
+      <!-- 작업구역 선택 -->
+      <div id="cropSection" style="display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+        <div style="font-size:11px;color:var(--tx3);margin-bottom:6px">📦 작업구역 선택 (사각형)</div>
+        <button class="btn btn-ghost" id="btnCrop" onclick="toggleCrop()" style="font-size:12px">✂️ 작업구역 그리기 (2점)</button>
+        <div id="cropInfo" style="display:none;margin-top:6px">
+          <div style="font-size:11px;color:#4ade80;margin-bottom:4px">✅ 작업구역 적용됨</div>
+          <button class="btn btn-ghost" onclick="clearCrop()" style="font-size:11px;padding:5px">🗑 작업구역 초기화</button>
+        </div>
+      </div>
     </div>
 
     <div class="sec">
       <h3>허가지선 (산지전용예정지)</h3>
-      <button class="btn btn-ghost" id="btnPermit" disabled onclick="togglePermit()">✏️ 허가지선 그리기</button>
+      <!-- DXF에서 가져오기 버튼 (DXF에 폐합선 있을 때 표시) -->
+      <div id="importPermitDiv" style="display:none;margin-bottom:8px">
+        <div style="font-size:11px;color:#fbbf24;margin-bottom:5px">📂 DXF에서 폐합선 감지됨</div>
+        <div id="importPermitList"></div>
+      </div>
+      <button class="btn btn-ghost" id="btnPermit" disabled onclick="togglePermit()">✏️ 허가지선 직접 그리기</button>
       <div id="permitInfo" style="display:none;margin-top:9px">
         <div class="stat full"><div class="v" id="permitArea">–</div><div class="k">신청 면적</div></div>
         <div style="display:flex;gap:5px;margin-top:8px">
-          <button class="thr" id="uM2" onclick="setUnit('m2')">㎡</button>
+          <button class="thr on" id="uM2" onclick="setUnit('m2')">㎡</button>
           <button class="thr" id="uA" onclick="setUnit('a')">a</button>
-          <button class="thr on" id="uHa" onclick="setUnit('ha')">ha</button>
+          <button class="thr" id="uHa" onclick="setUnit('ha')">ha</button>
         </div>
         <button class="btn btn-ghost" onclick="clearPermit()" style="margin-top:8px;font-size:12px;padding:7px">지우고 다시 그리기</button>
       </div>
       <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.6">꼭짓점 클릭 → 첫 점에 대면 <b style="color:var(--tx2)">자동 닫기</b> (또는 더블클릭)<br>우클릭 = 직전 점 취소</div>
     </div>
 
-    <div class="sec">
+    <div class="sec" id="secRecog" style="display:none">
       <h3>인식 결과</h3>
       <div class="info-grid">
         <div class="stat"><div class="v" id="nCont">–</div><div class="k">등고선</div></div>
@@ -195,7 +209,7 @@
           <button class="thr on" id="rShade" onclick="setRelief('shade')">음영(회색)</button>
           <button class="thr" id="rHypso" onclick="setRelief('hypso')">무지개</button>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:9px;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:9px;cursor:pointer;pointer-events:auto;position:relative;z-index:2">
           <input type="checkbox" id="gridToggle" onchange="S.showGrid=this.checked;render()"> 격자 보기
         </label>
         <!-- 버퍼선 -->
@@ -338,13 +352,16 @@
     </div>
 
     <div class="sec pipe">
-      <h3>분석 순서</h3>
-      <div class="pi cur" id="p1"><span class="n">1</span>지형 적재 · 표시</div>
-      <div class="pi" id="p2"><span class="n">2</span>TIN → DEM(격자)</div>
-      <div class="pi" id="p3"><span class="n">3</span>음영기복 / 3D</div>
-      <div class="pi" id="p4"><span class="n">4</span>흐름방향 · 누적 (D8)</div>
-      <div class="pi" id="p5"><span class="n">5</span>하천 · 유역 추출</div>
-      <div class="pi" id="p6"><span class="n">6</span>합리식 유출량 Q</div>
+      <h3>작업 순서</h3>
+      <div class="pi cur" id="p1"><span class="n">1</span>DXF 업로드</div>
+      <div class="pi" id="p1b"><span class="n">2</span>작업구역 선택 (사각형)</div>
+      <div class="pi" id="p1c"><span class="n">3</span>허가지선 선택 / 그리기</div>
+      <div class="pi" id="p1d"><span class="n">4</span>버퍼선 설정</div>
+      <div class="pi" id="p2"><span class="n">5</span>TIN → DEM(격자)</div>
+      <div class="pi" id="p3"><span class="n">6</span>음영기복 / 3D</div>
+      <div class="pi" id="p4"><span class="n">7</span>흐름방향 · 누적 (D8)</div>
+      <div class="pi" id="p5"><span class="n">8</span>하천 · 유역 추출</div>
+      <div class="pi" id="p6"><span class="n">9</span>합리식 유출량 Q</div>
     </div>
   </aside>
 
@@ -420,7 +437,7 @@ var S={ contours:[], surveys:[], polys:[],
         flow:null, streamMask:null, streamHa:5, showStreams:true,
         watershed:null, wsCanvas:null, wsSegs:null, showWS:true, mode:'pan', dnX:0, dnY:0,
         permit:null, permitDraw:null, ghostXY:null, snapClose:false,
-        showGrid:false, showArrows:false, areaUnit:'ha', reliefMode:'shade',
+        showGrid:false, showArrows:false, areaUnit:'m2', reliefMode:'shade',
         bounds:null, scale:1, ox:0, oy:0,
         zmin:0, zmax:0, isDown:false, lastM:null, name:'' };
 
@@ -552,9 +569,9 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
 })();
 
 function applyParsed(r){
-  S.contours=r.contours; S.surveys=r.surveys; S.polys=r.polys;
+  S.origContours=r.contours; S.origSurveys=r.surveys; S.origPolys=r.polys||[];
+  S.contours=r.contours; S.surveys=r.surveys; S.polys=r.polys||[];
 
-  // 표고 범위 (등고선 + 표고점 모두)
   var zs=[];
   S.contours.forEach(function(c){ zs.push(c.elev); });
   S.surveys.forEach(function(s){ var z=parseFloat(s.val)||s.z; if(z>0) zs.push(z); });
@@ -568,6 +585,37 @@ function applyParsed(r){
   document.getElementById('zHi').textContent=S.zmax.toFixed(0)+'m';
 
   document.getElementById('sbName').textContent=S.name;
+
+  /* ★ 작업구역 선택 버튼 표시 */
+  document.getElementById('cropSection').style.display='';
+
+  /* ★ DXF 폐합선 감지 → 허가지선 가져오기 */
+  var candidates=(S.polys||[]).filter(function(p){ return p.area>50; });
+  candidates.sort(function(a,b){ return b.area-a.area; });
+  var div=document.getElementById('importPermitDiv');
+  var lst=document.getElementById('importPermitList');
+  if(candidates.length>0){
+    div.style.display='';
+    lst.innerHTML='';
+    candidates.slice(0,5).forEach(function(p,i){
+      var btn=document.createElement('button');
+      btn.className='btn btn-ghost';
+      btn.style='font-size:11px;margin-bottom:4px;width:100%;text-align:left;';
+      btn.textContent='선택 '+(i+1)+': 레이어 ['+(p.layer||'?')+'] '+(p.area>0?Math.round(p.area)+' ㎡':'');
+      btn.onclick=(function(pp){ return function(){
+        S.permit=pp.pts.slice();
+        var A=polyArea(S.permit);
+        document.getElementById('permitArea').textContent=fmtArea(A);
+        document.getElementById('permitInfo').style.display='';
+        render();
+        toast('허가지선 가져오기 완료 · '+fmtArea(A),'ok');
+        if(S.dem) setTimeout(function(){ autoCalcRisk(); },200);
+      }; })(p);
+      lst.appendChild(btn);
+    });
+  } else {
+    div.style.display='none';
+  }
   document.getElementById('sbCont').textContent=S.contours.length;
   document.getElementById('sbSurv').textContent=S.surveys.length;
 
@@ -673,6 +721,15 @@ cv.addEventListener('click',function(e){
   if(Math.abs(e.clientX-S.dnX)+Math.abs(e.clientY-S.dnY) > 5) return; // 드래그면 무시
   var w=evWorld(e);
   if(S.mode==='pour'){ pickOutlet(w.x, w.y); }
+  else if(S.mode==='crop'){
+    if(!S.cropPt1){
+      S.cropPt1=w; toast('두 번째 꼭짓점을 클릭하세요');
+    } else {
+      S.cropPt2=w;
+      S.mode='pan'; cv.style.cursor='grab'; updateCropBtn();
+      applyCropRect({x1:S.cropPt1.x,y1:S.cropPt1.y,x2:w.x,y2:w.y});
+    }
+  }
   else if(S.mode==='section'){
     S.sectionPts=S.sectionPts||[];
     S.sectionPts.push({x:w.x,y:w.y});
@@ -865,6 +922,18 @@ function render(){
     ctx.fillStyle='#f472b6';
     for(var qi=0;qi<S.permitDraw.length;qi++){ var s=w2s(S.permitDraw[qi]); ctx.beginPath(); ctx.arc(s.x,s.y,3,0,6.283); ctx.fill(); }
     if(S.snapClose && S.permitDraw.length>=3){ var f0=w2s(S.permitDraw[0]); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(f0.x,f0.y,7,0,6.283); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // ★ 작업구역 사각형 (검정 점선)
+  if(S.mode==='crop' && S.cropPt1 && S.sectionGhost){
+    /* nothing - section ghost uses same var; crop uses cropPt1 only */
+  }
+  if(S.cropRect){
+    var cr=S.cropRect;
+    var crtl=w2s({x:cr.minX,y:cr.maxY}), crbr=w2s({x:cr.maxX,y:cr.minY});
+    ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.7)'; ctx.lineWidth=2; ctx.setLineDash([10,5]);
+    ctx.strokeRect(crtl.x,crtl.y,crbr.x-crtl.x,crbr.y-crtl.y); ctx.setLineDash([]);
     ctx.restore();
   }
 
@@ -1515,7 +1584,60 @@ function init3DScene(){
   (function loop(){ _three.raf=requestAnimationFrame(loop); renderer.render(scene,camera); })();
 }
 
-/* ── 버퍼선 거리 설정 ── */
+/* ══ 작업구역 선택 (사각형 클립) ══ */
+function toggleCrop(){
+  if(S.mode==='crop'){ S.mode='pan'; cv.style.cursor='grab'; updateCropBtn(); return; }
+  S.mode='crop'; S.cropPt1=null; S.cropPt2=null;
+  cv.style.cursor='crosshair';
+  updateCropBtn(); toast('첫 번째 꼭짓점을 클릭하세요');
+}
+function updateCropBtn(){
+  var b=document.getElementById('btnCrop');
+  if(S.mode==='crop'){ b.classList.add('active'); b.textContent='클릭 대기중… (ESC 취소)'; }
+  else { b.classList.remove('active'); b.textContent='✂️ 작업구역 그리기 (2점)'; }
+}
+function clearCrop(){
+  S.cropRect=null; S.cropPt1=null; S.cropPt2=null;
+  S.contours=S.origContours||S.contours;
+  S.surveys=S.origSurveys||S.surveys;
+  S.polys=S.origPolys||S.polys;
+  document.getElementById('cropInfo').style.display='none';
+  document.getElementById('btnCrop').style.display='';
+  /* 전체 범위로 화면 맞춤 */
+  fitViewToData();
+  render(); toast('작업구역 초기화됨');
+}
+function applyCropRect(r){
+  var minX=Math.min(r.x1,r.x2), maxX=Math.max(r.x1,r.x2);
+  var minY=Math.min(r.y1,r.y2), maxY=Math.max(r.y1,r.y2);
+  if((maxX-minX)<5||(maxY-minY)<5){ toast('작업구역이 너무 작아요','err'); return; }
+  S.cropRect={minX:minX,minY:minY,maxX:maxX,maxY:maxY};
+  /* 데이터 클립 */
+  S.contours=(S.origContours||S.contours).filter(function(c){
+    return c.pts.some(function(p){ return p.x>=minX&&p.x<=maxX&&p.y>=minY&&p.y<=maxY; });
+  });
+  S.surveys=(S.origSurveys||S.surveys).filter(function(s){
+    return s.x>=minX&&s.x<=maxX&&s.y>=minY&&s.y<=maxY;
+  });
+  S.polys=(S.origPolys||S.polys).filter(function(p){
+    return p.pts.some(function(pt){ return pt.x>=minX&&pt.x<=maxX&&pt.y>=minY&&pt.y<=maxY; });
+  });
+  /* bounds 업데이트 → 화면 맞춤 */
+  S.bounds={minX:minX,minY:minY,maxX:maxX,maxY:maxY};
+  fitViewToBounds({minX:minX,minY:minY,maxX:maxX,maxY:maxY});
+  document.getElementById('cropInfo').style.display='';
+  render(); toast('작업구역 적용 · 화면 확대','ok');
+}
+function fitViewToBounds(b){
+  var margin=0.08;
+  var w=b.maxX-b.minX, h=b.maxY-b.minY;
+  var sx=(cv.width*(1-2*margin))/w, sy=(cv.height*(1-2*margin))/h;
+  S.scale=Math.min(sx,sy);
+  S.ox=cv.width/2-S.scale*(b.minX+w/2);
+  S.oy=cv.height/2-S.scale*(b.minY+h/2);
+}
+
+/* ══ 버퍼선 거리 설정 ══ */
 function setBuffer(d){
   S.bufferDist=d;
   /* 버튼 활성화 표시 */
@@ -1530,18 +1652,24 @@ function setBuffer(d){
 
 /* ── 폴리곤 평행 오프셋 (버퍼 계산) ── */
 function offsetPolygon(pts, d){
-  var n=pts.length, out=[];
+  var n=pts.length; if(n<3) return pts;
+  /* 와인딩 판별 (Shoelace) — 세계좌표 Y상향 기준 */
+  var area2=0;
+  for(var i=0,j=n-1;i<n;j=i++) area2+=pts[j].x*pts[i].y-pts[i].x*pts[j].y;
+  /* CCW(+): 바깥=오른쪽 (dy,-dx), CW(-): 바깥=왼쪽 (-dy,dx) */
+  var s=area2>0?1:-1;
+  var out=[];
   for(var i=0;i<n;i++){
-    var prev=pts[(i-1+n)%n], curr=pts[i], next=pts[(i+1)%n];
-    var e1x=curr.x-prev.x, e1y=curr.y-prev.y, l1=Math.hypot(e1x,e1y)||1;
-    var e2x=next.x-curr.x, e2y=next.y-curr.y, l2=Math.hypot(e2x,e2y)||1;
-    var n1x=e1y/l1, n1y=-e1x/l1;
-    var n2x=e2y/l2, n2y=-e2x/l2;
-    var bx=n1x+n2x, by=n1y+n2y, bl=Math.hypot(bx,by)||1;
+    var prev=pts[(i-1+n)%n],curr=pts[i],next=pts[(i+1)%n];
+    var e1x=curr.x-prev.x,e1y=curr.y-prev.y,l1=Math.hypot(e1x,e1y)||1;
+    var e2x=next.x-curr.x,e2y=next.y-curr.y,l2=Math.hypot(e2x,e2y)||1;
+    var n1x=s*e1y/l1,n1y=s*(-e1x)/l1;
+    var n2x=s*e2y/l2,n2y=s*(-e2x)/l2;
+    var bx=n1x+n2x,by=n1y+n2y,bl=Math.hypot(bx,by)||1;
     var dot=n1x*(bx/bl)+n1y*(by/bl);
-    var sc=Math.abs(dot)>0.1?d/dot:d*2;
-    sc=Math.min(Math.abs(sc),d*3)*Math.sign(sc||1);
-    out.push({x:curr.x+bx/bl*sc, y:curr.y+by/bl*sc});
+    var sc=Math.abs(dot)>0.1?d/dot:d;
+    sc=Math.max(-d*3,Math.min(d*3,sc));
+    out.push({x:curr.x+bx/bl*sc,y:curr.y+by/bl*sc});
   }
   return out;
 }
@@ -1601,6 +1729,9 @@ function drawSectionProfile(p1, p2){
   var oc=pcv.getContext('2d');
   oc.clearRect(0,0,W,H);
   oc.fillStyle='#0e1626'; oc.fillRect(0,0,W,H);
+  /* 최소 표고 범위 10m 확보 (평지면 확대 표시) */
+  var minZoom=10;
+  if(maxZ-minZ<minZoom){ var mid=(maxZ+minZ)/2; minZ=mid-minZoom/2; maxZ=mid+minZoom/2; }
   var zr=(maxZ-minZ)||1;
   var toX=function(d){return pad.l+(W-pad.l-pad.r)*(d/totalLen);};
   var toY=function(z){return H-pad.b-(H-pad.t-pad.b)*((z-minZ)/zr);};
