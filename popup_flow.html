@@ -277,8 +277,11 @@
   <div class="stage">
     <canvas id="cv"></canvas>
     <div class="hint" id="hint" style="display:none">휠=확대 · 드래그=이동</div>
-    <div class="tools" id="tools" style="display:none">
+    <!-- 🗺 지도 버튼: DXF 없어도 항상 표시 -->
+    <div style="position:absolute;top:12px;right:12px;z-index:10">
       <button class="tbtn" id="btnWmsMap" title="위험도 지도 (산사태·지질)" onclick="toggleWmsPanel()">🗺</button>
+    </div>
+    <div class="tools" id="tools" style="display:none;top:58px">
       <button class="tbtn" title="화면 맞춤" onclick="fitView()">⤢</button>
       <button class="tbtn" title="확대" onclick="zoomBy(1.25)">＋</button>
       <button class="tbtn" title="축소" onclick="zoomBy(1/1.25)">－</button>
