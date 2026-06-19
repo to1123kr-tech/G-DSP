@@ -107,6 +107,15 @@
   .droplay .t{font-size:18px;font-weight:800}
   .droplay .s{font-size:13px;color:var(--tx2)}
   @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  /* ── 재해위험도 채점표 ── */
+  .risk-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--line);font-size:11.5px}
+  .risk-row:last-child{border-bottom:none}
+  .risk-lbl{color:var(--tx2);flex:1}
+  .risk-val{color:var(--tx);font-weight:600;font-size:11px;min-width:70px;text-align:right}
+  .risk-pt{color:var(--accent);font-weight:800;min-width:32px;text-align:right}
+  .risk-sel{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--tx);padding:5px;font-size:11px;margin-top:3px}
+  .risk-num{width:65px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--tx);padding:4px 6px;font-size:12px;text-align:right}
+  .risk-check{display:flex;gap:6px;align-items:flex-start;font-size:10.5px;color:var(--tx3);margin-bottom:3px;cursor:pointer;line-height:1.4}
 </style>
 </head>
 <body>
@@ -233,9 +242,65 @@
       <div class="lg"><span class="sw" style="border-color:#94a3b8;border-top-width:1.6px"></span>계곡선 (굵게)</div>
       <div class="lg"><span class="sw" style="border-color:#5b7290"></span>주곡선</div>
       <div class="lg"><span class="swx">✕</span>표고점 (+표고값)</div>
-      <div class="lg"><span class="sw" style="border-color:#38a0eb;border-top-width:2px"></span>하천망</div>
+      <div class="lg"><span class="sw" style="border-color:#0c4a8d;border-top-width:2.5px"></span>하천 4차 (Strahler)</div>
+      <div class="lg"><span class="sw" style="border-color:#1d64c8;border-top-width:2px"></span>하천 3차</div>
+      <div class="lg"><span class="sw" style="border-color:#38a0eb;border-top-width:1.5px"></span>하천 1·2차</div>
       <div class="lg"><span class="sw" style="border-color:#34d399;border-top-width:2px"></span>능선선 (유역경계)</div>
       <div class="lg"><span class="sw" style="border-color:#f472b6;border-top-width:2px;border-top-style:dashed"></span>허가지선</div>
+    </div>
+
+    <!-- 재해위험도 채점표 -->
+    <div class="sec">
+      <h3>⚖️ 재해위험도 판정</h3>
+      <button class="btn btn-ghost" onclick="autoCalcRisk()" style="margin-bottom:9px">📐 DEM 자동 분석 (4인자)</button>
+      <!-- 자동 4인자 -->
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:8px">
+        <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">DEM 자동 계산</div>
+        <div class="risk-row"><span class="risk-lbl">경사도</span><span class="risk-val" id="rv_slope">–</span><span class="risk-pt" id="rp_slope">–점</span></div>
+        <div class="risk-row"><span class="risk-lbl">경사길이</span><span class="risk-val" id="rv_slen">–</span><span class="risk-pt" id="rp_slen">–점</span></div>
+        <div class="risk-row"><span class="risk-lbl">경사위치</span><span class="risk-val" id="rv_spos">–</span><span class="risk-pt" id="rp_spos">–점</span></div>
+        <div class="risk-row"><span class="risk-lbl">사면형</span><span class="risk-val" id="rv_sform">–</span><span class="risk-pt" id="rp_sform">–점</span></div>
+      </div>
+      <!-- 수동 3인자 -->
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:8px">
+        <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">✏️ 직접 입력</div>
+        <div style="font-size:11px;color:var(--tx3);margin-bottom:3px">임상</div>
+        <select class="risk-sel" id="sel_imsang" onchange="updateRiskTotal()">
+          <option value="18">침엽수림 (소경목·치수림) — 18점</option>
+          <option value="26">침엽수림 (중경목·대경목) — 26점</option>
+          <option value="0" selected>활엽수림·혼효림 — 0점</option>
+          <option value="0">무림목지·채산림 — 0점</option>
+        </select>
+        <div style="font-size:11px;color:var(--tx3);margin:7px 0 3px">모암</div>
+        <select class="risk-sel" id="sel_moam" onchange="updateRiskTotal()">
+          <option value="0" selected>퇴적암 (이암·석회암·사암 등) — 0점</option>
+          <option value="5">화성암 (화강암류 기타) — 5점</option>
+          <option value="12">변성암 (천매암·점판암 기타) — 12점</option>
+          <option value="19">변성암 (편마암류·편암류) — 19점</option>
+          <option value="56">화성암 (반암류·안산암류) — 56점</option>
+        </select>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:7px">
+          <span style="font-size:11px;color:var(--tx3);flex:1">토심 (cm)</span>
+          <input class="risk-num" type="number" id="inp_tosim" value="50" min="0" max="300" oninput="updateRiskTotal()">
+        </div>
+      </div>
+      <!-- 보정 -->
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:8px">
+        <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">조사자 점수 보정</div>
+        <label class="risk-check"><input type="checkbox" id="cor1" onchange="updateRiskTotal()">주민이 위험지역이라 생각함 (+10)</label>
+        <label class="risk-check"><input type="checkbox" id="cor2" onchange="updateRiskTotal()">주민이 산사태 없다 생각함 (−10)</label>
+        <label class="risk-check"><input type="checkbox" id="cor3" onchange="updateRiskTotal()">인위적 산림훼손·방치 산지 (+20)</label>
+        <label class="risk-check"><input type="checkbox" id="cor4" onchange="updateRiskTotal()">과수원·유실수·조림 등 지피불안전 (+20)</label>
+        <label class="risk-check"><input type="checkbox" id="cor5" onchange="updateRiskTotal()">도심지 인접 산지 (+10)</label>
+      </div>
+      <!-- 합계 -->
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:11px;color:var(--tx3);margin-bottom:4px">합계 점수</div>
+        <div id="riskTotal" style="font-size:28px;font-weight:800;color:var(--accent)">–</div>
+        <div id="riskGrade" style="margin-top:8px;padding:8px;border-radius:8px;font-size:13px;font-weight:700;display:none"></div>
+      </div>
+      <!-- 강수시 우수흐름도 내보내기 -->
+      <button class="btn btn-ghost" onclick="exportFlowMap()" style="font-size:12px;margin-top:4px">💧 강수시 우수흐름도 PNG</button>
     </div>
 
     <div class="sec pipe">
@@ -657,44 +722,57 @@ function render(){
   });
   ctx.globalAlpha=1;
 
-  // 하천망 (흐름누적 ≥ 임계 → 하류로 선)
+  // 하천망 — Strahler 차수 색상 (4차: 짙은파랑 → 1차: 연파랑)
   if(S.flow && S.showStreams && S.streamMask){
-    var fl=S.flow, sm=S.streamMask.mask;
-    ctx.strokeStyle='rgba(56,160,235,0.95)'; ctx.lineCap='round';
-    ctx.lineWidth=Math.max(1, S.scale*fl.cell*0.28);
-    ctx.beginPath();
-    for(var si=0;si<sm.length;si++){
-      if(!sm[si]) continue;
-      var code=fl.fdir[si]; if(code<=0) continue;
-      var d=_step(code); if(!d) continue;
-      var c=si%fl.cols, r=(si/fl.cols)|0;
-      var a=w2s({x:fl.minX+c*fl.cell, y:fl.minY+r*fl.cell});
-      var b=w2s({x:fl.minX+(c+d[0])*fl.cell, y:fl.minY+(r+d[1])*fl.cell});
-      ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
-    }
-    ctx.stroke(); ctx.lineCap='butt';
+    var fl=S.flow, sm=S.streamMask.mask, fa=fl.acc, thr=S.streamMask.thr||1;
+    ctx.lineCap='round';
+    var orders=[
+      {minF:thr*64, color:'rgba(12,74,141,0.95)',  lw:2.6},
+      {minF:thr*16, color:'rgba(29,100,200,0.95)', lw:2.0},
+      {minF:thr*4,  color:'rgba(56,144,220,0.90)', lw:1.5},
+      {minF:thr,    color:'rgba(56,160,235,0.75)', lw:1.0}
+    ];
+    orders.forEach(function(ord){
+      ctx.strokeStyle=ord.color;
+      ctx.lineWidth=Math.max(ord.lw, S.scale*fl.cell*0.18);
+      ctx.beginPath();
+      for(var si=0;si<sm.length;si++){
+        if(!sm[si]||fa[si]<ord.minF) continue;
+        var code=fl.fdir[si]; if(code<=0) continue;
+        var d=_step(code); if(!d) continue;
+        var c=si%fl.cols, r=(si/fl.cols)|0;
+        var a=w2s({x:fl.minX+c*fl.cell,y:fl.minY+r*fl.cell});
+        var b=w2s({x:fl.minX+(c+d[0])*fl.cell,y:fl.minY+(r+d[1])*fl.cell});
+        ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+      }
+      ctx.stroke();
+    });
+    ctx.lineCap='butt';
   }
 
-  // D8 흐름 화살표 — 셀이 충분히 클 때만, 가시범위
+  // 강수시 우수흐름도 화살표 (파란색, 줌 3px 이상이면 표시)
   if(S.flow && S.showArrows){
     var af=S.flow, apx=S.scale*af.cell;
-    if(apx>=12){
+    if(apx>=3){
       var atl=s2w(0,0), abr=s2w(cv.width,cv.height);
       var ac0=Math.max(0,Math.floor((Math.min(atl.x,abr.x)-af.minX)/af.cell));
       var ac1=Math.min(af.cols-1,Math.ceil((Math.max(atl.x,abr.x)-af.minX)/af.cell));
       var ar0=Math.max(0,Math.floor((Math.min(atl.y,abr.y)-af.minY)/af.cell));
       var ar1=Math.min(af.rows-1,Math.ceil((Math.max(atl.y,abr.y)-af.minY)/af.cell));
-      ctx.strokeStyle='rgba(226,232,240,0.75)'; ctx.lineWidth=1; ctx.lineCap='round'; ctx.beginPath();
-      var hl=Math.min(6, apx*0.22), L=af.cell*0.34;
-      for(var ar=ar0;ar<=ar1;ar++)for(var ac=ac0;ac<=ac1;ac++){
+      // 셀 크기에 따라 샘플링 (너무 촘촘하면 간격 조절)
+      var step=apx<6?Math.max(1,Math.round(4/apx)):1;
+      ctx.strokeStyle='rgba(37,99,235,0.85)'; ctx.lineWidth=Math.max(0.8,apx*0.07);
+      ctx.lineCap='round'; ctx.beginPath();
+      var hl=Math.max(2,Math.min(8,apx*0.28)), L=af.cell*0.36;
+      for(var ar=ar0;ar<=ar1;ar+=step) for(var ac=ac0;ac<=ac1;ac+=step){
         var ai=ar*af.cols+ac, acode=af.fdir[ai]; if(acode<=0) continue;
         var ad=_step(acode); if(!ad) continue;
         var cx=af.minX+ac*af.cell, cy=af.minY+ar*af.cell;
-        var p1=w2s({x:cx-ad[0]*L, y:cy-ad[1]*L}), p2=w2s({x:cx+ad[0]*L, y:cy+ad[1]*L});
+        var p1=w2s({x:cx-ad[0]*L,y:cy-ad[1]*L}), p2=w2s({x:cx+ad[0]*L,y:cy+ad[1]*L});
         ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
-        var ang=Math.atan2(p2.y-p1.y, p2.x-p1.x);
-        ctx.moveTo(p2.x,p2.y); ctx.lineTo(p2.x-hl*Math.cos(ang-0.45), p2.y-hl*Math.sin(ang-0.45));
-        ctx.moveTo(p2.x,p2.y); ctx.lineTo(p2.x-hl*Math.cos(ang+0.45), p2.y-hl*Math.sin(ang+0.45));
+        var ang=Math.atan2(p2.y-p1.y,p2.x-p1.x);
+        ctx.moveTo(p2.x,p2.y); ctx.lineTo(p2.x-hl*Math.cos(ang-0.42),p2.y-hl*Math.sin(ang-0.42));
+        ctx.moveTo(p2.x,p2.y); ctx.lineTo(p2.x-hl*Math.cos(ang+0.42),p2.y-hl*Math.sin(ang+0.42));
       }
       ctx.stroke(); ctx.lineCap='butt';
     }
@@ -1306,7 +1384,191 @@ function init3DScene(){
   (function loop(){ _three.raf=requestAnimationFrame(loop); renderer.render(scene,camera); })();
 }
 
-/* ---------- 토스트 ---------- */
+/* ══════════════════════════════════════════════
+   재해위험도 7인자 채점표 자동 판정
+   ══════════════════════════════════════════════ */
+function ptInPoly(pt,poly){
+  var inside=false,n=poly.length;
+  for(var i=0,j=n-1;i<n;j=i++){
+    var xi=poly[i].x,yi=poly[i].y,xj=poly[j].x,yj=poly[j].y;
+    if(((yi>pt.y)!=(yj>pt.y))&&(pt.x<(xj-xi)*(pt.y-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+
+function autoCalcRisk(){
+  if(!S.dem){ toast('먼저 DEM을 생성하세요','err'); return; }
+  if(!S.permit||S.permit.length<3){ toast('먼저 허가지선을 그리세요','err'); return; }
+  var dem=S.dem,cell=dem.cell,z=dem.z,cols=dem.cols,rows=dem.rows;
+  var slopes=[],elevs=[],curvs=[];
+  for(var r=1;r<rows-1;r++) for(var c=1;c<cols-1;c++){
+    var px=dem.minX+c*cell,py=dem.minY+r*cell;
+    if(!ptInPoly({x:px,y:py},S.permit)) continue;
+    var zc=z[r*cols+c]; if(!(zc===zc)) continue;
+    var zl=z[r*cols+c-1],zr2=z[r*cols+c+1],zd=z[(r-1)*cols+c],zu=z[(r+1)*cols+c];
+    if(!(zl===zl&&zr2===zr2&&zd===zd&&zu===zu)) continue;
+    var dzdx=(zr2-zl)/(2*cell),dzdy=(zu-zd)/(2*cell);
+    slopes.push(Math.atan(Math.sqrt(dzdx*dzdx+dzdy*dzdy))*180/Math.PI);
+    elevs.push(zc);
+    curvs.push(zl+zr2+zd+zu-4*zc);
+  }
+  if(!slopes.length){ toast('허가지선 내 DEM 셀이 없어요 — DEM 생성 후 허가지선 확인','err'); return; }
+  var avgSlope=slopes.reduce(function(a,b){return a+b;})/slopes.length;
+  var avgElev=elevs.reduce(function(a,b){return a+b;})/elevs.length;
+  var zrng=(S.zmax-S.zmin)||1;
+  var posR=(avgElev-S.zmin)/zrng;
+  var avgCurv=curvs.reduce(function(a,b){return a+b;})/curvs.length;
+  var spreadCurv=curvs.reduce(function(a,b){return a+Math.abs(b);})/curvs.length;
+  var form=(spreadCurv>5*Math.abs(avgCurv)&&spreadCurv>0.3)?'복합':
+           avgCurv<-0.08?'상승':avgCurv>0.08?'하강':'평형';
+
+  /* 경사길이: 허가지선 centroid → 유역경계(능선) 최단거리 */
+  var cx=0,cy=0;
+  S.permit.forEach(function(p){cx+=p.x;cy+=p.y;});
+  cx/=S.permit.length; cy/=S.permit.length;
+  var slopeLen=0;
+  if(S.wsSegs&&S.wsSegs.length){
+    var minD=1e18;
+    S.wsSegs.forEach(function(sg){
+      /* 선분 위 최근점 */
+      var dx=sg[2]-sg[0],dy=sg[3]-sg[1],ll=dx*dx+dy*dy;
+      var t=ll>0?Math.max(0,Math.min(1,((cx-sg[0])*dx+(cy-sg[1])*dy)/ll)):0;
+      var nx=sg[0]+t*dx,ny=sg[1]+t*dy;
+      var d=Math.hypot(nx-cx,ny-cy);
+      if(d<minD) minD=d;
+    });
+    slopeLen=minD;
+  } else {
+    var b=S.bounds;
+    slopeLen=Math.sqrt((b.maxX-b.minX)*(b.maxY-b.minY))/3;
+  }
+
+  /* 점수 */
+  var pSlope=avgSlope<=25?16:avgSlope<=40?9:0;
+  var pSlen=slopeLen<=50?0:slopeLen<=100?19:slopeLen<=200?36:74;
+  var pSpos=posR<=0.1?0:posR<=0.6?9:26;
+  var pSform={'상승':0,'평형':5,'하강':12,'복합':23}[form]||0;
+
+  /* 표시 */
+  document.getElementById('rv_slope').textContent=avgSlope.toFixed(1)+'°';
+  document.getElementById('rp_slope').textContent=pSlope+'점';
+  document.getElementById('rv_slen').textContent=Math.round(slopeLen)+'m';
+  document.getElementById('rp_slen').textContent=pSlen+'점';
+  document.getElementById('rv_spos').textContent=posR<=0.1?'하부(0-1/10)':posR<=0.6?'중부(2-6/10)':'상부(7-10/10)';
+  document.getElementById('rp_spos').textContent=pSpos+'점';
+  document.getElementById('rv_sform').textContent=form+'사면';
+  document.getElementById('rp_sform').textContent=pSform+'점';
+
+  S._riskAuto={pSlope:pSlope,pSlen:pSlen,pSpos:pSpos,pSform:pSform};
+  updateRiskTotal();
+  toast('자동 분석 완료 — 임상·모암·토심 입력 후 합계 확인','ok');
+}
+
+function updateRiskTotal(){
+  var ra=S._riskAuto||{pSlope:0,pSlen:0,pSpos:0,pSform:0};
+  var pIm=parseInt(document.getElementById('sel_imsang').value)||0;
+  var pMo=parseInt(document.getElementById('sel_moam').value)||0;
+  var ts=parseFloat(document.getElementById('inp_tosim').value)||0;
+  var pTs=ts<=20?0:ts<=100?7:21;
+  var sub=ra.pSlope+ra.pSlen+ra.pSpos+ra.pSform+pIm+pMo+pTs;
+  var cor=0;
+  if(document.getElementById('cor1').checked) cor+=10;
+  if(document.getElementById('cor2').checked) cor-=10;
+  if(document.getElementById('cor3').checked) cor+=20;
+  if(document.getElementById('cor4').checked) cor+=20;
+  if(document.getElementById('cor5').checked) cor+=10;
+  var total=Math.max(0,sub+cor);
+  document.getElementById('riskTotal').textContent=total+'점';
+  var gd=document.getElementById('riskGrade');
+  gd.style.display='';
+  if(total<70){
+    gd.style.cssText='display:block;background:#0d3b1a;color:#4ade80;padding:8px;border-radius:8px;text-align:center;font-size:13px;font-weight:700';
+    gd.textContent='1등급 — 위험도 낮음';
+  } else if(total<100){
+    gd.style.cssText='display:block;background:#0d2b3b;color:#60cdff;padding:8px;border-radius:8px;text-align:center;font-size:13px;font-weight:700';
+    gd.textContent='2등급 — 위험도 보통';
+  } else if(total<130){
+    gd.style.cssText='display:block;background:#3b2b0d;color:#fbbf24;padding:8px;border-radius:8px;text-align:center;font-size:13px;font-weight:700';
+    gd.textContent='3등급 — 위험도 높음 ⚠️';
+  } else {
+    gd.style.cssText='display:block;background:#3b0d0d;color:#f87171;padding:8px;border-radius:8px;text-align:center;font-size:13px;font-weight:700';
+    gd.textContent='4등급 — 위험도 매우 높음 🔴';
+  }
+}
+
+/* ── 강수시 우수흐름도 PNG 내보내기 ── */
+function exportFlowMap(){
+  if(!S.flow){ toast('먼저 흐름·하천 분석을 실행하세요','err'); return; }
+  var fl=S.flow, cols=fl.cols, rows=fl.rows, cell=fl.cell;
+  var scale=Math.max(1,Math.min(4, Math.round(1200/Math.max(cols,rows))));
+  var W=cols*scale, H=rows*scale;
+  var off=document.createElement('canvas'); off.width=W; off.height=H;
+  var oc=off.getContext('2d');
+
+  /* 배경 흰색 */
+  oc.fillStyle='#ffffff'; oc.fillRect(0,0,W,H);
+
+  /* 등고선 */
+  oc.strokeStyle='#aaa'; oc.lineWidth=0.7;
+  S.contours.forEach(function(c){
+    var isIdx=(c.layer||'').toUpperCase()==='F0017114';
+    oc.lineWidth=isIdx?1.4:0.7;
+    oc.beginPath();
+    c.pts.forEach(function(p,k){
+      var sx=(p.x-fl.minX)/cell*scale, sy=H-(p.y-fl.minY)/cell*scale;
+      k===0?oc.moveTo(sx,sy):oc.lineTo(sx,sy);
+    });
+    if(c.closed) oc.closePath();
+    oc.stroke();
+  });
+
+  /* 허가지선 */
+  if(S.permit&&S.permit.length>=3){
+    oc.strokeStyle='#2563eb'; oc.lineWidth=2; oc.setLineDash([6,4]); oc.lineJoin='round';
+    oc.beginPath();
+    S.permit.forEach(function(p,k){
+      var sx=(p.x-fl.minX)/cell*scale, sy=H-(p.y-fl.minY)/cell*scale;
+      k===0?oc.moveTo(sx,sy):oc.lineTo(sx,sy);
+    });
+    oc.closePath(); oc.stroke(); oc.setLineDash([]);
+  }
+
+  /* 파란 화살표 (모든 셀) */
+  var arLen=scale*0.38, arHead=Math.max(1.5,scale*0.22);
+  oc.strokeStyle='rgba(37,99,235,0.85)'; oc.lineWidth=Math.max(0.6,scale*0.07);
+  oc.lineCap='round'; oc.beginPath();
+  var stepF=Math.max(1,Math.round(3/scale));
+  for(var r=0;r<rows;r+=stepF) for(var c2=0;c2<cols;c2+=stepF){
+    var code=fl.fdir[r*cols+c2]; if(code<=0) continue;
+    var d=_step(code); if(!d) continue;
+    var sx=(c2+0.5)*scale, sy=H-(r+0.5)*scale;
+    var ex=sx+d[0]*arLen, ey=sy-d[1]*arLen;
+    var ang=Math.atan2(ey-sy,ex-sx);
+    oc.moveTo(sx,sy); oc.lineTo(ex,ey);
+    oc.moveTo(ex,ey); oc.lineTo(ex-arHead*Math.cos(ang-0.42),ey-arHead*Math.sin(ang-0.42));
+    oc.moveTo(ex,ey); oc.lineTo(ex-arHead*Math.cos(ang+0.42),ey-arHead*Math.sin(ang+0.42));
+  }
+  oc.stroke(); oc.lineCap='butt';
+
+  /* 능선선 초록 */
+  if(S.wsSegs&&S.wsSegs.length){
+    oc.strokeStyle='#16a34a'; oc.lineWidth=Math.max(1,scale*0.15); oc.beginPath();
+    S.wsSegs.forEach(function(sg){
+      oc.moveTo((sg[0]-fl.minX)/cell*scale, H-(sg[1]-fl.minY)/cell*scale);
+      oc.lineTo((sg[2]-fl.minX)/cell*scale, H-(sg[3]-fl.minY)/cell*scale);
+    });
+    oc.stroke();
+  }
+
+  /* 다운로드 */
+  var a=document.createElement('a');
+  a.href=off.toDataURL('image/png');
+  a.download=(S.name||'수계분석')+'_우수흐름도.png';
+  a.click();
+  toast('강수시 우수흐름도 PNG 저장','ok');
+}
+
+
 var _tt;
 function toast(msg,type){
   var t=document.getElementById('toast');
