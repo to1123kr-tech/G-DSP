@@ -1497,6 +1497,23 @@ def vworld_key_endpoint():
 def kakao_key_endpoint():
     return jsonify({"key": KAKAO_APP_KEY})
 
+@app.route('/api/kakao-geocode')
+def kakao_geocode():
+    """Kakao 지오코딩 프록시 — 도로명/지번 주소 검색"""
+    query = request.args.get('query', '').strip()
+    if not query:
+        return jsonify({'error': 'query required'}), 400
+    try:
+        r = req.get(
+            'https://dapi.kakao.com/v2/local/search/address.json',
+            params={'query': query, 'size': 5},
+            headers={'Authorization': f'KakaoAK {KAKAO_APP_KEY}'},
+            timeout=10
+        )
+        return jsonify(r.json())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/building/key')
 def building_key_endpoint():
     return jsonify({"key": BUILDING_KEY})
