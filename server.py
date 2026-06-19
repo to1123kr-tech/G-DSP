@@ -513,6 +513,29 @@ def vw_wms_proxy():
         return b'', 404
 
 
+SAFEMAP_KEY = "K7JMZ9N6-K7JM-K7JM-K7JMZ9N6D1"
+
+@app.route('/api/safemap-wms')
+@cache.cached(timeout=3600, query_string=True)
+def safemap_wms_proxy():
+    """산사태위험지도 WMS 프록시 — safemap.go.kr CORS 우회"""
+    try:
+        params = dict(request.args)
+        params['serviceKey'] = SAFEMAP_KEY
+        url = "https://safemap.go.kr/openApi2/IF_0046_WMS"
+        r = req.get(url, params=params,
+                    headers={"Referer": "https://safemap.go.kr", "User-Agent": "Mozilla/5.0"},
+                    timeout=15)
+        content_type = r.headers.get('Content-Type', 'image/png')
+        resp = make_response(r.content)
+        resp.headers['Content-Type'] = content_type
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp
+    except Exception as e:
+        logger.error(f"[safemap-wms] {e}")
+        return b'', 404
+
+
 @app.route('/api/wfs')
 def wfs_parcel():
     try:
