@@ -1516,18 +1516,25 @@ function toggleWmsLayer(type){
       _loadCadastral();
       return;
     } else if(type==='landslide'){
-      /* 산사태위험도 — {bbox-epsg-4326} 사용해서 lat/lng bbox로 요청
-         safemap.go.kr은 EPSG:4326 필요, tileLayer.wms는 3857 bbox 전송해서 안 됨 */
-      var safeUrl = PROXY + '/api/safemap-wms'
-        + '?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1'
-        + '&LAYERS=A2SM_SANSATAI&STYLES='
-        + '&FORMAT=image%2Fpng&TRANSPARENT=TRUE'
-        + '&SRS=EPSG%3A4326&BBOX={bbox-epsg-4326}&WIDTH=256&HEIGHT=256';
-      lyr = L.tileLayer(safeUrl, {
-        tileSize: 256,
-        opacity: op,
-        attribution: '산사태위험도 © 행정안전부'
+      /* 산사태위험도 — getTileUrl 오버라이드로 EPSG:4326 bbox 직접 계산
+         tileLayer.wms는 EPSG:3857 bbox 전송 → safemap 거부 */
+      var _px = PROXY;
+      var SafemapLayer = L.TileLayer.WMS.extend({
+        getTileUrl: function(coords) {
+          var z=coords.z, x=coords.x, y=coords.y, n=Math.pow(2,z);
+          var w = x/n*360-180, e=(x+1)/n*360-180;
+          var latN=Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI;
+          var latS=Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)))*180/Math.PI;
+          return _px+'/api/safemap-wms'
+            +'?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1'
+            +'&LAYERS=A2SM_SANSATAI&STYLES='
+            +'&FORMAT=image%2Fpng&TRANSPARENT=TRUE'
+            +'&SRS=EPSG%3A4326'
+            +'&BBOX='+w+','+latS+','+e+','+latN
+            +'&WIDTH=256&HEIGHT=256';
+        }
       });
+      lyr = new SafemapLayer(_px+'/api/safemap-wms', {opacity:op, tileSize:256});
       var errCount = 0;
       lyr.on('tileerror', function(){
         errCount++;
@@ -1617,33 +1624,41 @@ function _loadCadastral(){
 var _cadDebounce;
 function _loadCadastralDebounced(){ clearTimeout(_cadDebounce); _cadDebounce=setTimeout(_loadCadastral,250); }
 
-/* 지도 검색 (Nominatim — API 키 불필요) */
+/* 지도 검색 — Kakao 지오코딩 (한국 주소 정확) */
 function wmsSearch(){
   var q = document.getElementById('wmsSearchInput').value.trim();
   if(!q) return;
   if(!_leafMap){ toast('지도를 먼저 여세요','err'); return; }
   toast('검색 중...');
-  fetch('https://nominatim.openstreetmap.org/search?q='
-    + encodeURIComponent(q)
-    + '&format=json&countrycodes=kr&limit=5&accept-language=ko',
-    { headers:{ 'User-Agent':'G-DSP/1.0' } })
+  var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+  fetch(PROXY + '/api/kakao-geocode?query=' + encodeURIComponent(q))
   .then(function(r){ return r.json(); })
-  .then(function(results){
-    if(!results || results.length === 0){
-      toast('검색 결과 없음', 'err'); return;
+  .then(function(d){
+    var docs = d && d.documents;
+    if(!docs || !docs.length){
+      /* Kakao 결과 없으면 Nominatim 폴백 */
+      return fetch('https://nominatim.openstreetmap.org/search?q='
+        + encodeURIComponent(q)+'&format=json&countrycodes=kr&limit=1',
+        {headers:{'User-Agent':'G-DSP/1.0'}})
+        .then(function(r2){ return r2.json(); })
+        .then(function(res){
+          if(!res || !res.length){ toast('검색 결과 없음','err'); return; }
+          _placeSearchMarker(parseFloat(res[0].lat), parseFloat(res[0].lon), q);
+        });
     }
-    var r = results[0];
-    var lat = parseFloat(r.lat), lon = parseFloat(r.lon);
-    _leafMap.setView([lat, lon], 15);
-    /* 검색 결과 마커 */
-    if(window._searchMarker) window._searchMarker.remove();
-    window._searchMarker = L.marker([lat, lon])
-      .addTo(_leafMap)
-      .bindPopup('<b style="font-size:12px">'+r.display_name.split(',')[0]+'</b>', {maxWidth:200})
-      .openPopup();
-    toast('📍 ' + r.display_name.split(',')[0]);
+    var doc = docs[0];
+    _placeSearchMarker(parseFloat(doc.y), parseFloat(doc.x), doc.address_name || doc.road_address_name || q);
   })
-  .catch(function(){ toast('검색 실패 — 네트워크 확인', 'err'); });
+  .catch(function(){ toast('검색 실패','err'); });
+}
+function _placeSearchMarker(lat, lon, label){
+  _leafMap.setView([lat, lon], 17);
+  if(window._searchMarker) window._searchMarker.remove();
+  window._searchMarker = L.marker([lat, lon])
+    .addTo(_leafMap)
+    .bindPopup('<b style="font-size:12px">'+label+'</b>', {maxWidth:220})
+    .openPopup();
+  toast('📍 ' + label);
 }
 
 /* 투명도 변경 */
