@@ -1495,13 +1495,11 @@ function toggleWmsLayer(type){
   if(isOn){
     if(_wmsLayers[type]){ _wmsLayers[type].addTo(_leafMap); return; }
     var lyr;
-    var VK = '16B90D39-90BB-3197-987A-54983A46F250';
+    var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
 
     if(type==='cadastral'){
-      /* VWorld 지적도 + 지번 — 연속지적도 WMS */
-      lyr = L.tileLayer.wms('https://api.vworld.kr/req/wms', {
-        key: VK,
-        domain: '168-107-15-68.nip.io',
+      /* 지적도 + 지번 — 서버 프록시 경유 (key/domain 서버에서 자동 추가) */
+      lyr = L.tileLayer.wms(PROXY + '/api/vw-wms', {
         layers: 'lt_c_lhsco030',
         styles: 'lt_c_lhsco030',
         format: 'image/png',
@@ -1512,7 +1510,6 @@ function toggleWmsLayer(type){
       });
     } else if(type==='landslide'){
       /* 산사태위험지도 — 서버 프록시 경유 (CORS 우회) */
-      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
       lyr = L.tileLayer.wms(PROXY + '/api/safemap-wms', {
         layers: 'A2SM_SANSATAI',
         format: 'image/png',
