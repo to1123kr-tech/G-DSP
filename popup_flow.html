@@ -416,7 +416,7 @@
         <button onclick="document.getElementById('floatLegend').style.display='none'" style="background:none;border:none;color:#5b7290;cursor:pointer;font-size:13px;padding:0;line-height:1">✕</button>
       </div>
       <div style="height:10px;border-radius:3px;background:linear-gradient(90deg,#2e3482,#2882c8,#46b478,#c8c83c,#d27828,#b42828);margin-bottom:3px"></div>
-      <div style="display:flex;justify-content:space-between;font-size:9px;color:#5b7290;margin-bottom:8px"><span>저지대</span><span>고지대</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:#5b7290;margin-bottom:8px"><span id="zLo">저지대</span><span id="zHi">고지대</span></div>
       <div style="font-size:10.5px;color:#9fb0c8;line-height:1.9">
         <div style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:1.6px solid #94a3b8"></span>계곡선</div>
         <div style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:1px solid #5b7290"></span>주곡선</div>
@@ -636,13 +636,14 @@ function applyParsed(r){
   S.zmin=zs.length?Math.min.apply(null,zs):0;
   S.zmax=zs.length?Math.max.apply(null,zs):1;
 
-  document.getElementById('nCont').textContent=S.contours.length;
-  document.getElementById('nSurv').textContent=S.surveys.length;
-  document.getElementById('zRange').textContent=S.zmin.toFixed(1)+' ~ '+S.zmax.toFixed(1);
-  document.getElementById('zLo').textContent=S.zmin.toFixed(0)+'m';
-  document.getElementById('zHi').textContent=S.zmax.toFixed(0)+'m';
-
-  document.getElementById('sbName').textContent=S.name;
+  /* null-safe textContent 설정 */
+  function setTxt(id, v){ var el=document.getElementById(id); if(el) el.textContent=v; }
+  setTxt('nCont', S.contours.length);
+  setTxt('nSurv', S.surveys.length);
+  setTxt('zRange', S.zmin.toFixed(1)+' ~ '+S.zmax.toFixed(1));
+  setTxt('zLo', S.zmin.toFixed(0)+'m');
+  setTxt('zHi', S.zmax.toFixed(0)+'m');
+  setTxt('sbName', S.name);
 
   /* ★ 작업구역 선택 버튼 표시 */
   document.getElementById('cropSection').style.display='';
