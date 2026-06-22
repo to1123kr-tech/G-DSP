@@ -145,15 +145,6 @@
       <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.5">
         변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식
       </div>
-      <!-- 작업구역 선택 -->
-      <div id="cropSection" style="display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
-        <div style="font-size:11px;color:var(--tx3);margin-bottom:6px">📦 작업구역 선택 (사각형)</div>
-        <button class="btn btn-ghost" id="btnCrop" onclick="toggleCrop()" style="font-size:12px">✂️ 작업구역 그리기</button>
-        <div id="cropInfo" style="display:none;margin-top:6px">
-          <div style="font-size:11px;color:#4ade80;margin-bottom:4px">✅ 작업구역 적용됨</div>
-          <button class="btn btn-ghost" onclick="clearCrop()" style="font-size:11px;padding:5px">🗑 작업구역 초기화</button>
-        </div>
-      </div>
     </div>
 
     <div class="sec">
@@ -195,6 +186,50 @@
       <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.6">선택: 폐합선 클릭 / 그리기: 꼭짓점 클릭 후 <b style="color:var(--tx2)">자동 닫기</b><br>우클릭 = 직전 점 취소</div>
     </div>
 
+    <!-- 버퍼선 (허가지선 다음) -->
+    <div class="sec">
+      <h3>🔲 버퍼선</h3>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+        <button class="thr on" id="buf0" onclick="setBuffer(0)">끄기</button>
+        <button class="thr" id="buf50" onclick="setBuffer(50)">50m</button>
+        <button class="thr" id="buf100" onclick="setBuffer(100)">100m</button>
+        <button class="thr" id="buf150" onclick="setBuffer(150)">150m</button>
+      </div>
+      <div style="font-size:10px;color:var(--tx3);margin-bottom:4px">버퍼선 색상</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#fbbf24;cursor:pointer" onclick="setBufColor('#fbbf24')" title="노랑"></button>
+        <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#22c55e;cursor:pointer" onclick="setBufColor('#22c55e')" title="초록"></button>
+        <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#ef4444;cursor:pointer" onclick="setBufColor('#ef4444')" title="빨강"></button>
+        <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#f472b6;cursor:pointer" onclick="setBufColor('#f472b6')" title="분홍"></button>
+        <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#3b82f6;cursor:pointer" onclick="setBufColor('#3b82f6')" title="파랑"></button>
+        <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#a855f7;cursor:pointer" onclick="setBufColor('#a855f7')" title="보라"></button>
+        <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#ffffff;cursor:pointer" onclick="setBufColor('#ffffff')" title="흰색"></button>
+        <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#000000;cursor:pointer" onclick="setBufColor('#000000')" title="검정"></button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+        <span style="font-size:11px;color:var(--tx3)">직접입력</span>
+        <input type="number" id="inpBufDist" value="50" min="0" max="500" step="10"
+          style="width:60px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--tx);padding:4px;font-size:12px;text-align:right">
+        <span style="font-size:11px;color:var(--tx3)">m</span>
+        <button class="thr" onclick="setBuffer(parseFloat(document.getElementById('inpBufDist').value)||0)">적용</button>
+      </div>
+      <div style="font-size:10.5px;color:var(--tx3);margin-top:8px;line-height:1.5">허가지선 기준 이격거리. 버퍼선까지 확인 후 작업구역을 잡으세요.</div>
+    </div>
+
+    <!-- 작업구역 (버퍼선 다음 — 마지막에 범위 자르기) -->
+    <div class="sec" id="cropSectionWrap" style="display:none">
+      <h3>📦 작업구역 (범위 자르기)</h3>
+      <div style="font-size:10.5px;color:var(--tx3);line-height:1.6;margin-bottom:8px">
+        원본 지형도가 넓을 때 사각형으로 분석 범위를 한정합니다.<br>
+        <b style="color:#fbbf24">허가지선·버퍼선을 모두 확인한 뒤</b> 마지막에 잡으세요.
+      </div>
+      <button class="btn btn-ghost" id="btnCrop" onclick="toggleCrop()" style="font-size:12px">✂️ 작업구역 그리기</button>
+      <div id="cropInfo" style="display:none;margin-top:6px">
+        <div style="font-size:11px;color:#4ade80;margin-bottom:4px">✅ 작업구역 적용됨</div>
+        <button class="btn btn-ghost" onclick="clearCrop()" style="font-size:11px;padding:5px">🗑 작업구역 초기화 (전체화면)</button>
+      </div>
+    </div>
+
     <div class="sec" id="secRecog" style="display:none">
       <h3>인식 결과</h3>
       <div class="info-grid">
@@ -227,41 +262,51 @@
         <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--tx3);margin-top:4px;cursor:pointer">
           <input type="checkbox" id="demClipPermit" onchange="S.demClipToPermit=this.checked;render()"> 허가지선 내부만 표시
         </label>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <button class="thr on" id="rShade" onclick="setRelief('shade')">음영(회색)</button>
-          <button class="thr" id="rHypso" onclick="setRelief('hypso')">무지개</button>
+
+        <!-- ☀️ 음영기복 컨트롤 패널 -->
+        <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
+          <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">🎨 색상 프리셋</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
+            <button class="thr on" id="pal_hypso" onclick="setHsPalette('hypso')">무지개</button>
+            <button class="thr" id="pal_terrain" onclick="setHsPalette('terrain')">자연색</button>
+            <button class="thr" id="pal_shade" onclick="setHsPalette('shade')">회색</button>
+            <button class="thr" id="pal_gray-blue" onclick="setHsPalette('gray-blue')">청회색</button>
+          </div>
+          <!-- 태양 방향 다이얼 + 슬라이더 -->
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+            <svg width="48" height="48" style="flex-shrink:0">
+              <circle cx="24" cy="24" r="20" fill="rgba(30,43,69,0.5)" stroke="#1e2b45" stroke-width="1"/>
+              <text x="24" y="9" text-anchor="middle" font-size="7" fill="#5b7290">N</text>
+              <circle id="sunDot" cx="24" cy="4" r="4" fill="#fbbf24"/>
+            </svg>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--tx3)">
+                <span>☀️ 빛 방향</span><span id="hsAzVal">315°</span>
+              </div>
+              <input type="range" min="0" max="360" value="315" step="5"
+                oninput="setHsAz(this.value)" style="width:100%;margin-top:3px">
+            </div>
+          </div>
+          <!-- 태양 고도 -->
+          <div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--tx3)">
+              <span>📐 빛 높이(고도)</span><span id="hsAltVal">45°</span>
+            </div>
+            <input type="range" min="10" max="80" value="45" step="5"
+              oninput="setHsAlt(this.value)" style="width:100%;margin-top:3px">
+          </div>
+          <!-- 수직 과장 (z) -->
+          <div style="margin-bottom:4px">
+            <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--tx3)">
+              <span>⛰️ 입체 강조(Z)</span><span id="hsZVal">×1.0</span>
+            </div>
+            <input type="range" min="0.5" max="5" value="1" step="0.5"
+              oninput="setHsZ(this.value)" style="width:100%;margin-top:3px">
+          </div>
         </div>
         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:9px;cursor:pointer;pointer-events:auto;position:relative;z-index:2">
           <input type="checkbox" id="gridToggle" onchange="S.showGrid=this.checked;render()"> 격자 보기
         </label>
-        <!-- 버퍼선 -->
-        <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
-          <div style="font-size:11px;color:var(--tx3);margin-bottom:6px">🔲 버퍼선</div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
-            <button class="thr on" id="buf0" onclick="setBuffer(0)">끄기</button>
-            <button class="thr" id="buf50" onclick="setBuffer(50)">50m</button>
-            <button class="thr" id="buf100" onclick="setBuffer(100)">100m</button>
-            <button class="thr" id="buf150" onclick="setBuffer(150)">150m</button>
-          </div>
-          <div style="font-size:10px;color:var(--tx3);margin-bottom:4px">버퍼선 색상</div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#fbbf24;cursor:pointer" onclick="setBufColor('#fbbf24')" title="노랑"></button>
-            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#22c55e;cursor:pointer" onclick="setBufColor('#22c55e')" title="초록"></button>
-            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#ef4444;cursor:pointer" onclick="setBufColor('#ef4444')" title="빨강"></button>
-            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#f472b6;cursor:pointer" onclick="setBufColor('#f472b6')" title="분홍"></button>
-            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#3b82f6;cursor:pointer" onclick="setBufColor('#3b82f6')" title="파랑"></button>
-            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#a855f7;cursor:pointer" onclick="setBufColor('#a855f7')" title="보라"></button>
-            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#ffffff;cursor:pointer" onclick="setBufColor('#ffffff')" title="흰색"></button>
-            <button style="width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:#000000;cursor:pointer" onclick="setBufColor('#000000')" title="검정"></button>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
-            <span style="font-size:11px;color:var(--tx3)">직접입력</span>
-            <input type="number" id="inpBufDist" value="50" min="0" max="500" step="10"
-              style="width:60px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--tx);padding:4px;font-size:12px;text-align:right">
-            <span style="font-size:11px;color:var(--tx3)">m</span>
-            <button class="thr" onclick="setBuffer(parseFloat(document.getElementById('inpBufDist').value)||0)">적용</button>
-          </div>
-        </div>
         <!-- 단면도 -->
         <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
           <div style="font-size:11px;color:var(--tx3);margin-bottom:6px">📐 단면도 그리기</div>
@@ -483,7 +528,7 @@ var S={ contours:[], surveys:[], polys:[],
         flow:null, streamMask:null, streamHa:1, showStreams:true,
         watershed:null, wsCanvas:null, wsSegs:null, showWS:true, mode:'pan', dnX:0, dnY:0,
         permit:null, permitDraw:null, ghostXY:null, snapClose:false,
-        showGrid:false, showArrows:false, demClipToPermit:false, areaUnit:'m2', reliefMode:'shade', daejangArea:null,
+        showGrid:false, showArrows:false, demClipToPermit:false, areaUnit:'m2', reliefMode:'hypso', daejangArea:null,
         bounds:null, scale:1, ox:0, oy:0,
         zmin:0, zmax:0, isDown:false, lastM:null, name:'' };
 
@@ -646,7 +691,7 @@ function applyParsed(r){
   setTxt('sbName', S.name);
 
   /* ★ 작업구역 선택 버튼 표시 */
-  document.getElementById('cropSection').style.display='';
+  var _csw=document.getElementById('cropSectionWrap'); if(_csw) _csw.style.display='';
 
   /* ★ DXF 폐합선 감지 → 선택 버튼 활성화 */
   var candidates=(S.polys||[]).filter(function(p){ return p.area>50; });
@@ -1251,16 +1296,22 @@ function hypsoRGB(t){
   return [Math.round(a[0]+(b[0]-a[0])*f), Math.round(a[1]+(b[1]-a[1])*f), Math.round(a[2]+(b[2]-a[2])*f)];
 }
 
-/* 음영기복 → 오프스크린 캔버스 (mode: 'shade' 회색 | 'hypso' 무지개) */
+/* 음영기복 설정 (전역) */
+var _hs = { az: 315, alt: 45, zFactor: 1.0, palette: 'hypso' };
+
+/* 음영기복 → 오프스크린 캔버스
+   mode: 'shade' 회색 | 'hypso' 무지개 | 'terrain' 자연색 | 'gray-blue' 청회색 */
 function buildHillshade(dem, mode){
+  mode = mode || _hs.palette;
   var cols=dem.cols, rows=dem.rows, z=dem.z, cell=dem.cell;
   var zmin=Infinity, zmax=-Infinity;
   for(var i=0;i<z.length;i++){ var v=z[i]; if(v===v){ if(v<zmin)zmin=v; if(v>zmax)zmax=v; } }
   var zr=(zmax-zmin)||1;
   var off=document.createElement('canvas'); off.width=cols; off.height=rows;
   var octx=off.getContext('2d'), img=octx.createImageData(cols,rows), d=img.data;
-  var az=315*Math.PI/180, zen=(90-45)*Math.PI/180;
+  var az=_hs.az*Math.PI/180, zen=(90-_hs.alt)*Math.PI/180;
   var cosZen=Math.cos(zen), sinZen=Math.sin(zen);
+  var zf=_hs.zFactor;  // 수직과장 (음영 강조)
   for(var r=0;r<rows;r++){
     for(var c=0;c<cols;c++){
       var here=z[r*cols+c];
@@ -1269,15 +1320,22 @@ function buildHillshade(dem, mode){
       var zl=z[r*cols+(c>0?c-1:c)], zrr=z[r*cols+(c<cols-1?c+1:c)];
       var zd=z[(r>0?r-1:r)*cols+c], zu=z[(r<rows-1?r+1:r)*cols+c];
       if(zl!==zl)zl=here; if(zrr!==zrr)zrr=here; if(zd!==zd)zd=here; if(zu!==zu)zu=here;
-      var dzdx=(zrr-zl)/(2*cell), dzdy=(zu-zd)/(2*cell);
+      var dzdx=(zrr-zl)/(2*cell)*zf, dzdy=(zu-zd)/(2*cell)*zf;  // ★ z과장 적용
       var slope=Math.atan(Math.sqrt(dzdx*dzdx+dzdy*dzdy));
       var aspect=Math.atan2(dzdy,-dzdx);
       var ill=cosZen*Math.cos(slope)+sinZen*Math.sin(slope)*Math.cos(az-aspect);
       if(ill<0)ill=0;
+      var t=(here-zmin)/zr;
       if(mode==='hypso'){
-        var col=hypsoRGB((here-zmin)/zr), sh=0.5+ill*0.5;
+        var col=hypsoRGB(t), sh=0.5+ill*0.5;
         d[o]=Math.round(col[0]*sh); d[o+1]=Math.round(col[1]*sh); d[o+2]=Math.round(col[2]*sh); d[o+3]=255;
-      } else {
+      } else if(mode==='terrain'){
+        var col2=terrainRGB(t), sh2=0.45+ill*0.55;
+        d[o]=Math.round(col2[0]*sh2); d[o+1]=Math.round(col2[1]*sh2); d[o+2]=Math.round(col2[2]*sh2); d[o+3]=255;
+      } else if(mode==='gray-blue'){
+        var g2=Math.round(40+ill*185);
+        d[o]=g2; d[o+1]=g2; d[o+2]=Math.min(255,g2+18); d[o+3]=255;
+      } else { // shade 순수 회색
         var g=Math.round(40+ill*185);
         d[o]=g; d[o+1]=g; d[o+2]=Math.min(255,g+6); d[o+3]=255;
       }
@@ -1287,11 +1345,49 @@ function buildHillshade(dem, mode){
   return off;
 }
 
+/* 자연 지형색 (저지대 녹색→갈색→설산백색) */
+function terrainRGB(t){
+  t=Math.max(0,Math.min(1,t));
+  var stops=[[0,[80,140,70]],[0.3,[150,170,90]],[0.55,[170,140,90]],
+             [0.78,[150,110,80]],[0.92,[180,170,165]],[1,[245,245,245]]];
+  for(var i=1;i<stops.length;i++){
+    if(t<=stops[i][0]){
+      var a=stops[i-1],b=stops[i],f=(t-a[0])/(b[0]-a[0]||1);
+      return [a[1][0]+(b[1][0]-a[1][0])*f, a[1][1]+(b[1][1]-a[1][1])*f, a[1][2]+(b[1][2]-a[1][2])*f];
+    }
+  }
+  return stops[stops.length-1][1];
+}
+
+/* 음영기복 컨트롤 갱신 (슬라이더 변경 시) */
+function updateHillshade(){
+  if(!S.dem) return;
+  S.hillCanvas=buildHillshade(S.dem, _hs.palette);
+  render();
+}
+function setHsAz(v){ _hs.az=parseFloat(v); var e=document.getElementById('hsAzVal'); if(e)e.textContent=Math.round(_hs.az)+'°'; updateHillshade(); updateSunDial(); }
+function setHsAlt(v){ _hs.alt=parseFloat(v); var e=document.getElementById('hsAltVal'); if(e)e.textContent=Math.round(_hs.alt)+'°'; updateHillshade(); }
+function setHsZ(v){ _hs.zFactor=parseFloat(v); var e=document.getElementById('hsZVal'); if(e)e.textContent='×'+_hs.zFactor.toFixed(1); updateHillshade(); }
+function setHsPalette(p){
+  _hs.palette=p;
+  ['hypso','terrain','shade','gray-blue'].forEach(function(k){
+    var b=document.getElementById('pal_'+k); if(b) b.className='thr'+(k===p?' on':'');
+  });
+  S.reliefMode=p;
+  updateHillshade();
+}
+/* 태양 방향 다이얼 시각 갱신 */
+function updateSunDial(){
+  var dot=document.getElementById('sunDot');
+  if(!dot) return;
+  var a=(_hs.az-90)*Math.PI/180;  // 0°=북(위), 시계방향
+  var R=20, cx=24, cy=24;
+  dot.setAttribute('cx', cx+R*Math.cos(a));
+  dot.setAttribute('cy', cy+R*Math.sin(a));
+}
+
 function setRelief(mode){
-  S.reliefMode=mode;
-  document.getElementById('rShade').className='thr'+(mode==='shade'?' on':'');
-  document.getElementById('rHypso').className='thr'+(mode==='hypso'?' on':'');
-  if(S.dem){ S.hillCanvas=buildHillshade(S.dem, mode); render(); }
+  setHsPalette(mode);
 }
 /* 면적 단위 ㎡ / a(아르=100㎡) / ha(=10000㎡) */
 function fmtArea(m2){
@@ -1323,6 +1419,7 @@ function runDEM(){
   document.getElementById('p3').className='pi cur';
   document.getElementById('btnFlow').disabled=false;
   render();
+  updateSunDial();
   toast('DEM 음영기복 완료 · 격자 '+dem.cols+'×'+dem.rows,'ok');
 }
 
@@ -1707,18 +1804,37 @@ function init3DScene(){
   var dir=new THREE.DirectionalLight(0xffffff,0.95); dir.position.set(-1,1.4,0.6); scene.add(dir);
   scene.add(new THREE.AmbientLight(0x556070,0.55));
 
-  /* ★ 허가지선 3D 선 (분홍) */
+  /* 폴리곤 변을 잘게 쪼개 지형을 따라가게 (드레이프) */
+  function densify3DLine(poly, dem, hp, exag, zLift){
+    var pts=[];
+    var closed=poly.concat([poly[0]]);
+    for(var i=0;i<closed.length-1;i++){
+      var a=closed[i], b=closed[i+1];
+      var segLen=Math.hypot(b.x-a.x,b.y-a.y);
+      var n=Math.max(1,Math.ceil(segLen/(dem.cell*0.8)));  // DEM 셀 간격으로 분할
+      for(var k=0;k<n;k++){
+        var t=k/n;
+        var pt=tmTo3DPt(a.x+(b.x-a.x)*t, a.y+(b.y-a.y)*t, dem, hp, exag);
+        if(zLift) pt.y+=zLift;
+        pts.push(pt);
+      }
+    }
+    pts.push(tmTo3DPt(closed[0].x,closed[0].y,dem,hp,exag));  // 닫기
+    return pts;
+  }
+
+  /* ★ 허가지선 3D 선 (분홍) — 지형 표면 드레이프 */
   if(S.permit&&S.permit.length>=3){
-    var pPts=S.permit.concat([S.permit[0]]).map(function(p){return tmTo3DPt(p.x,p.y,dem,hp,exag);});
+    var pPts=densify3DLine(S.permit, dem, hp, exag, 1.5);
     var pGeo=new THREE.BufferGeometry().setFromPoints(pPts);
     scene.add(new THREE.Line(pGeo,new THREE.LineBasicMaterial({color:0xff69b4})));
   }
 
-  /* ★ 버퍼선 3D (노란) */
+  /* ★ 버퍼선 3D (노란) — 지형 표면 드레이프 */
   if(S.permit&&S.permit.length>=3&&S.bufferDist>0){
     var bPoly=offsetPolygon(S.permit,S.bufferDist);
     if(bPoly&&bPoly.length>=3){
-      var bPts=bPoly.concat([bPoly[0]]).map(function(p){return tmTo3DPt(p.x,p.y,dem,hp,exag);});
+      var bPts=densify3DLine(bPoly, dem, hp, exag, 1.5);
       var bGeo=new THREE.BufferGeometry().setFromPoints(bPts);
       var bColor=parseInt((_bufColor||'#fbbf24').replace('#',''),16);
       scene.add(new THREE.Line(bGeo,new THREE.LineBasicMaterial({color:bColor})));
