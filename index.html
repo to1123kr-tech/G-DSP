@@ -5807,10 +5807,8 @@
         // 건물 소유자 — 건축물대장에 실제 건물이 있을 때만 표시
         if (bld) {
           _fetchOwner(bld, '건물').then(function(info){
-            /* ★ 건축물대장 실제 유무 재확인: 플래그 OR 건축물 항목(용도/층수)이 채워졌는지 */
-            var useEl = document.getElementById('ndInfoUse');
-            var domHasBld = useEl && useEl.textContent && useEl.textContent.trim() !== '-' && useEl.textContent.trim() !== '';
-            var hasBld = (window._hasBuildingRegister === true) || domHasBld;
+            /* ★ 건축물대장에 실제 건물 데이터(용도/층수/면적)가 있을 때만 건물 소유자 표시 */
+            var hasBld = (window._hasBuildingRegister === true);
             ['bldOwner', 'ndBldOwner', 'gBldOwner'].forEach(function(id){
               var el = document.getElementById(id);
               if (!el) return;
@@ -8079,7 +8077,7 @@
             var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
             ndCallLandApi(pnu, lng, lat);
             ndCallBldApi(pnu);
-            if (jibun) setTimeout(function(){ fetchIrosOwner(jibun); }, 1000);
+            if (jibun) setTimeout(function(){ fetchIrosOwner(jibun); }, 1800);
             toast('✓ ' + jibun, 'ok');
           }
         });
@@ -8183,10 +8181,13 @@
         + '&numOfRows=1&pageNo=1&_type=json';
 
       function applyBldData(it, isRecap) {
-        window._hasBuildingRegister = true;  // ★ 건축물대장 실제 존재 표시
         var use = it.mainPurpsCdNm || it.etcPurps || '-';
         var floor = it.grndFlrCnt ? it.grndFlrCnt + '층' : '-';
         var bldArea = it.archArea ? parseFloat(it.archArea).toLocaleString() + '㎡' : '-';
+        // ★ 의미있는 건물 데이터가 하나라도 있을 때만 건물 존재로 판단 (빈 레코드 제외)
+        if (use !== '-' || floor !== '-' || bldArea !== '-') {
+          window._hasBuildingRegister = true;
+        }
         var area = it.totArea ? parseFloat(it.totArea).toLocaleString() + '㎡' : '-';
         var year = it.useAprDay ? it.useAprDay.substring(0,4) + '년' : (it.crtnDay ? it.crtnDay.substring(0,4) + '년' : '-');
         var bcr = it.bcRat ? parseFloat(it.bcRat) + '%' : null;
@@ -8238,10 +8239,13 @@
           if (!totalCount || !items) return;
           if (!Array.isArray(items)) items = [items];
           var it = items[0];
-          window._hasBuildingRegister = true;  // ★ 건축물대장 실제 존재 표시
           var use = it.mainPurpsCdNm || it.etcPurps || '-';
           var floor = it.grndFlrCnt ? it.grndFlrCnt + '층' : '-';
           var bldArea = it.archArea ? parseFloat(it.archArea).toLocaleString() + '㎡' : '-';
+          // ★ 의미있는 데이터가 있을 때만 건물 존재로 판단
+          if (use !== '-' || floor !== '-' || bldArea !== '-') {
+            window._hasBuildingRegister = true;
+          }
           var area = it.totArea ? parseFloat(it.totArea).toLocaleString() + '㎡' : '-';
           var year = it.useAprDay ? it.useAprDay.substring(0,4) + '년' : '-';
           setText('ndInfoUse', use); setText('ndInfoFloor', floor);
@@ -8401,7 +8405,7 @@
         ndCallBldApi(pnu);
         setTimeout(function(){ ndCallLandApi(pnu, lng, lat); }, 500);
         // 소유자 조회
-        if (jibun) setTimeout(function(){ fetchIrosOwner(jibun); }, 800);
+        if (jibun) setTimeout(function(){ fetchIrosOwner(jibun); }, 1800);
       }
     }
 
