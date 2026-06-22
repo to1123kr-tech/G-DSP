@@ -427,15 +427,19 @@
 </main>
 
 <!-- 단면도 프로파일 오버레이 -->
-<div id="profileLay" style="display:none;position:fixed;bottom:0;left:0;right:0;height:220px;background:#0e1626;border-top:2px solid #1e2b45;z-index:75;padding:10px 14px 8px">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-    <span style="font-size:12px;font-weight:700;color:#e8eef7">📐 단면도 (고도 프로파일)</span>
-    <div style="display:flex;gap:8px;align-items:center">
-      <span id="profileInfo" style="font-size:11px;color:#9fb0c8">–</span>
+<div id="profileLay" style="display:none;position:fixed;top:60px;right:16px;width:420px;background:#0e1626;border:2px solid #1e2b45;border-radius:12px;z-index:75;padding:12px 14px 10px;box-shadow:0 12px 40px rgba(0,0,0,0.5)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span style="font-size:13px;font-weight:700;color:#e8eef7">📐 단면도</span>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button onclick="clearAllSections()" title="모든 단면 삭제" style="background:rgba(127,29,29,.4);border:1px solid #7f1d1d;color:#fca5a5;cursor:pointer;border-radius:6px;padding:3px 8px;font-size:11px">전체삭제</button>
       <button onclick="closeSection()" style="background:rgba(30,43,69,.8);border:1px solid #1e2b45;color:#e8eef7;cursor:pointer;border-radius:6px;padding:3px 10px;font-size:13px">✕</button>
     </div>
   </div>
-  <canvas id="profileCanvas" style="width:100%;height:160px;border-radius:6px"></canvas>
+  <!-- 단면 탭 (누적된 단면들) -->
+  <div id="sectionTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"></div>
+  <div id="profileInfo" style="font-size:11px;color:#9fb0c8;margin-bottom:6px">–</div>
+  <canvas id="profileCanvas" style="width:100%;height:200px;border-radius:6px;background:#0a1120"></canvas>
+  <div style="font-size:10px;color:#5b7290;margin-top:6px;text-align:center">단면선을 추가로 그리면 탭으로 누적됩니다</div>
 </div>
 
 <div id="d3dlay" style="display:none;position:fixed;inset:0;z-index:80;background:#06080f">
@@ -1057,7 +1061,31 @@ function render(){
     }
   }
 
-  // ★ 단면선 (흰 실선 + 양쪽 점)
+  // ★ 누적 단면선들 (번호 표시)
+  if(typeof _sections!=='undefined' && _sections.length){
+    _sections.forEach(function(sec,idx){
+      var active=(idx===_activeSection);
+      var sp1=w2s(sec.p1), sp2=w2s(sec.p2);
+      ctx.save();
+      ctx.strokeStyle=active?'#fff':'rgba(255,255,255,0.45)';
+      ctx.lineWidth=active?2.5:1.5; ctx.setLineDash([6,3]);
+      ctx.beginPath(); ctx.moveTo(sp1.x,sp1.y); ctx.lineTo(sp2.x,sp2.y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle=active?'#fff':'rgba(255,255,255,0.6)';
+      [sp1,sp2].forEach(function(p){ ctx.beginPath(); ctx.arc(p.x,p.y,active?4:3,0,6.283); ctx.fill(); });
+      /* 단면 번호 라벨 (중앙) */
+      var mx=(sp1.x+sp2.x)/2, my=(sp1.y+sp2.y)/2;
+      ctx.fillStyle=active?'#3b82f6':'rgba(59,130,246,0.6)';
+      ctx.beginPath(); ctx.arc(mx,my,9,0,6.283); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(String(idx+1), mx, my);
+      ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+      ctx.restore();
+    });
+  }
+
+  // ★ 그리는 중인 단면선 (흰 실선 + 양쪽 점)
   if(S.sectionPts && S.sectionPts.length>=1){
     ctx.save();
     ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.setLineDash([6,3]);
@@ -1067,7 +1095,6 @@ function render(){
       ctx.setLineDash([]);
       ctx.fillStyle='#fff';
       [sp1,sp2].forEach(function(p){ ctx.beginPath(); ctx.arc(p.x,p.y,4,0,6.283); ctx.fill(); });
-      /* A, B 라벨 */
       ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif';
       ctx.fillText('A',sp1.x+6,sp1.y-6); ctx.fillText('B',sp2.x+6,sp2.y-6);
     } else if(S.sectionGhost){
@@ -1377,7 +1404,9 @@ function runFlow(){
   document.getElementById('p5').className='pi cur';
   document.getElementById('btnPour').disabled=false;
   render();
-  toast('흐름·하천 분석 완료 · '+((Date.now()-t0)/1000).toFixed(1)+'초','ok');
+  var ms=Date.now()-t0;
+  var timeStr = ms<100 ? '즉시 완료' : (ms/1000).toFixed(1)+'초';
+  toast('흐름·하천 분석 '+timeStr+' · 하천 셀 '+sm.count.toLocaleString()+'개','ok');
 }
 
 function setThr(ha){
@@ -1899,16 +1928,23 @@ function offsetPolygon(pts, d){
 }
 
 /* ── 단면도 ── */
+/* 누적 단면 배열: [{p1,p2,profile,minZ,maxZ,len}], 현재 활성 인덱스 */
+var _sections=[], _activeSection=0;
+
 function toggleSection(){
   if(S.mode==='section'){
-    closeSection(); return;
+    S.mode='pan'; S.sectionPts=null; S.sectionGhost=null;
+    cv.style.cursor='grab';
+    var bb=document.getElementById('btnSection');
+    bb.classList.remove('active'); bb.textContent='✂️ 단면선 그리기 (2점 클릭)';
+    render(); return;
   }
   if(!S.triList||!S.triList.length){ toast('먼저 TIN을 생성하세요','err'); return; }
   S.mode='section'; S.sectionPts=[]; S.sectionGhost=null;
   cv.style.cursor='crosshair';
   var b=document.getElementById('btnSection');
   b.classList.add('active'); b.textContent='A 지점 클릭…';
-  toast('단면 시작점(A)을 클릭하세요');
+  toast(_sections.length>0?'추가 단면 시작점(A) 클릭':'단면 시작점(A)을 클릭하세요');
 }
 function finishSection(){
   if(!S.triList||!S.triList.length||!S.sectionPts||S.sectionPts.length<2) return;
@@ -1916,8 +1952,16 @@ function finishSection(){
   cv.style.cursor='grab';
   var b=document.getElementById('btnSection');
   b.classList.remove('active'); b.textContent='✂️ 단면선 그리기 (2점 클릭)';
+  /* 누적 배열에 추가 */
+  var sec=buildSectionData(S.sectionPts[0], S.sectionPts[1]);
+  if(sec){
+    _sections.push(sec);
+    _activeSection=_sections.length-1;
+  }
+  S.sectionPts=null;  // 그린 단면선은 누적 배열로 이동
   render();
-  drawSectionProfile(S.sectionPts[0], S.sectionPts[1]);
+  renderSectionTabs();
+  drawActiveProfile();
 }
 function closeSection(){
   S.mode='pan'; S.sectionPts=null; S.sectionGhost=null;
@@ -1926,6 +1970,32 @@ function closeSection(){
   b.classList.remove('active'); b.textContent='✂️ 단면선 그리기 (2점 클릭)';
   document.getElementById('profileLay').style.display='none';
   render();
+}
+function clearAllSections(){
+  _sections=[]; _activeSection=0;
+  S.sectionPts=null;
+  document.getElementById('profileLay').style.display='none';
+  render();
+  toast('모든 단면 삭제됨');
+}
+/* 단면 탭 렌더 */
+function renderSectionTabs(){
+  var tabs=document.getElementById('sectionTabs');
+  if(!tabs) return;
+  tabs.innerHTML='';
+  _sections.forEach(function(s,i){
+    var btn=document.createElement('button');
+    var active=(i===_activeSection);
+    btn.textContent='단면 '+(i+1);
+    btn.style='font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;border:1px solid '+(active?'#3b82f6':'#1e2b45')+';background:'+(active?'rgba(59,130,246,0.2)':'rgba(30,43,69,0.5)')+';color:'+(active?'#93c5fd':'#9fb0c8')+';';
+    btn.onclick=function(){ _activeSection=i; renderSectionTabs(); drawActiveProfile(); render(); };
+    tabs.appendChild(btn);
+  });
+}
+function drawActiveProfile(){
+  if(_sections.length===0){ document.getElementById('profileLay').style.display='none'; return; }
+  var sec=_sections[_activeSection];
+  if(sec) drawSectionProfile(sec.p1, sec.p2, sec);
 }
 /* TIN에서 한 점의 높이를 무게중심 보간 (단면도용) */
 function sampleTINz(px, py){
@@ -1945,19 +2015,17 @@ function sampleTINz(px, py){
   }
   return NaN; // 어느 삼각형에도 안 들어감 (TIN 범위 밖)
 }
-
-function drawSectionProfile(p1, p2){
+/* 단면 데이터 계산 (TIN 보간 + NaN 메우기) → {p1,p2,profile,minZ,maxZ,len} */
+function buildSectionData(p1, p2){
   var dem=S.dem;
   var dx=p2.x-p1.x, dy=p2.y-p1.y, totalLen=Math.hypot(dx,dy);
-  if(totalLen<1){ toast('단면선이 너무 짧아요','err'); return; }
-  /* ★ TIN 직접 보간 — DEM 격자 NaN/평지 문제 해결 */
+  if(totalLen<1){ toast('단면선이 너무 짧아요','err'); return null; }
   var step=Math.max(1, (dem?dem.cell:5)/3), nSamp=Math.ceil(totalLen/step)+1;
   var profile=[], minZ=Infinity, maxZ=-Infinity;
   for(var i=0;i<=nSamp;i++){
     var t=i/nSamp;
     var wx=p1.x+t*dx, wy=p1.y+t*dy;
-    var z=sampleTINz(wx, wy);            // ★ TIN에서 직접 보간
-    /* TIN 밖이면 DEM 격자로 폴백 */
+    var z=sampleTINz(wx, wy);
     if(!(z===z) && dem){
       var ci=Math.round((wx-dem.minX)/dem.cell), ri=Math.round((wy-dem.minY)/dem.cell);
       if(ci>=0&&ci<dem.cols&&ri>=0&&ri<dem.rows){ z=dem.z[ri*dem.cols+ci]; }
@@ -1965,12 +2033,10 @@ function drawSectionProfile(p1, p2){
     profile.push({d:t*totalLen, z:z});
     if(z===z){ if(z<minZ)minZ=z; if(z>maxZ)maxZ=z; }
   }
-  /* ★ NaN 구간 선형보간으로 메우기 (삼각형 틈/경계) */
+  /* NaN 구간 선형보간 */
   for(var k=0;k<profile.length;k++){
     if(profile[k].z===profile[k].z) continue;
-    // 앞쪽 유효값
     var prev=k-1; while(prev>=0 && !(profile[prev].z===profile[prev].z)) prev--;
-    // 뒤쪽 유효값
     var next=k+1; while(next<profile.length && !(profile[next].z===profile[next].z)) next++;
     if(prev>=0 && next<profile.length){
       var ratio=(k-prev)/(next-prev);
@@ -1982,30 +2048,54 @@ function drawSectionProfile(p1, p2){
       if(profile[k].z>maxZ)maxZ=profile[k].z;
     }
   }
+  return {p1:p1, p2:p2, profile:profile, minZ:minZ, maxZ:maxZ, len:totalLen};
+}
+
+function drawSectionProfile(p1, p2, sec){
+  /* sec 없으면 즉석 계산 (구버전 호환) */
+  if(!sec) sec=buildSectionData(p1, p2);
+  if(!sec) return;
+  var profile=sec.profile, totalLen=sec.len;
+  var minZ=sec.minZ, maxZ=sec.maxZ;
+
   var lay=document.getElementById('profileLay');
   lay.style.display='';
-  var info='A→B 거리: '+totalLen.toFixed(0)+'m  |  고도범위: '+minZ.toFixed(1)+'~'+maxZ.toFixed(1)+'m';
-  document.getElementById('profileInfo').textContent=info;
-  /* 캔버스에 그리기 */
+  /* 종횡비(수직과장) 표시 */
   var pcv=document.getElementById('profileCanvas');
-  pcv.width=pcv.offsetWidth||800; pcv.height=pcv.offsetHeight||150;
-  var W=pcv.width, H=pcv.height, pad={l:42,r:14,t:10,b:22};
+  pcv.width=pcv.offsetWidth||400; pcv.height=pcv.offsetHeight||200;
+  var W=pcv.width, H=pcv.height, pad={l:44,r:16,t:12,b:26};
+  var zSpan=(maxZ-minZ)||1;
+  var plotW=W-pad.l-pad.r, plotH=H-pad.t-pad.b;
+  /* 수직과장 배율 계산 (가로:세로 실제 비율 대비) */
+  var horizM=totalLen, vertM=zSpan;
+  var horizPxPerM=plotW/horizM, vertPxPerM=plotH/vertM;
+  var vExag=(vertPxPerM/horizPxPerM);
+  var info='A→B '+totalLen.toFixed(0)+'m · 고도 '+minZ.toFixed(1)+'~'+maxZ.toFixed(1)+'m (Δ'+(maxZ-minZ).toFixed(1)+'m) · 수직과장 ×'+vExag.toFixed(1);
+  document.getElementById('profileInfo').textContent=info;
+
   var oc=pcv.getContext('2d');
   oc.clearRect(0,0,W,H);
-  oc.fillStyle='#0e1626'; oc.fillRect(0,0,W,H);
-  /* 최소 표고 범위 10m 확보 (평지면 확대 표시) */
-  var minZoom=10;
+  oc.fillStyle='#0a1120'; oc.fillRect(0,0,W,H);
+  /* 최소 표고 범위 확보 (평지 확대) */
+  var minZoom=5;
   if(maxZ-minZ<minZoom){ var mid=(maxZ+minZ)/2; minZ=mid-minZoom/2; maxZ=mid+minZoom/2; }
   var zr=(maxZ-minZ)||1;
-  var toX=function(d){return pad.l+(W-pad.l-pad.r)*(d/totalLen);};
-  var toY=function(z){return H-pad.b-(H-pad.t-pad.b)*((z-minZ)/zr);};
-  /* 그리드 */
+  var toX=function(d){return pad.l+plotW*(d/totalLen);};
+  var toY=function(z){return H-pad.b-plotH*((z-minZ)/zr);};
+  /* 가로 그리드 + 고도 라벨 */
   oc.strokeStyle='rgba(30,43,69,0.8)'; oc.lineWidth=1;
-  for(var gi=0;gi<=4;gi++){
-    var gy=pad.t+(H-pad.t-pad.b)*gi/4;
+  for(var gi=0;gi<=5;gi++){
+    var gy=pad.t+plotH*gi/5;
     oc.beginPath(); oc.moveTo(pad.l,gy); oc.lineTo(W-pad.r,gy); oc.stroke();
-    var zLabel=maxZ-gi*(zr/4);
-    oc.fillStyle='#5b7290'; oc.font='9px sans-serif'; oc.fillText(zLabel.toFixed(0)+'m',2,gy+3);
+    var zLabel=maxZ-gi*(zr/5);
+    oc.fillStyle='#5b7290'; oc.font='9px sans-serif';
+    oc.fillText(zLabel.toFixed(0)+'m',4,gy+3);
+  }
+  /* 세로 그리드 (거리) */
+  for(var gx=0;gx<=4;gx++){
+    var px=pad.l+plotW*gx/4;
+    oc.strokeStyle='rgba(30,43,69,0.5)';
+    oc.beginPath(); oc.moveTo(px,pad.t); oc.lineTo(px,H-pad.b); oc.stroke();
   }
   /* 채움 (무지개) */
   var validPts=profile.filter(function(p){return p.z===p.z;});
@@ -2016,23 +2106,21 @@ function drawSectionProfile(p1, p2){
   validPts.forEach(function(p){ oc.lineTo(toX(p.d),toY(p.z)); });
   oc.lineTo(toX(validPts[validPts.length-1].d), H-pad.b);
   oc.closePath();
-  /* 무지개 그라디언트 */
-  var grad=oc.createLinearGradient(pad.l,H-pad.b,pad.l,pad.t);
+  var grad=oc.createLinearGradient(0,H-pad.b,0,pad.t);
   var stops=[[0,'rgba(46,52,130,0.9)'],[0.2,'rgba(40,130,200,0.9)'],[0.4,'rgba(70,180,120,0.9)'],[0.65,'rgba(200,200,60,0.9)'],[0.82,'rgba(210,120,40,0.9)'],[1,'rgba(180,40,40,0.9)']];
   stops.forEach(function(s){grad.addColorStop(s[0],s[1]);});
   oc.fillStyle=grad; oc.fill();
   oc.restore();
   /* 외곽선 */
-  oc.strokeStyle='rgba(255,255,255,0.9)'; oc.lineWidth=1.5;
+  oc.strokeStyle='rgba(255,255,255,0.95)'; oc.lineWidth=1.8;
   oc.beginPath();
   validPts.forEach(function(p,i){ i===0?oc.moveTo(toX(p.d),toY(p.z)):oc.lineTo(toX(p.d),toY(p.z)); });
   oc.stroke();
   /* A B 라벨 */
-  oc.fillStyle='#fff'; oc.font='bold 11px sans-serif';
-  oc.fillText('A',pad.l-8,H-pad.b+14); oc.fillText('B',W-pad.r-4,H-pad.b+14);
+  oc.fillStyle='#fff'; oc.font='bold 12px sans-serif';
+  oc.fillText('A',pad.l-2,H-8); oc.fillText('B',W-pad.r-8,H-8);
   oc.fillStyle='#9fb0c8'; oc.font='9px sans-serif';
-  oc.fillText('0m',pad.l,H-pad.b+14);
-  oc.fillText(totalLen.toFixed(0)+'m',W-pad.r-28,H-pad.b+14);
+  oc.fillText(totalLen.toFixed(0)+'m',W/2-15,H-8);
 }
 
 /* ── DEM 해상도 변경 ── */
