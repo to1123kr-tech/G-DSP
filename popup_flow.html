@@ -49,6 +49,8 @@
   .thr{flex:1;padding:7px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);
     color:var(--tx3);font-size:12px;font-weight:700;cursor:pointer}
   .thr.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent}
+  .thr2{padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--tx3);font-size:10.5px;cursor:pointer}
+  .thr2.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent;font-weight:600}
   .btn-ghost.active{color:#06121f;background:linear-gradient(135deg,#34d399,#0ea5e9);border-color:transparent}
   .num{width:100%;margin-top:3px;padding:6px 7px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--tx);font-size:13px}
 
@@ -252,26 +254,16 @@
           <input type="checkbox" id="tinToggle" checked onchange="S.showTIN=this.checked;render()"> 삼각망 보기
         </label>
       </div>
-      <button class="btn btn-ghost" id="btnDEM" disabled onclick="runDEM()" style="margin-top:9px">▦ DEM 생성 (음영기복)</button>
+      <!-- 격자 해상도 (DEM 생성 전 선택) -->
+      <div style="display:flex;gap:6px;margin-top:9px;margin-bottom:6px">
+        <button class="thr on" id="demRes10" onclick="changeDEMRes(10)">격자 10m</button>
+        <button class="thr" id="demRes5" onclick="changeDEMRes(5)">격자 5m</button>
+      </div>
+      <button class="btn btn-ghost" id="btnDEM" disabled onclick="runDEM()">▦ DEM 생성 (음영기복)</button>
       <div id="demResult" style="display:none;margin-top:10px">
-        <!-- 해상도 선택 -->
-        <div style="display:flex;gap:6px;margin-bottom:8px">
-          <button class="thr on" id="demRes10" onclick="changeDEMRes(10)">격자 10m</button>
-          <button class="thr" id="demRes5" onclick="changeDEMRes(5)">격자 5m</button>
-        </div>
         <div class="stat full"><div class="v" id="demSize">–</div><div class="k">격자 크기</div></div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:9px;cursor:pointer">
-          <input type="checkbox" id="demToggle" checked onchange="S.showDEM=this.checked;render()"> 음영기복 보기
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--tx3);margin-top:4px;cursor:pointer">
-          <input type="checkbox" id="demClipPermit" onchange="S.demClipToPermit=this.checked;render()"> 허가지선 내부만 표시
-        </label>
-
-        <!-- 🎨 음영기복 조정 버튼 (우측 팝업 열기) -->
-        <button class="btn btn-ghost" onclick="toggleHsPanel()" style="margin-top:10px;font-size:12px">🎨 음영기복 조정 (색상·태양·입체)</button>
-        <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:9px;cursor:pointer;pointer-events:auto;position:relative;z-index:2">
-          <input type="checkbox" id="gridToggle" onchange="S.showGrid=this.checked;render()"> 격자 보기
-        </label>
+        <!-- 🎨 음영기복 조정 버튼 (우측 팝업 — 색상·태양·입체·표시옵션 통합) -->
+        <button class="btn btn-primary" onclick="toggleHsPanel()" style="margin-top:9px;font-size:12px">🎨 음영기복 조정 패널 열기</button>
         <!-- 단면도 -->
         <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
           <div style="font-size:11px;color:var(--tx3);margin-bottom:6px">📐 단면도 그리기</div>
@@ -279,11 +271,7 @@
         </div>
         <!-- 3D -->
         <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
-          <div style="display:flex;gap:6px;margin-bottom:8px">
-            <button class="thr on" id="t3dShade" onclick="set3DColor('shade')">3D 회색</button>
-            <button class="thr" id="t3dHypso" onclick="set3DColor('hypso')">3D 무지개</button>
-          </div>
-          <button class="btn btn-ghost" id="btn3D" onclick="open3D()" style="margin-top:4px">🧊 3D 입체 보기</button>
+          <button class="btn btn-ghost" id="btn3D" onclick="open3D()">🧊 3D 입체 보기</button>
         </div>
       </div>
       <button class="btn btn-ghost" id="btnFlow" disabled onclick="runFlow()" style="margin-top:9px">💧 흐름·하천 분석 (D8)</button>
@@ -432,6 +420,17 @@
         <span style="font-size:13px;font-weight:700;color:#e8eef7">🎨 음영기복 조정</span>
         <button onclick="toggleHsPanel()" style="background:none;border:none;color:#5b7290;cursor:pointer;font-size:15px;padding:0;line-height:1">✕</button>
       </div>
+      <!-- 음영기복 표시 + 격자 해상도 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9fb0c8;cursor:pointer">
+          <input type="checkbox" id="demToggle" checked onchange="S.showDEM=this.checked;render()"> 음영기복 표시
+        </label>
+        <div style="display:flex;gap:4px">
+          <button class="thr2 on" id="demRes10b" onclick="changeDEMRes(10)">10m</button>
+          <button class="thr2" id="demRes5b" onclick="changeDEMRes(5)">5m</button>
+        </div>
+      </div>
+      <div style="border-top:1px solid #2a3b5c;margin-bottom:10px"></div>
       <!-- 색상 프리셋 -->
       <div style="font-size:11px;color:#9fb0c8;margin-bottom:7px">색상 프리셋</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
@@ -482,9 +481,9 @@
         <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
           <span>🌫️ 부드럽게</span><span id="hsSmoothVal" style="color:#c4b5fd;font-weight:600">2회</span>
         </div>
-        <input type="range" min="0" max="6" value="2" step="1"
+        <input type="range" min="0" max="4" value="2" step="1"
           oninput="setHsSmooth(this.value)" style="width:100%;margin-top:4px">
-        <div style="font-size:9px;color:#5b7290;margin-top:2px">삼각형 각짐을 부드럽게 (0=원본)</div>
+        <div style="font-size:9px;color:#5b7290;margin-top:2px">삼각형 각짐 완화 (0=원본, 과하면 뭉개짐)</div>
       </div>
     </div>
 
@@ -1915,6 +1914,8 @@ function close3D(){
   if(wmsP&&wmsP._wasOpen){ wmsP.classList.add('open'); if(_leafMap) _leafMap.invalidateSize(); }
 }
 function init3DScene(){
+  /* 음영기복 팔레트와 3D 색상 연동 (무지개/자연색 → 컬러, 회색계열 → 회색) */
+  _3dColorMode = (_hs.palette==='hypso'||_hs.palette==='terrain') ? 'hypso' : 'shade';
   var lay=document.getElementById('d3dlay'), canvas=document.getElementById('d3dcanvas');
   var W=lay.clientWidth||800, H=lay.clientHeight||600, dem=S.dem, exag=2.2;
   var hp=demPositions(dem, exag);
@@ -1924,12 +1925,13 @@ function init3DScene(){
 
   var material;
   if(_3dColorMode==='hypso'){
-    /* ★ 무지개 vertex color */
+    /* ★ 무지개/자연색 vertex color */
+    var useTerrain=(_hs.palette==='terrain');
     var cols3=new Float32Array(dem.cols*dem.rows*3);
     for(var vi=0;vi<dem.cols*dem.rows;vi++){
       var zv=dem.z[vi]; if(!(zv===zv)) zv=hp.zmin;
       var t=(zv-hp.zmin)/(hp.zmax-hp.zmin||1);
-      var rgb=hypsoRGB(t);
+      var rgb=useTerrain?terrainRGB(t):hypsoRGB(t);
       cols3[vi*3]=rgb[0]/255; cols3[vi*3+1]=rgb[1]/255; cols3[vi*3+2]=rgb[2]/255;
     }
     geo.setAttribute('color',new THREE.BufferAttribute(cols3,3));
@@ -2414,6 +2416,7 @@ function changeDEMRes(cell){
   S.demCell=cell;
   ['5','10'].forEach(function(v){
     var b=document.getElementById('demRes'+v); if(b) b.className='thr'+(v==cell?' on':'');
+    var b2=document.getElementById('demRes'+v+'b'); if(b2) b2.className='thr2'+(v==cell?' on':'');
   });
   if(S.triList&&S.triList.length) runDEM();
 }
@@ -2422,8 +2425,8 @@ function changeDEMRes(cell){
 var _3dColorMode='shade';
 function set3DColor(mode){
   _3dColorMode=mode;
-  document.getElementById('t3dShade').className='thr'+(mode==='shade'?' on':'');
-  document.getElementById('t3dHypso').className='thr'+(mode==='hypso'?' on':'');
+  var bs=document.getElementById('t3dShade'); if(bs) bs.className='thr'+(mode==='shade'?' on':'');
+  var bh=document.getElementById('t3dHypso'); if(bh) bh.className='thr'+(mode==='hypso'?' on':'');
 }
 
 /* ── 3D TM좌표 → 장면 좌표 변환 ── */
