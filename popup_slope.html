@@ -1126,20 +1126,134 @@ function fixCanvasSize(){
   }
   render();
 }
-/* PNG 저장 — 흰 배경 합성 (보고서용) */
+/* PNG 저장 — 흰 배경 + 경사도 면적표 합성 (보고서용) */
 function exportPNG(){
-  // 흰 배경 캔버스에 현재 캔버스 합성
+  var hasTable = S.gridCells && S.gridCells.length && S.bins;
+  var tableW = hasTable ? 340 : 0;  // 표 영역 너비
   var off=document.createElement('canvas');
-  off.width=cv.width; off.height=cv.height;
+  off.width=cv.width + tableW;
+  off.height=cv.height;
   var oc=off.getContext('2d');
+
+  // 흰 배경
   oc.fillStyle='#ffffff';
   oc.fillRect(0,0,off.width,off.height);
+  // 지도 캔버스
   oc.drawImage(cv,0,0);
+
+  if(hasTable){
+    drawSlopeTablePNG(oc, cv.width+20, 30, tableW-40);
+  }
+
   var link=document.createElement('a');
   link.download=(S.fileName||'slope')+'_경사도.png';
   link.href=off.toDataURL('image/png');
   link.click();
-  toast('PNG 저장 (흰 배경)');
+  toast(hasTable ? 'PNG 저장 (표 포함)' : 'PNG 저장 (흰 배경)');
+}
+
+/* PNG용 경사도 면적표 그리기 (오토식 4열) */
+function drawSlopeTablePNG(ctx, x, y, w){
+  var corr=(S.daejangArea&&S.daejangArea>0)?(S.daejangArea/S.totalArea):1;
+  var dispTotal=S.totalArea*corr;
+  var labels=['0~5°','5~10°','10~15°','15~20°','20~25°','25~30°','30~35°','35~40°','40°+'];
+  var binMid=[2.5,7.5,12.5,17.5,22.5,27.5,32.5,37.5,42.5];
+
+  // 격자수 카운트
+  var cellCnt=new Array(9).fill(0);
+  S.gridCells.forEach(function(g){ cellCnt[Math.min(Math.floor(g.slope/5),8)]++; });
+
+  ctx.save();
+  ctx.textBaseline='middle';
+  // 제목
+  ctx.fillStyle='#111';
+  ctx.font='bold 16px sans-serif';
+  ctx.fillText('경사도 분석표', x, y);
+  y+=14;
+
+  // 평균 경사도 박스
+  ctx.fillStyle='#f0f7ff';
+  ctx.fillRect(x, y, w, 44);
+  ctx.strokeStyle='#3b82f6'; ctx.lineWidth=1;
+  ctx.strokeRect(x, y, w, 44);
+  ctx.fillStyle='#1e40af';
+  ctx.font='bold 22px sans-serif';
+  ctx.fillText(S.avgSlope.toFixed(2)+'°', x+12, y+18);
+  ctx.fillStyle='#555';
+  ctx.font='11px sans-serif';
+  ctx.fillText('평균 경사도', x+12, y+34);
+  // 적합 판정
+  var fit=S.avgSlope<15;
+  ctx.fillStyle=fit?'#16a34a':'#dc2626';
+  ctx.font='bold 12px sans-serif';
+  ctx.textAlign='right';
+  ctx.fillText(fit?'✓ 적합 (15° 미만)':'✗ 검토 필요', x+w-12, y+22);
+  ctx.textAlign='left';
+  y+=58;
+
+  // 표 헤더
+  var rowH=26;
+  var cols=[w*0.28, w*0.18, w*0.30, w*0.24];  // 구간/칸수/면적/비율
+  var cx=[x, x+cols[0], x+cols[0]+cols[1], x+cols[0]+cols[1]+cols[2]];
+  ctx.fillStyle='#1e293b';
+  ctx.fillRect(x, y, w, rowH);
+  ctx.fillStyle='#fff';
+  ctx.font='bold 11px sans-serif';
+  ctx.fillText('경사구간', cx[0]+6, y+rowH/2);
+  ctx.fillText('격자수', cx[1]+6, y+rowH/2);
+  ctx.fillText('면적(㎡)', cx[2]+6, y+rowH/2);
+  ctx.fillText('구성비', cx[3]+6, y+rowH/2);
+  y+=rowH;
+
+  // 데이터 행
+  ctx.font='11px sans-serif';
+  S.bins.forEach(function(area,i){
+    var v=area*corr;
+    var pct=dispTotal>0?(v/dispTotal*100):0;
+    // 행 배경 (줄무늬)
+    ctx.fillStyle=(i%2===0)?'#f8fafc':'#ffffff';
+    ctx.fillRect(x, y, w, rowH);
+    // 색상 칩
+    ctx.fillStyle=slopeColor(binMid[i], 0.85);
+    ctx.fillRect(cx[0]+4, y+rowH/2-5, 10, 10);
+    // 텍스트
+    ctx.fillStyle='#222';
+    ctx.fillText(labels[i], cx[0]+20, y+rowH/2);
+    ctx.fillStyle = cellCnt[i]>0?'#222':'#bbb';
+    ctx.fillText(cellCnt[i]>0?String(cellCnt[i]):'—', cx[1]+6, y+rowH/2);
+    ctx.fillText(v>0?v.toFixed(2):'—', cx[2]+6, y+rowH/2);
+    ctx.fillText(v>0?pct.toFixed(2)+'%':'—', cx[3]+6, y+rowH/2);
+    y+=rowH;
+  });
+
+  // 합계 행
+  ctx.fillStyle='#e2e8f0';
+  ctx.fillRect(x, y, w, rowH);
+  ctx.fillStyle='#111';
+  ctx.font='bold 11px sans-serif';
+  ctx.fillText('합계', cx[0]+6, y+rowH/2);
+  ctx.fillText(String(S.gridCells.length), cx[1]+6, y+rowH/2);
+  ctx.fillText(dispTotal.toFixed(2), cx[2]+6, y+rowH/2);
+  ctx.fillText('100.00%', cx[3]+6, y+rowH/2);
+  y+=rowH;
+
+  // 표 외곽선
+  ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
+  var tableTop=y-rowH*11;
+  ctx.strokeRect(x, tableTop, w, rowH*11);
+  // 세로 구분선
+  for(var c=1;c<4;c++){
+    ctx.beginPath(); ctx.moveTo(cx[c], tableTop); ctx.lineTo(cx[c], y); ctx.stroke();
+  }
+
+  // 보정 안내
+  if(corr!==1){
+    y+=8;
+    ctx.fillStyle='#dc2626';
+    ctx.font='10px sans-serif';
+    ctx.fillText('※ 대장면적 '+dispTotal.toFixed(0)+'㎡ 보정 (CAD실측 '+S.totalArea.toFixed(0)+'㎡)', x, y+6);
+  }
+  ctx.restore();
 }
 
 /* ============================================================
