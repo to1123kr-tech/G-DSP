@@ -1322,9 +1322,11 @@ function buildTIN(){
 function computeGrid(permitPts, triList){
   var GW=10;
   var pb=getBounds(permitPts);
-  var gridOX=pb.minX, gridOY=pb.maxY;
-  var cols=Math.ceil((pb.maxX-pb.minX)/GW)+1;
-  var rows=Math.ceil((pb.maxY-pb.minY)/GW)+1;
+  /* ★ 절대좌표 10m 스냅 — 오토캐드 그리드와 정렬 (칸 위치 일치) */
+  var gridOX=Math.floor(pb.minX/GW)*GW;   // 10m 경계로 내림
+  var gridOY=Math.ceil(pb.maxY/GW)*GW;    // 10m 경계로 올림
+  var cols=Math.ceil((pb.maxX-gridOX)/GW)+1;
+  var rows=Math.ceil((gridOY-pb.minY)/GW)+1;
   var permitCCW=ensureCCW(permitPts.map(function(p){return{x:p.x,y:p.y};}));
 
   var gridCells=[], totalW=0, totalA=0, bins=new Array(9).fill(0);
