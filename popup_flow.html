@@ -1849,7 +1849,7 @@ function toggleSection(){
   if(S.mode==='section'){
     closeSection(); return;
   }
-  if(!S.dem){ toast('먼저 DEM을 생성하세요','err'); return; }
+  if(!S.triList||!S.triList.length){ toast('먼저 TIN을 생성하세요','err'); return; }
   S.mode='section'; S.sectionPts=[]; S.sectionGhost=null;
   cv.style.cursor='crosshair';
   var b=document.getElementById('btnSection');
@@ -1857,7 +1857,7 @@ function toggleSection(){
   toast('단면 시작점(A)을 클릭하세요');
 }
 function finishSection(){
-  if(!S.dem||!S.sectionPts||S.sectionPts.length<2) return;
+  if(!S.triList||!S.triList.length||!S.sectionPts||S.sectionPts.length<2) return;
   S.mode='pan'; S.sectionGhost=null;
   cv.style.cursor='grab';
   var b=document.getElementById('btnSection');
@@ -1873,20 +1873,60 @@ function closeSection(){
   document.getElementById('profileLay').style.display='none';
   render();
 }
+/* TIN에서 한 점의 높이를 무게중심 보간 (단면도용) */
+function sampleTINz(px, py){
+  if(!S.triList || !S.triList.length) return NaN;
+  for(var ti=0;ti<S.triList.length;ti++){
+    var t=S.triList[ti];
+    if(px<t.minX||px>t.maxX||py<t.minY||py>t.maxY) continue;
+    var x1=t.p0.x,y1=t.p0.y, x2=t.p1.x,y2=t.p1.y, x3=t.p2.x,y3=t.p2.y;
+    var det=(y2-y3)*(x1-x3)+(x3-x2)*(y1-y3);
+    if(Math.abs(det)<1e-9) continue;
+    var a=((y2-y3)*(px-x3)+(x3-x2)*(py-y3))/det;
+    var b=((y3-y1)*(px-x3)+(x1-x3)*(py-y3))/det;
+    var c=1-a-b;
+    if(a>=-0.001&&b>=-0.001&&c>=-0.001){
+      return a*t.p0.z + b*t.p1.z + c*t.p2.z;
+    }
+  }
+  return NaN; // 어느 삼각형에도 안 들어감 (TIN 범위 밖)
+}
+
 function drawSectionProfile(p1, p2){
   var dem=S.dem;
   var dx=p2.x-p1.x, dy=p2.y-p1.y, totalLen=Math.hypot(dx,dy);
   if(totalLen<1){ toast('단면선이 너무 짧아요','err'); return; }
-  var step=dem.cell/2, nSamp=Math.ceil(totalLen/step)+1;
+  /* ★ TIN 직접 보간 — DEM 격자 NaN/평지 문제 해결 */
+  var step=Math.max(1, (dem?dem.cell:5)/3), nSamp=Math.ceil(totalLen/step)+1;
   var profile=[], minZ=Infinity, maxZ=-Infinity;
   for(var i=0;i<=nSamp;i++){
     var t=i/nSamp;
     var wx=p1.x+t*dx, wy=p1.y+t*dy;
-    var c=(wx-dem.minX)/dem.cell, r=(wy-dem.minY)/dem.cell;
-    var ci=Math.round(c), ri=Math.round(r), z=NaN;
-    if(ci>=0&&ci<dem.cols&&ri>=0&&ri<dem.rows){ z=dem.z[ri*dem.cols+ci]; }
+    var z=sampleTINz(wx, wy);            // ★ TIN에서 직접 보간
+    /* TIN 밖이면 DEM 격자로 폴백 */
+    if(!(z===z) && dem){
+      var ci=Math.round((wx-dem.minX)/dem.cell), ri=Math.round((wy-dem.minY)/dem.cell);
+      if(ci>=0&&ci<dem.cols&&ri>=0&&ri<dem.rows){ z=dem.z[ri*dem.cols+ci]; }
+    }
     profile.push({d:t*totalLen, z:z});
     if(z===z){ if(z<minZ)minZ=z; if(z>maxZ)maxZ=z; }
+  }
+  /* ★ NaN 구간 선형보간으로 메우기 (삼각형 틈/경계) */
+  for(var k=0;k<profile.length;k++){
+    if(profile[k].z===profile[k].z) continue;
+    // 앞쪽 유효값
+    var prev=k-1; while(prev>=0 && !(profile[prev].z===profile[prev].z)) prev--;
+    // 뒤쪽 유효값
+    var next=k+1; while(next<profile.length && !(profile[next].z===profile[next].z)) next++;
+    if(prev>=0 && next<profile.length){
+      var ratio=(k-prev)/(next-prev);
+      profile[k].z=profile[prev].z + (profile[next].z-profile[prev].z)*ratio;
+    } else if(prev>=0){ profile[k].z=profile[prev].z; }
+    else if(next<profile.length){ profile[k].z=profile[next].z; }
+    if(profile[k].z===profile[k].z){
+      if(profile[k].z<minZ)minZ=profile[k].z;
+      if(profile[k].z>maxZ)maxZ=profile[k].z;
+    }
   }
   var lay=document.getElementById('profileLay');
   lay.style.display='';
