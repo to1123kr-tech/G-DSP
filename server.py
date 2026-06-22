@@ -62,96 +62,126 @@ def kigam_featureinfo_proxy():
     params:
         lng, lat  — WGS84 경위도 (직접 입력 시)
         x, y      — 국가TM 좌표 (EPSG:5186, DXF 세계좌표) → 서버에서 자동변환
-    returns: JSON {ok, props:{기호, 지층, 대표암성, 시대}, moam:{score, name}}
+    returns: JSON {ok, props, moam:{score, name}}
+
+    여러 INFO_FORMAT(json/gml/html/plain)을 차례로 시도하고,
+    JSON이 아니어도 정규식으로 지질기호를 추출한다.
     """
+    import re as _re
     try:
         if request.args.get('lng'):
             lng = float(request.args['lng'])
             lat = float(request.args['lat'])
         else:
-            # TM(EPSG:5186/KATECH) → WGS84 변환
             tx = float(request.args.get('x', 0))
             ty = float(request.args.get('y', 0))
             lng, lat = tm5186_to_wgs84(tx, ty)
 
-        d = 0.003  # bbox 약 300m
-        params = {
+        d = 0.003
+        base_params = {
             'key': KIGAM_KEY,
             'SERVICE': 'WMS', 'REQUEST': 'GetFeatureInfo', 'VERSION': '1.1.1',
             'LAYERS': 'L_50K_Geology_Map',
             'QUERY_LAYERS': 'L_50K_Geology_Map',
-            'INFO_FORMAT': 'application/json',
             'BBOX': f'{lng-d},{lat-d},{lng+d},{lat+d}',
             'WIDTH': '101', 'HEIGHT': '101', 'X': '50', 'Y': '50',
             'SRS': 'EPSG:4326',
         }
-        r = req.get('https://data.kigam.re.kr/openapi/wms', params=params,
-                    headers={"Referer":"https://data.kigam.re.kr"}, timeout=12)
-        data = r.json()
-        features = data.get('features', [])
-        if features:
-            props = features[0].get('properties', {})
-            # 모암 자동 분류
-            code = str(props.get('기호', props.get('CODE', props.get('SYM', '')))).lower().strip()
-            rock = str(props.get('대표암성', props.get('RNAME', ''))).lower()
-            moam = classify_moam(code, rock)
-            return jsonify({'ok': True, 'props': props, 'moam': moam, 'wgs84':[lng,lat]})
-        return jsonify({'ok': False, 'msg': '해당 위치에 지질 데이터 없음'})
+        # INFO_FORMAT 후보 순서대로 시도
+        formats = ['application/json', 'application/vnd.ogc.gml', 'text/plain', 'text/html']
+        last_body = ''
+        last_ct = ''
+        for fmt in formats:
+            params = dict(base_params); params['INFO_FORMAT'] = fmt
+            try:
+                r = req.get('https://data.kigam.re.kr/openapi/wms', params=params,
+                            headers={"Referer": "https://data.kigam.re.kr",
+                                     "User-Agent": "Mozilla/5.0"}, timeout=12)
+            except Exception as fe:
+                logger.warning(f"[kigam-info] {fmt} request failed: {fe}")
+                continue
+            body = r.text or ''
+            ct = r.headers.get('Content-Type', '')
+            last_body, last_ct = body, ct
+            if not body.strip():
+                continue  # 빈 응답 → 다음 포맷
+
+            props = {}
+            # 1) JSON 파싱 시도
+            if 'json' in ct.lower() or body.lstrip().startswith('{'):
+                try:
+                    data = r.json()
+                    feats = data.get('features', [])
+                    if feats:
+                        props = feats[0].get('properties', {}) or {}
+                except Exception:
+                    pass
+            # 2) GML/XML 파싱 (태그값 추출)
+            if not props and ('<' in body):
+                # <기호>Kgr</기호> 또는 <기호 ...>Kgr</...> 형태
+                for key in ['기호', '지층', '대표암성', 'SYMBOL', 'CODE', 'SYM', 'RNAME', 'LEGEND']:
+                    m = _re.search(r'<[^>]*' + key + r'[^>]*>([^<]+)<', body, _re.IGNORECASE)
+                    if m:
+                        props[key] = m.group(1).strip()
+            # 3) text/plain 파싱 (key=value 또는 key: value)
+            if not props and '=' in body:
+                for line in body.splitlines():
+                    mm = _re.match(r'\s*([\w가-힣]+)\s*[=:]\s*(.+)', line)
+                    if mm:
+                        props[mm.group(1).strip()] = mm.group(2).strip()
+
+            if props:
+                code = str(props.get('기호', props.get('CODE', props.get('SYM',
+                          props.get('SYMBOL', props.get('LEGEND', '')))))).strip()
+                rock = str(props.get('대표암성', props.get('RNAME',
+                          props.get('지층', '')))).strip()
+                moam = classify_moam(code, rock)
+                return jsonify({'ok': True, 'props': props, 'moam': moam,
+                                'wgs84': [lng, lat], 'fmt': fmt})
+
+        # 모든 포맷 실패 → 디버그 정보 포함
+        snippet = (last_body or '').strip()[:160]
+        logger.warning(f"[kigam-info] no props. ct={last_ct} body={snippet!r}")
+        return jsonify({'ok': False,
+                        'msg': '지질 정보를 읽지 못했습니다 (응답 형식 불명)',
+                        'debug': {'ct': last_ct, 'snippet': snippet}})
     except Exception as e:
         logger.error(f"[kigam-info] {e}")
         return jsonify({'ok': False, 'msg': str(e)}), 500
 
 
 def tm5186_to_wgs84(x, y):
-    """EPSG:5186 (Korean TM, 중부원점 127°E) → WGS84 경위도 근사변환"""
-    import math
-    a = 6378137.0  # GRS80
-    f = 1/298.257222101
-    e2 = 2*f - f**2
-    # EPSG:5186: cm=127°, lat0=38°, fe=200000, fn=500000, k=1.0
-    lng0, lat0 = math.radians(127), math.radians(38)
-    fe, fn, k = 200000, 500000, 1.0
-    x = (x - fe) / k
-    y = (y - fn) / k
-    # 자오선 호 at lat0
-    def meri_arc(lat):
-        return a*((1-e2/4-3*e2**2/64)*lat
-                  -(3*e2/8+3*e2**2/32)*math.sin(2*lat)
-                  +(15*e2**2/256)*math.sin(4*lat))
-    M = meri_arc(lat0) + y
-    mu = M/(a*(1-e2/4-3*e2**2/64-5*e2**3/256))
-    e1 = (1-math.sqrt(1-e2))/(1+math.sqrt(1-e2))
-    fp = (mu + (3*e1/2-27*e1**3/32)*math.sin(2*mu)
-               + (21*e1**2/16)*math.sin(4*mu)
-               + (151*e1**3/96)*math.sin(6*mu))
-    N1 = a/math.sqrt(1-e2*math.sin(fp)**2)
-    T1 = math.tan(fp)**2
-    C1 = e2/(1-e2)*math.cos(fp)**2
-    R1 = a*(1-e2)/(1-e2*math.sin(fp)**2)**1.5
-    D = x/(N1*k)
-    lat = fp - (N1*math.tan(fp)/R1)*(D**2/2-(5+3*T1+10*C1-4*C1**2-9*e2/(1-e2))*D**4/24)
-    lng = lng0 + (D-(1+2*T1+C1)*D**3/6)/math.cos(fp)
-    return math.degrees(lng), math.degrees(lat)
+    """EPSG:5186 (Korean Central Belt 2010) → WGS84 경위도
+    pyproj Transformer 사용 (정밀). 모듈 하단 _TM5186_TO_WGS84 정의됨.
+    """
+    lng, lat = _TM5186_TO_WGS84.transform(x, y)
+    return lng, lat
 
 
 def classify_moam(code, rock=''):
     """지질 기호/암석명 → 재해위험성 모암 채점표 분류
     채점: 퇴적암=0, 화성암기타=5, 변성암천매암=12, 변성암편마암=19, 화성암반암=56
     """
-    c = code.lower(); r = rock.lower()
-    # 화성암 반암/안산암 (56점) — 가장 높은 위험
-    if any(k in c+r for k in ['and','bas','rhy','por','tra','pgo','dac']):
+    c = (code or '').lower().strip()
+    r = (rock or '').lower()
+    full = c + ' ' + r
+    # 1) 안산암류/화산암/반암 (56점) — 가장 높은 위험
+    if any(k in full for k in ['andesite','basalt','rhyolite','porphyr','trachyte','dacite',
+                                'volcanic','tuff','안산암','현무암','유문암','반암','조면암','응회암','화산']):
         return {'score':56,'name':'화성암(반암류·안산암류)'}
-    # 변성암 편마암/편암 (19점)
-    if any(k in c+r for k in ['gn','sch','schist','편마암','편암','gneiss']):
+    if 'gr' not in c and any(k in c for k in ['an','ba','bs','vo','rh','da','tr']):
+        return {'score':56,'name':'화성암(반암류·안산암류)'}
+    # 2) 편마암/편암 (19점)
+    if any(k in full for k in ['gneiss','schist','편마암','편암']) or 'gn' in c or 'sch' in c:
         return {'score':19,'name':'변성암(편마암류·편암류)'}
-    # 변성암 천매암/점판암 (12점)
-    if any(k in c+r for k in ['ph','sl','apt','met','arg','천매암','점판암','phyllite','slate']):
+    # 3) 천매암/점판암 (12점)
+    if any(k in full for k in ['phyllite','slate','천매암','점판암','슬레이트']) or c.endswith('sl') or 'ph' in c:
         return {'score':12,'name':'변성암(천매암·점판암 기타)'}
-    # 화성암 화강암 (5점)
-    if any(k in c+r for k in ['gr','ga','dio','gab','ton','mon','sye','화강','diorite','gabbro']):
+    # 4) 화강암류 (5점)
+    if any(k in full for k in ['granite','diorite','gabbro','tonalite','monzonite','syenite',
+                                '화강암','섬록암','반려암','화강']) or 'gr' in c or (c[:1]=='g'):
         return {'score':5,'name':'화성암(화강암류 기타)'}
-    # 퇴적암 (0점) — 기본값
+    # 5) 퇴적암 (0점) — 기본값
     return {'score':0,'name':'퇴적암(이암·석회암·사암 등)'}
 
 
