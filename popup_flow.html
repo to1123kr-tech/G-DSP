@@ -207,6 +207,9 @@
         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:9px;cursor:pointer">
           <input type="checkbox" id="demToggle" checked onchange="S.showDEM=this.checked;render()"> 음영기복 보기
         </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--tx3);margin-top:4px;cursor:pointer">
+          <input type="checkbox" id="demClipPermit" onchange="S.demClipToPermit=this.checked;render()"> 허가지선 내부만 표시
+        </label>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="thr on" id="rShade" onclick="setRelief('shade')">음영(회색)</button>
           <button class="thr" id="rHypso" onclick="setRelief('hypso')">무지개</button>
@@ -259,9 +262,11 @@
       <button class="btn btn-ghost" id="btnFlow" disabled onclick="runFlow()" style="margin-top:9px">💧 흐름·하천 분석 (D8)</button>
       <div id="flowResult" style="display:none;margin-top:10px">
         <div class="stat full" style="margin-bottom:8px"><div class="v" id="streamLen">–</div><div class="k">하천 셀 (누적≥임계)</div></div>
-        <div style="display:flex;gap:6px;margin-bottom:9px">
-          <button class="thr on" id="thr5" onclick="setThr(5)">5ha 기본</button>
-          <button class="thr" id="thr1" onclick="setThr(1)">1ha 정밀</button>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px">
+          <button class="thr" id="thr01" onclick="setThr(0.1)">0.1ha</button>
+          <button class="thr" id="thr05" onclick="setThr(0.5)">0.5ha</button>
+          <button class="thr on" id="thr1" onclick="setThr(1)">1ha</button>
+          <button class="thr" id="thr5" onclick="setThr(5)">5ha</button>
         </div>
         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);cursor:pointer">
           <input type="checkbox" id="streamToggle" checked onchange="S.showStreams=this.checked;render()"> 하천망 보기
@@ -332,7 +337,9 @@
           <option value="0" selected>활엽수림·혼효림 — 0점</option>
           <option value="0">무림목지·채산림 — 0점</option>
         </select>
-        <div style="font-size:11px;color:var(--tx3);margin:7px 0 3px">모암</div>
+        <div style="font-size:11px;color:var(--tx3);margin:7px 0 3px">모암 <span style="color:#fbbf24;font-size:10px">✨ 수치지질도 자동감지 가능</span></div>
+        <button class="btn btn-ghost" id="btnDetectMoam" onclick="detectMoAmFromKIGAM()" style="font-size:11px;margin-bottom:5px;padding:5px 8px">🔬 수치지질도로 모암 자동감지</button>
+        <div id="moamDetectResult" style="display:none;font-size:10px;color:#60cdff;margin-bottom:5px;padding:4px 6px;background:rgba(56,160,235,0.1);border-radius:4px;border:1px solid rgba(56,160,235,0.3)"></div>
         <select class="risk-sel" id="sel_moam" onchange="updateRiskTotal()">
           <option value="0" selected>퇴적암 (이암·석회암·사암 등) — 0점</option>
           <option value="5">화성암 (화강암류 기타) — 5점</option>
@@ -447,10 +454,10 @@ var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 var S={ contours:[], surveys:[], polys:[],
         triList:[], showTIN:true,
         dem:null, showDEM:true, hillCanvas:null,
-        flow:null, streamMask:null, streamHa:5, showStreams:true,
+        flow:null, streamMask:null, streamHa:1, showStreams:true,
         watershed:null, wsCanvas:null, wsSegs:null, showWS:true, mode:'pan', dnX:0, dnY:0,
         permit:null, permitDraw:null, ghostXY:null, snapClose:false,
-        showGrid:false, showArrows:false, areaUnit:'m2', reliefMode:'shade',
+        showGrid:false, showArrows:false, demClipToPermit:false, areaUnit:'m2', reliefMode:'shade',
         bounds:null, scale:1, ox:0, oy:0,
         zmin:0, zmax:0, isDown:false, lastM:null, name:'' };
 
@@ -652,7 +659,7 @@ function applyParsed(r){
   // TIN 초기화 + 버튼 활성 + 파이프 리셋
   S.triList=[]; S.showTIN=true;
   S.dem=null; S.hillCanvas=null; S.showDEM=true;
-  S.flow=null; S.streamMask=null; S.streamHa=5; S.showStreams=true;
+  S.flow=null; S.streamMask=null; S.streamHa=1; S.showStreams=true;
   S.watershed=null; S.wsCanvas=null; S.wsSegs=null; S.showWS=true; S.mode='pan';
   S.showGrid=false; S.showArrows=false;
   var _gt=document.getElementById('gridToggle'); if(_gt)_gt.checked=false;
@@ -800,13 +807,32 @@ function render(){
   if(!S.bounds) return;
   var zr=(S.zmax-S.zmin)||1;
 
+  /* ★ 작업구역 canvas clip */
+  if(S.cropRect){
+    var cr=S.cropRect;
+    var crtl=w2s({x:cr.minX,y:cr.maxY}), crbr=w2s({x:cr.maxX,y:cr.minY});
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(Math.floor(crtl.x), Math.floor(crtl.y),
+             Math.ceil(crbr.x-crtl.x)+1, Math.ceil(crbr.y-crtl.y)+1);
+    ctx.clip();
+  }
+
   // DEM 음영기복 (가장 아래 배경)
   if(S.dem && S.showDEM && S.hillCanvas){
     var d=S.dem;
     var x0=d.minX, x1=d.minX+(d.cols-1)*d.cell, y0=d.minY, y1=d.minY+(d.rows-1)*d.cell;
     var tl=w2s({x:x0,y:y1}), br=w2s({x:x1,y:y0});
+    /* ★ 허가지선 내부만 클리핑 */
+    if(S.demClipToPermit && S.permit && S.permit.length>=3){
+      ctx.save();
+      ctx.beginPath();
+      S.permit.forEach(function(p,i){ var s=w2s(p); i===0?ctx.moveTo(s.x,s.y):ctx.lineTo(s.x,s.y); });
+      ctx.closePath(); ctx.clip();
+    }
     ctx.imageSmoothingEnabled=true;
     ctx.drawImage(S.hillCanvas, tl.x, tl.y, br.x-tl.x, br.y-tl.y);
+    if(S.demClipToPermit && S.permit && S.permit.length>=3) ctx.restore();
   }
 
   // 유역 채움 (반투명 하늘색)
@@ -879,7 +905,7 @@ function render(){
     ];
     orders.forEach(function(ord){
       ctx.strokeStyle=ord.color;
-      ctx.lineWidth=Math.max(ord.lw, S.scale*fl.cell*0.18);
+      ctx.lineWidth=Math.max(ord.lw*1.5, S.scale*fl.cell*0.25);
       ctx.beginPath();
       for(var si=0;si<sm.length;si++){
         if(!sm[si]||fa[si]<ord.minF) continue;
@@ -970,22 +996,14 @@ function render(){
     ctx.restore();
   }
 
-  // ★ 작업구역 사각형 + 미리보기
+  /* ★ 작업구역 그리는 중 미리보기 (clip 밖) */
   if(S.mode==='crop' && S.cropPt1 && S.cropGhost){
-    /* 그리는 중 미리보기 */
     var p1s=w2s(S.cropPt1), p2s=w2s(S.cropGhost);
-    ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=2;
-    ctx.setLineDash([8,4]); ctx.fillStyle='rgba(255,255,255,0.05)';
+    ctx.save(); ctx.strokeStyle='rgba(255,220,0,0.9)'; ctx.lineWidth=2.5;
+    ctx.setLineDash([8,4]); ctx.fillStyle='rgba(255,220,0,0.06)';
     ctx.fillRect(Math.min(p1s.x,p2s.x),Math.min(p1s.y,p2s.y),Math.abs(p2s.x-p1s.x),Math.abs(p2s.y-p1s.y));
     ctx.strokeRect(Math.min(p1s.x,p2s.x),Math.min(p1s.y,p2s.y),Math.abs(p2s.x-p1s.x),Math.abs(p2s.y-p1s.y));
     ctx.setLineDash([]); ctx.restore();
-  }
-  if(S.cropRect){
-    var cr=S.cropRect;
-    var crtl=w2s({x:cr.minX,y:cr.maxY}), crbr=w2s({x:cr.maxX,y:cr.minY});
-    ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2.5; ctx.setLineDash([12,5]);
-    ctx.strokeRect(crtl.x,crtl.y,crbr.x-crtl.x,crbr.y-crtl.y); ctx.setLineDash([]);
-    ctx.restore();
   }
 
   // ★ pickPermit 모드 - 폴리 표시 + hover
@@ -1051,6 +1069,17 @@ function render(){
     ctx.moveTo(p.x+3.5,p.y-3.5);ctx.lineTo(p.x-3.5,p.y+3.5);
     ctx.stroke();
     if(showVal && sv.val!=null){ ctx.fillStyle='#fbbf24'; ctx.fillText(sv.val.toFixed(1), p.x+5, p.y-4); }
+  }
+
+  /* ★ 작업구역 clip 해제 후 경계선 다시 그리기 */
+  if(S.cropRect){
+    ctx.restore(); // clip 해제
+    var cr2=S.cropRect;
+    var ctl=w2s({x:cr2.minX,y:cr2.maxY}), cbr=w2s({x:cr2.maxX,y:cr2.minY});
+    ctx.save();
+    ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2.5; ctx.setLineDash([12,5]);
+    ctx.strokeRect(ctl.x,ctl.y,cbr.x-ctl.x,cbr.y-ctl.y);
+    ctx.setLineDash([]); ctx.restore();
   }
 }
 
@@ -1331,8 +1360,9 @@ function runFlow(){
 function setThr(ha){
   if(!S.flow) return;
   S.streamHa=ha;
-  document.getElementById('thr5').className='thr'+(ha===5?' on':'');
-  document.getElementById('thr1').className='thr'+(ha===1?' on':'');
+  [{v:0.1,id:'thr01'},{v:0.5,id:'thr05'},{v:1,id:'thr1'},{v:5,id:'thr5'}].forEach(function(o){
+    var b=document.getElementById(o.id); if(b) b.className='thr'+(o.v===ha?' on':'');
+  });
   S.streamMask=buildStreams(S.flow, ha);
   document.getElementById('streamLen').textContent=S.streamMask.count.toLocaleString();
   render();
@@ -1949,6 +1979,48 @@ function ptInPoly(pt,poly){
     if(((yi>pt.y)!=(yj>pt.y))&&(pt.x<(xj-xi)*(pt.y-yi)/(yj-yi)+xi)) inside=!inside;
   }
   return inside;
+}
+
+/* ══ KIGAM 수치지질도 모암 자동감지 ══ */
+function detectMoAmFromKIGAM(){
+  if(!S.permit||S.permit.length<3){ toast('먼저 허가지선을 완성하세요','err'); return; }
+  var cx=0,cy=0;
+  S.permit.forEach(function(p){cx+=p.x;cy+=p.y;});
+  cx/=S.permit.length; cy/=S.permit.length;
+  var PROXY=localStorage.getItem('gdsp_crawl_server')||'https://168-107-15-68.nip.io';
+  var btn=document.getElementById('btnDetectMoam');
+  if(btn){btn.textContent='🔄 분석 중...'; btn.disabled=true;}
+  fetch(PROXY+'/api/kigam-info?x='+cx+'&y='+cy)
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(btn){btn.textContent='🔬 수치지질도로 모암 자동감지'; btn.disabled=false;}
+      var el=document.getElementById('moamDetectResult');
+      if(!d.ok){
+        if(el){el.style.display='';el.textContent='⚠️ '+d.msg;el.style.color='#f87171';}
+        toast('지질 정보 없음: '+d.msg,'err'); return;
+      }
+      var moam=d.moam, props=d.props||{};
+      var rock=props['대표암성']||props['RNAME']||props['지층']||'';
+      var code=props['기호']||props['CODE']||props['SYM']||'';
+      var info=(code?'기호: '+code:'')+( rock?' | '+rock:'');
+      if(el){
+        el.style.display=''; el.style.color='#60cdff';
+        el.textContent='✅ '+moam.name+' ('+moam.score+'점)'+(info?' — '+info:'');
+      }
+      /* 드롭다운 자동 선택 */
+      var sel=document.getElementById('sel_moam');
+      if(sel){
+        for(var i=0;i<sel.options.length;i++){
+          if(parseInt(sel.options[i].value)===moam.score){ sel.selectedIndex=i; break; }
+        }
+      }
+      updateRiskTotal();
+      toast('모암 감지: '+moam.name+' '+moam.score+'점','ok');
+    })
+    .catch(function(e){
+      if(btn){btn.textContent='🔬 수치지질도로 모암 자동감지'; btn.disabled=false;}
+      toast('KIGAM 연결 실패','err');
+    });
 }
 
 function autoCalcRisk(){
