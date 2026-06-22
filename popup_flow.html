@@ -158,24 +158,41 @@
 
     <div class="sec">
       <h3>허가지선 (산지전용예정지)</h3>
-      <!-- DXF 폐합선 감지 안내 (목록 없이 바로 클릭 선택) -->
-      <div id="importPermitDiv" style="display:none;margin-bottom:8px">
-        <div style="font-size:11px;color:#fbbf24;line-height:1.5;padding:8px 10px;background:rgba(251,191,36,0.1);border-radius:6px;border:1px solid rgba(251,191,36,0.3)">
-          📂 DXF 폐합선 <b id="polyCount">0</b>개 감지됨<br>
-          <span style="color:var(--tx3);font-size:10px">지도에서 노란 점선을 클릭하면 허가지선으로 선택됩니다</span>
-        </div>
+      <!-- 허가지선 선택 (DXF 폐합선 클릭) -->
+      <button class="btn btn-primary" id="btnPickMode" disabled onclick="enterPickMode()" style="margin-bottom:6px">🖱 허가지선 선택 (폐합선 클릭)</button>
+      <button class="btn btn-ghost" id="btnPermit" disabled onclick="togglePermit()">✏️ 허가지선 그리기</button>
+      <div id="pickHint" style="display:none;font-size:10.5px;color:#fbbf24;margin-top:6px;line-height:1.5;padding:6px 9px;background:rgba(251,191,36,0.1);border-radius:6px;border:1px solid rgba(251,191,36,0.3)">
+        지도에서 노란 점선(폐합선)을 클릭하세요
       </div>
-      <button class="btn btn-ghost" id="btnPermit" disabled onclick="togglePermit()">✏️ 허가지선 직접 그리기</button>
       <div id="permitInfo" style="display:none;margin-top:9px">
-        <div class="stat full"><div class="v" id="permitArea">–</div><div class="k">신청 면적</div></div>
+        <!-- 면적 좌우 분할: CAD실측 | 보정(공부) -->
+        <div style="display:flex;gap:6px">
+          <div style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 8px;text-align:center">
+            <div style="font-size:16px;font-weight:800;color:var(--tx)" id="permitArea">–</div>
+            <div style="font-size:9.5px;color:var(--tx3);margin-top:2px">CAD 실측면적</div>
+          </div>
+          <div style="flex:1;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.3);border-radius:8px;padding:9px 8px;text-align:center">
+            <div style="font-size:16px;font-weight:800;color:#4ade80" id="permitAreaCorr">–</div>
+            <div style="font-size:9.5px;color:var(--tx3);margin-top:2px">보정면적 (공부)</div>
+          </div>
+        </div>
+        <!-- 대장면적 입력 (보정) -->
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+          <span style="font-size:11px;color:var(--tx2);white-space:nowrap">대장면적</span>
+          <input type="number" id="daejangArea" placeholder="공부 면적 입력" min="0" step="0.1"
+            oninput="onDaejangInput()"
+            style="flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:5px 7px;font-size:12px">
+          <span style="font-size:11px;color:var(--tx3)">㎡</span>
+        </div>
+        <div id="corrInfo" style="font-size:10px;color:#4ade80;margin-top:5px;display:none"></div>
         <div style="display:flex;gap:5px;margin-top:8px">
           <button class="thr on" id="uM2" onclick="setUnit('m2')">㎡</button>
           <button class="thr" id="uA" onclick="setUnit('a')">a</button>
           <button class="thr" id="uHa" onclick="setUnit('ha')">ha</button>
         </div>
-        <button class="btn btn-ghost" onclick="clearPermit()" style="margin-top:8px;font-size:12px;padding:7px">지우고 다시 그리기</button>
+        <button class="btn btn-ghost" onclick="clearPermit()" style="margin-top:8px;font-size:12px;padding:7px">지우고 다시 선택</button>
       </div>
-      <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.6">꼭짓점 클릭 → 첫 점에 대면 <b style="color:var(--tx2)">자동 닫기</b> (또는 더블클릭)<br>우클릭 = 직전 점 취소</div>
+      <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.6">선택: 폐합선 클릭 / 그리기: 꼭짓점 클릭 후 <b style="color:var(--tx2)">자동 닫기</b><br>우클릭 = 직전 점 취소</div>
     </div>
 
     <div class="sec" id="secRecog" style="display:none">
@@ -457,7 +474,7 @@ var S={ contours:[], surveys:[], polys:[],
         flow:null, streamMask:null, streamHa:1, showStreams:true,
         watershed:null, wsCanvas:null, wsSegs:null, showWS:true, mode:'pan', dnX:0, dnY:0,
         permit:null, permitDraw:null, ghostXY:null, snapClose:false,
-        showGrid:false, showArrows:false, demClipToPermit:false, areaUnit:'m2', reliefMode:'shade',
+        showGrid:false, showArrows:false, demClipToPermit:false, areaUnit:'m2', reliefMode:'shade', daejangArea:null,
         bounds:null, scale:1, ox:0, oy:0,
         zmin:0, zmax:0, isDown:false, lastM:null, name:'' };
 
@@ -621,15 +638,13 @@ function applyParsed(r){
   /* ★ 작업구역 선택 버튼 표시 */
   document.getElementById('cropSection').style.display='';
 
-  /* ★ DXF 폐합선 감지 → 카운트만 표시 (목록 없이 지도에서 직접 클릭) */
+  /* ★ DXF 폐합선 감지 → 선택 버튼 활성화 */
   var candidates=(S.polys||[]).filter(function(p){ return p.area>50; });
   S.polys=candidates;  // 50㎡ 이상만 후보로
-  var div=document.getElementById('importPermitDiv');
-  if(candidates.length>0){
-    div.style.display='';
-    var pc=document.getElementById('polyCount'); if(pc) pc.textContent=candidates.length;
-  } else {
-    div.style.display='none';
+  var bpm2=document.getElementById('btnPickMode');
+  if(bpm2){
+    if(candidates.length>0){ bpm2.disabled=false; bpm2.textContent='🖱 허가지선 선택 (폐합선 '+candidates.length+'개)'; }
+    else { bpm2.disabled=true; bpm2.textContent='🖱 허가지선 선택 (폐합선 없음)'; }
   }
   document.getElementById('sbCont').textContent=S.contours.length;
   document.getElementById('sbSurv').textContent=S.surveys.length;
@@ -684,6 +699,8 @@ function computeBounds(){
   S.surveys.forEach(eat);
   if(minX>maxX){ minX=0;minY=0;maxX=1;maxY=1; }
   S.bounds={minX:minX,minY:minY,maxX:maxX,maxY:maxY};
+  /* ★ 작업구역 초기화용 원본 bounds 백업 */
+  S.origBounds={minX:minX,minY:minY,maxX:maxX,maxY:maxY};
 }
 function resize(){
   var st=cv.parentElement;
@@ -1253,7 +1270,7 @@ function setUnit(u){
   document.getElementById('uM2').className='thr'+(u==='m2'?' on':'');
   document.getElementById('uA').className ='thr'+(u==='a' ?' on':'');
   document.getElementById('uHa').className ='thr'+(u==='ha'?' on':'');
-  if(S.permit) document.getElementById('permitArea').textContent=fmtArea(polyArea(S.permit));
+  if(S.permit) updatePermitAreaDisplay();
   if(S.watershed) document.getElementById('wsArea').textContent=fmtArea(S.watershed.areaM2);
 }
 function runDEM(){
@@ -1484,9 +1501,11 @@ function finishPermit(){
   while(pts.length>=2){ var a=pts[pts.length-1],b=pts[pts.length-2]; if(Math.hypot(a.x-b.x,a.y-b.y) < 4/S.scale) pts.pop(); else break; }
   if(pts.length<3){ toast('꼭짓점을 3개 이상 찍어주세요','err'); return; }
   S.permit=pts.slice();
-  var A=polyArea(S.permit);
-  document.getElementById('permitArea').textContent=fmtArea(A);
+  S.daejangArea=null;
+  var dj2=document.getElementById('daejangArea'); if(dj2) dj2.value='';
   document.getElementById('permitInfo').style.display='';
+  updatePermitAreaDisplay();
+  var A=polyArea(S.permit);
   S.mode='pan'; S.permitDraw=null; S.ghostXY=null; S.snapClose=false;
   var bb=document.getElementById('btnPermit'); bb.classList.remove('active'); bb.textContent='✏️ 허가지선 그리기';
   cv.style.cursor='grab'; render();
@@ -1496,13 +1515,12 @@ function finishPermit(){
 }
 function clearPermit(){
   S.permit=null; S.permitDraw=null; S.ghostXY=null; S.pickHover=null;
+  S.daejangArea=null;
+  var dj=document.getElementById('daejangArea'); if(dj) dj.value='';
   document.getElementById('permitInfo').style.display='none';
-  /* 폐합선 후보 다시 표시 (재선택 가능) */
-  if(S.polys && S.polys.length){
-    var ipd=document.getElementById('importPermitDiv'); if(ipd) ipd.style.display='';
-  }
   if(S.mode==='permit') togglePermit();
   render();
+  toast('허가지선 초기화 — 다시 선택하거나 그리세요');
 }
 
 /* ---------- PNG 내보내기 (현재 화면 캡쳐) ---------- */
@@ -1704,7 +1722,42 @@ function setBuffer(d){
   toast(d>0?'버퍼선 '+d+'m 적용':'버퍼선 끔');
 }
 
-/* ══ 지도에서 허가지선 마우스 클릭 선택 (pan 모드에서 자동) ══ */
+/* ══ 허가지선 선택 모드 진입 ══ */
+function enterPickMode(){
+  if(!S.polys||!S.polys.length){ toast('DXF에 폐합선이 없어요 — 그리기를 사용하세요','err'); return; }
+  S.mode='pickPermit'; S.pickHover=null;
+  cv.style.cursor='crosshair';
+  var bp=document.getElementById('btnPickMode');
+  if(bp){ bp.classList.add('active'); }
+  document.getElementById('pickHint').style.display='';
+  render();
+  toast('폐합선을 클릭하세요');
+}
+
+/* ══ 대장(공부)면적 입력 → 보정 ══ */
+function onDaejangInput(){
+  var v=parseFloat(document.getElementById('daejangArea').value);
+  S.daejangArea=(v&&v>0)?v:null;
+  updatePermitAreaDisplay();
+}
+function updatePermitAreaDisplay(){
+  if(!S.permit||S.permit.length<3) return;
+  var cad=polyArea(S.permit);
+  document.getElementById('permitArea').textContent=fmtArea(cad);
+  var corrEl=document.getElementById('permitAreaCorr');
+  var ci=document.getElementById('corrInfo');
+  if(S.daejangArea&&S.daejangArea>0){
+    corrEl.textContent=fmtArea(S.daejangArea);
+    var ratio=S.daejangArea/cad;
+    ci.style.display='';
+    ci.textContent='보정계수 ×'+ratio.toFixed(4)+' (분석·채점은 보정면적 기준)';
+  } else {
+    corrEl.textContent=fmtArea(cad);  // 입력 없으면 실측=보정
+    ci.style.display='none';
+  }
+}
+
+/* ══ 허가지선 마우스 클릭 선택 ══ */
 function pickPermitAtClick(wx,wy){
   if(!S.polys||!S.polys.length) return;
   var best=null, bestDist=30/S.scale; // 30px 이내
@@ -1721,13 +1774,16 @@ function pickPermitAtClick(wx,wy){
   });
   if(best){
     S.permit=best.pts.slice();
-    var A=polyArea(S.permit);
-    document.getElementById('permitArea').textContent=fmtArea(A);
+    S.daejangArea=null;  // 새 선택 시 보정 초기화
+    var dj=document.getElementById('daejangArea'); if(dj) dj.value='';
     document.getElementById('permitInfo').style.display='';
-    /* 폐합선 안내 숨김 (선택 완료) */
-    var ipd=document.getElementById('importPermitDiv'); if(ipd) ipd.style.display='none';
+    updatePermitAreaDisplay();
+    /* 선택 모드 종료 */
     S.mode='pan'; cv.style.cursor='grab'; S.pickHover=null;
+    document.getElementById('pickHint').style.display='none';
+    var bp=document.getElementById('btnPickMode'); if(bp) bp.classList.remove('active');
     render();
+    var A=polyArea(S.permit);
     toast('허가지선 선택 완료 · '+fmtArea(A),'ok');
     if(S.dem) setTimeout(function(){ autoCalcRisk(); },200);
   } else {
@@ -1767,11 +1823,13 @@ function clearCrop(){
   S.contours=S.origContours||S.contours;
   S.surveys=S.origSurveys||S.surveys;
   S.polys=S.origPolys||S.polys;
+  /* ★ 원본 전체 범위로 bounds 복원 */
+  if(S.origBounds){ S.bounds={minX:S.origBounds.minX,minY:S.origBounds.minY,maxX:S.origBounds.maxX,maxY:S.origBounds.maxY}; }
   document.getElementById('cropInfo').style.display='none';
   document.getElementById('btnCrop').style.display='';
-  /* 전체 범위로 화면 맞춤 */
-  fitViewToData();
-  render(); toast('작업구역 초기화됨');
+  /* ★ 전체화면으로 축소 복원 */
+  fitView();
+  render(); toast('작업구역 초기화 · 전체화면 복원','ok');
 }
 function applyCropRect(r){
   var minX=Math.min(r.x1,r.x2), maxX=Math.max(r.x1,r.x2);
