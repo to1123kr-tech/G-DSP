@@ -26,6 +26,135 @@ logger = logging.getLogger(__name__)
 VWORLD_KEY = "16B90D39-90BB-3197-987A-54983A46F250"
 VWORLD_DOMAIN = "168-107-15-68.nip.io"
 KAKAO_APP_KEY = "c670e0bc85874ef6267220f09882b379"  # REST API 키 (JS키 0f432d...와 다름!)
+
+# ── KIGAM 수치지질도 ──────────────────────────────────────────────
+KIGAM_KEY = "mzt5lyC51EuMLE1FlKz1Xvk7inmlKd"
+
+@app.route('/api/kigam-wms')
+@cache.cached(timeout=3600, query_string=True)
+def kigam_wms_proxy():
+    """KIGAM 수치지질도 WMS 프록시 (CORS 우회)
+    URL: https://data.kigam.re.kr/openapi/wms
+    파라미터: key=KEY + 표준WMS파라미터
+    레이어: L_50K_Geology_Map / L_250K_Geology_Map
+    """
+    try:
+        params = dict(request.args)
+        params['key'] = KIGAM_KEY
+        r = req.get(
+            'https://data.kigam.re.kr/openapi/wms',
+            params=params,
+            headers={"Referer": "https://data.kigam.re.kr", "User-Agent": "Mozilla/5.0"},
+            timeout=15
+        )
+        resp = make_response(r.content)
+        resp.headers['Content-Type'] = r.headers.get('Content-Type', 'image/png')
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        logger.info(f"[kigam-wms] {r.status_code} {len(r.content)}bytes")
+        return resp
+    except Exception as e:
+        logger.error(f"[kigam-wms] {e}")
+        return b'', 404
+
+@app.route('/api/kigam-info')
+def kigam_featureinfo_proxy():
+    """KIGAM GetFeatureInfo — 허가지선 centroid의 지질 정보 조회
+    params:
+        lng, lat  — WGS84 경위도 (직접 입력 시)
+        x, y      — 국가TM 좌표 (EPSG:5186, DXF 세계좌표) → 서버에서 자동변환
+    returns: JSON {ok, props:{기호, 지층, 대표암성, 시대}, moam:{score, name}}
+    """
+    try:
+        if request.args.get('lng'):
+            lng = float(request.args['lng'])
+            lat = float(request.args['lat'])
+        else:
+            # TM(EPSG:5186/KATECH) → WGS84 변환
+            tx = float(request.args.get('x', 0))
+            ty = float(request.args.get('y', 0))
+            lng, lat = tm5186_to_wgs84(tx, ty)
+
+        d = 0.003  # bbox 약 300m
+        params = {
+            'key': KIGAM_KEY,
+            'SERVICE': 'WMS', 'REQUEST': 'GetFeatureInfo', 'VERSION': '1.1.1',
+            'LAYERS': 'L_50K_Geology_Map',
+            'QUERY_LAYERS': 'L_50K_Geology_Map',
+            'INFO_FORMAT': 'application/json',
+            'BBOX': f'{lng-d},{lat-d},{lng+d},{lat+d}',
+            'WIDTH': '101', 'HEIGHT': '101', 'X': '50', 'Y': '50',
+            'SRS': 'EPSG:4326',
+        }
+        r = req.get('https://data.kigam.re.kr/openapi/wms', params=params,
+                    headers={"Referer":"https://data.kigam.re.kr"}, timeout=12)
+        data = r.json()
+        features = data.get('features', [])
+        if features:
+            props = features[0].get('properties', {})
+            # 모암 자동 분류
+            code = str(props.get('기호', props.get('CODE', props.get('SYM', '')))).lower().strip()
+            rock = str(props.get('대표암성', props.get('RNAME', ''))).lower()
+            moam = classify_moam(code, rock)
+            return jsonify({'ok': True, 'props': props, 'moam': moam, 'wgs84':[lng,lat]})
+        return jsonify({'ok': False, 'msg': '해당 위치에 지질 데이터 없음'})
+    except Exception as e:
+        logger.error(f"[kigam-info] {e}")
+        return jsonify({'ok': False, 'msg': str(e)}), 500
+
+
+def tm5186_to_wgs84(x, y):
+    """EPSG:5186 (Korean TM, 중부원점 127°E) → WGS84 경위도 근사변환"""
+    import math
+    a = 6378137.0  # GRS80
+    f = 1/298.257222101
+    e2 = 2*f - f**2
+    # EPSG:5186: cm=127°, lat0=38°, fe=200000, fn=500000, k=1.0
+    lng0, lat0 = math.radians(127), math.radians(38)
+    fe, fn, k = 200000, 500000, 1.0
+    x = (x - fe) / k
+    y = (y - fn) / k
+    # 자오선 호 at lat0
+    def meri_arc(lat):
+        return a*((1-e2/4-3*e2**2/64)*lat
+                  -(3*e2/8+3*e2**2/32)*math.sin(2*lat)
+                  +(15*e2**2/256)*math.sin(4*lat))
+    M = meri_arc(lat0) + y
+    mu = M/(a*(1-e2/4-3*e2**2/64-5*e2**3/256))
+    e1 = (1-math.sqrt(1-e2))/(1+math.sqrt(1-e2))
+    fp = (mu + (3*e1/2-27*e1**3/32)*math.sin(2*mu)
+               + (21*e1**2/16)*math.sin(4*mu)
+               + (151*e1**3/96)*math.sin(6*mu))
+    N1 = a/math.sqrt(1-e2*math.sin(fp)**2)
+    T1 = math.tan(fp)**2
+    C1 = e2/(1-e2)*math.cos(fp)**2
+    R1 = a*(1-e2)/(1-e2*math.sin(fp)**2)**1.5
+    D = x/(N1*k)
+    lat = fp - (N1*math.tan(fp)/R1)*(D**2/2-(5+3*T1+10*C1-4*C1**2-9*e2/(1-e2))*D**4/24)
+    lng = lng0 + (D-(1+2*T1+C1)*D**3/6)/math.cos(fp)
+    return math.degrees(lng), math.degrees(lat)
+
+
+def classify_moam(code, rock=''):
+    """지질 기호/암석명 → 재해위험성 모암 채점표 분류
+    채점: 퇴적암=0, 화성암기타=5, 변성암천매암=12, 변성암편마암=19, 화성암반암=56
+    """
+    c = code.lower(); r = rock.lower()
+    # 화성암 반암/안산암 (56점) — 가장 높은 위험
+    if any(k in c+r for k in ['and','bas','rhy','por','tra','pgo','dac']):
+        return {'score':56,'name':'화성암(반암류·안산암류)'}
+    # 변성암 편마암/편암 (19점)
+    if any(k in c+r for k in ['gn','sch','schist','편마암','편암','gneiss']):
+        return {'score':19,'name':'변성암(편마암류·편암류)'}
+    # 변성암 천매암/점판암 (12점)
+    if any(k in c+r for k in ['ph','sl','apt','met','arg','천매암','점판암','phyllite','slate']):
+        return {'score':12,'name':'변성암(천매암·점판암 기타)'}
+    # 화성암 화강암 (5점)
+    if any(k in c+r for k in ['gr','ga','dio','gab','ton','mon','sye','화강','diorite','gabbro']):
+        return {'score':5,'name':'화성암(화강암류 기타)'}
+    # 퇴적암 (0점) — 기본값
+    return {'score':0,'name':'퇴적암(이암·석회암·사암 등)'}
+
+
 BUILDING_KEY = "09b819905e0a70316749fb91c03a216633ad3e75196a6aa25e6a9f273d9116f8"  # 국토부 건축물대장
 _WGS84_TO_TM5186 = Transformer.from_crs("EPSG:4326", "EPSG:5186", always_xy=True)
 _TM5186_TO_WGS84 = Transformer.from_crs("EPSG:5186", "EPSG:4326", always_xy=True)
@@ -510,41 +639,6 @@ def vw_wms_proxy():
         r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=10)
         return r.content, 200, {'Content-Type': r.headers.get('Content-Type', 'image/png')}
     except:
-        return b'', 404
-
-
-SAFEMAP_KEY = "K7JMZ9N6-K7JM-K7JM-K7JM-K7JMZ9N6D1"
-
-@app.route('/api/safemap-wms')
-@cache.cached(timeout=3600, query_string=True)
-def safemap_wms_proxy():
-    """산사태위험지도 WMS 프록시
-    실제 URL: http://safemap.go.kr/openapi2/IF_0046_WMS (비표준 WMS)
-    파라미터: serviceKey, srs=EPSG:4326, bbox=minLng,minLat,maxLng,maxLat
-              format=image/png, width, height, transparent=TRUE
-    """
-    try:
-        params = {
-            'serviceKey': SAFEMAP_KEY,
-            'srs':         request.args.get('srs',         'EPSG:4326'),
-            'bbox':        request.args.get('bbox',         ''),
-            'format':      request.args.get('format',       'image/png'),
-            'width':       request.args.get('width',        '256'),
-            'height':      request.args.get('height',       '256'),
-            'transparent': request.args.get('transparent',  'TRUE'),
-        }
-        url = "http://safemap.go.kr/openapi2/IF_0046_WMS"
-        r = req.get(url, params=params,
-                    headers={"Referer": "http://safemap.go.kr", "User-Agent": "Mozilla/5.0"},
-                    timeout=15)
-        content_type = r.headers.get('Content-Type', 'image/png')
-        resp = make_response(r.content)
-        resp.headers['Content-Type'] = content_type
-        resp.headers['Access-Control-Allow-Origin'] = '*'
-        logger.info(f"[safemap] {r.status_code} {content_type} {len(r.content)}bytes")
-        return resp
-    except Exception as e:
-        logger.error(f"[safemap-wms] {e}")
         return b'', 404
 
 
@@ -1504,23 +1598,6 @@ def vworld_key_endpoint():
 @app.route('/api/kakao/key')
 def kakao_key_endpoint():
     return jsonify({"key": KAKAO_APP_KEY})
-
-@app.route('/api/kakao-geocode')
-def kakao_geocode():
-    """Kakao 지오코딩 프록시 — 도로명/지번 주소 검색"""
-    query = request.args.get('query', '').strip()
-    if not query:
-        return jsonify({'error': 'query required'}), 400
-    try:
-        r = req.get(
-            'https://dapi.kakao.com/v2/local/search/address.json',
-            params={'query': query, 'size': 5},
-            headers={'Authorization': f'KakaoAK {KAKAO_APP_KEY}'},
-            timeout=10
-        )
-        return jsonify(r.json())
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/building/key')
 def building_key_endpoint():
