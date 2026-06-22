@@ -1126,12 +1126,20 @@ function fixCanvasSize(){
   }
   render();
 }
-/* PNG 저장 */
+/* PNG 저장 — 흰 배경 합성 (보고서용) */
 function exportPNG(){
+  // 흰 배경 캔버스에 현재 캔버스 합성
+  var off=document.createElement('canvas');
+  off.width=cv.width; off.height=cv.height;
+  var oc=off.getContext('2d');
+  oc.fillStyle='#ffffff';
+  oc.fillRect(0,0,off.width,off.height);
+  oc.drawImage(cv,0,0);
   var link=document.createElement('a');
   link.download=(S.fileName||'slope')+'_경사도.png';
-  link.href=cv.toDataURL('image/png');
+  link.href=off.toDataURL('image/png');
   link.click();
+  toast('PNG 저장 (흰 배경)');
 }
 
 /* ============================================================
@@ -1185,6 +1193,13 @@ function dxfText(x,y,h,txt,layer,aci){
           '40',h.toFixed(3),'1',txt];
 }
 
+/* 선 1개 (표 격자선용) */
+function dxfLine(x1,y1,x2,y2,layer,aci){
+  return ['0','LINE','8',layer,'62',String(aci||7),
+          '10',x1.toFixed(3),'20',y1.toFixed(3),'30','0.0',
+          '11',x2.toFixed(3),'21',y2.toFixed(3),'31','0.0'];
+}
+
 function exportDXF(){
   if(!S.gridCells||!S.gridCells.length){ toast('먼저 분석을 실행하세요','err'); return; }
   var permitPts = S.effectivePermit ? S.effectivePermit : S.permit.pts;
@@ -1208,26 +1223,78 @@ function exportDXF(){
   // 4) 신청구역 경계 (빨강, 두껍게)
   ent=ent.concat(dxfPolyline(permitPts.map(function(p){return{x:p.x,y:p.y};}), 'PERMIT', 5, true));
 
-  // 5) 면적표 (도면 우측에 텍스트로) — ASCII만 사용(캐드 호환)
+  // 5) 면적표 — 오토슬럼프식 격자 표 (경사도구간 | 격자수 | 면적 | 구성비)
   var pb=getBounds(permitPts);
-  var tx=pb.maxX+10, ty=pb.maxY;
   var corr=(S.daejangArea&&S.daejangArea>0)?(S.daejangArea/S.totalArea):1;
   var dispTotal=S.totalArea*corr;
-  ent=ent.concat(dxfText(tx, ty, 3, 'AVG SLOPE = '+S.avgSlope.toFixed(2)+' deg', 'AREA_TABLE', 1));
-  ty-=6;
-  if(corr!==1){
-    ent=ent.concat(dxfText(tx, ty, 2, 'AREA(book) = '+dispTotal.toFixed(0)+' m2  (cad '+S.totalArea.toFixed(0)+')', 'AREA_TABLE', 7));
-  } else {
-    ent=ent.concat(dxfText(tx, ty, 2, 'AREA = '+S.totalArea.toFixed(0)+' m2', 'AREA_TABLE', 7));
-  }
-  ty-=8;
-  var binLabelsAscii=['0-5','5-10','10-15','15-20','20-25','25-30','30-35','35-40','40+'];
+
+  // 표 위치: 도면 우측 상단
+  var binLabelsAscii=['0-5','5-10','10-15','15-20','20-25','25-30','30-35','35-40','40 over'];
   var binMid=[2.5,7.5,12.5,17.5,22.5,27.5,32.5,37.5,42.5];
+
+  // 격자수 카운트 (구간별 칸 개수)
+  var binCellCount=new Array(9).fill(0);
+  S.gridCells.forEach(function(g){
+    var bi=Math.min(Math.floor(g.slope/5),8);
+    binCellCount[bi]++;
+  });
+
+  // 표 크기 설정
+  var tScale=Math.max(3, (pb.maxX-pb.minX)/40);  // 도면 크기 비례
+  var rowH=tScale*1.8, th=tScale*0.9;
+  var colW=[tScale*6, tScale*4, tScale*6, tScale*5];  // 4열 너비
+  var tableW=colW[0]+colW[1]+colW[2]+colW[3];
+  var tx0=pb.maxX+tScale*3;     // 표 좌측 X
+  var ty0=pb.maxY;               // 표 상단 Y
+  var nRows=11;  // 헤더 + 9구간 + 합계
+
+  // 표 외곽 + 가로선
+  for(var r=0;r<=nRows;r++){
+    var yy=ty0-r*rowH;
+    ent=ent.concat(dxfLine(tx0, yy, tx0+tableW, yy, 'AREA_TABLE', 7));
+  }
+  // 세로선
+  var cx=tx0;
+  ent=ent.concat(dxfLine(cx, ty0, cx, ty0-nRows*rowH, 'AREA_TABLE', 7));
+  for(var ci=0;ci<4;ci++){
+    cx+=colW[ci];
+    ent=ent.concat(dxfLine(cx, ty0, cx, ty0-nRows*rowH, 'AREA_TABLE', 7));
+  }
+
+  // 헤더 텍스트
+  function cellText(col, row, txt, aci){
+    var cxs=tx0; for(var k=0;k<col;k++) cxs+=colW[k];
+    var px=cxs+colW[col]*0.12, py=ty0-row*rowH-rowH*0.68;
+    ent=ent.concat(dxfText(px, py, th, txt, 'AREA_TABLE', aci||7));
+  }
+  cellText(0,0,'SLOPE deg',7); cellText(1,0,'CELLS',7);
+  cellText(2,0,'AREA m2',7); cellText(3,0,'RATIO',7);
+
+  // 데이터 행
   S.bins.forEach(function(area,i){
     var v=area*corr;
-    ent=ent.concat(dxfText(tx, ty, 2, binLabelsAscii[i]+' deg : '+v.toFixed(0)+' m2', 'AREA_TABLE', slopeACI(binMid[i])));
-    ty-=4;
+    var pct=dispTotal>0?(v/dispTotal*100):0;
+    var aci=slopeACI(binMid[i]);
+    cellText(0,i+1,binLabelsAscii[i],aci);
+    cellText(1,i+1,String(binCellCount[i]),7);
+    cellText(2,i+1,v.toFixed(2),7);
+    cellText(3,i+1,pct.toFixed(2)+'%',7);
   });
+
+  // 합계 행
+  cellText(0,10,'TOTAL',1);
+  cellText(1,10,String(S.gridCells.length),1);
+  cellText(2,10,dispTotal.toFixed(2),1);
+  cellText(3,10,'100.00%',1);
+
+  // 평균 경사도 (표 아래)
+  var avgY=ty0-nRows*rowH-rowH*1.2;
+  ent=ent.concat(dxfText(tx0, avgY, th*1.3,
+    'AVG SLOPE = '+S.avgSlope.toFixed(2)+' deg', 'AREA_TABLE', 1));
+  if(corr!==1){
+    ent=ent.concat(dxfText(tx0, avgY-rowH, th,
+      '(book area '+dispTotal.toFixed(0)+' m2 / cad '+S.totalArea.toFixed(0)+' m2)', 'AREA_TABLE', 7));
+  }
 
   var dxf=dxfHeader().concat(ent).concat(['0','ENDSEC','0','EOF']).join('\n');
   var blob=new Blob([dxf],{type:'application/dxf'});
