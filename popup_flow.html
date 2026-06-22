@@ -708,6 +708,21 @@ function applyParsed(r){
   S.origContours=r.contours; S.origSurveys=r.surveys; S.origPolys=r.polys||[];
   S.contours=r.contours; S.surveys=r.surveys; S.polys=r.polys||[];
 
+  /* ★ 새 파일 로드 — 이전 작업 상태 모두 초기화 (작업구역 clip 잔류 버그 방지) */
+  S.cropRect=null; S.cropPt1=null; S.cropPt2=null; S.cropGhost=null;
+  S.permit=null; S.permitDraw=null; S.ghostXY=null; S.pickHover=null;
+  S.dem=null; S.demSmooth=null; S.hillCanvas=null;
+  S.triList=[]; S.flow=null; S.streamMask=null; S.watershed=null; S.wsCanvas=null;
+  S.sectionPts=null; S.daejangArea=null;
+  if(typeof _sections!=='undefined'){ _sections=[]; _activeSection=0; }
+  S.mode='pan';
+  /* 패널·결과 숨김 초기화 */
+  ['permitInfo','demResult','flowResult','tinResult','wsResult','cropInfo','profileLay','hsPanel'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.style.display='none';
+  });
+  /* 작업구역 버튼 텍스트 리셋 */
+  var _bc=document.getElementById('btnCrop'); if(_bc){ _bc.classList.remove('active'); _bc.textContent='✂️ 작업구역 그리기'; _bc.style.display=''; }
+
   var zs=[];
   S.contours.forEach(function(c){ zs.push(c.elev); });
   S.surveys.forEach(function(s){ var z=parseFloat(s.val)||s.z; if(z>0) zs.push(z); });

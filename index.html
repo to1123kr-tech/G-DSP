@@ -5776,8 +5776,22 @@
       .then(function(r){ return r.json(); })
       .then(function(d){
         var dataList = d.dataList || [];
-        var land = dataList.find(function(x){ return x.real_cls_cd === '토지'; });
-        var bld  = dataList.find(function(x){ return x.real_cls_cd === '건물'; });
+        /* ★ IROS 응답 두 형식 모두 처리:
+           - list API: real_cls_cd = "토지"/"건물" (문자열)
+           - cont API: real_cls_cd = "13311"(숫자), real_cls_name = "토지"(문자열)
+           둘 중 '토지'/'건물' 문자열이 들어있는 필드를 찾아서 비교 */
+        function clsOf(x){
+          var nm = (x.real_cls_name || '').trim();
+          if (nm === '토지' || nm === '건물') return nm;
+          var cd = (x.real_cls_cd || '').trim();
+          if (cd === '토지' || cd === '건물') return cd;
+          // 숫자코드 폴백: 건물 코드 계열(1334x~1336x)
+          if (/^1334|^1335|^1336/.test(cd)) return '건물';
+          if (/^133|^152|^131/.test(cd)) return '토지';
+          return '토지'; // 기본
+        }
+        var land = dataList.find(function(x){ return clsOf(x) === '토지'; });
+        var bld  = dataList.find(function(x){ return clsOf(x) === '건물'; });
         
         // 토지 소유자 (토지이용 패널)
         if (land) {
@@ -5790,13 +5804,17 @@
           setText('ndInfoOwner', '-');
         }
         
-        // 건물 소유자 (모든 건축물대장 패널)
+        // 건물 소유자 — 건축물대장에 실제 건물이 있을 때만 표시
         if (bld) {
           _fetchOwner(bld, '건물').then(function(info){
+            /* ★ 건축물대장 실제 유무 재확인: 플래그 OR 건축물 항목(용도/층수)이 채워졌는지 */
+            var useEl = document.getElementById('ndInfoUse');
+            var domHasBld = useEl && useEl.textContent && useEl.textContent.trim() !== '-' && useEl.textContent.trim() !== '';
+            var hasBld = (window._hasBuildingRegister === true) || domHasBld;
             ['bldOwner', 'ndBldOwner', 'gBldOwner'].forEach(function(id){
               var el = document.getElementById(id);
               if (!el) return;
-              if (!info) { el.textContent = '-'; return; }
+              if (!info || !hasBld) { el.textContent = '-'; return; }
               el.innerHTML = info.name + (info.pin ? '<br><span style="font-size:9px;color:var(--txt3)">고유번호: ' + info.pin + '</span>' : '');
             });
           });
@@ -8061,7 +8079,7 @@
             var rl = document.getElementById('ndRcLabel'); if(rl) rl.textContent = jibun;
             ndCallLandApi(pnu, lng, lat);
             ndCallBldApi(pnu);
-            if (jibun) setTimeout(function(){ fetchIrosOwner(jibun); }, 500);
+            if (jibun) setTimeout(function(){ fetchIrosOwner(jibun); }, 1000);
             toast('✓ ' + jibun, 'ok');
           }
         });
@@ -8152,6 +8170,7 @@
 
     // 건축물대장 자동 조회 - 총괄표제부 먼저, 없으면 일반건축물
     function ndCallBldApi(pnu) {
+      window._hasBuildingRegister = false;  // ★ 조회 시작 시 초기화
       var apiKey = localStorage.getItem('gdsp_building') || '';
       if (!apiKey || !pnu || pnu.length < 19) return;
       var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
@@ -8164,6 +8183,7 @@
         + '&numOfRows=1&pageNo=1&_type=json';
 
       function applyBldData(it, isRecap) {
+        window._hasBuildingRegister = true;  // ★ 건축물대장 실제 존재 표시
         var use = it.mainPurpsCdNm || it.etcPurps || '-';
         var floor = it.grndFlrCnt ? it.grndFlrCnt + '층' : '-';
         var bldArea = it.archArea ? parseFloat(it.archArea).toLocaleString() + '㎡' : '-';
@@ -8218,6 +8238,7 @@
           if (!totalCount || !items) return;
           if (!Array.isArray(items)) items = [items];
           var it = items[0];
+          window._hasBuildingRegister = true;  // ★ 건축물대장 실제 존재 표시
           var use = it.mainPurpsCdNm || it.etcPurps || '-';
           var floor = it.grndFlrCnt ? it.grndFlrCnt + '층' : '-';
           var bldArea = it.archArea ? parseFloat(it.archArea).toLocaleString() + '㎡' : '-';
