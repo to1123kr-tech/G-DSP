@@ -158,13 +158,13 @@
 
     <div class="sec">
       <h3>허가지선 (산지전용예정지)</h3>
-      <!-- DXF에서 가져오기 버튼 (DXF에 폐합선 있을 때 표시) -->
+      <!-- DXF 폐합선 감지 안내 (목록 없이 바로 클릭 선택) -->
       <div id="importPermitDiv" style="display:none;margin-bottom:8px">
-        <div style="font-size:11px;color:#fbbf24;margin-bottom:5px">📂 DXF에서 폐합선 감지됨</div>
-        <div id="importPermitList"></div>
+        <div style="font-size:11px;color:#fbbf24;line-height:1.5;padding:8px 10px;background:rgba(251,191,36,0.1);border-radius:6px;border:1px solid rgba(251,191,36,0.3)">
+          📂 DXF 폐합선 <b id="polyCount">0</b>개 감지됨<br>
+          <span style="color:var(--tx3);font-size:10px">지도에서 노란 점선을 클릭하면 허가지선으로 선택됩니다</span>
+        </div>
       </div>
-      <!-- 마우스로 허가지선 선택 (DXF 폴리 클릭) -->
-      <button class="btn btn-ghost" id="btnPickPermit" disabled onclick="togglePickPermit()" style="margin-bottom:6px">🖱 지도에서 허가지선 클릭 선택</button>
       <button class="btn btn-ghost" id="btnPermit" disabled onclick="togglePermit()">✏️ 허가지선 직접 그리기</button>
       <div id="permitInfo" style="display:none;margin-top:9px">
         <div class="stat full"><div class="v" id="permitArea">–</div><div class="k">신청 면적</div></div>
@@ -621,30 +621,13 @@ function applyParsed(r){
   /* ★ 작업구역 선택 버튼 표시 */
   document.getElementById('cropSection').style.display='';
 
-  /* ★ DXF 폐합선 감지 → 허가지선 가져오기 */
+  /* ★ DXF 폐합선 감지 → 카운트만 표시 (목록 없이 지도에서 직접 클릭) */
   var candidates=(S.polys||[]).filter(function(p){ return p.area>50; });
-  candidates.sort(function(a,b){ return b.area-a.area; });
+  S.polys=candidates;  // 50㎡ 이상만 후보로
   var div=document.getElementById('importPermitDiv');
-  var lst=document.getElementById('importPermitList');
   if(candidates.length>0){
     div.style.display='';
-    lst.innerHTML='';
-    candidates.slice(0,5).forEach(function(p,i){
-      var btn=document.createElement('button');
-      btn.className='btn btn-ghost';
-      btn.style='font-size:11px;margin-bottom:4px;width:100%;text-align:left;';
-      btn.textContent='선택 '+(i+1)+': 레이어 ['+(p.layer||'?')+'] '+(p.area>0?Math.round(p.area)+' ㎡':'');
-      btn.onclick=(function(pp){ return function(){
-        S.permit=pp.pts.slice();
-        var A=polyArea(S.permit);
-        document.getElementById('permitArea').textContent=fmtArea(A);
-        document.getElementById('permitInfo').style.display='';
-        render();
-        toast('허가지선 가져오기 완료 · '+fmtArea(A),'ok');
-        if(S.dem) setTimeout(function(){ autoCalcRisk(); },200);
-      }; })(p);
-      lst.appendChild(btn);
-    });
+    var pc=document.getElementById('polyCount'); if(pc) pc.textContent=candidates.length;
   } else {
     div.style.display='none';
   }
@@ -681,7 +664,6 @@ function applyParsed(r){
   document.getElementById('p6').className='pi';
   S.permit=null; S.permitDraw=null; S.ghostXY=null;
   document.getElementById('btnPermit').disabled=false;
-  var bpp=document.getElementById('btnPickPermit'); if(bpp) bpp.disabled=false;
   document.getElementById('permitInfo').style.display='none';
   var bpm=document.getElementById('btnPermit'); bpm.classList.remove('active'); bpm.textContent='✏️ 허가지선 그리기';
   cv.style.cursor='grab';
@@ -743,6 +725,25 @@ window.addEventListener('mousemove',function(e){
   if(S.mode==='pickPermit'){
     updatePickHover(evWorld(e).x, evWorld(e).y); return;
   }
+  /* ★ 기본(pan) 모드 — 폐합선 보이는 동안 hover 하이라이트 (선택 안내) */
+  if(S.mode==='pan' && S.polys && S.polys.length && !S.permit && !S.isDown){
+    var pw=evWorld(e); var prevHover=S.pickHover;
+    var best=null, bestD=18/S.scale;
+    S.polys.forEach(function(p){
+      var n=p.pts.length;
+      for(var i=0;i<n;i++){
+        var a=p.pts[i],b=p.pts[(i+1)%n];
+        var ddx=b.x-a.x,ddy=b.y-a.y,l=Math.hypot(ddx,ddy)||1;
+        var tt=Math.max(0,Math.min(1,((pw.x-a.x)*ddx+(pw.y-a.y)*ddy)/(l*l)));
+        var d=Math.hypot(pw.x-(a.x+tt*ddx),pw.y-(a.y+tt*ddy));
+        if(d<bestD){ bestD=d; best=p; }
+      }
+    });
+    S.pickHover=best;
+    cv.style.cursor=best?'pointer':'grab';
+    if(prevHover!==best) render();
+    if(best) return; // 폐합선 위 → 패닝 안 함
+  }
   if(S.mode==='permit' && S.permitDraw){
     var wp=evWorld(e); S.ghostXY=wp; S.snapClose=false;
     if(S.permitDraw.length>=3){
@@ -760,6 +761,10 @@ cv.addEventListener('click',function(e){
   if(Math.abs(e.clientX-S.dnX)+Math.abs(e.clientY-S.dnY) > 5) return; // 드래그면 무시
   var w=evWorld(e);
   if(S.mode==='pour'){ pickOutlet(w.x, w.y); }
+  else if(S.mode==='pan' && S.pickHover && S.polys && !S.permit){
+    /* ★ 기본 모드에서 폐합선 클릭 → 바로 허가지선 선택 */
+    pickPermitAtClick(w.x, w.y);
+  }
   else if(S.mode==='crop'){
     if(!S.cropPt1){
       S.cropPt1=w; S.cropGhost=null; toast('두 번째 꼭짓점을 클릭하세요');
@@ -1006,13 +1011,14 @@ function render(){
     ctx.setLineDash([]); ctx.restore();
   }
 
-  // ★ pickPermit 모드 - 폴리 표시 + hover
-  if(S.mode==='pickPermit' && S.polys && S.polys.length){
+  // ★ DXF 폐합선 — 항상 표시 (허가지선 후보, 노란 점선)
+  //   허가지선 확정 전까지만 표시 (확정 후엔 분홍 허가지선만)
+  if(S.polys && S.polys.length && !S.permit){
     S.polys.forEach(function(p){
-      var isHov=(S.pickHover===p);
+      var isHov=(S.mode==='pickPermit' && S.pickHover===p);
       ctx.save();
-      ctx.strokeStyle=isHov?'#fff':'rgba(255,220,0,0.6)';
-      ctx.lineWidth=isHov?2.5:1.2; ctx.setLineDash([6,3]);
+      ctx.strokeStyle=isHov?'#fff':'rgba(255,220,0,0.55)';
+      ctx.lineWidth=isHov?2.8:1.2; ctx.setLineDash(isHov?[]:[6,3]);
       ctx.beginPath();
       p.pts.forEach(function(pt,i){ var s=w2s(pt); i===0?ctx.moveTo(s.x,s.y):ctx.lineTo(s.x,s.y); });
       ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
@@ -1489,8 +1495,12 @@ function finishPermit(){
   if(S.dem) setTimeout(function(){ autoCalcRisk(); toast('경사도 자동 계산 완료 — 나머지 3인자를 입력하세요','ok'); },200);
 }
 function clearPermit(){
-  S.permit=null; S.permitDraw=null; S.ghostXY=null;
+  S.permit=null; S.permitDraw=null; S.ghostXY=null; S.pickHover=null;
   document.getElementById('permitInfo').style.display='none';
+  /* 폐합선 후보 다시 표시 (재선택 가능) */
+  if(S.polys && S.polys.length){
+    var ipd=document.getElementById('importPermitDiv'); if(ipd) ipd.style.display='';
+  }
   if(S.mode==='permit') togglePermit();
   render();
 }
@@ -1694,21 +1704,7 @@ function setBuffer(d){
   toast(d>0?'버퍼선 '+d+'m 적용':'버퍼선 끔');
 }
 
-/* ══ 지도에서 허가지선 마우스 클릭 선택 ══ */
-function togglePickPermit(){
-  if(S.mode==='pickPermit'){
-    S.mode='pan'; cv.style.cursor='grab';
-    var b=document.getElementById('btnPickPermit');
-    b.classList.remove('active'); b.textContent='🖱 지도에서 허가지선 클릭 선택';
-    S.pickHover=null; render(); return;
-  }
-  if(!S.polys||!S.polys.length){ toast('DXF에 폐합선이 없어요 — 직접 그리기를 사용하세요','err'); return; }
-  S.mode='pickPermit'; S.pickHover=null;
-  cv.style.cursor='crosshair';
-  var b=document.getElementById('btnPickPermit');
-  b.classList.add('active'); b.textContent='폴리라인 클릭 선택 중… (ESC 취소)';
-  toast('허가지선으로 사용할 경계선을 클릭하세요');
-}
+/* ══ 지도에서 허가지선 마우스 클릭 선택 (pan 모드에서 자동) ══ */
 function pickPermitAtClick(wx,wy){
   if(!S.polys||!S.polys.length) return;
   var best=null, bestDist=30/S.scale; // 30px 이내
@@ -1728,9 +1724,9 @@ function pickPermitAtClick(wx,wy){
     var A=polyArea(S.permit);
     document.getElementById('permitArea').textContent=fmtArea(A);
     document.getElementById('permitInfo').style.display='';
+    /* 폐합선 안내 숨김 (선택 완료) */
+    var ipd=document.getElementById('importPermitDiv'); if(ipd) ipd.style.display='none';
     S.mode='pan'; cv.style.cursor='grab'; S.pickHover=null;
-    var b=document.getElementById('btnPickPermit');
-    b.classList.remove('active'); b.textContent='🖱 지도에서 허가지선 클릭 선택';
     render();
     toast('허가지선 선택 완료 · '+fmtArea(A),'ok');
     if(S.dem) setTimeout(function(){ autoCalcRisk(); },200);
