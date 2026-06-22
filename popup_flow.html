@@ -469,13 +469,22 @@
           oninput="setHsAlt(this.value)" style="width:100%;margin-top:4px">
       </div>
       <!-- 입체 강조 -->
-      <div>
+      <div style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
           <span>⛰️ 입체 강조(Z)</span><span id="hsZVal" style="color:#4ade80;font-weight:600">×1.0</span>
         </div>
         <input type="range" min="0.5" max="5" value="1" step="0.5"
           oninput="setHsZ(this.value)" style="width:100%;margin-top:4px">
         <div style="font-size:9px;color:#5b7290;margin-top:2px">높일수록 산이 뚜렷해집니다</div>
+      </div>
+      <!-- 부드럽게 (스무딩) -->
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
+          <span>🌫️ 부드럽게</span><span id="hsSmoothVal" style="color:#c4b5fd;font-weight:600">2회</span>
+        </div>
+        <input type="range" min="0" max="6" value="2" step="1"
+          oninput="setHsSmooth(this.value)" style="width:100%;margin-top:4px">
+        <div style="font-size:9px;color:#5b7290;margin-top:2px">삼각형 각짐을 부드럽게 (0=원본)</div>
       </div>
     </div>
 
@@ -1316,6 +1325,38 @@ function fillDEMHoles(dem){
   return dem;
 }
 
+/* DEM 가우시안 스무딩 — TIN 삼각형 각짐 제거 (passes회 반복)
+   NaN(데이터 없음)은 보존, 유효값만 3×3 가중평균 */
+function smoothDEM(dem, passes){
+  passes = passes || 1;
+  var cols=dem.cols, rows=dem.rows;
+  // 3×3 가우시안 커널 (중앙4, 변2, 모서리1 → 합16)
+  var kw=[[1,2,1],[2,4,2],[1,2,1]];
+  for(var p=0;p<passes;p++){
+    var z=dem.z, z2=new Float32Array(z);
+    for(var r=0;r<rows;r++){
+      for(var c=0;c<cols;c++){
+        var here=z[r*cols+c];
+        if(!(here===here)) continue; // NaN 보존
+        var sum=0,wsum=0;
+        for(var dr=-1;dr<=1;dr++){
+          for(var dc=-1;dc<=1;dc++){
+            var nr=r+dr, nc=c+dc;
+            if(nr<0||nr>=rows||nc<0||nc>=cols) continue;
+            var v=z[nr*cols+nc];
+            if(!(v===v)) continue;
+            var w=kw[dr+1][dc+1];
+            sum+=v*w; wsum+=w;
+          }
+        }
+        if(wsum>0) z2[r*cols+c]=sum/wsum;
+      }
+    }
+    dem.z=z2;
+  }
+  return dem;
+}
+
 /* 무지개(표고) 색 — [r,g,b] */
 function hypsoRGB(t){
   t=Math.max(0,Math.min(1,t));
@@ -1327,7 +1368,7 @@ function hypsoRGB(t){
 }
 
 /* 음영기복 설정 (전역) */
-var _hs = { az: 315, alt: 45, zFactor: 1.0, palette: 'hypso' };
+var _hs = { az: 315, alt: 45, zFactor: 1.0, palette: 'hypso', smooth: 2 };
 
 /* 음영기복 → 오프스크린 캔버스
    mode: 'shade' 회색 | 'hypso' 무지개 | 'terrain' 자연색 | 'gray-blue' 청회색
@@ -1409,8 +1450,18 @@ function terrainRGB(t){
 /* 음영기복 컨트롤 갱신 (슬라이더 변경 시) */
 function updateHillshade(){
   if(!S.dem) return;
-  S.hillCanvas=buildHillshade(S.dem, _hs.palette);
+  var src=S.demSmooth||S.dem;
+  S.hillCanvas=buildHillshade(src, _hs.palette);
   render();
+}
+/* 스무딩 강도 변경 → 표시용 DEM 재생성 */
+function setHsSmooth(v){
+  _hs.smooth=parseInt(v);
+  var e=document.getElementById('hsSmoothVal'); if(e)e.textContent=_hs.smooth+'회';
+  if(S.dem){
+    S.demSmooth=smoothDEM({cols:S.dem.cols,rows:S.dem.rows,cell:S.dem.cell,minX:S.dem.minX,minY:S.dem.minY,z:new Float32Array(S.dem.z)}, _hs.smooth);
+    updateHillshade();
+  }
 }
 function setHsAz(v){ _hs.az=parseFloat(v); var e=document.getElementById('hsAzVal'); if(e)e.textContent=Math.round(_hs.az)+'°'; updateHillshade(); updateSunDial(); }
 function setHsAlt(v){ _hs.alt=parseFloat(v); var e=document.getElementById('hsAltVal'); if(e)e.textContent=Math.round(_hs.alt)+'°'; updateHillshade(); }
@@ -1495,7 +1546,10 @@ function runDEM(){
   var dem=buildDEM(cell);
   if(!dem){ toast('DEM 생성 실패','err'); return; }
   fillDEMHoles(dem);  // ★ 구멍 메우기
-  S.dem=dem; S.hillCanvas=buildHillshade(dem, S.reliefMode); S.showDEM=true;
+  S.dem=dem;          // 원본 DEM (경사·흐름 분석용 — 정확도 유지)
+  /* 표시용 스무딩 DEM (TIN 삼각형 각짐 제거) — 음영기복 전용 */
+  S.demSmooth = smoothDEM({cols:dem.cols, rows:dem.rows, cell:dem.cell, minX:dem.minX, minY:dem.minY, z:new Float32Array(dem.z)}, _hs.smooth);
+  S.hillCanvas=buildHillshade(S.demSmooth, S.reliefMode); S.showDEM=true;
   document.getElementById('demSize').textContent=dem.cols+'×'+dem.rows+' ('+cell+'m격자)';
   document.getElementById('demResult').style.display='';
   document.getElementById('demToggle').checked=true;
