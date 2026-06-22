@@ -125,8 +125,25 @@ canvas.grabbing{cursor:grabbing}
       <button class="btn btn-pri" id="btnRepickOk" onclick="confirmRepick()" style="margin-top:6px;display:none;background:var(--ok)">이 선으로 확정</button>
     </div>
 
+    <!-- ③ 면적 보정 — 파일업로드 → 허가지선 → 면적보정 순서 -->
+    <div class="sec" id="areaCorrSec" style="display:none">
+      <div class="sec-t">③ 면적 보정</div>
+      <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:7px">
+        대장(공부)면적을 넣으면 면적표가<br>그 값에 맞게 환산됩니다 (경사도 불변)
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--txt);white-space:nowrap">대장면적</span>
+        <input type="number" id="daejangArea" placeholder="캐드 실측" min="0" step="0.01"
+          oninput="onDaejangInput()"
+          style="flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:12px;width:60px">
+        <span style="font-size:11px;color:var(--dim)">㎡</span>
+      </div>
+      <div id="corrInfo" style="font-size:10px;color:var(--ok);margin-top:6px;line-height:1.5;display:none"></div>
+      <button class="btn btn-ghost" id="btnResetArea" onclick="resetDaejang()" style="margin-top:6px;padding:6px;font-size:10px;display:none">캐드 실측면적으로 되돌리기</button>
+    </div>
+
     <div class="sec">
-      <div class="sec-t">③ 분석</div>
+      <div class="sec-t">④ 분석</div>
       <button class="btn btn-pri" id="btnRun" disabled onclick="runAnalysis()">경사도 분석 실행</button>
       <div style="font-size:10px;color:var(--dim);margin-top:7px;line-height:1.6">
         TIN 생성 → 10m 격자 → 면적가중 평균<br>오토슬럼프와 동일 방식
@@ -134,7 +151,7 @@ canvas.grabbing{cursor:grabbing}
     </div>
 
     <div class="sec" id="cutSec" style="display:none">
-      <div class="sec-t">④ 절단선 (영역 제외)</div>
+      <div class="sec-t">⑤ 절단선 (영역 제외)</div>
       <button class="btn btn-pri" id="btnDrawCut" onclick="startDrawCut()" style="background:#3b82f6;margin-bottom:6px">✂ 절단선 그리기</button>
       <div id="cutHint" style="font-size:10px;color:var(--dim);line-height:1.6;margin-bottom:6px">
         경계 위에서 시작 → 점 클릭 →<br>경계 밖에서 더블클릭으로 종료
@@ -208,21 +225,6 @@ canvas.grabbing{cursor:grabbing}
         <div><span class="slope-badge" id="slopeBadge">—</span></div>
       </div>
       <div class="result-info" id="resultInfo"></div>
-    </div>
-    <div class="sec">
-      <div class="sec-t">면적 보정</div>
-      <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:7px">
-        대장(공부)면적을 넣으면 면적표가<br>그 값에 맞게 환산됩니다 (경사도 불변)
-      </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:11px;color:var(--txt);white-space:nowrap">대장면적</span>
-        <input type="number" id="daejangArea" placeholder="캐드 실측" min="0" step="0.01"
-          oninput="onDaejangInput()"
-          style="flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:12px;width:60px">
-        <span style="font-size:11px;color:var(--dim)">㎡</span>
-      </div>
-      <div id="corrInfo" style="font-size:10px;color:var(--ok);margin-top:6px;line-height:1.5;display:none"></div>
-      <button class="btn btn-ghost" id="btnResetArea" onclick="resetDaejang()" style="margin-top:6px;padding:6px;font-size:10px;display:none">캐드 실측면적으로 되돌리기</button>
     </div>
     <div class="sec" style="flex:1">
       <div class="sec-t">구간별 면적</div>
@@ -1257,6 +1259,7 @@ function runAnalysis(){
     } finally{
       document.getElementById('btnRun').textContent='경사도 분석 실행';
       document.getElementById('btnRun').disabled=false;
+  var acs=document.getElementById('areaCorrSec'); if(acs) acs.style.display='';
     }
   }, 30);
 }
