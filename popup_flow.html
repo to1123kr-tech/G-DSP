@@ -318,20 +318,6 @@
       </div>
     </div>
 
-    <div class="sec legend">
-      <h3>범례</h3>
-      <div class="ramp"></div>
-      <div class="ramp-lab"><span id="zLo">저지대</span><span id="zHi">고지대</span></div>
-      <div class="lg"><span class="sw" style="border-color:#94a3b8;border-top-width:1.6px"></span>계곡선 (굵게)</div>
-      <div class="lg"><span class="sw" style="border-color:#5b7290"></span>주곡선</div>
-      <div class="lg"><span class="swx">✕</span>표고점 (+표고값)</div>
-      <div class="lg"><span class="sw" style="border-color:#0c4a8d;border-top-width:2.5px"></span>하천 4차 (Strahler)</div>
-      <div class="lg"><span class="sw" style="border-color:#1d64c8;border-top-width:2px"></span>하천 3차</div>
-      <div class="lg"><span class="sw" style="border-color:#38a0eb;border-top-width:1.5px"></span>하천 1·2차</div>
-      <div class="lg"><span class="sw" style="border-color:#34d399;border-top-width:2px"></span>능선선 (유역경계)</div>
-      <div class="lg"><span class="sw" style="border-color:#f472b6;border-top-width:2px;border-top-style:dashed"></span>허가지선</div>
-    </div>
-
     <!-- 재해위험도 채점표 -->
     <div class="sec">
       <h3>⚖️ 재해위험도 판정</h3>
@@ -422,6 +408,25 @@
       <span>등고선 <b id="sbCont">0</b></span>
       <span>표고점 <b id="sbSurv">0</b></span>
       <span class="cursor-xy" id="sbXY">–</span>
+    </div>
+    <!-- 플로팅 범례 (우측 하단) -->
+    <div id="floatLegend" style="display:none;position:absolute;right:14px;bottom:44px;background:rgba(14,22,38,0.92);border:1px solid #1e2b45;border-radius:10px;padding:10px 12px;z-index:6;backdrop-filter:blur(4px);max-width:180px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+        <span style="font-size:11px;font-weight:700;color:#e8eef7;letter-spacing:0.5px">범례</span>
+        <button onclick="document.getElementById('floatLegend').style.display='none'" style="background:none;border:none;color:#5b7290;cursor:pointer;font-size:13px;padding:0;line-height:1">✕</button>
+      </div>
+      <div style="height:10px;border-radius:3px;background:linear-gradient(90deg,#2e3482,#2882c8,#46b478,#c8c83c,#d27828,#b42828);margin-bottom:3px"></div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:#5b7290;margin-bottom:8px"><span>저지대</span><span>고지대</span></div>
+      <div style="font-size:10.5px;color:#9fb0c8;line-height:1.9">
+        <div style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:1.6px solid #94a3b8"></span>계곡선</div>
+        <div style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:1px solid #5b7290"></span>주곡선</div>
+        <div style="display:flex;align-items:center;gap:7px"><span style="width:18px;text-align:center;color:#f59e0b;font-weight:800">✕</span>표고점</div>
+        <div style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:2.5px solid #0c4a8d"></span>하천 4차</div>
+        <div style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:1.5px solid #38a0eb"></span>하천 1·2차</div>
+        <div style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:2px solid #34d399"></span>능선선</div>
+        <div style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:2px dashed #f472b6"></span>허가지선</div>
+        <div style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:2px dashed #fbbf24"></span>버퍼선</div>
+      </div>
     </div>
   </div>
 </main>
@@ -657,6 +662,7 @@ function applyParsed(r){
   document.getElementById('hint').style.display='';
   document.getElementById('tools').style.display='';
   document.getElementById('sbar').style.display='';
+  document.getElementById('floatLegend').style.display='';
 
   // TIN 초기화 + 버튼 활성 + 파이프 리셋
   S.triList=[]; S.showTIN=true;
@@ -2173,17 +2179,29 @@ function detectMoAmFromKIGAM(){
   var btn=document.getElementById('btnDetectMoam');
   if(btn){btn.textContent='🔄 분석 중...'; btn.disabled=true;}
   fetch(PROXY+'/api/kigam-info?x='+cx+'&y='+cy)
-    .then(function(r){return r.json();})
-    .then(function(d){
+    .then(function(r){ return r.text(); })   // 먼저 text로 받아서
+    .then(function(txt){
       if(btn){btn.textContent='🔬 수치지질도로 모암 자동감지'; btn.disabled=false;}
       var el=document.getElementById('moamDetectResult');
+      var d;
+      try { d=JSON.parse(txt); }
+      catch(parseErr){
+        /* 서버가 JSON 아닌 응답 → 에러 표시 */
+        if(el){
+          el.style.display=''; el.style.color='#f87171';
+          el.textContent='⚠️ 서버 응답 오류 (수동 선택하세요)';
+        }
+        toast('지질 서버 응답 오류 — 모암을 수동 선택하세요','err');
+        return;
+      }
       if(!d.ok){
-        if(el){el.style.display='';el.textContent='⚠️ '+d.msg;el.style.color='#f87171';}
-        toast('지질 정보 없음: '+d.msg,'err'); return;
+        var dbg = d.debug ? ' ['+(d.debug.ct||'')+']' : '';
+        if(el){el.style.display='';el.textContent='⚠️ '+(d.msg||'조회 실패')+dbg;el.style.color='#f87171';}
+        toast('지질 정보 없음 — 수동 선택하세요','err'); return;
       }
       var moam=d.moam, props=d.props||{};
       var rock=props['대표암성']||props['RNAME']||props['지층']||'';
-      var code=props['기호']||props['CODE']||props['SYM']||'';
+      var code=props['기호']||props['CODE']||props['SYM']||props['SYMBOL']||'';
       var info=(code?'기호: '+code:'')+( rock?' | '+rock:'');
       if(el){
         el.style.display=''; el.style.color='#60cdff';
@@ -2201,7 +2219,9 @@ function detectMoAmFromKIGAM(){
     })
     .catch(function(e){
       if(btn){btn.textContent='🔬 수치지질도로 모암 자동감지'; btn.disabled=false;}
-      toast('KIGAM 연결 실패','err');
+      var el=document.getElementById('moamDetectResult');
+      if(el){el.style.display='';el.style.color='#f87171';el.textContent='⚠️ 서버 연결 실패 (수동 선택하세요)';}
+      toast('KIGAM 연결 실패 — 모암을 수동 선택하세요','err');
     });
 }
 
