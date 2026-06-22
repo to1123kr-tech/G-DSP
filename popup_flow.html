@@ -263,47 +263,8 @@
           <input type="checkbox" id="demClipPermit" onchange="S.demClipToPermit=this.checked;render()"> 허가지선 내부만 표시
         </label>
 
-        <!-- ☀️ 음영기복 컨트롤 패널 -->
-        <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
-          <div style="font-size:11px;color:var(--tx3);margin-bottom:8px">🎨 색상 프리셋</div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
-            <button class="thr on" id="pal_hypso" onclick="setHsPalette('hypso')">무지개</button>
-            <button class="thr" id="pal_terrain" onclick="setHsPalette('terrain')">자연색</button>
-            <button class="thr" id="pal_shade" onclick="setHsPalette('shade')">회색</button>
-            <button class="thr" id="pal_gray-blue" onclick="setHsPalette('gray-blue')">청회색</button>
-          </div>
-          <!-- 태양 방향 다이얼 + 슬라이더 -->
-          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
-            <svg width="48" height="48" style="flex-shrink:0">
-              <circle cx="24" cy="24" r="20" fill="rgba(30,43,69,0.5)" stroke="#1e2b45" stroke-width="1"/>
-              <text x="24" y="9" text-anchor="middle" font-size="7" fill="#5b7290">N</text>
-              <circle id="sunDot" cx="24" cy="4" r="4" fill="#fbbf24"/>
-            </svg>
-            <div style="flex:1">
-              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--tx3)">
-                <span>☀️ 빛 방향</span><span id="hsAzVal">315°</span>
-              </div>
-              <input type="range" min="0" max="360" value="315" step="5"
-                oninput="setHsAz(this.value)" style="width:100%;margin-top:3px">
-            </div>
-          </div>
-          <!-- 태양 고도 -->
-          <div style="margin-bottom:8px">
-            <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--tx3)">
-              <span>📐 빛 높이(고도)</span><span id="hsAltVal">45°</span>
-            </div>
-            <input type="range" min="10" max="80" value="45" step="5"
-              oninput="setHsAlt(this.value)" style="width:100%;margin-top:3px">
-          </div>
-          <!-- 수직 과장 (z) -->
-          <div style="margin-bottom:4px">
-            <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--tx3)">
-              <span>⛰️ 입체 강조(Z)</span><span id="hsZVal">×1.0</span>
-            </div>
-            <input type="range" min="0.5" max="5" value="1" step="0.5"
-              oninput="setHsZ(this.value)" style="width:100%;margin-top:3px">
-          </div>
-        </div>
+        <!-- 🎨 음영기복 조정 버튼 (우측 팝업 열기) -->
+        <button class="btn btn-ghost" onclick="toggleHsPanel()" style="margin-top:10px;font-size:12px">🎨 음영기복 조정 (색상·태양·입체)</button>
         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:9px;cursor:pointer;pointer-events:auto;position:relative;z-index:2">
           <input type="checkbox" id="gridToggle" onchange="S.showGrid=this.checked;render()"> 격자 보기
         </label>
@@ -454,6 +415,59 @@
       <span>표고점 <b id="sbSurv">0</b></span>
       <span class="cursor-xy" id="sbXY">–</span>
     </div>
+    <!-- 🎨 음영기복 조정 팝업 (우측) -->
+    <div id="hsPanel" style="display:none;position:absolute;right:14px;top:14px;width:260px;background:rgba(14,22,38,0.96);border:1px solid #2a3b5c;border-radius:12px;padding:14px;z-index:8;backdrop-filter:blur(6px);box-shadow:0 10px 40px rgba(0,0,0,0.5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;font-weight:700;color:#e8eef7">🎨 음영기복 조정</span>
+        <button onclick="toggleHsPanel()" style="background:none;border:none;color:#5b7290;cursor:pointer;font-size:15px;padding:0;line-height:1">✕</button>
+      </div>
+      <!-- 색상 프리셋 -->
+      <div style="font-size:11px;color:#9fb0c8;margin-bottom:7px">색상 프리셋</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
+        <button class="thr on" id="pal_hypso" onclick="setHsPalette('hypso')">🌈 무지개</button>
+        <button class="thr" id="pal_terrain" onclick="setHsPalette('terrain')">🏔️ 자연색</button>
+        <button class="thr" id="pal_shade" onclick="setHsPalette('shade')">⬜ 회색</button>
+        <button class="thr" id="pal_gray-blue" onclick="setHsPalette('gray-blue')">🔵 청회색</button>
+      </div>
+      <!-- 태양 방향 다이얼 -->
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+        <svg width="56" height="56" style="flex-shrink:0;cursor:pointer" id="sunSvg" onclick="sunDialClick(event)">
+          <circle cx="28" cy="28" r="24" fill="rgba(30,43,69,0.6)" stroke="#2a3b5c" stroke-width="1.5"/>
+          <text x="28" y="11" text-anchor="middle" font-size="8" fill="#7d92b0">N</text>
+          <text x="28" y="51" text-anchor="middle" font-size="8" fill="#5b7290">S</text>
+          <text x="50" y="31" text-anchor="middle" font-size="8" fill="#5b7290">E</text>
+          <text x="6" y="31" text-anchor="middle" font-size="8" fill="#5b7290">W</text>
+          <line id="sunRay" x1="28" y1="28" x2="28" y2="6" stroke="#fbbf24" stroke-width="1.5" opacity="0.5"/>
+          <circle id="sunDot" cx="28" cy="6" r="5" fill="#fbbf24"/>
+        </svg>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
+            <span>☀️ 빛 방향</span><span id="hsAzVal" style="color:#fbbf24;font-weight:600">315°</span>
+          </div>
+          <input type="range" min="0" max="360" value="315" step="5"
+            oninput="setHsAz(this.value)" style="width:100%;margin-top:4px">
+          <div style="font-size:9px;color:#5b7290;margin-top:2px">다이얼 클릭으로도 조정</div>
+        </div>
+      </div>
+      <!-- 빛 높이 -->
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
+          <span>📐 빛 높이(고도)</span><span id="hsAltVal" style="color:#93c5fd;font-weight:600">45°</span>
+        </div>
+        <input type="range" min="10" max="80" value="45" step="5"
+          oninput="setHsAlt(this.value)" style="width:100%;margin-top:4px">
+      </div>
+      <!-- 입체 강조 -->
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
+          <span>⛰️ 입체 강조(Z)</span><span id="hsZVal" style="color:#4ade80;font-weight:600">×1.0</span>
+        </div>
+        <input type="range" min="0.5" max="5" value="1" step="0.5"
+          oninput="setHsZ(this.value)" style="width:100%;margin-top:4px">
+        <div style="font-size:9px;color:#5b7290;margin-top:2px">높일수록 산이 뚜렷해집니다</div>
+      </div>
+    </div>
+
     <!-- 플로팅 범례 (우측 하단) -->
     <div id="floatLegend" style="display:none;position:absolute;right:14px;bottom:44px;background:rgba(14,22,38,0.92);border:1px solid #1e2b45;border-radius:10px;padding:10px 12px;z-index:6;backdrop-filter:blur(4px);max-width:180px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
@@ -1376,14 +1390,39 @@ function setHsPalette(p){
   S.reliefMode=p;
   updateHillshade();
 }
-/* 태양 방향 다이얼 시각 갱신 */
+/* 음영기복 팝업 열기/닫기 */
+function toggleHsPanel(){
+  if(!S.dem){ toast('먼저 DEM을 생성하세요','err'); return; }
+  var p=document.getElementById('hsPanel');
+  if(!p) return;
+  var show=(p.style.display==='none'||!p.style.display);
+  p.style.display=show?'':'none';
+  if(show) updateSunDial();
+}
+/* 태양 다이얼 클릭 → 방위각 설정 */
+function sunDialClick(ev){
+  var svg=document.getElementById('sunSvg');
+  var rect=svg.getBoundingClientRect();
+  var cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+  var dx=ev.clientX-cx, dy=ev.clientY-cy;
+  var ang=Math.atan2(dy,dx)*180/Math.PI;  // 화면좌표 (오른쪽=0, 시계방향)
+  var az=(ang+90+360)%360;  // 북쪽=0 기준 변환
+  _hs.az=Math.round(az/5)*5;
+  var sl=document.querySelector('#hsPanel input[type=range]');
+  if(sl) sl.value=_hs.az;
+  var e=document.getElementById('hsAzVal'); if(e)e.textContent=Math.round(_hs.az)+'°';
+  updateHillshade(); updateSunDial();
+}
+/* 태양 방향 다이얼 시각 갱신 (점 + 광선) */
 function updateSunDial(){
   var dot=document.getElementById('sunDot');
+  var ray=document.getElementById('sunRay');
   if(!dot) return;
   var a=(_hs.az-90)*Math.PI/180;  // 0°=북(위), 시계방향
-  var R=20, cx=24, cy=24;
-  dot.setAttribute('cx', cx+R*Math.cos(a));
-  dot.setAttribute('cy', cy+R*Math.sin(a));
+  var R=22, cx=28, cy=28;
+  var x=cx+R*Math.cos(a), y=cy+R*Math.sin(a);
+  dot.setAttribute('cx', x); dot.setAttribute('cy', y);
+  if(ray){ ray.setAttribute('x2', x); ray.setAttribute('y2', y); }
 }
 
 function setRelief(mode){
@@ -1420,6 +1459,7 @@ function runDEM(){
   document.getElementById('btnFlow').disabled=false;
   render();
   updateSunDial();
+  var hp2=document.getElementById('hsPanel'); if(hp2) hp2.style.display='';  // 팝업 자동 열기
   toast('DEM 음영기복 완료 · 격자 '+dem.cols+'×'+dem.rows,'ok');
 }
 
