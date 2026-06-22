@@ -81,7 +81,11 @@
   .tbtn{width:38px;height:38px;border-radius:10px;background:rgba(17,26,46,.9);border:1px solid var(--line);
     color:var(--tx2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
   .tbtn:hover{color:var(--tx);border-color:#2b3c5c}
-  .hint{position:absolute;left:12px;top:12px;font-size:11.5px;color:var(--tx3);
+  .lyrBtn{padding:6px 11px;border-radius:8px;background:rgba(17,26,46,.9);border:1px solid var(--line);
+    color:var(--tx3);font-size:11.5px;cursor:pointer;backdrop-filter:blur(6px);transition:.15s}
+  .lyrBtn:hover{border-color:#2b3c5c}
+  .lyrBtn.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent;font-weight:600}
+  .hint{position:absolute;left:12px;bottom:32px;font-size:11.5px;color:var(--tx3);
     background:rgba(11,18,32,.75);padding:6px 10px;border-radius:8px;border:1px solid var(--line);backdrop-filter:blur(4px)}
   .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--tx3)}
   .empty .big{font-size:46px;opacity:.5}
@@ -398,6 +402,13 @@
   <div class="stage">
     <canvas id="cv"></canvas>
     <div class="hint" id="hint" style="display:none">휠=확대 · 드래그=이동</div>
+    <!-- 레이어 토글 바 (좌측 상단) -->
+    <div id="layerBar" style="display:none;position:absolute;left:12px;top:12px;display:none;gap:5px;z-index:6;flex-wrap:wrap;max-width:340px">
+      <button class="lyrBtn on" id="lyrContour" onclick="toggleLayer('contour')" title="등고선 표시/숨김">등고선</button>
+      <button class="lyrBtn on" id="lyrDem" onclick="toggleLayer('dem')" title="음영기복 표시/숨김">음영기복</button>
+      <button class="lyrBtn on" id="lyrStream" onclick="toggleLayer('stream')" title="하천망 표시/숨김">하천망</button>
+      <button class="lyrBtn on" id="lyrSurvey" onclick="toggleLayer('survey')" title="표고점 표시/숨김">표고점</button>
+    </div>
     <div class="tools" id="tools" style="display:none">
       <button class="tbtn" title="화면 맞춤" onclick="fitView()">⤢</button>
       <button class="tbtn" title="확대" onclick="zoomBy(1.25)">＋</button>
@@ -539,7 +550,7 @@ var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 var S={ contours:[], surveys:[], polys:[],
         triList:[], showTIN:true,
         dem:null, showDEM:true, hillCanvas:null,
-        flow:null, streamMask:null, streamHa:1, showStreams:true,
+        flow:null, streamMask:null, streamHa:1, showStreams:true, showContours:true, showSurvey:true,
         watershed:null, wsCanvas:null, wsSegs:null, showWS:true, mode:'pan', dnX:0, dnY:0,
         permit:null, permitDraw:null, ghostXY:null, snapClose:false,
         showGrid:false, showArrows:false, demClipToPermit:false, areaUnit:'m2', reliefMode:'hypso', daejangArea:null,
@@ -723,6 +734,7 @@ function applyParsed(r){
   document.getElementById('tools').style.display='';
   document.getElementById('sbar').style.display='';
   document.getElementById('floatLegend').style.display='';
+  document.getElementById('layerBar').style.display='flex';
 
   // TIN 초기화 + 버튼 활성 + 파이프 리셋
   S.triList=[]; S.showTIN=true;
@@ -968,7 +980,8 @@ function render(){
     ctx.stroke();
   }
 
-  // 등고선
+  // 등고선 (토글 가능)
+  if(S.showContours!==false){
   S.contours.forEach(function(c){
     var t=(c.elev-S.zmin)/zr;
     var isIndex=(c.layer||'').toUpperCase()==='F0017114'; // 계곡선
@@ -984,6 +997,7 @@ function render(){
     ctx.stroke();
   });
   ctx.globalAlpha=1;
+  }
 
   // 하천망 — Strahler 차수 색상 (4차: 짙은파랑 → 1차: 연파랑)
   if(S.flow && S.showStreams && S.streamMask){
@@ -1173,7 +1187,8 @@ function render(){
     ctx.restore();
   }
 
-  // 표고점
+  // 표고점 (토글 가능)
+  if(S.showSurvey!==false){
   var showVal=S.scale>1.2;
   ctx.font='10px sans-serif';
   for(var i=0;i<S.surveys.length;i++){
@@ -1185,6 +1200,7 @@ function render(){
     ctx.moveTo(p.x+3.5,p.y-3.5);ctx.lineTo(p.x-3.5,p.y+3.5);
     ctx.stroke();
     if(showVal && sv.val!=null){ ctx.fillStyle='#fbbf24'; ctx.fillText(sv.val.toFixed(1), p.x+5, p.y-4); }
+  }
   }
 
   /* ★ 작업구역 clip 해제 후 경계선 다시 그리기 */
@@ -1390,6 +1406,20 @@ function setHsPalette(p){
   S.reliefMode=p;
   updateHillshade();
 }
+/* 레이어 표시/숨김 토글 */
+function toggleLayer(which){
+  var map={contour:'showContours', dem:'showDEM', stream:'showStreams', survey:'showSurvey'};
+  var btnMap={contour:'lyrContour', dem:'lyrDem', stream:'lyrStream', survey:'lyrSurvey'};
+  var key=map[which];
+  S[key]=(S[key]===false)?true:false;  // 토글
+  var btn=document.getElementById(btnMap[which]);
+  if(btn) btn.className='lyrBtn'+(S[key]!==false?' on':'');
+  /* 사이드바 체크박스도 동기화 */
+  if(which==='dem'){ var d=document.getElementById('demToggle'); if(d)d.checked=(S.showDEM!==false); }
+  if(which==='stream'){ var s=document.getElementById('streamToggle'); if(s)s.checked=(S.showStreams!==false); }
+  render();
+}
+
 /* 음영기복 팝업 열기/닫기 */
 function toggleHsPanel(){
   if(!S.dem){ toast('먼저 DEM을 생성하세요','err'); return; }
@@ -2147,13 +2177,35 @@ function renderSectionTabs(){
   if(!tabs) return;
   tabs.innerHTML='';
   _sections.forEach(function(s,i){
-    var btn=document.createElement('button');
     var active=(i===_activeSection);
+    /* 탭 묶음 (라벨 + 삭제버튼) */
+    var wrap=document.createElement('span');
+    wrap.style='display:inline-flex;align-items:center;border-radius:6px;overflow:hidden;border:1px solid '+(active?'#3b82f6':'#1e2b45')+';background:'+(active?'rgba(59,130,246,0.2)':'rgba(30,43,69,0.5)')+';';
+    var btn=document.createElement('button');
     btn.textContent='단면 '+(i+1);
-    btn.style='font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;border:1px solid '+(active?'#3b82f6':'#1e2b45')+';background:'+(active?'rgba(59,130,246,0.2)':'rgba(30,43,69,0.5)')+';color:'+(active?'#93c5fd':'#9fb0c8')+';';
+    btn.style='font-size:11px;padding:4px 8px;cursor:pointer;border:none;background:none;color:'+(active?'#93c5fd':'#9fb0c8')+';';
     btn.onclick=function(){ _activeSection=i; renderSectionTabs(); drawActiveProfile(); render(); };
-    tabs.appendChild(btn);
+    var del=document.createElement('button');
+    del.textContent='×';
+    del.title='이 단면 삭제';
+    del.style='font-size:13px;padding:2px 6px;cursor:pointer;border:none;background:none;color:#fca5a5;line-height:1;';
+    del.onclick=function(ev){ ev.stopPropagation(); deleteSection(i); };
+    wrap.appendChild(btn); wrap.appendChild(del);
+    tabs.appendChild(wrap);
   });
+}
+/* 개별 단면 삭제 */
+function deleteSection(i){
+  _sections.splice(i,1);
+  if(_activeSection>=_sections.length) _activeSection=Math.max(0,_sections.length-1);
+  renderSectionTabs();
+  if(_sections.length===0){
+    document.getElementById('profileLay').style.display='none';
+  } else {
+    drawActiveProfile();
+  }
+  render();
+  toast('단면 삭제됨');
 }
 function drawActiveProfile(){
   if(_sections.length===0){ document.getElementById('profileLay').style.display='none'; return; }
