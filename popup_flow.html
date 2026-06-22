@@ -1330,43 +1330,60 @@ function hypsoRGB(t){
 var _hs = { az: 315, alt: 45, zFactor: 1.0, palette: 'hypso' };
 
 /* 음영기복 → 오프스크린 캔버스
-   mode: 'shade' 회색 | 'hypso' 무지개 | 'terrain' 자연색 | 'gray-blue' 청회색 */
+   mode: 'shade' 회색 | 'hypso' 무지개 | 'terrain' 자연색 | 'gray-blue' 청회색
+   ★ SS배 슈퍼샘플링으로 또렷하게 (격자 사이를 보간해서 고해상도 음영) */
 function buildHillshade(dem, mode){
   mode = mode || _hs.palette;
   var cols=dem.cols, rows=dem.rows, z=dem.z, cell=dem.cell;
   var zmin=Infinity, zmax=-Infinity;
   for(var i=0;i<z.length;i++){ var v=z[i]; if(v===v){ if(v<zmin)zmin=v; if(v>zmax)zmax=v; } }
   var zr=(zmax-zmin)||1;
-  var off=document.createElement('canvas'); off.width=cols; off.height=rows;
-  var octx=off.getContext('2d'), img=octx.createImageData(cols,rows), d=img.data;
+  /* 슈퍼샘플 배율: 격자가 작으면 크게 (큰 격자수는 1배로 메모리 보호) */
+  var SS = cols*rows > 200000 ? 1 : (cols*rows > 60000 ? 2 : 3);
+  var W=cols*SS, H=rows*SS;
+  var off=document.createElement('canvas'); off.width=W; off.height=H;
+  var octx=off.getContext('2d'), img=octx.createImageData(W,H), d=img.data;
   var az=_hs.az*Math.PI/180, zen=(90-_hs.alt)*Math.PI/180;
   var cosZen=Math.cos(zen), sinZen=Math.sin(zen);
-  var zf=_hs.zFactor;  // 수직과장 (음영 강조)
-  for(var r=0;r<rows;r++){
-    for(var c=0;c<cols;c++){
-      var here=z[r*cols+c];
-      var o=((rows-1-r)*cols+c)*4;
-      if(here!==here){ d[o+3]=0; continue; }
-      var zl=z[r*cols+(c>0?c-1:c)], zrr=z[r*cols+(c<cols-1?c+1:c)];
-      var zd=z[(r>0?r-1:r)*cols+c], zu=z[(r<rows-1?r+1:r)*cols+c];
-      if(zl!==zl)zl=here; if(zrr!==zrr)zrr=here; if(zd!==zd)zd=here; if(zu!==zu)zu=here;
-      var dzdx=(zrr-zl)/(2*cell)*zf, dzdy=(zu-zd)/(2*cell)*zf;  // ★ z과장 적용
+  var zf=_hs.zFactor;
+  /* 양선형 보간으로 격자 사이 z값 추정 */
+  function zAt(fc, fr){
+    var c0=Math.floor(fc), r0=Math.floor(fr);
+    var c1=Math.min(cols-1,c0+1), r1=Math.min(rows-1,r0+1);
+    var tx=fc-c0, ty=fr-r0;
+    var z00=z[r0*cols+c0], z10=z[r0*cols+c1], z01=z[r1*cols+c0], z11=z[r1*cols+c1];
+    if(z00!==z00||z10!==z10||z01!==z01||z11!==z11) return NaN;
+    return (1-tx)*(1-ty)*z00+tx*(1-ty)*z10+(1-tx)*ty*z01+tx*ty*z11;
+  }
+  var cellSS=cell/SS;
+  for(var r=0;r<H;r++){
+    for(var c=0;c<W;c++){
+      var fc=c/SS, fr=r/SS;
+      var here=zAt(fc,fr);
+      var o=((H-1-r)*W+c)*4;
+      if(!(here===here)){ d[o+3]=0; continue; }
+      var zl=zAt(Math.max(0,fc-1/SS),fr), zrr=zAt(Math.min(cols-0.001,fc+1/SS),fr);
+      var zd=zAt(fc,Math.max(0,fr-1/SS)), zu=zAt(fc,Math.min(rows-0.001,fr+1/SS));
+      if(!(zl===zl))zl=here; if(!(zrr===zrr))zrr=here; if(!(zd===zd))zd=here; if(!(zu===zu))zu=here;
+      var dzdx=(zrr-zl)/(2*cellSS)*zf, dzdy=(zu-zd)/(2*cellSS)*zf;
       var slope=Math.atan(Math.sqrt(dzdx*dzdx+dzdy*dzdy));
       var aspect=Math.atan2(dzdy,-dzdx);
       var ill=cosZen*Math.cos(slope)+sinZen*Math.sin(slope)*Math.cos(az-aspect);
       if(ill<0)ill=0;
+      /* 음영 대비 강화 (감마) */
+      ill=Math.pow(ill,0.85);
       var t=(here-zmin)/zr;
       if(mode==='hypso'){
-        var col=hypsoRGB(t), sh=0.5+ill*0.5;
+        var col=hypsoRGB(t), sh=0.35+ill*0.65;
         d[o]=Math.round(col[0]*sh); d[o+1]=Math.round(col[1]*sh); d[o+2]=Math.round(col[2]*sh); d[o+3]=255;
       } else if(mode==='terrain'){
-        var col2=terrainRGB(t), sh2=0.45+ill*0.55;
+        var col2=terrainRGB(t), sh2=0.3+ill*0.7;
         d[o]=Math.round(col2[0]*sh2); d[o+1]=Math.round(col2[1]*sh2); d[o+2]=Math.round(col2[2]*sh2); d[o+3]=255;
       } else if(mode==='gray-blue'){
-        var g2=Math.round(40+ill*185);
+        var g2=Math.round(25+ill*205);
         d[o]=g2; d[o+1]=g2; d[o+2]=Math.min(255,g2+18); d[o+3]=255;
-      } else { // shade 순수 회색
-        var g=Math.round(40+ill*185);
+      } else { // shade 순수 회색 — 대비 강하게
+        var g=Math.round(25+ill*205);
         d[o]=g; d[o+1]=g; d[o+2]=Math.min(255,g+6); d[o+3]=255;
       }
     }
