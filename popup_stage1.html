@@ -715,21 +715,36 @@ function downloadDXF(){
   s+=num(9,'$EXTMIN')+num(10,b.minX.toFixed(3))+num(20,b.minY.toFixed(3))+num(30,'0.0');
   s+=num(9,'$EXTMAX')+num(10,b.maxX.toFixed(3))+num(20,b.maxY.toFixed(3))+num(30,'0.0');
   s+=num(0,'ENDSEC');
-  /* TABLES — 레이어 정의 (실제 쓰인 것만) */
+  /* ★ 레이어별 색상 (원본 수치지도 색 그대로) — AutoCAD Color Index */
+  var LCOLOR={
+    'F0017111':30,  /* 주곡선 = 주황 */
+    'F0017114':7,   /* 계곡선 = 흰색 */
+    'F0017121':30,  /* 주곡선(오목) = 주황 */
+    'F0017122':30,  /* 간곡선 = 주황 */
+    'F0017124':7,   /* 조곡선 = 흰색 */
+    '등고선':30,
+    '표고점':5       /* 표고점 = 파랑 (잘 보이게) */
+  };
+  function lcolor(ly){ return LCOLOR[ly]!=null?LCOLOR[ly]:7; }
+  /* TABLES — 레이어 정의 (실제 쓰인 것만, 색상 포함) */
   var layers={}; S.contours.forEach(function(c){ layers[c.layer||'등고선']=1; });
   if(S.surveys.length) layers['표고점']=1;
   var lkeys=Object.keys(layers);
   s+=num(0,'SECTION')+num(2,'TABLES')+num(0,'TABLE')+num(2,'LAYER')+num(70,String(lkeys.length));
   lkeys.forEach(function(ly){
-    s+=num(0,'LAYER')+num(2,ly)+num(70,'0')+num(62,'7')+num(6,'CONTINUOUS');
+    s+=num(0,'LAYER')+num(2,ly)+num(70,'0')+num(62,String(lcolor(ly)))+num(6,'CONTINUOUS');
   });
   s+=num(0,'ENDTAB')+num(0,'ENDSEC');
   /* ENTITIES */
   s+=num(0,'SECTION')+num(2,'ENTITIES');
-  /* 등고선 — 3D POLYLINE (z=고도 보존) */
+  /* TEXT 글자 크기: 지형도 범위에 비례 (범위의 약 0.4% → 너무 작지 않게) */
+  var span=Math.max(b.maxX-b.minX, b.maxY-b.minY);
+  var txtH=Math.max(3, Math.round(span*0.004*10)/10);  /* 최소 3m, 보통 8~12m */
+  /* 등고선 — 3D POLYLINE (z=고도 보존, 색상 지정) */
   S.contours.forEach(function(c){
     var lay=c.layer||'등고선';
-    s+=num(0,'POLYLINE')+num(8,lay)+num(66,'1')+num(70,c.closed?'9':'8');  /* 8=3D, +1=closed */
+    var col=lcolor(lay);
+    s+=num(0,'POLYLINE')+num(8,lay)+num(62,String(col))+num(66,'1')+num(70,c.closed?'9':'8');  /* 8=3D, +1=closed */
     s+=num(10,'0.0')+num(20,'0.0')+num(30,'0.0');
     var elev=(c.elev||0).toFixed(3);
     c.pts.forEach(function(p){
@@ -742,13 +757,13 @@ function downloadDXF(){
   S.surveys.forEach(function(sv){
     var z=sv.val||sv.z||0;
     /* POINT: 좌표 + z(표고) — popup_flow 파서가 표고점으로 인식 */
-    s+=num(0,'POINT')+num(8,'표고점');
+    s+=num(0,'POINT')+num(8,'표고점')+num(62,'5');
     s+=num(10,sv.x.toFixed(3))+num(20,sv.y.toFixed(3))+num(30,z.toFixed(3));
     /* TEXT: 높이 숫자 — 오토캐드/캐드에서 표고값이 보이게 (반올림 없이 소수점 그대로) */
-    s+=num(0,'TEXT')+num(8,'표고점');
-    s+=num(10,(sv.x+1).toFixed(3))+num(20,sv.y.toFixed(3))+num(30,'0.0');
-    s+=num(40,'2.0');           /* 글자 높이 2m */
-    s+=num(1,z.toFixed(2));     /* 표고값 (소수 2자리, 반올림 안 함) */
+    s+=num(0,'TEXT')+num(8,'표고점')+num(62,'5');
+    s+=num(10,(sv.x+txtH*0.5).toFixed(3))+num(20,sv.y.toFixed(3))+num(30,'0.0');
+    s+=num(40,txtH.toFixed(1));   /* 글자 높이 (지형 범위 비례) */
+    s+=num(1,z.toFixed(2));       /* 표고값 (소수 2자리, 반올림 안 함) */
   });
   s+=num(0,'ENDSEC')+num(0,'EOF');
 
