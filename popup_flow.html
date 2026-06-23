@@ -627,6 +627,12 @@ function parseDXF(text){
       }
     } else if(cur.type==='INSERT'&&isElevLayer(cur.layer)){
       surveys.push({x:cur.ix,y:cur.iy,z:(cur.iz||0),val:null});
+    } else if(cur.type==='POINT'){
+      /* ★ POINT 표고점: z좌표(30)가 표고. 표고점 레이어 또는 z>0이면 인식 */
+      var play=(cur.layer||'').toUpperCase();
+      if(isElevLayer(cur.layer)||cur.layer==='표고점'||(cur.iz&&cur.iz>0)){
+        surveys.push({x:cur.ix,y:cur.iy,z:(cur.iz||0),val:(cur.iz>0?cur.iz:null)});
+      }
     } else if(cur.type==='TEXT'){
       /* F0027132(표고수치) 외 F0027/H0027 계열 + 수치처럼 보이는 TEXT 모두 인식 */
       var tlay=(cur.layer||'').toUpperCase();
@@ -649,7 +655,7 @@ function parseDXF(text){
       if(t==='ENDSEC') break;
       if(t==='LWPOLYLINE') cur={type:t,pts:[],flags:0,elev:0,_px:null};
       else if(t==='POLYLINE') cur={type:t,pts:[],zs:[],flags:0,layer:null};
-      else if(t==='INSERT'||t==='TEXT') cur={type:t};
+      else if(t==='INSERT'||t==='TEXT'||t==='POINT') cur={type:t};
       else cur=null;
       vmode=false; vx=null; continue;
     }
@@ -667,13 +673,13 @@ function parseDXF(text){
       case 70: if(cur.type==='LWPOLYLINE'||cur.type==='POLYLINE') cur.flags=parseInt(v,10)||0; break;
       case 10:
         if(cur.type==='LWPOLYLINE') cur._px=parseFloat(v);
-        else if(cur.type==='INSERT'||cur.type==='TEXT') cur.ix=parseFloat(v);
+        else if(cur.type==='INSERT'||cur.type==='TEXT'||cur.type==='POINT') cur.ix=parseFloat(v);
         break;
       case 20:
         if(cur.type==='LWPOLYLINE'&&cur._px!=null){ cur.pts.push({x:cur._px,y:parseFloat(v)}); cur._px=null; }
-        else if(cur.type==='INSERT'||cur.type==='TEXT') cur.iy=parseFloat(v);
+        else if(cur.type==='INSERT'||cur.type==='TEXT'||cur.type==='POINT') cur.iy=parseFloat(v);
         break;
-      case 30: if(cur.type==='INSERT'||cur.type==='TEXT') cur.iz=parseFloat(v); break;
+      case 30: if(cur.type==='INSERT'||cur.type==='TEXT'||cur.type==='POINT') cur.iz=parseFloat(v); break;
       case 1: if(cur.type==='TEXT') cur.text=v; break;
     }
   }
