@@ -1227,7 +1227,7 @@ function render(){
 
   // 표고점 (토글 가능)
   if(S.showSurvey!==false){
-  var showVal=S.scale>1.2;
+  var showVal=S.scale>0.6;
   ctx.font='10px sans-serif';
   for(var i=0;i<S.surveys.length;i++){
     var sv=S.surveys[i], p=w2s(sv);
