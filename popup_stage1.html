@@ -549,7 +549,7 @@ function render(){
       if(s.val&&S.scale>0.4){
         ctx.fillStyle='rgba(159,176,200,.9)';
         ctx.font='9px sans-serif';
-        ctx.fillText(s.val.toFixed(0), p.x+4, p.y+3);
+        ctx.fillText(s.val.toFixed(1), p.x+4, p.y+3);
       }
     });
   }
@@ -738,11 +738,17 @@ function downloadDXF(){
     });
     s+=num(0,'SEQEND');
   });
-  /* 표고점 — POINT (z=표고). popup_flow 파서가 POINT를 표고점으로 인식하도록 함께 수정됨 */
+  /* 표고점 — POINT(좌표+z, popup_flow가 읽음) + TEXT(높이 숫자, 오토캐드에서 보임) */
   S.surveys.forEach(function(sv){
     var z=sv.val||sv.z||0;
+    /* POINT: 좌표 + z(표고) — popup_flow 파서가 표고점으로 인식 */
     s+=num(0,'POINT')+num(8,'표고점');
     s+=num(10,sv.x.toFixed(3))+num(20,sv.y.toFixed(3))+num(30,z.toFixed(3));
+    /* TEXT: 높이 숫자 — 오토캐드/캐드에서 표고값이 보이게 (반올림 없이 소수점 그대로) */
+    s+=num(0,'TEXT')+num(8,'표고점');
+    s+=num(10,(sv.x+1).toFixed(3))+num(20,sv.y.toFixed(3))+num(30,'0.0');
+    s+=num(40,'2.0');           /* 글자 높이 2m */
+    s+=num(1,z.toFixed(2));     /* 표고값 (소수 2자리, 반올림 안 함) */
   });
   s+=num(0,'ENDSEC')+num(0,'EOF');
 
