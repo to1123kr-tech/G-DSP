@@ -467,6 +467,15 @@
         <input type="range" min="10" max="80" value="45" step="5"
           oninput="setHsAlt(this.value)" style="width:100%;margin-top:4px">
       </div>
+      <!-- 음영 격자 (음영 전용 — 수계 결과에 영향 없음) -->
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
+          <span>🔲 음영 격자</span><span id="hsCellVal" style="color:#fbbf24;font-weight:600">기본</span>
+        </div>
+        <input type="range" min="0" max="10" value="0" step="1"
+          oninput="setHsCell(this.value)" style="width:100%;margin-top:4px">
+        <div style="font-size:9px;color:#5b7290;margin-top:2px">작을수록 또렷 (0=수계격자 그대로 · 음영에만 적용, 수계 결과 불변)</div>
+      </div>
       <!-- 입체 강조 -->
       <div style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
@@ -711,7 +720,7 @@ function applyParsed(r){
   /* ★ 새 파일 로드 — 이전 작업 상태 모두 초기화 (작업구역 clip 잔류 버그 방지) */
   S.cropRect=null; S.cropPt1=null; S.cropPt2=null; S.cropGhost=null;
   S.permit=null; S.permitDraw=null; S.ghostXY=null; S.pickHover=null;
-  S.dem=null; S.demSmooth=null; S.hillCanvas=null;
+  S.dem=null; S.demSmooth=null; S.demHill=null; S.hillCanvas=null;
   S.triList=[]; S.flow=null; S.streamMask=null; S.watershed=null; S.wsCanvas=null;
   S.sectionPts=null; S.daejangArea=null;
   if(typeof _sections!=='undefined'){ _sections=[]; _activeSection=0; }
@@ -761,7 +770,7 @@ function applyParsed(r){
 
   // TIN 초기화 + 버튼 활성 + 파이프 리셋
   S.triList=[]; S.showTIN=true;
-  S.dem=null; S.hillCanvas=null; S.showDEM=true;
+  S.dem=null; S.demSmooth=null; S.demHill=null; S.hillCanvas=null; S.showDEM=true;
   S.flow=null; S.streamMask=null; S.streamHa=1; S.showStreams=true;
   S.watershed=null; S.wsCanvas=null; S.wsSegs=null; S.showWS=true; S.mode='pan';
   S.showGrid=false; S.showArrows=false;
@@ -1382,7 +1391,7 @@ function hypsoRGB(t){
 }
 
 /* 음영기복 설정 (전역) */
-var _hs = { az: 315, alt: 45, zFactor: 1.0, palette: 'hypso', smooth: 2 };
+var _hs = { az: 315, alt: 45, zFactor: 1.0, palette: 'hypso', smooth: 2, hillCell: 0 };  // hillCell:0 = 수계격자와 동일(기본)
 
 /* 음영기복 → 오프스크린 캔버스
    mode: 'shade' 회색 | 'hypso' 무지개 | 'terrain' 자연색 | 'gray-blue' 청회색
@@ -1464,16 +1473,44 @@ function terrainRGB(t){
 /* 음영기복 컨트롤 갱신 (슬라이더 변경 시) */
 function updateHillshade(){
   if(!S.dem) return;
-  var src=S.demSmooth||S.dem;
+  var src=S.demHill||S.demSmooth||S.dem;
   S.hillCanvas=buildHillshade(src, _hs.palette);
   render();
 }
-/* 스무딩 강도 변경 → 표시용 DEM 재생성 */
+/* ★ 음영 전용 DEM 재생성 — 수계용 S.dem과 완전 분리 (S.dem 절대 건드리지 않음)
+   _hs.hillCell이 0이면 수계격자 그대로(S.dem 스무딩), 아니면 그 격자로 음영만 새로 생성 */
+function rebuildHillDEM(){
+  if(!S.dem) return;
+  var hc=_hs.hillCell;
+  if(!hc || hc<=0){
+    // 음영 전용 격자 미사용 → 수계 DEM을 스무딩만 해서 표시
+    S.demHill=null;
+    S.demSmooth=smoothDEM({cols:S.dem.cols,rows:S.dem.rows,cell:S.dem.cell,minX:S.dem.minX,minY:S.dem.minY,z:new Float32Array(S.dem.z)}, _hs.smooth);
+  } else {
+    // 음영 전용 격자로 TIN에서 독립 생성 → S.dem과 무관
+    var hd=buildDEM(hc);
+    if(hd){
+      fillDEMHoles(hd);
+      S.demHill=smoothDEM({cols:hd.cols,rows:hd.rows,cell:hd.cell,minX:hd.minX,minY:hd.minY,z:new Float32Array(hd.z)}, _hs.smooth);
+    } else {
+      S.demHill=null;
+    }
+  }
+}
+/* 음영 전용 격자 변경 → 음영만 재생성 (수계 결과 불변) */
+function setHsCell(v){
+  _hs.hillCell=parseInt(v);
+  var e=document.getElementById('hsCellVal');
+  if(e) e.textContent=(_hs.hillCell<=0?'기본':_hs.hillCell+'m');
+  rebuildHillDEM();
+  updateHillshade();
+}
+/* 스무딩 강도 변경 → 음영 표시용 DEM 재생성 (수계 불변) */
 function setHsSmooth(v){
   _hs.smooth=parseInt(v);
   var e=document.getElementById('hsSmoothVal'); if(e)e.textContent=_hs.smooth+'회';
   if(S.dem){
-    S.demSmooth=smoothDEM({cols:S.dem.cols,rows:S.dem.rows,cell:S.dem.cell,minX:S.dem.minX,minY:S.dem.minY,z:new Float32Array(S.dem.z)}, _hs.smooth);
+    rebuildHillDEM();
     updateHillshade();
   }
 }
@@ -1562,8 +1599,9 @@ function runDEM(){
   fillDEMHoles(dem);  // ★ 구멍 메우기
   S.dem=dem;          // 원본 DEM (경사·흐름 분석용 — 정확도 유지)
   /* 표시용 스무딩 DEM (TIN 삼각형 각짐 제거) — 음영기복 전용 */
-  S.demSmooth = smoothDEM({cols:dem.cols, rows:dem.rows, cell:dem.cell, minX:dem.minX, minY:dem.minY, z:new Float32Array(dem.z)}, _hs.smooth);
-  S.hillCanvas=buildHillshade(S.demSmooth, S.reliefMode); S.showDEM=true;
+  S.demHill=null;     // 음영 전용 격자 초기화 (DEM 새로 만들면 기본으로)
+  rebuildHillDEM();   // _hs.hillCell 설정에 따라 음영 DEM 생성 (S.dem 불변)
+  S.hillCanvas=buildHillshade(S.demHill||S.demSmooth, S.reliefMode); S.showDEM=true;
   document.getElementById('demSize').textContent=dem.cols+'×'+dem.rows+' ('+cell+'m격자)';
   document.getElementById('demResult').style.display='';
   document.getElementById('demToggle').checked=true;
