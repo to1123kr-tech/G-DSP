@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>G-DSP — 지형도 준비 (1단계 테스트)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
+<style>
+  :root{
+    --bg:#0a1020; --panel:#0f1830; --panel2:#13203c; --line:#1e2b45;
+    --tx:#e8eef7; --tx2:#9fb0c8; --tx3:#5b7290;
+    --pri:#3b82f6; --pri2:#60a5fa; --ok:#34d399; --warn:#fbbf24; --err:#f87171;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Malgun Gothic',sans-serif;
+    background:var(--bg);color:var(--tx);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+  /* 헤더 */
+  .hdr{display:flex;align-items:center;gap:12px;padding:11px 18px;background:var(--panel);
+    border-bottom:1px solid var(--line);flex-shrink:0}
+  .hdr-title{font-size:14px;font-weight:700;letter-spacing:.3px}
+  .hdr-badge{font-size:10px;color:var(--warn);background:rgba(251,191,36,.12);
+    padding:3px 9px;border-radius:20px;font-weight:600}
+  .hdr-spacer{flex:1}
+  .hdr-stat{font-size:11px;color:var(--tx2)}
+  .hdr-stat b{color:var(--pri2);font-weight:700;font-size:13px}
+
+  /* 본체 */
+  .main{flex:1;display:flex;overflow:hidden}
+
+  /* 좌측: 캔버스 */
+  .stage{flex:1;position:relative;background:
+    radial-gradient(ellipse at 50% 40%, #0d1526 0%, #080d1a 100%)}
+  #cv{width:100%;height:100%;display:block;cursor:grab}
+  #cv:active{cursor:grabbing}
+
+  /* 드롭존 (업로드 전) */
+  .dropzone{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;
+    background:rgba(10,16,32,.6);backdrop-filter:blur(2px);
+    transition:opacity .3s;z-index:5}
+  .dropzone.hide{opacity:0;pointer-events:none}
+  .dropzone.drag{background:rgba(59,130,246,.08)}
+  .dz-icon{width:72px;height:72px;color:var(--tx3);transition:.25s}
+  .dropzone.drag .dz-icon{color:var(--pri2);transform:scale(1.08)}
+  .dz-title{font-size:17px;font-weight:700;color:var(--tx)}
+  .dz-sub{font-size:12.5px;color:var(--tx2);text-align:center;line-height:1.7;max-width:420px}
+  .dz-sub b{color:var(--pri2)}
+  .dz-btn{margin-top:4px;padding:10px 22px;background:var(--pri);color:#fff;
+    border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;
+    transition:.2s}
+  .dz-btn:hover{background:var(--pri2)}
+  .dz-hint{font-size:11px;color:var(--tx3);margin-top:2px}
+
+  /* 처리중 오버레이 */
+  .processing{position:absolute;inset:0;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:16px;
+    background:rgba(8,13,26,.85);backdrop-filter:blur(3px);z-index:8}
+  .processing.show{display:flex}
+  .spinner{width:48px;height:48px;border:3px solid var(--line);
+    border-top-color:var(--pri2);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .proc-text{font-size:13px;color:var(--tx2)}
+
+  /* 플로팅 범례 (우측 하단) */
+  .legend{position:absolute;right:14px;bottom:14px;background:rgba(15,24,48,.92);
+    border:1px solid var(--line);border-radius:10px;padding:11px 13px;
+    display:none;z-index:6;min-width:130px}
+  .legend.show{display:block}
+  .legend h4{font-size:10px;color:var(--tx3);letter-spacing:.8px;
+    text-transform:uppercase;margin-bottom:8px;font-weight:700}
+  .legend-bar{height:10px;border-radius:5px;margin-bottom:5px;
+    background:linear-gradient(to right,#2c5c9e,#2a9d8f,#7ec850,#f4d35e,#e07a3e,#b5302a)}
+  .legend-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--tx2)}
+
+  /* 화면맞춤 버튼 */
+  .fit-btn{position:absolute;left:14px;top:14px;width:36px;height:36px;
+    background:rgba(15,24,48,.92);border:1px solid var(--line);border-radius:9px;
+    color:var(--tx2);cursor:pointer;display:none;align-items:center;justify-content:center;
+    font-size:16px;z-index:6}
+  .fit-btn.show{display:flex}
+  .fit-btn:hover{color:var(--pri2);border-color:var(--pri)}
+
+  /* 우측 패널 */
+  .side{width:280px;background:var(--panel);border-left:1px solid var(--line);
+    padding:18px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;gap:16px}
+
+  .sec{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:14px}
+  .sec h3{font-size:10.5px;letter-spacing:.6px;color:var(--tx3);
+    text-transform:uppercase;margin-bottom:11px;font-weight:700}
+
+  /* 단계 표시 */
+  .steps{display:flex;flex-direction:column;gap:9px}
+  .step{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--tx3)}
+  .step .dot{width:22px;height:22px;border-radius:50%;background:var(--panel);
+    border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;flex-shrink:0;color:var(--tx3)}
+  .step.done{color:var(--tx)}
+  .step.done .dot{background:var(--ok);border-color:var(--ok);color:#06281c}
+  .step.cur{color:var(--pri2)}
+  .step.cur .dot{border-color:var(--pri);color:var(--pri2)}
+
+  /* 통계 카드 */
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .stat-card{background:var(--panel);border:1px solid var(--line);border-radius:9px;
+    padding:11px;text-align:center}
+  .stat-card .v{font-size:21px;font-weight:700;color:var(--pri2);line-height:1.1}
+  .stat-card .v.muted{color:var(--tx3)}
+  .stat-card .k{font-size:10px;color:var(--tx3);margin-top:3px}
+
+  /* 정보 박스 */
+  .info{font-size:11px;color:var(--tx2);line-height:1.7;background:rgba(59,130,246,.06);
+    border:1px solid rgba(59,130,246,.18);border-radius:9px;padding:11px}
+  .info b{color:var(--pri2)}
+
+  /* 레이어 분류 결과 */
+  .layer-row{display:flex;align-items:center;gap:8px;font-size:11px;padding:5px 0;
+    border-bottom:1px solid rgba(30,43,69,.5)}
+  .layer-row:last-child{border-bottom:none}
+  .layer-row .tag{font-family:ui-monospace,monospace;font-size:10px;color:var(--tx2);
+    background:var(--panel);padding:2px 6px;border-radius:5px}
+  .layer-row .cnt{margin-left:auto;color:var(--pri2);font-weight:600}
+  .layer-row.kept .ic{color:var(--ok)}
+  .layer-row.drop .ic{color:var(--tx3)}
+  .layer-row .ic{font-size:12px}
+
+  /* 다운로드 버튼 */
+  .dl-btn{padding:12px;background:var(--ok);color:#06281c;border:none;border-radius:10px;
+    font-size:13px;font-weight:700;cursor:pointer;transition:.2s;width:100%}
+  .dl-btn:hover{background:#5ee9b5}
+
+  /* 다음 버튼 */
+  .next-btn{padding:12px;background:var(--pri);color:#fff;border:none;border-radius:10px;
+    font-size:13px;font-weight:700;cursor:pointer;transition:.2s;width:100%}
+  .next-btn:hover{background:var(--pri2)}
+  .next-btn:disabled{background:var(--panel);color:var(--tx3);cursor:not-allowed}
+
+  /* 새 파일 버튼 */
+  .reset-btn{padding:9px;background:transparent;color:var(--tx2);
+    border:1px solid var(--line);border-radius:9px;font-size:12px;cursor:pointer;
+    transition:.2s;width:100%}
+  .reset-btn:hover{border-color:var(--pri);color:var(--pri2)}
+
+  /* 토스트 */
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--panel2);border:1px solid var(--pri);color:var(--tx);
+    padding:12px 22px;border-radius:11px;font-size:12.5px;font-weight:600;
+    opacity:0;transition:.28s;pointer-events:none;z-index:99;white-space:nowrap;
+    box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.ok{border-color:var(--ok)}
+  #toast.err{border-color:var(--err)}
+  #toast.warn{border-color:var(--warn)}
+
+  .hidden{display:none!important}
+
+  /* ── 지도 토글 버튼 ── */
+  .hdr-mapbtn{padding:7px 14px;background:var(--panel2);border:1px solid var(--line);
+    color:var(--tx2);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+    transition:.2s;margin-right:10px}
+  .hdr-mapbtn:hover{border-color:var(--pri);color:var(--pri2)}
+  .hdr-mapbtn.active{background:var(--pri);border-color:var(--pri);color:#fff}
+
+  /* ── 지도 패널 (우측 슬라이드) ── */
+  .wms-panel{position:fixed;top:0;right:0;height:100vh;width:440px;
+    background:var(--panel);border-left:1px solid var(--line);
+    transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+    z-index:50;display:flex;flex-direction:column;box-shadow:-8px 0 24px rgba(0,0,0,.4)}
+  .wms-panel.open{transform:translateX(0)}
+  .wms-resize{position:absolute;left:0;top:0;width:6px;height:100%;cursor:ew-resize;
+    background:transparent;z-index:51}
+  .wms-resize:hover,.wms-resize.dragging{background:var(--pri)}
+  .wms-head{display:flex;align-items:center;gap:10px;padding:13px 16px;
+    border-bottom:1px solid var(--line);flex-shrink:0}
+  .wms-head .t{font-size:13px;font-weight:700;flex:1}
+  .wms-head .x{background:none;border:none;color:var(--tx3);font-size:18px;
+    cursor:pointer;padding:0;line-height:1}
+  .wms-head .x:hover{color:var(--tx)}
+
+  /* 검색 + 배경전환 */
+  .wms-top{padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}
+  .bg-toggle{display:flex;gap:6px;margin-top:0}
+  .bg-btn{flex:1;padding:7px;background:var(--panel2);border:1px solid var(--line);
+    color:var(--tx2);border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer;transition:.2s}
+  .bg-btn.on{background:var(--pri);border-color:var(--pri);color:#fff}
+
+  /* WMS 레이어 토글 */
+  .wms-layers{padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}
+  .wms-layers h5{font-size:10px;color:var(--tx3);letter-spacing:.6px;
+    text-transform:uppercase;margin-bottom:10px;font-weight:700}
+  .wms-row{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:12px}
+  .wms-row .nm{flex:1}
+  .wms-tog{width:38px;height:21px;border-radius:11px;background:var(--line);
+    border:none;cursor:pointer;position:relative;transition:.2s;flex-shrink:0}
+  .wms-tog::after{content:'';position:absolute;top:2px;left:2px;width:17px;height:17px;
+    border-radius:50%;background:#fff;transition:.2s}
+  .wms-tog.on{background:var(--pri)}
+  .wms-tog.on::after{transform:translateX(17px)}
+  .wms-op{margin-top:12px}
+  .wms-op label{display:flex;justify-content:space-between;font-size:11px;color:var(--tx2);margin-bottom:5px}
+  .wms-op input{width:100%}
+
+  /* 지도 캔버스 */
+  .wms-map{flex:1;min-height:0}
+  #wmsMap{width:100%;height:100%;background:#0a0f1a}
+
+  /* 안내 */
+  .wms-note{padding:10px 16px;font-size:10.5px;color:var(--tx3);line-height:1.6;
+    border-top:1px solid var(--line);flex-shrink:0}
+</style>
+</head>
+<body>
+  <div class="hdr">
+    <span class="hdr-title">🗻 지형도 준비</span>
+    <span class="hdr-badge">1단계 테스트</span>
+    <div class="hdr-spacer"></div>
+    <button class="hdr-mapbtn" id="btnWmsMap" onclick="toggleWmsPanel()">🗺 지도</button>
+    <span class="hdr-stat" id="hdrStat"></span>
+  </div>
+
+  <div class="main">
+    <!-- 캔버스 영역 -->
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+
+      <!-- 드롭존 -->
+      <div class="dropzone" id="dropzone">
+        <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 15l5.5-5.5 4 4L21 4M21 4v6M21 4h-6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3 20h18" stroke-linecap="round"/>
+        </svg>
+        <div class="dz-title">지형도를 올려주세요</div>
+        <div class="dz-sub">
+          국토정보플랫폼에서 받은 <b>수치지형도 원본</b>을 그대로 끌어다 놓으세요.<br>
+          올리면 경사·수계에 필요한 <b>등고선·표고점</b>만 자동으로 남겨요.
+        </div>
+        <button class="dz-btn" onclick="document.getElementById('fileInput').click()">파일 선택</button>
+        <div class="dz-hint">DXF 파일 · 버튼 누를 필요 없이 올리면 바로 정리돼요</div>
+        <input type="file" id="fileInput" accept=".dxf" class="hidden">
+      </div>
+
+      <!-- 처리중 -->
+      <div class="processing" id="processing">
+        <div class="spinner"></div>
+        <div class="proc-text" id="procText">지형도를 읽는 중...</div>
+      </div>
+
+      <!-- 화면맞춤 -->
+      <button class="fit-btn" id="fitBtn" title="화면 맞춤" onclick="fitView();render()">⤢</button>
+
+      <!-- 범례 -->
+      <div class="legend" id="legend">
+        <h4>고도</h4>
+        <div class="legend-bar"></div>
+        <div class="legend-lbl"><span id="legLow">–</span><span id="legHigh">–</span></div>
+      </div>
+    </div>
+
+    <!-- 우측 패널 -->
+    <div class="side">
+      <!-- 진행 단계 -->
+      <div class="sec">
+        <h3>진행</h3>
+        <div class="steps">
+          <div class="step cur" id="st1"><span class="dot">1</span>지형도 올리기</div>
+          <div class="step" id="st2"><span class="dot">2</span>레이어 자동 정리</div>
+          <div class="step" id="st3"><span class="dot">3</span>준비 완료</div>
+        </div>
+      </div>
+
+      <!-- 결과 통계 (정리 후 표시) -->
+      <div class="sec hidden" id="resultSec">
+        <h3>정리 결과</h3>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="v" id="vCont">–</div><div class="k">등고선</div></div>
+          <div class="stat-card"><div class="v" id="vElev">–</div><div class="k">표고점</div></div>
+        </div>
+        <div style="margin-top:10px" id="elevRange"></div>
+      </div>
+
+      <!-- 레이어 분류 (정리 후 표시) -->
+      <div class="sec hidden" id="layerSec">
+        <h3>레이어 분류</h3>
+        <div id="layerList"></div>
+      </div>
+
+      <!-- 안내 -->
+      <div class="info hidden" id="infoBox">
+        ✅ <b>레이어 정리 완료</b><br>
+        등고선과 표고점만 남기고 도로·건물·식생 등은 자동으로 걸러냈어요.
+        이제 다음 단계(지도·지적도)로 갈 수 있어요.
+      </div>
+
+      <div class="hdr-spacer"></div>
+
+      <!-- 액션 -->
+      <button class="dl-btn hidden" id="dlBtn" onclick="downloadDXF()">⬇ 정리된 DXF 다운로드</button>
+      <button class="next-btn" id="nextBtn" disabled>다음 단계 →</button>
+      <button class="reset-btn hidden" id="resetBtn" onclick="resetAll()">↺ 다른 지형도 올리기</button>
+    </div>
+  </div>
+
+  <!-- ── 지도 패널 (VWorld + WMS) ── -->
+  <div class="wms-panel" id="wmsPanel">
+    <div class="wms-resize" id="wmsResizeHandle"></div>
+    <div class="wms-head">
+      <span class="t">🗺 지도 · 지적도</span>
+      <button class="x" onclick="toggleWmsPanel()">✕</button>
+    </div>
+    <div class="wms-top">
+      <div class="bg-toggle">
+        <button class="bg-btn on" id="bgBase" onclick="setWmsBg('base')">일반</button>
+        <button class="bg-btn" id="bgSat" onclick="setWmsBg('satellite')">위성</button>
+      </div>
+    </div>
+    <div class="wms-layers">
+      <h5>레이어</h5>
+      <div class="wms-row">
+        <span class="nm">📋 지적도 + 지번</span>
+        <button class="wms-tog" id="togCadastral" onclick="toggleWmsLayer('cadastral')"></button>
+      </div>
+      <div class="wms-row">
+        <span class="nm">🏔️ 산사태위험지도</span>
+        <button class="wms-tog" id="togLandslide" onclick="toggleWmsLayer('landslide')"></button>
+      </div>
+      <div class="wms-row">
+        <span class="nm">🪨 수치지질도</span>
+        <button class="wms-tog" id="togGeology" onclick="toggleWmsLayer('geology')"></button>
+      </div>
+      <div class="wms-op">
+        <label>레이어 투명도 <span id="opVal">60%</span></label>
+        <input type="range" id="wmsOpacity" min="10" max="100" value="60" oninput="setWmsOpacity(this.value)">
+      </div>
+    </div>
+    <div class="wms-map"><div id="wmsMap"></div></div>
+    <div class="wms-note">
+      지형도를 올리면 그 위치로 지도가 이동해요. 패널 왼쪽 가장자리를 끌면 크기를 조절할 수 있어요.
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════
+   G-DSP 1단계: 지형도 업로드 + 자동 레이어 정리
+   - popup_flow의 검증된 parseDXF 파서 재활용
+   - 파서가 F0017(등고선)·F0027/H0027(표고점)만 자동 추출
+   - 원본 통째로 올려도 도로/건물/식생 자동 제외
+   ════════════════════════════════════════════════════ */
+
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+var S = {
+  name:'', contours:[], surveys:[], polys:[],
+  bounds:null, scale:1, ox:0, oy:0, zmin:0, zmax:1,
+  allLayerCount:{}, keptLayerCount:{}
+};
+
+/* ── 캔버스 크기 ── */
+function resizeCanvas(){
+  var st=document.getElementById('stage');
+  cv.width=st.clientWidth; cv.height=st.clientHeight;
+  if(S.bounds){ render(); }
+}
+window.addEventListener('resize', resizeCanvas);
+
+/* ── 좌표 변환 ── */
+function w2s(p){ return {x:p.x*S.scale+S.ox, y:cv.height-(p.y*S.scale+S.oy)}; }
+function s2w(sx,sy){ return {x:(sx-S.ox)/S.scale, y:(cv.height-sy-S.oy)/S.scale}; }
+
+/* ── 토스트 ── */
+var _tt;
+function toast(msg, type){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.className='show'+(type?' '+type:'');
+  clearTimeout(_tt);
+  _tt=setTimeout(function(){ t.className=t.className.replace('show','').trim(); }, 2800);
+}
+
+/* ── 색상: 고도 hypsometric ── */
+function hypso(t){
+  t=Math.max(0,Math.min(1,t));
+  var stops=[[0,[44,92,158]],[0.2,[42,157,143]],[0.45,[126,200,80]],
+             [0.65,[244,211,94]],[0.82,[224,122,62]],[1,[181,48,42]]];
+  for(var i=0;i<stops.length-1;i++){
+    if(t>=stops[i][0]&&t<=stops[i+1][0]){
+      var f=(t-stops[i][0])/(stops[i+1][0]-stops[i][0]);
+      var a=stops[i][1],b=stops[i+1][1];
+      return 'rgb('+Math.round(a[0]+(b[0]-a[0])*f)+','+
+                    Math.round(a[1]+(b[1]-a[1])*f)+','+
+                    Math.round(a[2]+(b[2]-a[2])*f)+')';
+    }
+  }
+  return 'rgb(181,48,42)';
+}
+
+/* ── 레이어 판정 (popup_flow와 동일) ── */
+function isContourLayer(lay){ lay=(lay||'').toUpperCase();
+  if(/^F0017/.test(lay)) return true;
+  if(lay==='CONTOUR'||lay==='등고선'||lay==='TOPO') return true;
+  return false; }
+function isElevLayer(lay){ lay=(lay||'').toUpperCase();
+  if(/^F0027|^H0027/.test(lay)) return true;
+  if(lay==='ELEV'||lay==='ELEVATION'||lay==='표고점') return true;
+  return false; }
+
+function polyArea(pts){
+  var a=0; for(var i=0,n=pts.length;i<n;i++){var j=(i+1)%n;a+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;}
+  return Math.abs(a)/2;
+}
+
+/* ── DXF 파서 (popup_flow 검증본 + 레이어 집계 추가) ── */
+function parseDXF(text){
+  var lines=text.split(/\r\n|\n/), contours=[],surveys=[],texts=[],polys=[];
+  var allLayer={}, keptLayer={};  // ★ 레이어별 엔티티 집계
+  var i=0,n=lines.length;
+  function next(){ if(i>=n-1)return null; var c=parseInt(lines[i].trim(),10); var v=lines[i+1]; i+=2; return {c:c,v:v}; }
+  var inEnt=false;
+  while(i<n-1){var p=next();if(!p)break;if(p.c===2&&p.v.trim()==='ENTITIES'){inEnt=true;break;}}
+  if(!inEnt) throw new Error('ENTITIES 섹션이 없어요 — 올바른 DXF인지 확인하세요');
+
+  var cur=null, vmode=false, vx=null;
+  function endVertex(){
+    if(cur&&cur.type==='POLYLINE'&&vx&&vx.x!=null&&vx.y!=null){
+      cur.pts.push({x:vx.x,y:vx.y});
+      if(vx.z!=null) cur.zs.push(vx.z);
+    }
+    vx=null;
+  }
+  function flush(){
+    if(!cur) return;
+    /* 레이어 집계 (모든 엔티티) */
+    if(cur.layer){ allLayer[cur.layer]=(allLayer[cur.layer]||0)+1; }
+    if(cur.type==='LWPOLYLINE'||cur.type==='POLYLINE'){
+      if(cur.pts.length>=2){
+        var lay=(cur.layer||'').toUpperCase();
+        var elev=cur.elev||0;
+        if(cur.type==='POLYLINE'&&cur.zs.length){
+          var s=cur.zs.slice().sort(function(a,b){return a-b;}); elev=s[s.length>>1];
+        }
+        var ent={layer:cur.layer,elev:elev,pts:cur.pts,closed:!!(cur.flags&1)};
+        var isC=isContourLayer(lay)||(elev!==0&&elev>-100);
+        if(isC){ contours.push(ent); if(cur.layer) keptLayer[cur.layer]=(keptLayer[cur.layer]||0)+1; }
+      }
+    } else if(cur.type==='INSERT'&&isElevLayer(cur.layer)){
+      surveys.push({x:cur.ix,y:cur.iy,z:(cur.iz||0),val:null});
+      if(cur.layer) keptLayer[cur.layer]=(keptLayer[cur.layer]||0)+1;
+    } else if(cur.type==='POINT'){
+      if(isElevLayer(cur.layer)||cur.layer==='표고점'||(cur.iz&&cur.iz>0)){
+        surveys.push({x:cur.ix,y:cur.iy,z:(cur.iz||0),val:(cur.iz>0?cur.iz:null)});
+        if(cur.layer) keptLayer[cur.layer]=(keptLayer[cur.layer]||0)+1;
+      }
+    } else if(cur.type==='TEXT'){
+      var tm=/^[\d.]+$/.exec((cur.text||'').trim());
+      if(tm){ var tv=parseFloat(tm[0]); if(tv>0&&tv<9999) texts.push({x:cur.ix,y:cur.iy,val:tv}); }
+    }
+    cur=null; vmode=false; vx=null;
+  }
+
+  while(i<n-1){
+    var p=next(); if(!p)break;
+    if(p.c===0){
+      var t=p.v.trim();
+      if(cur&&cur.type==='POLYLINE'&&t==='VERTEX'){ endVertex(); vmode=true; vx={x:null,y:null,z:null}; continue; }
+      if(cur&&cur.type==='POLYLINE'&&t==='SEQEND'){ endVertex(); flush(); continue; }
+      flush();
+      if(t==='ENDSEC') break;
+      if(t==='LWPOLYLINE') cur={type:t,pts:[],flags:0,elev:0,_px:null,layer:null};
+      else if(t==='POLYLINE') cur={type:t,pts:[],zs:[],flags:0,layer:null};
+      else if(t==='INSERT'||t==='TEXT'||t==='POINT') cur={type:t,layer:null};
+      else cur=null;
+      vmode=false; vx=null; continue;
+    }
+    if(!cur) continue;
+    var v=p.v;
+    if(cur.type==='POLYLINE'&&vmode&&vx){
+      if(p.c===10) vx.x=parseFloat(v);
+      else if(p.c===20) vx.y=parseFloat(v);
+      else if(p.c===30) vx.z=parseFloat(v);
+      continue;
+    }
+    switch(p.c){
+      case 8: cur.layer=v.trim(); break;
+      case 38: if(cur.type==='LWPOLYLINE'||cur.type==='POLYLINE') cur.elev=parseFloat(v)||0; break;
+      case 70: if(cur.type==='LWPOLYLINE'||cur.type==='POLYLINE') cur.flags=parseInt(v,10)||0; break;
+      case 10:
+        if(cur.type==='LWPOLYLINE') cur._px=parseFloat(v);
+        else if(cur.type==='INSERT'||cur.type==='TEXT'||cur.type==='POINT') cur.ix=parseFloat(v);
+        break;
+      case 20:
+        if(cur.type==='LWPOLYLINE'&&cur._px!=null){ cur.pts.push({x:cur._px,y:parseFloat(v)}); cur._px=null; }
+        else if(cur.type==='INSERT'||cur.type==='TEXT'||cur.type==='POINT') cur.iy=parseFloat(v);
+        break;
+      case 30: if(cur.type==='INSERT'||cur.type==='TEXT'||cur.type==='POINT') cur.iz=parseFloat(v); break;
+      case 1: if(cur.type==='TEXT') cur.text=v; break;
+    }
+  }
+  flush();
+  /* 표고점-표고값 매칭 */
+  surveys.forEach(function(s){
+    var best=null,bd=1e18;
+    texts.forEach(function(t){var d=Math.hypot(t.x-s.x,t.y-s.y);if(d<bd){bd=d;best=t;}});
+    if(best&&bd<30)s.val=best.val;
+  });
+  return {contours:contours,surveys:surveys,polys:polys,allLayer:allLayer,keptLayer:keptLayer};
+}
+
+/* ── 화면 맞춤 ── */
+function fitView(){
+  if(!S.bounds) return;
+  var b=S.bounds, pad=50;
+  var dx=b.maxX-b.minX, dy=b.maxY-b.minY;
+  S.scale=Math.min((cv.width-pad*2)/(dx||1),(cv.height-pad*2)/(dy||1));
+  S.ox=(cv.width-dx*S.scale)/2 - b.minX*S.scale;
+  S.oy=(cv.height-dy*S.scale)/2 - b.minY*S.scale;
+}
+
+/* ── 렌더 ── */
+function render(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if(!S.bounds) return;
+  var zr=(S.zmax-S.zmin)||1;
+
+  /* 등고선 */
+  S.contours.forEach(function(c){
+    var t=(c.elev-S.zmin)/zr;
+    var isIndex=(c.layer||'').toUpperCase()==='F0017114'; // 계곡선
+    ctx.strokeStyle=hypso(t);
+    ctx.lineWidth=isIndex?1.7:0.85;
+    ctx.globalAlpha=isIndex?1:0.92;
+    ctx.beginPath();
+    for(var k=0;k<c.pts.length;k++){
+      var s=w2s(c.pts[k]);
+      if(k===0)ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y);
+    }
+    if(c.closed)ctx.closePath();
+    ctx.stroke();
+  });
+  ctx.globalAlpha=1;
+
+  /* 표고점 */
+  if(S.scale>0.05){
+    S.surveys.forEach(function(s){
+      var p=w2s(s);
+      ctx.fillStyle='rgba(232,238,247,.85)';
+      ctx.beginPath(); ctx.arc(p.x,p.y,2,0,Math.PI*2); ctx.fill();
+      if(s.val&&S.scale>0.4){
+        ctx.fillStyle='rgba(159,176,200,.9)';
+        ctx.font='9px sans-serif';
+        ctx.fillText(s.val.toFixed(0), p.x+4, p.y+3);
+      }
+    });
+  }
+}
+
+/* ── 팬/줌 ── */
+var _drag=null;
+cv.addEventListener('mousedown',function(e){
+  if(!S.bounds) return;
+  _drag={x:e.clientX,y:e.clientY,ox:S.ox,oy:S.oy};
+});
+window.addEventListener('mousemove',function(e){
+  if(!_drag) return;
+  S.ox=_drag.ox+(e.clientX-_drag.x);
+  S.oy=_drag.oy-(e.clientY-_drag.y);
+  render();
+});
+window.addEventListener('mouseup',function(){ _drag=null; });
+cv.addEventListener('wheel',function(e){
+  if(!S.bounds) return;
+  e.preventDefault();
+  var rect=cv.getBoundingClientRect();
+  var sx=e.clientX-rect.left, sy=e.clientY-rect.top;
+  var w=s2w(sx,sy);
+  var f=e.deltaY<0?1.12:1/1.12;
+  S.scale*=f;
+  S.ox=sx-w.x*S.scale;
+  S.oy=(cv.height-sy)-w.y*S.scale;
+  render();
+},{passive:false});
+
+/* ── 파일 처리 ── */
+function handleFile(f){
+  if(!f) return;
+  if(!/\.dxf$/i.test(f.name||'')){ toast('DXF 파일만 올릴 수 있어요','err'); return; }
+  S.name=f.name;
+
+  /* 처리중 표시 */
+  document.getElementById('processing').classList.add('show');
+  document.getElementById('procText').textContent='지형도를 읽는 중... ('+(f.size/1048576).toFixed(1)+'MB)';
+  setStep(2);
+
+  var rd=new FileReader();
+  rd.onload=function(){
+    /* 약간 지연 → 스피너 보이게 (큰 파일은 파싱이 무거움) */
+    setTimeout(function(){
+      try{
+        var r=parseDXF(rd.result);
+        if(!r.contours.length && !r.surveys.length){
+          document.getElementById('processing').classList.remove('show');
+          toast('등고선·표고점을 못 찾았어요. 수치지형도가 맞는지 확인하세요','err');
+          setStep(1);
+          return;
+        }
+        applyResult(r);
+      }catch(err){
+        document.getElementById('processing').classList.remove('show');
+        toast(err.message||'파일을 읽을 수 없어요','err');
+        setStep(1);
+      }
+    }, 80);
+  };
+  rd.onerror=function(){
+    document.getElementById('processing').classList.remove('show');
+    toast('파일 읽기 실패','err'); setStep(1);
+  };
+  rd.readAsText(f);
+}
+
+/* ── 결과 적용 ── */
+function applyResult(r){
+  S.contours=r.contours; S.surveys=r.surveys; S.polys=r.polys;
+  S.allLayerCount=r.allLayer; S.keptLayerCount=r.keptLayer;
+
+  /* 고도 범위 */
+  var zs=[];
+  S.contours.forEach(function(c){ if(c.elev>-100) zs.push(c.elev); });
+  S.surveys.forEach(function(s){ if(s.val) zs.push(s.val); else if(s.z) zs.push(s.z); });
+  if(zs.length){ S.zmin=Math.min.apply(null,zs); S.zmax=Math.max.apply(null,zs); }
+  else { S.zmin=0; S.zmax=1; }
+
+  /* 경계 */
+  var minX=1e18,minY=1e18,maxX=-1e18,maxY=-1e18;
+  function eat(p){ if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x; if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y; }
+  S.contours.forEach(function(c){ c.pts.forEach(eat); });
+  S.surveys.forEach(eat);
+  S.bounds={minX:minX,minY:minY,maxX:maxX,maxY:maxY};
+
+  /* 처리 종료 */
+  document.getElementById('processing').classList.remove('show');
+  document.getElementById('dropzone').classList.add('hide');
+
+  /* 통계 표시 */
+  document.getElementById('vCont').textContent=S.contours.length;
+  document.getElementById('vElev').textContent=S.surveys.length;
+  document.getElementById('hdrStat').innerHTML='등고선 <b>'+S.contours.length+'</b> · 표고점 <b>'+S.surveys.length+'</b>';
+  document.getElementById('elevRange').innerHTML=
+    '<div style="font-size:11px;color:var(--tx2);text-align:center">고도 '+
+    S.zmin.toFixed(0)+'m ~ '+S.zmax.toFixed(0)+'m</div>';
+  document.getElementById('legLow').textContent=S.zmin.toFixed(0)+'m';
+  document.getElementById('legHigh').textContent=S.zmax.toFixed(0)+'m';
+
+  /* 레이어 분류 목록 */
+  renderLayerList();
+
+  /* 섹션 표시 */
+  document.getElementById('resultSec').classList.remove('hidden');
+  document.getElementById('layerSec').classList.remove('hidden');
+  document.getElementById('infoBox').classList.remove('hidden');
+  document.getElementById('resetBtn').classList.remove('hidden');
+  document.getElementById('dlBtn').classList.remove('hidden');
+  document.getElementById('legend').classList.add('show');
+  document.getElementById('fitBtn').classList.add('show');
+  document.getElementById('nextBtn').disabled=false;
+
+  setStep(3);
+  fitView();
+  render();
+
+  /* 지도가 열려있으면 이 지형도 위치로 이동 */
+  if(_leafMap && _wmsOpen) setTimeout(centerWmsMap, 150);
+
+  toast('✅ 레이어 정리 완료 · 등고선 '+S.contours.length+' · 표고점 '+S.surveys.length, 'ok');
+}
+
+/* ── 레이어 분류 목록 ── */
+function renderLayerList(){
+  var box=document.getElementById('layerList');
+  box.innerHTML='';
+  /* 남긴 레이어 (등고선·표고점) */
+  var kept=Object.entries(S.keptLayerCount).sort(function(a,b){return b[1]-a[1];});
+  var meaning={'F0017111':'주곡선','F0017114':'계곡선','F0017121':'주곡선(오목)',
+               'F0017122':'간곡선','F0017124':'조곡선','F0027217':'표고점',
+               'F0027132':'표고값','H0027311':'삼각점','H0027312':'수준점'};
+  kept.forEach(function(e){
+    var lyr=e[0], cnt=e[1];
+    var name=meaning[lyr]||'지형';
+    box.innerHTML+='<div class="layer-row kept"><span class="ic">✅</span>'+
+      '<span class="tag">'+lyr+'</span><span style="color:var(--tx2)">'+name+'</span>'+
+      '<span class="cnt">'+cnt+'</span></div>';
+  });
+  /* 제거된 레이어 요약 */
+  var allCount=Object.keys(S.allLayerCount).length;
+  var keptCount=kept.length;
+  var dropCount=allCount-keptCount;
+  if(dropCount>0){
+    box.innerHTML+='<div class="layer-row drop" style="margin-top:6px;padding-top:8px;'+
+      'border-top:1px solid var(--line)"><span class="ic">🗑</span>'+
+      '<span style="color:var(--tx3)">제거됨 (도로·건물·식생 등)</span>'+
+      '<span style="color:var(--tx3);margin-left:auto;font-weight:600">'+dropCount+'종</span></div>';
+  }
+}
+
+/* ── 정리된 DXF 다운로드 (R12, 등고선 z + 표고점 보존) ── */
+function downloadDXF(){
+  if(!S.contours.length && !S.surveys.length){ toast('먼저 지형도를 올려주세요','err'); return; }
+  function num(code,val){ return code+'\n'+val+'\n'; }
+  var b=S.bounds;
+  var s='';
+  /* HEADER */
+  s+=num(0,'SECTION')+num(2,'HEADER');
+  s+=num(9,'$ACADVER')+num(1,'AC1009');  /* R12 */
+  s+=num(9,'$EXTMIN')+num(10,b.minX.toFixed(3))+num(20,b.minY.toFixed(3))+num(30,'0.0');
+  s+=num(9,'$EXTMAX')+num(10,b.maxX.toFixed(3))+num(20,b.maxY.toFixed(3))+num(30,'0.0');
+  s+=num(0,'ENDSEC');
+  /* TABLES — 레이어 정의 (실제 쓰인 것만) */
+  var layers={}; S.contours.forEach(function(c){ layers[c.layer||'등고선']=1; });
+  if(S.surveys.length) layers['표고점']=1;
+  var lkeys=Object.keys(layers);
+  s+=num(0,'SECTION')+num(2,'TABLES')+num(0,'TABLE')+num(2,'LAYER')+num(70,String(lkeys.length));
+  lkeys.forEach(function(ly){
+    s+=num(0,'LAYER')+num(2,ly)+num(70,'0')+num(62,'7')+num(6,'CONTINUOUS');
+  });
+  s+=num(0,'ENDTAB')+num(0,'ENDSEC');
+  /* ENTITIES */
+  s+=num(0,'SECTION')+num(2,'ENTITIES');
+  /* 등고선 — 3D POLYLINE (z=고도 보존) */
+  S.contours.forEach(function(c){
+    var lay=c.layer||'등고선';
+    s+=num(0,'POLYLINE')+num(8,lay)+num(66,'1')+num(70,c.closed?'9':'8');  /* 8=3D, +1=closed */
+    s+=num(10,'0.0')+num(20,'0.0')+num(30,'0.0');
+    var elev=(c.elev||0).toFixed(3);
+    c.pts.forEach(function(p){
+      s+=num(0,'VERTEX')+num(8,lay)+num(70,'32');
+      s+=num(10,p.x.toFixed(3))+num(20,p.y.toFixed(3))+num(30,elev);
+    });
+    s+=num(0,'SEQEND');
+  });
+  /* 표고점 — POINT (z=표고). popup_flow 파서가 POINT를 표고점으로 인식하도록 함께 수정됨 */
+  S.surveys.forEach(function(sv){
+    var z=sv.val||sv.z||0;
+    s+=num(0,'POINT')+num(8,'표고점');
+    s+=num(10,sv.x.toFixed(3))+num(20,sv.y.toFixed(3))+num(30,z.toFixed(3));
+  });
+  s+=num(0,'ENDSEC')+num(0,'EOF');
+
+  /* 다운로드 */
+  var blob=new Blob([s],{type:'application/dxf'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  var base=(S.name||'지형도').replace(/\.dxf$/i,'');
+  a.href=url; a.download=base+'_정리.dxf';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('⬇ 정리된 DXF 다운로드 · 등고선 '+S.contours.length+' · 표고점 '+S.surveys.length,'ok');
+}
+
+/* ── 단계 표시 ── */
+function setStep(n){
+  [1,2,3].forEach(function(i){
+    var el=document.getElementById('st'+i);
+    el.className='step'+(i<n?' done':i===n?' cur':'');
+  });
+}
+
+/* ── 초기화 ── */
+function resetAll(){
+  S.contours=[]; S.surveys=[]; S.polys=[]; S.bounds=null;
+  S.allLayerCount={}; S.keptLayerCount={};
+  document.getElementById('dropzone').classList.remove('hide');
+  document.getElementById('resultSec').classList.add('hidden');
+  document.getElementById('layerSec').classList.add('hidden');
+  document.getElementById('infoBox').classList.add('hidden');
+  document.getElementById('resetBtn').classList.add('hidden');
+  document.getElementById('dlBtn').classList.add('hidden');
+  document.getElementById('legend').classList.remove('show');
+  document.getElementById('fitBtn').classList.remove('show');
+  document.getElementById('nextBtn').disabled=true;
+  document.getElementById('hdrStat').innerHTML='';
+  document.getElementById('fileInput').value='';
+  setStep(1);
+  ctx.clearRect(0,0,cv.width,cv.height);
+}
+
+/* ── 이벤트 바인딩 ── */
+document.getElementById('fileInput').addEventListener('change',function(e){
+  if(e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+var dz=document.getElementById('dropzone');
+var stage=document.getElementById('stage');
+['dragenter','dragover'].forEach(function(ev){
+  stage.addEventListener(ev,function(e){ e.preventDefault(); dz.classList.add('drag'); });
+});
+['dragleave','drop'].forEach(function(ev){
+  stage.addEventListener(ev,function(e){ e.preventDefault();
+    if(ev==='dragleave'&&stage.contains(e.relatedTarget)) return;
+    dz.classList.remove('drag');
+  });
+});
+stage.addEventListener('drop',function(e){
+  e.preventDefault();
+  var f=e.dataTransfer.files[0];
+  if(f) handleFile(f);
+});
+
+document.getElementById('nextBtn').addEventListener('click',function(){
+  toast('2단계(지도·지적도)는 다음에 만들어요 🗺️','warn');
+});
+
+/* ════════════════════════════════════════════════
+   2단계: VWorld 지도 + WMS (지적도·산사태·지질)
+   - 검증된 popup_flow 지도 코드 재활용
+   ════════════════════════════════════════════════ */
+var SAFEMAP_KEY = 'K7JMZ9N6-K7JM-K7JM-K7JM-K7JMZ9N6D1';
+var KIGAM_KEY   = 'mzt5lyC51EuMLE1FlKz1Xvk7inmlKd';
+var _leafMap = null, _wmsOpen = false;
+var _wmsLayers = {}, _bgLayers = {}, _activeBg = 'base';
+
+/* 패널 열기/닫기 */
+function toggleWmsPanel(){
+  _wmsOpen = !_wmsOpen;
+  var panel = document.getElementById('wmsPanel');
+  var btn   = document.getElementById('btnWmsMap');
+  panel.classList.toggle('open', _wmsOpen);
+  if(btn) btn.classList.toggle('active', _wmsOpen);
+  if(_wmsOpen && !_leafMap){ setTimeout(initLeafMap, 60); }
+  else if(_wmsOpen && _leafMap){ setTimeout(function(){ _leafMap.invalidateSize(); centerWmsMap(); }, 120); }
+}
+
+/* Leaflet 초기화 */
+function initLeafMap(){
+  if(_leafMap || typeof L === 'undefined') return;
+  _leafMap = L.map('wmsMap',{ zoomControl:false, attributionControl:false }).setView([36.5,127.5],10);
+  L.control.zoom({ position:'bottomright' }).addTo(_leafMap);
+  var VK = '16B90D39-90BB-3197-987A-54983A46F250';
+  _bgLayers.base = L.tileLayer(
+    'https://api.vworld.kr/req/wmts/1.0.0/'+VK+'/Base/{z}/{y}/{x}.png',
+    {maxZoom:19, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}
+  ).addTo(_leafMap);
+  _bgLayers.satellite = L.tileLayer(
+    'https://api.vworld.kr/req/wmts/1.0.0/'+VK+'/Satellite/{z}/{y}/{x}.jpeg',
+    {maxZoom:19}
+  );
+  centerWmsMap();
+}
+
+/* TM(EPSG:5186) → WGS84 정확 변환 (proj4 사용) */
+(function(){
+  if(typeof proj4!=='undefined'){
+    proj4.defs('EPSG:5186','+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+  }
+})();
+function tm5186toWgs84(E, N){
+  if(typeof proj4!=='undefined'){
+    var r=proj4('EPSG:5186','WGS84',[E,N]);  // [lon, lat]
+    return [r[1], r[0]];  // [lat, lon]
+  }
+  return [37.2, 127.0];  // proj4 미로드 시 폴백 (대략 중부)
+}
+
+/* DXF 현장 좌표로 지도 이동 */
+function centerWmsMap(){
+  if(!_leafMap || !S.bounds) return;
+  var b=S.bounds;
+  var cx=(b.minX+b.maxX)/2, cy=(b.minY+b.maxY)/2;
+  var latlng;
+  if(Math.abs(cx)>10000 && Math.abs(cy)>10000){
+    latlng = tm5186toWgs84(cx, cy);
+  } else {
+    latlng = [cy, cx];
+  }
+  if(latlng[0]>30 && latlng[0]<40 && latlng[1]>124 && latlng[1]<132){
+    _leafMap.setView(latlng, 16);
+  }
+  setTimeout(function(){ _leafMap && _leafMap.invalidateSize(); }, 100);
+}
+
+/* 배경지도 전환 */
+function setWmsBg(type){
+  if(!_leafMap || _activeBg === type) return;
+  _leafMap.removeLayer(_bgLayers[_activeBg]);
+  _leafMap.addLayer(_bgLayers[type]);
+  Object.values(_wmsLayers).forEach(function(l){ if(l.bringToFront) l.bringToFront(); });
+  _activeBg = type;
+  document.getElementById('bgBase').classList.toggle('on', type==='base');
+  document.getElementById('bgSat').classList.toggle('on', type==='satellite');
+}
+
+/* WMS 레이어 ON/OFF */
+function toggleWmsLayer(type){
+  if(!_leafMap){ toast('지도를 먼저 열어주세요','err'); return; }
+  var tog = document.getElementById('tog'+type.charAt(0).toUpperCase()+type.slice(1));
+  var isOn = tog.classList.toggle('on');
+  var op = parseInt(document.getElementById('wmsOpacity').value)/100;
+  var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+
+  if(isOn){
+    if(_wmsLayers[type]){ _wmsLayers[type].addTo(_leafMap); return; }
+    var lyr;
+    if(type==='cadastral'){
+      lyr = L.tileLayer.wms(PROXY + '/api/vw-wms', {
+        layers: 'lt_c_lhsco030', styles: 'lt_c_lhsco030',
+        format: 'image/png', transparent: true, opacity: op,
+        version: '1.3.0', tiled: true
+      });
+    } else if(type==='landslide'){
+      var _px = PROXY;
+      var SafemapLayer = L.TileLayer.extend({
+        getTileUrl: function(coords) {
+          var z=coords.z, x=coords.x, y=coords.y, n=Math.pow(2,z);
+          var w=x/n*360-180, e=(x+1)/n*360-180;
+          var latN=Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI;
+          var latS=Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)))*180/Math.PI;
+          return _px+'/api/safemap-wms'
+            +'?srs=EPSG%3A4326'
+            +'&bbox='+w+','+latS+','+e+','+latN
+            +'&format=image%2Fpng'
+            +'&width=256&height=256&transparent=TRUE';
+        }
+      });
+      lyr = new SafemapLayer('', {opacity:op, tileSize:256,
+        attribution:'산사태위험도 © 행정안전부', maxNativeZoom:16, maxZoom:22});
+    } else if(type==='geology'){
+      if(!KIGAM_KEY){ toast('수치지질도 키 없음','err'); tog.classList.remove('on'); return; }
+      lyr = L.tileLayer.wms('https://data.kigam.re.kr/openapi/wms?key=' + encodeURIComponent(KIGAM_KEY), {
+        layers: 'L_50K_Geology_Map', format: 'image/png',
+        transparent: true, opacity: op, version: '1.1.1', crossOrigin: 'anonymous'
+      });
+    }
+    if(lyr){ lyr.addTo(_leafMap); _wmsLayers[type]=lyr; }
+  } else {
+    if(_wmsLayers[type]){ _leafMap.removeLayer(_wmsLayers[type]); }
+  }
+}
+
+/* 투명도 변경 */
+function setWmsOpacity(val){
+  document.getElementById('opVal').textContent = val+'%';
+  var op = val/100;
+  Object.values(_wmsLayers).forEach(function(l){ if(l.setOpacity) l.setOpacity(op); });
+}
+
+/* 패널 리사이즈 드래그 */
+(function(){
+  var resizing=false, startX=0, startW=0;
+  var handle = document.getElementById('wmsResizeHandle');
+  var panel  = document.getElementById('wmsPanel');
+  if(!handle || !panel) return;
+  handle.addEventListener('mousedown', function(e){
+    resizing=true; startX=e.clientX; startW=panel.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor='ew-resize';
+    document.body.style.userSelect='none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e){
+    if(!resizing) return;
+    var dx = startX - e.clientX;
+    var nw = Math.max(280, Math.min(window.innerWidth*0.75, startW+dx));
+    panel.style.width = nw+'px';
+    if(_leafMap) _leafMap.invalidateSize();
+  });
+  document.addEventListener('mouseup', function(){
+    if(!resizing) return;
+    resizing=false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor='';
+    document.body.style.userSelect='';
+    if(_leafMap) _leafMap.invalidateSize();
+  });
+})();
+
+/* 초기 캔버스 크기 */
+resizeCanvas();
+</script>
+</body>
+</html>
