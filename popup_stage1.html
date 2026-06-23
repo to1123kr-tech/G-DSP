@@ -902,7 +902,7 @@ function toggleWmsLayer(type){
     var lyr;
     if(type==='cadastral'){
       lyr = L.tileLayer.wms(PROXY + '/api/vw-wms', {
-        layers: 'lt_c_lhsco030', styles: 'lt_c_lhsco030',
+        layers: 'lt_c_landinfobasemap', styles: 'lt_c_landinfobasemap',
         format: 'image/png', transparent: true, opacity: op,
         version: '1.3.0', tiled: true
       });
@@ -924,10 +924,10 @@ function toggleWmsLayer(type){
       lyr = new SafemapLayer('', {opacity:op, tileSize:256,
         attribution:'산사태위험도 © 행정안전부', maxNativeZoom:16, maxZoom:22});
     } else if(type==='geology'){
-      if(!KIGAM_KEY){ toast('수치지질도 키 없음','err'); tog.classList.remove('on'); return; }
-      lyr = L.tileLayer.wms('https://data.kigam.re.kr/openapi/wms?key=' + encodeURIComponent(KIGAM_KEY), {
-        layers: 'L_50K_Geology_Map', format: 'image/png',
-        transparent: true, opacity: op, version: '1.1.1', crossOrigin: 'anonymous'
+      /* KIGAM 수치지질도 — 서버 프록시 경유 (CORS 우회) */
+      lyr = L.tileLayer.wms(PROXY + '/api/kigam-wms', {
+        layers: 'L_50K_Geology_Map',
+        format: 'image/png', transparent: true, opacity: op, version: '1.3.0'
       });
     }
     if(lyr){ lyr.addTo(_leafMap); _wmsLayers[type]=lyr; }
