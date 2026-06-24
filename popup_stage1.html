@@ -186,6 +186,27 @@
     color:var(--tx2);border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer;transition:.2s}
   .bg-btn.on{background:var(--pri);border-color:var(--pri);color:#fff}
 
+  /* 주소 검색창 */
+  .wms-search{display:flex;gap:6px;margin-bottom:8px}
+  .wms-search input{flex:1;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:7px;color:var(--tx);font-size:12px}
+  .wms-search input:focus{outline:none;border-color:var(--pri)}
+  .wms-search button{padding:8px 11px;background:var(--pri);border:none;border-radius:7px;
+    color:#fff;cursor:pointer;font-size:13px}
+  .wms-search button:hover{background:var(--pri2)}
+  .wms-search-results{background:var(--panel2);border:1px solid var(--line);border-radius:7px;
+    margin-bottom:8px;max-height:160px;overflow-y:auto}
+  .wms-sr-item{padding:8px 10px;font-size:11.5px;color:var(--tx2);cursor:pointer;
+    border-bottom:1px solid var(--line)}
+  .wms-sr-item:last-child{border-bottom:none}
+  .wms-sr-item:hover{background:var(--panel);color:var(--pri2)}
+
+  /* 산사태 범례 */
+  .ls-legend{padding:8px 6px 4px;display:flex;flex-direction:column;gap:5px}
+  .ls-leg-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--tx2)}
+  .ls-sw{display:inline-block;width:16px;height:12px;border-radius:3px;flex-shrink:0;
+    border:1px solid rgba(255,255,255,.15)}
+
   /* WMS 레이어 토글 */
   .wms-layers{padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}
   .wms-layers h5{font-size:10px;color:var(--tx3);letter-spacing:.6px;
@@ -235,6 +256,13 @@
   /* 지도 캔버스 */
   .wms-map{flex:1;min-height:0}
   #wmsMap{width:100%;height:100%;background:#0a0f1a}
+
+  /* 전체화면 */
+  #wmsPanel:fullscreen{width:100vw!important;height:100vh!important;transform:none!important;max-width:none!important}
+  #wmsPanel:-webkit-full-screen{width:100vw!important;height:100vh!important;transform:none!important}
+  .wms-fs-btn{display:block;width:30px;height:30px;line-height:30px;text-align:center;
+    font-size:15px;color:#222;background:#fff;cursor:pointer;text-decoration:none}
+  .wms-fs-btn:hover{background:#f4f4f4}
 
   /* 안내 */
   .wms-note{padding:10px 16px;font-size:10.5px;color:var(--tx3);line-height:1.6;
@@ -340,6 +368,11 @@
       <button class="x" onclick="toggleWmsPanel()">✕</button>
     </div>
     <div class="wms-top">
+      <div class="wms-search">
+        <input type="text" id="mapSearchInput" placeholder="주소·지번 검색 (예: 무송리 383)" onkeydown="if(event.key==='Enter')doMapSearch()">
+        <button id="mapSearchBtn" onclick="doMapSearch()">🔍</button>
+      </div>
+      <div class="wms-search-results hidden" id="mapSearchResults"></div>
       <div class="bg-toggle">
         <button class="bg-btn on" id="bgBase" onclick="setWmsBg('base')">일반</button>
         <button class="bg-btn" id="bgSat" onclick="setWmsBg('satellite')">위성</button>
@@ -364,6 +397,13 @@
       <div class="wms-row">
         <span class="nm">🏔️ 산사태위험지도</span>
         <button class="wms-tog" id="togLandslide" onclick="toggleWmsLayer('landslide')"></button>
+      </div>
+      <div class="ls-legend hidden" id="lsLegend">
+        <div class="ls-leg-row"><span class="ls-sw" style="background:#e60000"></span>1등급 · 매우높음</div>
+        <div class="ls-leg-row"><span class="ls-sw" style="background:#ff8c00"></span>2등급 · 높음</div>
+        <div class="ls-leg-row"><span class="ls-sw" style="background:#ffd24d"></span>3등급 · 보통</div>
+        <div class="ls-leg-row"><span class="ls-sw" style="background:#9bd64a"></span>4등급 · 낮음</div>
+        <div class="ls-leg-row"><span class="ls-sw" style="background:#4fa3e3"></span>5등급 · 매우낮음</div>
       </div>
       <div class="wms-row">
         <span class="nm">🪨 수치지질도</span>
@@ -818,12 +858,14 @@ function downloadDXF(){
     'F0017122':30,  /* 간곡선 = 주황 */
     'F0017124':7,   /* 조곡선 = 흰색 */
     '등고선':30,
-    '표고점':5       /* 표고점 = 파랑 (잘 보이게) */
+    '표고점':5,      /* 표고점 = 파랑 (잘 보이게) */
+    '지적선':1       /* 지적선 = 빨강 */
   };
   function lcolor(ly){ return LCOLOR[ly]!=null?LCOLOR[ly]:7; }
   /* TABLES — 레이어 정의 (실제 쓰인 것만, 색상 포함) */
   var layers={}; S.contours.forEach(function(c){ layers[c.layer||'등고선']=1; });
   if(S.surveys.length) layers['표고점']=1;
+  if(S.parcels && S.parcels.length) layers['지적선']=1;
   var lkeys=Object.keys(layers);
   s+=num(0,'SECTION')+num(2,'TABLES')+num(0,'TABLE')+num(2,'LAYER')+num(70,String(lkeys.length));
   lkeys.forEach(function(ly){
@@ -860,6 +902,27 @@ function downloadDXF(){
     s+=num(40,txtH.toFixed(1));   /* 글자 높이 (지형 범위 비례) */
     s+=num(1,z.toFixed(2));       /* 표고값 (소수 2자리, 반올림 안 함) */
   });
+  /* 지적선(입힌 필지) — 닫힌 2D POLYLINE(빨강) + 지번 TEXT */
+  if(S.parcels && S.parcels.length){
+    S.parcels.forEach(function(pc){
+      pc.rings.forEach(function(ring){
+        s+=num(0,'POLYLINE')+num(8,'지적선')+num(62,'1')+num(66,'1')+num(70,'1');  /* 70=1 → 닫힘 */
+        s+=num(10,'0.0')+num(20,'0.0')+num(30,'0.0');
+        ring.forEach(function(p){
+          s+=num(0,'VERTEX')+num(8,'지적선')+num(70,'32');
+          s+=num(10,p.x.toFixed(3))+num(20,p.y.toFixed(3))+num(30,'0.0');
+        });
+        s+=num(0,'SEQEND');
+      });
+      /* 지번 TEXT (필지 중심) */
+      if(pc.jibun){
+        s+=num(0,'TEXT')+num(8,'지적선')+num(62,'1');
+        s+=num(10,pc.cx.toFixed(3))+num(20,pc.cy.toFixed(3))+num(30,'0.0');
+        s+=num(40,txtH.toFixed(1));
+        s+=num(1,pc.jibun);
+      }
+    });
+  }
   s+=num(0,'ENDSEC')+num(0,'EOF');
 
   /* 다운로드 */
@@ -870,7 +933,8 @@ function downloadDXF(){
   a.href=url; a.download=base+'_정리.dxf';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast('⬇ 정리된 DXF 다운로드 · 등고선 '+S.contours.length+' · 표고점 '+S.surveys.length,'ok');
+  var pcN = (S.parcels && S.parcels.length) ? ' · 지적선 '+S.parcels.length : '';
+  toast('⬇ DXF 다운로드 · 등고선 '+S.contours.length+' · 표고점 '+S.surveys.length+pcN,'ok');
 }
 
 /* ── 단계 표시 ── */
@@ -973,6 +1037,18 @@ function initLeafMap(){
     wheelDebounceTime:30
   }).setView([36.5,127.5],10);
   L.control.zoom({ position:'bottomright' }).addTo(_leafMap);
+  /* +/- 아래에 전체화면 버튼 */
+  var FsCtl = L.Control.extend({
+    options:{position:'bottomright'},
+    onAdd:function(){
+      var div=L.DomUtil.create('div','leaflet-bar');
+      var a=L.DomUtil.create('a','wms-fs-btn',div);
+      a.href='#'; a.id='fsBtnIcon'; a.innerHTML='⛶'; a.title='지도 전체화면';
+      L.DomEvent.on(a,'click',function(e){ L.DomEvent.stop(e); toggleMapFullscreen(); });
+      return div;
+    }
+  });
+  _leafMap.addControl(new FsCtl());
   var VK = VWORLD_KEY;
   _bgLayers.base = L.tileLayer(
     'https://api.vworld.kr/req/wmts/1.0.0/'+VK+'/Base/{z}/{y}/{x}.png',
@@ -996,7 +1072,30 @@ function initLeafMap(){
   centerWmsMap();
 }
 
-/* TM(EPSG:5186) → WGS84 정확 변환 (proj4 사용) */
+/* 지도 전체화면 토글 (지도 패널 전체를 풀스크린 → 임상도 등 크게 보기) */
+function toggleMapFullscreen(){
+  var el=document.getElementById('wmsPanel');
+  var fsEl=document.fullscreenElement||document.webkitFullscreenElement;
+  if(!fsEl){
+    var req=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
+    if(req) req.call(el);
+    else toast('이 브라우저는 전체화면을 지원하지 않아요','warn');
+  } else {
+    var ex=document.exitFullscreen||document.webkitExitFullscreen;
+    if(ex) ex.call(document);
+  }
+}
+['fullscreenchange','webkitfullscreenchange'].forEach(function(ev){
+  document.addEventListener(ev, function(){
+    var fsEl=document.fullscreenElement||document.webkitFullscreenElement;
+    var ic=document.getElementById('fsBtnIcon');
+    if(ic){ ic.innerHTML = fsEl ? '⮌' : '⛶'; ic.title = fsEl ? '전체화면 끄기' : '지도 전체화면'; }
+    setTimeout(function(){
+      if(_leafMap){ _leafMap.invalidateSize(); }
+      if(_landslideOn) updateLandslideImg();
+    }, 150);
+  });
+});
 (function(){
   if(typeof proj4!=='undefined'){
     proj4.defs('EPSG:5186','+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
@@ -1056,6 +1155,7 @@ function toggleWmsLayer(type){
   /* 산사태 — 화면 전체를 1장으로 받음 (타일 1개씩 프록시 받던 지연 제거) */
   if(type==='landslide'){
     _landslideOn = isOn;
+    document.getElementById('lsLegend').classList.toggle('hidden', !isOn);
     if(isOn) updateLandslideImg();
     else if(_landslideImg){ _leafMap.removeLayer(_landslideImg); _landslideImg=null; }
     return;
@@ -1065,9 +1165,9 @@ function toggleWmsLayer(type){
     if(_wmsLayers[type]){ _wmsLayers[type].addTo(_leafMap); return; }
     var lyr;
     if(type==='geology'){
-      /* KIGAM 수치지질도 — 직접 호출 + 버전 1.1.1 (서버 kigam-info가 1.1.1/50K로 정상작동하는 조합) */
+      /* KIGAM 수치지질도 — 직접 호출 + 1.1.1 + 250K (KIGAM 공식 예제가 쓰는 조합 = 넓은 줌에서 렌더됨) */
       lyr = L.tileLayer.wms('https://data.kigam.re.kr/openapi/wms', {
-        layers: 'L_50K_Geology_Map', styles: '',
+        layers: 'L_250K_Geology_Map', styles: '',
         format: 'image/png', transparent: true, version: '1.1.1',
         key: KIGAM_KEY, opacity: op, maxZoom: 22,
         updateWhenIdle: false, keepBuffer: 4
@@ -1079,7 +1179,7 @@ function toggleWmsLayer(type){
   }
 }
 
-/* 산사태위험지도 단일이미지 갱신 — 현재 화면 bbox를 한 장으로 요청 */
+/* 산사태위험지도 단일이미지 갱신 — 현재 화면 bbox를 한 장으로 요청 (지도와 같은 EPSG:3857로 → 격자 정확히 정렬) */
 function updateLandslideImg(){
   if(!_landslideOn || !_leafMap) return;
   var b = _leafMap.getBounds();
@@ -1088,10 +1188,13 @@ function updateLandslideImg(){
   var h = Math.min(Math.max(sz.y,256), 1536);
   var op = parseInt(document.getElementById('wmsOpacity').value)/100;
   var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
-  var sw=b.getSouthWest(), ne=b.getNorthEast();
+  /* 지도 투영(3857)로 bbox 계산 → 위성지도와 픽셀 단위로 정확히 겹침 (4326은 큰 화면에서 세로로 어긋남) */
+  var crs = _leafMap.options.crs;
+  var p1 = crs.project(b.getSouthWest()), p2 = crs.project(b.getNorthEast());
+  var minx=Math.min(p1.x,p2.x), miny=Math.min(p1.y,p2.y), maxx=Math.max(p1.x,p2.x), maxy=Math.max(p1.y,p2.y);
   var url = PROXY+'/api/safemap-wms'
-    +'?srs=EPSG%3A4326'
-    +'&bbox='+sw.lng+','+sw.lat+','+ne.lng+','+ne.lat
+    +'?srs=EPSG%3A3857'
+    +'&bbox='+minx+','+miny+','+maxx+','+maxy
     +'&width='+w+'&height='+h
     +'&format=image%2Fpng&transparent=TRUE';
   var newImg = L.imageOverlay(url, b, {opacity:op, interactive:false});
@@ -1111,6 +1214,43 @@ function setWmsOpacity(val){
   var op = val/100;
   Object.values(_wmsLayers).forEach(function(l){ if(l.setOpacity) l.setOpacity(op); });
   if(_landslideImg && _landslideImg.setOpacity) _landslideImg.setOpacity(op);
+}
+
+/* ── 주소·지번 검색 (VWorld 검색 API 경유) ── */
+function doMapSearch(){
+  if(!_leafMap){ toast('지도를 먼저 열어주세요','err'); return; }
+  var q = document.getElementById('mapSearchInput').value.trim();
+  if(!q) return;
+  var box = document.getElementById('mapSearchResults');
+  box.innerHTML='<div class="wms-sr-item">검색 중…</div>'; box.classList.remove('hidden');
+  var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+  fetch(PROXY+'/api/vw-search?query='+encodeURIComponent(q))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(!d.ok || !d.items || !d.items.length){
+        box.innerHTML='<div class="wms-sr-item">검색 결과가 없어요</div>'; return;
+      }
+      box.innerHTML='';
+      d.items.forEach(function(it){
+        var div=document.createElement('div');
+        div.className='wms-sr-item';
+        div.textContent=it.parcel || it.pnu || '(주소 없음)';
+        div.onclick=function(){ goToSearchResult(it); };
+        box.appendChild(div);
+      });
+      if(d.items.length===1) goToSearchResult(d.items[0]);
+    })
+    .catch(function(e){ box.innerHTML='<div class="wms-sr-item">검색 실패 — 서버 연결 확인</div>'; });
+}
+function goToSearchResult(it){
+  var pt = it.point || {};
+  var x = parseFloat(pt.x), y = parseFloat(pt.y);
+  if(isNaN(x) || isNaN(y)){ toast('위치 정보가 없어요','warn'); return; }
+  var ll;
+  if(Math.abs(x) > 1000) ll = L.CRS.EPSG3857.unproject(L.point(x, y));  /* 3857 미터 */
+  else ll = L.latLng(y, x);                                            /* 경위도 */
+  _leafMap.setView(ll, 18);
+  document.getElementById('mapSearchResults').classList.add('hidden');
 }
 
 /* ════════════════════════════════════════════════
