@@ -937,6 +937,8 @@ document.getElementById('nextBtn').addEventListener('click',function(){
    ════════════════════════════════════════════════ */
 var SAFEMAP_KEY = 'K7JMZ9N6-K7JM-K7JM-K7JM-K7JMZ9N6D1';
 var KIGAM_KEY   = 'mzt5lyC51EuMLE1FlKz1Xvk7inmlKd';
+var VWORLD_KEY  = '16B90D39-90BB-3197-987A-54983A46F250';  /* 베이스맵과 동일 키 (등록 도메인: nip.io) */
+var VWORLD_DOMAIN = '168-107-15-68.nip.io';
 var _leafMap = null, _wmsOpen = false;
 var _wmsLayers = {}, _bgLayers = {}, _activeBg = 'base';
 
@@ -961,9 +963,15 @@ function toggleWmsPanel(){
 /* Leaflet 초기화 */
 function initLeafMap(){
   if(_leafMap || typeof L === 'undefined') return;
-  _leafMap = L.map('wmsMap',{ zoomControl:false, attributionControl:false }).setView([36.5,127.5],10);
+  _leafMap = L.map('wmsMap',{
+    zoomControl:false, attributionControl:false,
+    zoomSnap:0.25,            /* 0.25단계까지 멈춤 → 부드럽게 */
+    zoomDelta:0.5,            /* +/- 버튼·더블클릭 0.5씩 */
+    wheelPxPerZoomLevel:130,  /* 휠 한 칸당 줌량 ↓ (기본 60 → 130, 조금씩 확대축소) */
+    wheelDebounceTime:30
+  }).setView([36.5,127.5],10);
   L.control.zoom({ position:'bottomright' }).addTo(_leafMap);
-  var VK = '16B90D39-90BB-3197-987A-54983A46F250';
+  var VK = VWORLD_KEY;
   _bgLayers.base = L.tileLayer(
     'https://api.vworld.kr/req/wmts/1.0.0/'+VK+'/Base/{z}/{y}/{x}.png',
     {maxZoom:19, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'}
@@ -1043,10 +1051,13 @@ function toggleWmsLayer(type){
     if(_wmsLayers[type]){ _wmsLayers[type].addTo(_leafMap); return; }
     var lyr;
     if(type==='cadastral'){
-      lyr = L.tileLayer.wms(PROXY + '/api/vw-wms', {
+      /* VWorld 지적도+지번 — index.html/map.html처럼 직접 호출 (이미지 타일은 CORS 무관, 프록시보다 안정적) */
+      lyr = L.tileLayer.wms('https://api.vworld.kr/req/wms', {
         layers: 'lt_c_landinfobasemap', styles: 'lt_c_landinfobasemap',
-        format: 'image/png', transparent: true, opacity: op,
-        version: '1.3.0', tiled: true
+        format: 'image/png', transparent: true, version: '1.3.0',
+        key: VWORLD_KEY, domain: VWORLD_DOMAIN, tiled: true,
+        opacity: op, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4,
+        errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
       });
     } else if(type==='landslide'){
       var _px = PROXY;
@@ -1063,13 +1074,17 @@ function toggleWmsLayer(type){
             +'&width=256&height=256&transparent=TRUE';
         }
       });
+      /* 프록시 경유라 첫 로딩이 느림 → 버퍼 늘리고 이동중에도 미리 받게 해서 매끄럽게 */
       lyr = new SafemapLayer('', {opacity:op, tileSize:256,
-        attribution:'산사태위험도 © 행정안전부', maxNativeZoom:16, maxZoom:22});
+        attribution:'산사태위험도 © 행정안전부', maxNativeZoom:16, maxZoom:22,
+        updateWhenIdle:false, updateWhenZooming:false, keepBuffer:6});
     } else if(type==='geology'){
-      /* KIGAM 수치지질도 — 서버 프록시 경유 (CORS 우회) */
-      lyr = L.tileLayer.wms(PROXY + '/api/kigam-wms', {
-        layers: 'L_50K_Geology_Map',
-        format: 'image/png', transparent: true, opacity: op, version: '1.3.0'
+      /* KIGAM 수치지질도 — 직접 호출 + 버전 1.1.1 (서버 kigam-info가 1.1.1/50K로 정상작동하는 조합) */
+      lyr = L.tileLayer.wms('https://data.kigam.re.kr/openapi/wms', {
+        layers: 'L_50K_Geology_Map', styles: '',
+        format: 'image/png', transparent: true, version: '1.1.1',
+        key: KIGAM_KEY, opacity: op, maxZoom: 22,
+        updateWhenIdle: false, keepBuffer: 4
       });
     }
     if(lyr){ lyr.addTo(_leafMap); _wmsLayers[type]=lyr; }
