@@ -1181,13 +1181,13 @@ function toggleWmsLayer(type){
     if(_wmsLayers[type]){ _wmsLayers[type].addTo(_leafMap); return; }
     var lyr;
     if(type==='geology'){
-      /* KIGAM 수치지질도 1:5만 (상세) — 프록시 경유(Referer 헤더) + KIGAM이 요구하는 EPSG:4326으로 요청
-         (Leaflet 기본 3857로 보내면 빈 이미지가 옴 → crs로 4326 강제) */
-      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
-      lyr = L.tileLayer.wms(PROXY + '/api/kigam-wms', {
+      /* KIGAM 수치지질도 1:5만 — 직접 호출.
+         인증키가 nip.io 도메인에 묶여 승인됨 → 브라우저가 자동으로 보내는 Referer(=nip.io)가 등록도메인과 일치해야 통과.
+         프록시는 Referer를 data.kigam.re.kr로 보내서 거부당했음. + KIGAM이 요구하는 EPSG:4326 강제(기본 3857은 빈 이미지). */
+      lyr = L.tileLayer.wms('https://data.kigam.re.kr/openapi/wms', {
         layers: 'L_50K_Geology_Map', styles: '',
         format: 'image/png', transparent: true, version: '1.1.1',
-        crs: L.CRS.EPSG4326,
+        key: KIGAM_KEY, crs: L.CRS.EPSG4326,
         opacity: op, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4
       });
     }
