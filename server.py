@@ -52,7 +52,7 @@ def kigam_wms_proxy():
         r = req.get(
             'https://data.kigam.re.kr/openapi/wms',
             params=params,
-            headers={"Referer": "https://data.kigam.re.kr", "User-Agent": "Mozilla/5.0"},
+            headers={"Referer": "https://168-107-15-68.nip.io", "User-Agent": "Mozilla/5.0"},
             timeout=15
         )
         resp = make_response(r.content)
@@ -103,7 +103,7 @@ def kigam_featureinfo_proxy():
             params = dict(base_params); params['INFO_FORMAT'] = fmt
             try:
                 r = req.get('https://data.kigam.re.kr/openapi/wms', params=params,
-                            headers={"Referer": "https://data.kigam.re.kr",
+                            headers={"Referer": "https://168-107-15-68.nip.io",
                                      "User-Agent": "Mozilla/5.0"}, timeout=12)
             except Exception as fe:
                 logger.warning(f"[kigam-info] {fmt} request failed: {fe}")
