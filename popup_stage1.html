@@ -201,11 +201,14 @@
   .wms-sr-item:last-child{border-bottom:none}
   .wms-sr-item:hover{background:var(--panel);color:var(--pri2)}
 
-  /* 산사태 범례 */
-  .ls-legend{padding:8px 6px 4px;display:flex;flex-direction:column;gap:5px}
-  .ls-leg-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--tx2)}
+  /* 산사태 범례 (지도 위 플로팅) */
+  .map-legend{position:absolute;left:10px;bottom:14px;z-index:500;
+    background:rgba(8,13,26,.86);border:1px solid var(--line);border-radius:9px;
+    padding:9px 11px;display:flex;flex-direction:column;gap:5px;backdrop-filter:blur(4px)}
+  .map-leg-title{font-size:10px;font-weight:700;color:var(--tx2);letter-spacing:.4px;margin-bottom:2px}
+  .ls-leg-row{display:flex;align-items:center;gap:8px;font-size:11px;color:#dbe4f0}
   .ls-sw{display:inline-block;width:16px;height:12px;border-radius:3px;flex-shrink:0;
-    border:1px solid rgba(255,255,255,.15)}
+    border:1px solid rgba(255,255,255,.2)}
 
   /* WMS 레이어 토글 */
   .wms-layers{padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}
@@ -253,13 +256,21 @@
   .cad-swatch{display:inline-block;width:16px;height:0;border-top:2px solid #ff2d2d;
     vertical-align:middle;margin-left:4px}
 
+  /* 본문(컨트롤 + 지도) — 평소엔 세로, 전체화면엔 가로 */
+  .wms-body{flex:1;min-height:0;display:flex;flex-direction:column}
+  .wms-controls{flex-shrink:0;overflow-y:auto;display:flex;flex-direction:column}
   /* 지도 캔버스 */
-  .wms-map{flex:1;min-height:0}
+  .wms-map{flex:1;min-height:0;position:relative}
   #wmsMap{width:100%;height:100%;background:#0a0f1a}
 
-  /* 전체화면 */
-  #wmsPanel:fullscreen{width:100vw!important;height:100vh!important;transform:none!important;max-width:none!important}
-  #wmsPanel:-webkit-full-screen{width:100vw!important;height:100vh!important;transform:none!important}
+  /* 전체화면: 컨트롤은 좌측 사이드바, 지도는 크게 */
+  #wmsPanel:fullscreen, #wmsPanel:-webkit-full-screen{width:100vw!important;height:100vh!important;transform:none!important;max-width:none!important}
+  #wmsPanel:fullscreen .wms-body{flex-direction:row}
+  #wmsPanel:fullscreen .wms-controls{width:340px;flex-shrink:0;border-right:1px solid var(--line)}
+  #wmsPanel:fullscreen .wms-map{flex:1;min-width:0}
+  #wmsPanel:-webkit-full-screen .wms-body{flex-direction:row}
+  #wmsPanel:-webkit-full-screen .wms-controls{width:340px;flex-shrink:0;border-right:1px solid var(--line)}
+  #wmsPanel:-webkit-full-screen .wms-map{flex:1;min-width:0}
   .wms-fs-btn{display:block;width:30px;height:30px;line-height:30px;text-align:center;
     font-size:15px;color:#222;background:#fff;cursor:pointer;text-decoration:none}
   .wms-fs-btn:hover{background:#f4f4f4}
@@ -367,57 +378,62 @@
       <span class="t">🗺 지도 · 지적도</span>
       <button class="x" onclick="toggleWmsPanel()">✕</button>
     </div>
-    <div class="wms-top">
-      <div class="wms-search">
-        <input type="text" id="mapSearchInput" placeholder="주소·지번 검색 (예: 무송리 383)" onkeydown="if(event.key==='Enter')doMapSearch()">
-        <button id="mapSearchBtn" onclick="doMapSearch()">🔍</button>
+    <div class="wms-body">
+     <div class="wms-controls">
+      <div class="wms-top">
+        <div class="wms-search">
+          <input type="text" id="mapSearchInput" placeholder="주소·지번 검색 (예: 무송리 383)" onkeydown="if(event.key==='Enter')doMapSearch()">
+          <button id="mapSearchBtn" onclick="doMapSearch()">🔍</button>
+        </div>
+        <div class="wms-search-results hidden" id="mapSearchResults"></div>
+        <div class="bg-toggle">
+          <button class="bg-btn on" id="bgBase" onclick="setWmsBg('base')">일반</button>
+          <button class="bg-btn" id="bgSat" onclick="setWmsBg('satellite')">위성</button>
+        </div>
       </div>
-      <div class="wms-search-results hidden" id="mapSearchResults"></div>
-      <div class="bg-toggle">
-        <button class="bg-btn on" id="bgBase" onclick="setWmsBg('base')">일반</button>
-        <button class="bg-btn" id="bgSat" onclick="setWmsBg('satellite')">위성</button>
+      <!-- 지적도(필지) — 빨간 벡터 + 지번, 클릭하면 선택 -->
+      <div class="wms-parcel">
+        <div class="wms-row">
+          <span class="nm">📋 지적도 + 지번 <span class="cad-swatch"></span></span>
+          <button class="wms-tog" id="togParcel" onclick="toggleParcelMode()"></button>
+        </div>
+        <div class="parcel-actions hidden" id="parcelActions">
+          <div class="parcel-hint">줌 16+ 에서 <b>빨간 지적선·지번</b>이 나와요. 필지를 <b>클릭</b>하면 선택(파랑)되고, 여러 개 가능해요.</div>
+          <div class="parcel-cnt">선택한 필지 <b id="parcelCnt">0</b>개</div>
+          <button class="parcel-btn apply" id="btnApplyParcel" onclick="applyParcelsToCanvas()" disabled>✚ 지형도에 입히기</button>
+          <button class="parcel-btn clear" id="btnClearParcel" onclick="clearSelectedParcels()" disabled>선택·입힌 필지 지우기</button>
+        </div>
       </div>
-    </div>
-    <!-- 지적도(필지) — 빨간 벡터 + 지번, 클릭하면 선택 -->
-    <div class="wms-parcel">
-      <div class="wms-row">
-        <span class="nm">📋 지적도 + 지번 <span class="cad-swatch"></span></span>
-        <button class="wms-tog" id="togParcel" onclick="toggleParcelMode()"></button>
-      </div>
-      <div class="parcel-actions hidden" id="parcelActions">
-        <div class="parcel-hint">줌 16+ 에서 <b>빨간 지적선·지번</b>이 나와요. 필지를 <b>클릭</b>하면 선택(파랑)되고, 여러 개 가능해요.</div>
-        <div class="parcel-cnt">선택한 필지 <b id="parcelCnt">0</b>개</div>
-        <button class="parcel-btn apply" id="btnApplyParcel" onclick="applyParcelsToCanvas()" disabled>✚ 지형도에 입히기</button>
-        <button class="parcel-btn clear" id="btnClearParcel" onclick="clearSelectedParcels()" disabled>선택·입힌 필지 지우기</button>
-      </div>
-    </div>
 
-    <div class="wms-layers">
-      <h5>주제도</h5>
-      <div class="wms-row">
-        <span class="nm">🏔️ 산사태위험지도</span>
-        <button class="wms-tog" id="togLandslide" onclick="toggleWmsLayer('landslide')"></button>
+      <div class="wms-layers">
+        <h5>주제도</h5>
+        <div class="wms-row">
+          <span class="nm">🪨 수치지질도 <span style="font-size:10px;color:var(--tx3)">1:5만</span></span>
+          <button class="wms-tog" id="togGeology" onclick="toggleWmsLayer('geology')"></button>
+        </div>
+        <div class="wms-op">
+          <label>투명도 <span id="opVal">60%</span></label>
+          <input type="range" id="wmsOpacity" min="10" max="100" value="60" oninput="setWmsOpacity(this.value)">
+        </div>
       </div>
-      <div class="ls-legend hidden" id="lsLegend">
-        <div class="ls-leg-row"><span class="ls-sw" style="background:#e60000"></span>1등급 · 매우높음</div>
-        <div class="ls-leg-row"><span class="ls-sw" style="background:#ff8c00"></span>2등급 · 높음</div>
-        <div class="ls-leg-row"><span class="ls-sw" style="background:#ffd24d"></span>3등급 · 보통</div>
-        <div class="ls-leg-row"><span class="ls-sw" style="background:#9bd64a"></span>4등급 · 낮음</div>
-        <div class="ls-leg-row"><span class="ls-sw" style="background:#4fa3e3"></span>5등급 · 매우낮음</div>
-      </div>
-      <div class="wms-row">
-        <span class="nm">🪨 수치지질도</span>
-        <button class="wms-tog" id="togGeology" onclick="toggleWmsLayer('geology')"></button>
-      </div>
-      <div class="wms-op">
-        <label>주제도 투명도 <span id="opVal">60%</span></label>
-        <input type="range" id="wmsOpacity" min="10" max="100" value="60" oninput="setWmsOpacity(this.value)">
-      </div>
-    </div>
 
-    <div class="wms-map"><div id="wmsMap"></div></div>
-    <div class="wms-note">
-      지형도를 올리면 그 위치로 지도가 이동해요. 패널 왼쪽 가장자리를 끌면 크기를 조절할 수 있어요.
+      <div class="wms-note">
+        지형도를 올리면 그 위치로 지도가 이동해요. 우측 위 ⛶ 로 전체화면, 패널 왼쪽 가장자리를 끌면 크기 조절돼요.
+      </div>
+     </div>
+
+     <div class="wms-map">
+       <div id="wmsMap"></div>
+       <!-- 산사태 범례 (지도 위 플로팅) -->
+       <div class="map-legend hidden" id="lsLegend">
+         <div class="map-leg-title">산사태위험등급</div>
+         <div class="ls-leg-row"><span class="ls-sw" style="background:#e60000"></span>1등급 · 매우높음</div>
+         <div class="ls-leg-row"><span class="ls-sw" style="background:#ff8c00"></span>2등급 · 높음</div>
+         <div class="ls-leg-row"><span class="ls-sw" style="background:#ffd24d"></span>3등급 · 보통</div>
+         <div class="ls-leg-row"><span class="ls-sw" style="background:#9bd64a"></span>4등급 · 낮음</div>
+         <div class="ls-leg-row"><span class="ls-sw" style="background:#4fa3e3"></span>5등급 · 매우낮음</div>
+       </div>
+     </div>
     </div>
   </div>
 
@@ -1165,12 +1181,14 @@ function toggleWmsLayer(type){
     if(_wmsLayers[type]){ _wmsLayers[type].addTo(_leafMap); return; }
     var lyr;
     if(type==='geology'){
-      /* KIGAM 수치지질도 — 직접 호출 + 1.1.1 + 250K (KIGAM 공식 예제가 쓰는 조합 = 넓은 줌에서 렌더됨) */
-      lyr = L.tileLayer.wms('https://data.kigam.re.kr/openapi/wms', {
-        layers: 'L_250K_Geology_Map', styles: '',
+      /* KIGAM 수치지질도 1:5만 (상세) — 프록시 경유(Referer 헤더) + KIGAM이 요구하는 EPSG:4326으로 요청
+         (Leaflet 기본 3857로 보내면 빈 이미지가 옴 → crs로 4326 강제) */
+      var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+      lyr = L.tileLayer.wms(PROXY + '/api/kigam-wms', {
+        layers: 'L_50K_Geology_Map', styles: '',
         format: 'image/png', transparent: true, version: '1.1.1',
-        key: KIGAM_KEY, opacity: op, maxZoom: 22,
-        updateWhenIdle: false, keepBuffer: 4
+        crs: L.CRS.EPSG4326,
+        opacity: op, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4
       });
     }
     if(lyr){ lyr.addTo(_leafMap); _wmsLayers[type]=lyr; }
