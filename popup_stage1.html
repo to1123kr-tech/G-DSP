@@ -219,15 +219,18 @@
   .parcel-btn.clear:hover:not(:disabled){border-color:var(--err);color:var(--err)}
   .parcel-btn:disabled{opacity:.4;cursor:not-allowed}
 
-  /* Leaflet 지번 라벨 (선택 필지) */
-  .parcel-lbl{background:rgba(8,13,26,.82)!important;border:1px solid #3b82f6!important;
-    color:#cfe4ff!important;font-weight:700;font-size:11px;border-radius:5px;
-    padding:1px 6px;box-shadow:none!important}
+  /* Leaflet 지번 라벨 (상시표시·선택 필지) — 흰 글씨 + 검정 외곽 (위성 위에서 잘 보이게) */
+  .parcel-lbl{background:transparent!important;border:none!important;box-shadow:none!important;
+    color:#fff!important;font-weight:700;font-size:11px;padding:0!important;
+    text-shadow:0 0 3px #000,0 0 3px #000,1px 1px 2px #000,-1px -1px 2px #000}
   .parcel-lbl::before{display:none!important}
   /* Leaflet 지번 툴팁 (호버) */
   .parcel-tip{background:rgba(8,13,26,.9)!important;border:1px solid var(--line)!important;
     color:#fff!important;font-weight:600;font-size:11px;border-radius:5px;padding:2px 7px}
   .parcel-tip::before{border-top-color:rgba(8,13,26,.9)!important}
+  /* 지적도 빨강 스와치 */
+  .cad-swatch{display:inline-block;width:16px;height:0;border-top:2px solid #ff2d2d;
+    vertical-align:middle;margin-left:4px}
 
   /* 지도 캔버스 */
   .wms-map{flex:1;min-height:0}
@@ -342,12 +345,22 @@
         <button class="bg-btn" id="bgSat" onclick="setWmsBg('satellite')">위성</button>
       </div>
     </div>
-    <div class="wms-layers">
-      <h5>레이어</h5>
+    <!-- 지적도(필지) — 빨간 벡터 + 지번, 클릭하면 선택 -->
+    <div class="wms-parcel">
       <div class="wms-row">
-        <span class="nm">📋 지적도 + 지번</span>
-        <button class="wms-tog" id="togCadastral" onclick="toggleWmsLayer('cadastral')"></button>
+        <span class="nm">📋 지적도 + 지번 <span class="cad-swatch"></span></span>
+        <button class="wms-tog" id="togParcel" onclick="toggleParcelMode()"></button>
       </div>
+      <div class="parcel-actions hidden" id="parcelActions">
+        <div class="parcel-hint">줌 16+ 에서 <b>빨간 지적선·지번</b>이 나와요. 필지를 <b>클릭</b>하면 선택(파랑)되고, 여러 개 가능해요.</div>
+        <div class="parcel-cnt">선택한 필지 <b id="parcelCnt">0</b>개</div>
+        <button class="parcel-btn apply" id="btnApplyParcel" onclick="applyParcelsToCanvas()" disabled>✚ 지형도에 입히기</button>
+        <button class="parcel-btn clear" id="btnClearParcel" onclick="clearSelectedParcels()" disabled>선택·입힌 필지 지우기</button>
+      </div>
+    </div>
+
+    <div class="wms-layers">
+      <h5>주제도</h5>
       <div class="wms-row">
         <span class="nm">🏔️ 산사태위험지도</span>
         <button class="wms-tog" id="togLandslide" onclick="toggleWmsLayer('landslide')"></button>
@@ -357,22 +370,8 @@
         <button class="wms-tog" id="togGeology" onclick="toggleWmsLayer('geology')"></button>
       </div>
       <div class="wms-op">
-        <label>레이어 투명도 <span id="opVal">60%</span></label>
+        <label>주제도 투명도 <span id="opVal">60%</span></label>
         <input type="range" id="wmsOpacity" min="10" max="100" value="60" oninput="setWmsOpacity(this.value)">
-      </div>
-    </div>
-
-    <!-- 필지 선택 → 지형도에 입히기 -->
-    <div class="wms-parcel">
-      <div class="wms-row">
-        <span class="nm">📐 필지 선택 모드</span>
-        <button class="wms-tog" id="togParcel" onclick="toggleParcelMode()"></button>
-      </div>
-      <div class="parcel-actions hidden" id="parcelActions">
-        <div class="parcel-hint">지도에서 필지를 <b>클릭</b>해 선택하세요 (여러 개 가능). 줌 16+ 에서 빨간 지적선이 나와요.</div>
-        <div class="parcel-cnt">선택한 필지 <b id="parcelCnt">0</b>개</div>
-        <button class="parcel-btn apply" id="btnApplyParcel" onclick="applyParcelsToCanvas()" disabled>✚ 지형도에 입히기</button>
-        <button class="parcel-btn clear" id="btnClearParcel" onclick="clearSelectedParcels()" disabled>선택·입힌 필지 지우기</button>
       </div>
     </div>
 
@@ -949,6 +948,9 @@ var _parcelGeo = null;             /* 마지막으로 받은 GeoJSON (재스타�
 var _parcelSelected = new Map();   /* key → {jibun, geometry} : 선택 필지(화면 벗어나도 유지) */
 var _parcelLoading = false, _parcelLastKey = '', _parcelTimer = null;
 
+/* ── 산사태 단일이미지 오버레이 (프록시 타일 지연 회피: 화면당 1요청) ── */
+var _landslideOn = false, _landslideImg = null, _landslideTimer = null, _landslideReq = 0;
+
 /* 패널 열기/닫기 */
 function toggleWmsPanel(){
   _wmsOpen = !_wmsOpen;
@@ -980,11 +982,16 @@ function initLeafMap(){
     'https://api.vworld.kr/req/wmts/1.0.0/'+VK+'/Satellite/{z}/{y}/{x}.jpeg',
     {maxZoom:19}
   );
-  /* 필지 선택 모드일 때, 지도 이동/줌 끝나면 화면 필지 갱신 (줌16+, 350ms 디바운스) */
+  /* 지도 이동/줌 끝나면: 필지 갱신 + 산사태 단일이미지 갱신 */
   _leafMap.on('moveend', function(){
-    if(!_parcelOn) return;
-    if(_parcelTimer) clearTimeout(_parcelTimer);
-    _parcelTimer=setTimeout(loadParcels, 350);
+    if(_parcelOn){
+      if(_parcelTimer) clearTimeout(_parcelTimer);
+      _parcelTimer=setTimeout(loadParcels, 350);
+    }
+    if(_landslideOn){
+      if(_landslideTimer) clearTimeout(_landslideTimer);
+      _landslideTimer=setTimeout(updateLandslideImg, 200);
+    }
   });
   centerWmsMap();
 }
@@ -1045,40 +1052,19 @@ function toggleWmsLayer(type){
   var tog = document.getElementById('tog'+type.charAt(0).toUpperCase()+type.slice(1));
   var isOn = tog.classList.toggle('on');
   var op = parseInt(document.getElementById('wmsOpacity').value)/100;
-  var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+
+  /* 산사태 — 화면 전체를 1장으로 받음 (타일 1개씩 프록시 받던 지연 제거) */
+  if(type==='landslide'){
+    _landslideOn = isOn;
+    if(isOn) updateLandslideImg();
+    else if(_landslideImg){ _leafMap.removeLayer(_landslideImg); _landslideImg=null; }
+    return;
+  }
 
   if(isOn){
     if(_wmsLayers[type]){ _wmsLayers[type].addTo(_leafMap); return; }
     var lyr;
-    if(type==='cadastral'){
-      /* VWorld 지적도+지번 — index.html/map.html처럼 직접 호출 (이미지 타일은 CORS 무관, 프록시보다 안정적) */
-      lyr = L.tileLayer.wms('https://api.vworld.kr/req/wms', {
-        layers: 'lt_c_landinfobasemap', styles: 'lt_c_landinfobasemap',
-        format: 'image/png', transparent: true, version: '1.3.0',
-        key: VWORLD_KEY, domain: VWORLD_DOMAIN, tiled: true,
-        opacity: op, maxZoom: 22, updateWhenIdle: false, keepBuffer: 4,
-        errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-      });
-    } else if(type==='landslide'){
-      var _px = PROXY;
-      var SafemapLayer = L.TileLayer.extend({
-        getTileUrl: function(coords) {
-          var z=coords.z, x=coords.x, y=coords.y, n=Math.pow(2,z);
-          var w=x/n*360-180, e=(x+1)/n*360-180;
-          var latN=Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI;
-          var latS=Math.atan(Math.sinh(Math.PI*(1-2*(y+1)/n)))*180/Math.PI;
-          return _px+'/api/safemap-wms'
-            +'?srs=EPSG%3A4326'
-            +'&bbox='+w+','+latS+','+e+','+latN
-            +'&format=image%2Fpng'
-            +'&width=256&height=256&transparent=TRUE';
-        }
-      });
-      /* 프록시 경유라 첫 로딩이 느림 → 버퍼 늘리고 이동중에도 미리 받게 해서 매끄럽게 */
-      lyr = new SafemapLayer('', {opacity:op, tileSize:256,
-        attribution:'산사태위험도 © 행정안전부', maxNativeZoom:16, maxZoom:22,
-        updateWhenIdle:false, updateWhenZooming:false, keepBuffer:6});
-    } else if(type==='geology'){
+    if(type==='geology'){
       /* KIGAM 수치지질도 — 직접 호출 + 버전 1.1.1 (서버 kigam-info가 1.1.1/50K로 정상작동하는 조합) */
       lyr = L.tileLayer.wms('https://data.kigam.re.kr/openapi/wms', {
         layers: 'L_50K_Geology_Map', styles: '',
@@ -1093,11 +1079,38 @@ function toggleWmsLayer(type){
   }
 }
 
+/* 산사태위험지도 단일이미지 갱신 — 현재 화면 bbox를 한 장으로 요청 */
+function updateLandslideImg(){
+  if(!_landslideOn || !_leafMap) return;
+  var b = _leafMap.getBounds();
+  var sz = _leafMap.getSize();
+  var w = Math.min(Math.max(sz.x,256), 1536);   /* 너무 크면 서버 거부 가능 → 1536 상한 */
+  var h = Math.min(Math.max(sz.y,256), 1536);
+  var op = parseInt(document.getElementById('wmsOpacity').value)/100;
+  var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+  var sw=b.getSouthWest(), ne=b.getNorthEast();
+  var url = PROXY+'/api/safemap-wms'
+    +'?srs=EPSG%3A4326'
+    +'&bbox='+sw.lng+','+sw.lat+','+ne.lng+','+ne.lat
+    +'&width='+w+'&height='+h
+    +'&format=image%2Fpng&transparent=TRUE';
+  var newImg = L.imageOverlay(url, b, {opacity:op, interactive:false});
+  var myReq = ++_landslideReq;
+  newImg.on('load', function(){
+    if(myReq !== _landslideReq){ _leafMap.removeLayer(newImg); return; }  /* 더 최신 요청 있으면 폐기 */
+    if(_landslideImg) _leafMap.removeLayer(_landslideImg);  /* 새 이미지 뜬 뒤 옛것 제거 → 깜빡임 ↓ */
+    _landslideImg = newImg;
+  });
+  newImg.on('error', function(){ _leafMap.removeLayer(newImg); });
+  newImg.addTo(_leafMap);
+}
+
 /* 투명도 변경 */
 function setWmsOpacity(val){
   document.getElementById('opVal').textContent = val+'%';
   var op = val/100;
   Object.values(_wmsLayers).forEach(function(l){ if(l.setOpacity) l.setOpacity(op); });
+  if(_landslideImg && _landslideImg.setOpacity) _landslideImg.setOpacity(op);
 }
 
 /* ════════════════════════════════════════════════
@@ -1166,23 +1179,25 @@ function loadParcels(){
 function drawParcels(gj){
   if(_parcelLayer){ _leafMap.removeLayer(_parcelLayer); _parcelLayer=null; }
   if(!gj || !gj.features || !gj.features.length) return;
+  var z = _leafMap ? _leafMap.getZoom() : 0;
+  var showLabels = z >= 17;   /* 충분히 확대하면 모든 지번 상시표시 (겹침 방지) */
   _parcelLayer = L.geoJSON(gj, {
     style: function(feature){
       var sel=_parcelSelected.has(featKey(feature));
       return sel
-        ? { color:'#3b82f6', weight:2.4, fillColor:'#3b82f6', fillOpacity:0.22 }
-        : { color:'#ff2d2d', weight:1.4, fillColor:'#ff2d2d', fillOpacity:0.04 };
+        ? { color:'#3b82f6', weight:2.6, fillColor:'#3b82f6', fillOpacity:0.22 }
+        : { color:'#ff2d2d', weight:1.8, fillColor:'#ff2d2d', fillOpacity:0.02 };
     },
     onEachFeature: function(feature, layer){
       var jibun=(feature.properties && feature.properties.jibun) || '';
       var sel=_parcelSelected.has(featKey(feature));
-      if(sel && jibun){
+      if(jibun && (showLabels || sel)){
         layer.bindTooltip(jibun, {permanent:true, direction:'center', className:'parcel-lbl'});
       } else if(jibun){
         layer.bindTooltip(jibun, {sticky:true, direction:'top', className:'parcel-tip'});
       }
       layer.on('click', function(e){ L.DomEvent.stop(e); toggleParcelSelect(feature); });
-      layer.on('mouseover', function(){ if(!_parcelSelected.has(featKey(feature))) layer.setStyle({weight:2.2, fillOpacity:0.10}); });
+      layer.on('mouseover', function(){ if(!_parcelSelected.has(featKey(feature))) layer.setStyle({weight:2.6, fillOpacity:0.10}); });
       layer.on('mouseout', function(){ if(_parcelLayer) _parcelLayer.resetStyle(layer); });
     }
   }).addTo(_leafMap);
