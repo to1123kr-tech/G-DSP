@@ -30,6 +30,14 @@ KAKAO_APP_KEY = "c670e0bc85874ef6267220f09882b379"  # REST API 키 (JS키 0f432d
 # ── KIGAM 수치지질도 ──────────────────────────────────────────────
 KIGAM_KEY = "mzt5lyC51EuMLE1FlKz1Xvk7inmlKd"
 
+# ── 산사태위험지도 (행정안전부 생활안전지도, WMS 전용) ─────────────────
+# ⚠️ 아래 키를 본인의 실제 산사태 서비스키로 반드시 교체하세요. (placeholder로는 안 뜸)
+#   발급 방법 (둘 중 하나):
+#   1) safemap.go.kr 회원가입 → 오픈API → 'IF_0046 산사태위험지도' 신청 후 발급된 인증키
+#   2) 공공데이터포털(data.go.kr) '행정안전부_생활안전지도 산사태위험지도'(15149602) 신청
+#      → '일반 인증키(Decoding)' 사용 (Encoding 키는 이중인코딩되니 사용 금지)
+SAFEMAP_KEY = "K7JMZ9N6-K7JM-K7JM-K7JM-K7JMZ9N6D1"
+
 @app.route('/api/kigam-wms')
 @cache.cached(timeout=3600, query_string=True)
 def kigam_wms_proxy():
@@ -148,6 +156,33 @@ def kigam_featureinfo_proxy():
     except Exception as e:
         logger.error(f"[kigam-info] {e}")
         return jsonify({'ok': False, 'msg': str(e)}), 500
+
+
+@app.route('/api/safemap-wms')
+@cache.cached(timeout=3600, query_string=True)
+def safemap_wms_proxy():
+    """산사태위험지도 WMS 프록시 (CORS·HTTPS 우회)
+    upstream: http://safemap.go.kr/openapi2/IF_0046_WMS
+    클라이언트가 보내는 표준 WMS 파라미터(srs, bbox, width, height, format, transparent)에
+    serviceKey만 추가해 그대로 중계한다.
+    """
+    try:
+        params = dict(request.args)        # srs, bbox, format, width, height, transparent ...
+        params['serviceKey'] = SAFEMAP_KEY
+        r = req.get(
+            'http://safemap.go.kr/openapi2/IF_0046_WMS',
+            params=params,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=20
+        )
+        resp = make_response(r.content)
+        resp.headers['Content-Type'] = r.headers.get('Content-Type', 'image/png')
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        logger.info(f"[safemap-wms] {r.status_code} {len(r.content)}bytes ct={r.headers.get('Content-Type')}")
+        return resp
+    except Exception as e:
+        logger.error(f"[safemap-wms] {e}")
+        return b'', 404
 
 
 def tm5186_to_wgs84(x, y):
