@@ -709,10 +709,21 @@ def landinfo():
         url = "https://api.vworld.kr/ned/data/getLandCharacteristics"
         params = {
             "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
-            "format": "json", "numOfRows": "1", "pageNo": "1", "pnu": pnu
+            "format": "json", "numOfRows": "30", "pageNo": "1", "pnu": pnu
         }
         r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
-        return jsonify(r.json())
+        data = r.json()
+        # 토지특성은 연도별 이력이 누적됨. numOfRows=1이면 옛 연도가 잡혀 작년 공시지가가 떴음.
+        # 최신 기준연도(stdrYear)가 맨 앞에 오도록 정렬 → 프런트가 field[0]에서 올해 값을 읽음.
+        try:
+            lc = data.get("landCharacteristicss") if isinstance(data, dict) else None
+            fld = lc.get("field") if isinstance(lc, dict) else None
+            if isinstance(fld, list) and len(fld) > 1:
+                fld.sort(key=lambda x: str(x.get("stdrYear", "")), reverse=True)
+                data["landCharacteristicss"]["field"] = fld
+        except Exception:
+            pass
+        return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
