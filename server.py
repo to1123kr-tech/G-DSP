@@ -784,6 +784,63 @@ def vw_diag():
         return jsonify({"error": str(e)}), 500
 
 
+def _analyze_resp(r):
+    """HTTP 응답을 분석 — 이미지면 색칠 픽셀 검사, 아니면 텍스트 미리보기."""
+    import io
+    ct = r.headers.get('Content-Type', '')
+    out = {"status_code": r.status_code, "content_type": ct, "bytes": len(r.content)}
+    if 'image' in ct:
+        out["is_image"] = True
+        try:
+            from PIL import Image
+            im = Image.open(io.BytesIO(r.content)).convert("RGBA")
+            data = list(im.getdata())
+            non_blank = 0
+            sample = {}
+            for (rr, gg, bb, aa) in data:
+                if aa > 10 and not (rr > 245 and gg > 245 and bb > 245):
+                    non_blank += 1
+                    k = f"{rr},{gg},{bb}"
+                    sample[k] = sample.get(k, 0) + 1
+            out["total_px"] = len(data)
+            out["colored_px"] = non_blank
+            out["top_colors"] = sorted(sample.items(), key=lambda x: -x[1])[:8]
+            out["verdict"] = ("데이터 있음 (색칠된 픽셀 존재)"
+                              if non_blank > 50 else "빈 이미지 (투명/흰색만)")
+        except Exception as pe:
+            out["pixel_check"] = (f"PIL 실패: {pe} → bytes로 판단 "
+                                  f"({'데이터 가능성' if len(r.content) > 3000 else '빈 이미지 가능성'})")
+    else:
+        out["is_image"] = False
+        out["text_preview"] = r.text[:800]
+    return out
+
+
+@app.route('/api/kigam-diag')
+def kigam_diag():
+    """KIGAM 지질도 WMS 진단 — Referer 2종(data.kigam / nip.io) 둘 다 시도해
+    어느 게 진짜 이미지를 주는지 한 방에 판정. (표시 미확인 원인 규명용)"""
+    try:
+        params = dict(request.args)
+        params['key'] = KIGAM_KEY
+        results = {"_request_url_sample": None}
+        for label, ref in [("A_referer_kigam", "https://data.kigam.re.kr"),
+                           ("B_referer_nipio", f"https://{VWORLD_DOMAIN}")]:
+            try:
+                r = req.get('https://data.kigam.re.kr/openapi/wms', params=params,
+                            headers={"Referer": ref, "User-Agent": "Mozilla/5.0"}, timeout=20)
+                info = _analyze_resp(r)
+                info["referer_used"] = ref
+                if results["_request_url_sample"] is None:
+                    results["_request_url_sample"] = r.url
+                results[label] = info
+            except Exception as fe:
+                results[label] = {"error": str(fe), "referer_used": ref}
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # iros.go.kr 프록시 (인터넷등기소 소유자 조회)
 @app.route('/api/iros/list', methods=['POST', 'OPTIONS'])
 def iros_proxy_list():
