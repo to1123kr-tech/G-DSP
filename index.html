@@ -6557,7 +6557,7 @@
       toast('건축물대장 API 조회 중...', 'ok');
       var sigunguCd = currentPnu.substring(0, 5);
       var bjdongCd = currentPnu.substring(5, 10);
-      var platGbCd = currentPnu.substring(10, 11);
+      var platGbCd = (currentPnu.substring(10,11) === '2') ? '1' : '0';  // ⭐ 산여부→대지구분(산=1,일반=0). PNU자리(1/2) 직접 사용은 오류
       var bun = String(parseInt(currentPnu.substring(11, 15)) || 0).padStart(4, '0');
       var ji = String(parseInt(currentPnu.substring(15, 19)) || 0).padStart(4, '0');
       var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?serviceKey=' + encodeURIComponent(apiKey)
@@ -8192,7 +8192,7 @@
     // 토지이용 API 대체 엔드포인트 (fallback)
     function ndCallLandApi2(pnu, apiKey) {
       var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
-      var platGbCd = '0';  // 건축물대장 API는 항상 platGbCd=0
+      var platGbCd = (pnu.substring(10,11) === '2') ? '1' : '0';  // ⭐ 산여부→대지구분(산=1,일반=0)
       var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
       var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
       var url = 'https://apis.data.go.kr/1613000/LandUseService/getLandUseInfo'
@@ -8223,7 +8223,7 @@
       var apiKey = localStorage.getItem('gdsp_building') || '';
       if (!apiKey || !pnu || pnu.length < 19) return;
       var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
-      var platGbCd = '0';  // 건축물대장 API는 항상 platGbCd=0
+      var platGbCd = (pnu.substring(10,11) === '2') ? '1' : '0';  // ⭐ 산여부(PNU 11번째: 산=2)→대지구분(산=1,일반=0). 산 지번이 일반지번 건물을 가져오던 버그 수정
       var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
       var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
       var base = '?serviceKey=' + encodeURIComponent(apiKey)
@@ -8319,7 +8319,7 @@
     // 총괄표제부 API - 건폐율/용적률 보완(레거시 호환)
     function ndCallBldRecapApi(pnu, apiKey, needBcr, needFar) {
       var sigunguCd = pnu.substring(0,5), bjdongCd = pnu.substring(5,10);
-      var platGbCd = '0';  // 건축물대장 API는 항상 platGbCd=0
+      var platGbCd = (pnu.substring(10,11) === '2') ? '1' : '0';  // ⭐ 산여부→대지구분(산=1,일반=0)
       var bun = String(parseInt(pnu.substring(11,15))||0).padStart(4,'0');
       var ji = String(parseInt(pnu.substring(15,19))||0).padStart(4,'0');
       var url = 'https://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo'
