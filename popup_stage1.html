@@ -321,17 +321,60 @@
         <span class="nm">📋 지적도 + 지번</span>
         <button class="wms-tog" id="togCadastral" onclick="toggleWmsLayer('cadastral')"></button>
       </div>
+      <!-- 산사태·지질 WMS 토글 숨김: API 검증결과 사용불가(산사태=산림청불일치, 지질=KIGAM 403). 캡처로 대체. 코드 보존용으로 주석처리.
       <div class="wms-row">
-        <span class="nm">🏔️ 산사태위험지도</span>
+        <span class="nm">산사태위험지도</span>
         <button class="wms-tog" id="togLandslide" onclick="toggleWmsLayer('landslide')"></button>
       </div>
       <div class="wms-row">
-        <span class="nm">🪨 수치지질도</span>
+        <span class="nm">수치지질도</span>
         <button class="wms-tog" id="togGeology" onclick="toggleWmsLayer('geology')"></button>
       </div>
+      -->
       <div class="wms-op">
-        <label>레이어 투명도 <span id="opVal">60%</span></label>
+        <label>지적도 투명도 <span id="opVal">60%</span></label>
         <input type="range" id="wmsOpacity" min="10" max="100" value="60" oninput="setWmsOpacity(this.value)">
+      </div>
+
+      <style>
+      .cap-types{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 8px}
+      .cap-btn{flex:1 1 30%;min-width:62px;padding:7px 4px;font-size:11px;border:1px solid var(--line);
+        background:var(--card,#fff);border-radius:7px;cursor:pointer}
+      .cap-btn:hover{border-color:var(--pri);color:var(--pri)}
+      .cap-ctrl{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px;font-size:12px}
+      .cap-now{margin-bottom:6px}
+      .cap-actions{display:flex;gap:6px;margin-top:7px}
+      .cap-actions button{flex:1;padding:6px;font-size:11px;border:1px solid var(--line);
+        background:var(--card,#fff);border-radius:6px;cursor:pointer}
+      .cap-actions button:hover{border-color:var(--pri)}
+      .cap-hint{font-size:10px;color:var(--mut,#8a8a8a);line-height:1.45}
+      .leaflet-div-icon.cap-h{background:#fff;border:2px solid #2b6cff;border-radius:50%;
+        box-shadow:0 1px 5px rgba(0,0,0,.45)}
+      .leaflet-div-icon.cap-c{background:transparent;border:none;display:flex;align-items:center;
+        justify-content:center;color:#2b6cff;font-size:22px;font-weight:bold;
+        text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff}
+      </style>
+      <div class="wms-cap">
+        <h5 style="margin:12px 0 4px;font-size:12px">📷 주제도 캡처 (이미지 정합)</h5>
+        <div class="cap-hint" style="margin-bottom:7px">공식 화면(산사태·지질·임상·토양) 캡처 → 지도에 맞추기</div>
+        <div class="cap-types">
+          <button class="cap-btn" onclick="capUpload('산사태')">🏔️ 산사태</button>
+          <button class="cap-btn" onclick="capUpload('지질')">🪨 지질</button>
+          <button class="cap-btn" onclick="capUpload('임상')">🌲 임상</button>
+          <button class="cap-btn" onclick="capUpload('토양')">🌱 토양</button>
+          <button class="cap-btn" onclick="capUpload('기타')">📄 기타</button>
+        </div>
+        <input type="file" id="capFile" accept="image/*" style="display:none">
+        <div id="capCtrl" class="cap-ctrl" style="display:none">
+          <div class="cap-now">현재 캡처: <b id="capLabel">-</b></div>
+          <label>캡처 투명도 <span id="capOpVal">70%</span></label>
+          <input type="range" id="capOpacity" min="10" max="100" value="70" oninput="capSetOpacity(this.value)" style="width:100%">
+          <div class="cap-actions">
+            <button onclick="capToggleLock()" id="capLockBtn">🔒 잠금</button>
+            <button onclick="capRemove()">🗑 제거</button>
+          </div>
+          <div class="cap-hint" style="margin-top:7px">중앙 <b>✛</b>=이동 · 모서리 <b>●</b>=크기조절 · 맞춘 뒤 잠그기</div>
+        </div>
       </div>
     </div>
     <div class="wms-map"><div id="wmsMap"></div></div>
@@ -982,6 +1025,130 @@ function setWmsOpacity(val){
     if(_leafMap) _leafMap.invalidateSize();
   });
 })();
+
+/* ===== 주제도 캡처 오버레이 (이미지 정합) ===== */
+var _cap = { img:null, bounds:null, handles:[], center:null, locked:false, theme:null, pendingTheme:null };
+
+function capUpload(theme){
+  if(!_leafMap){ toast('지도를 먼저 열어주세요','err'); return; }
+  if(_cap.img && !confirm('현재 캡처를 새 이미지로 교체할까요?')) return;
+  _cap.pendingTheme = theme;
+  var f = document.getElementById('capFile');
+  f.value = '';
+  f.click();
+}
+
+(function(){
+  var f = document.getElementById('capFile');
+  if(!f) return;
+  f.addEventListener('change', function(e){
+    var file = e.target.files && e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){ capPlace(ev.target.result, _cap.pendingTheme || '기타'); };
+    reader.readAsDataURL(file);
+  });
+})();
+
+function capPlace(dataUrl, theme){
+  capRemove(true);
+  if(!_leafMap.getPane('capPane')){
+    _leafMap.createPane('capPane');
+    _leafMap.getPane('capPane').style.zIndex = 350;   // 지적도(>=400)보다 아래
+  }
+  var b = _leafMap.getBounds(), c = b.getCenter();
+  var latSpan = (b.getNorth()-b.getSouth())*0.25;
+  var lngSpan = (b.getEast()-b.getWest())*0.25;
+  _cap.bounds = [[c.lat-latSpan, c.lng-lngSpan],[c.lat+latSpan, c.lng+lngSpan]];
+  var op = parseInt(document.getElementById('capOpacity').value)/100;
+  _cap.img = L.imageOverlay(dataUrl, _cap.bounds, {opacity:op, pane:'capPane', interactive:false}).addTo(_leafMap);
+  _cap.theme = theme; _cap.locked = false;
+  capBuildHandles();
+  document.getElementById('capCtrl').style.display = 'block';
+  document.getElementById('capLabel').textContent = theme;
+  document.getElementById('capLockBtn').textContent = '🔒 잠금';
+  toast(theme+' 캡처 올림 — 위치·크기 맞추세요','ok');
+}
+
+function capBuildHandles(){
+  capClearHandles();
+  if(_cap.locked || !_cap.img) return;
+  var bnds = L.latLngBounds(_cap.bounds);
+  var corners = { nw:[bnds.getNorth(),bnds.getWest()], ne:[bnds.getNorth(),bnds.getEast()],
+                  se:[bnds.getSouth(),bnds.getEast()], sw:[bnds.getSouth(),bnds.getWest()] };
+  Object.keys(corners).forEach(function(k){
+    var m = L.marker(corners[k], { draggable:true, zIndexOffset:1000,
+      icon: L.divIcon({className:'cap-h', html:'', iconSize:[14,14], iconAnchor:[7,7]}) }).addTo(_leafMap);
+    m._corner = k;
+    m.on('drag', function(){ capCornerDrag(m); });
+    _cap.handles.push(m);
+  });
+  var cc = bnds.getCenter();
+  var cm = L.marker([cc.lat,cc.lng], { draggable:true, zIndexOffset:1000,
+    icon: L.divIcon({className:'cap-c', html:'✛', iconSize:[26,26], iconAnchor:[13,13]}) }).addTo(_leafMap);
+  cm.on('dragstart', function(){ cm._prev = cm.getLatLng(); });
+  cm.on('drag', function(){ capCenterDrag(cm); });
+  _cap.center = cm;
+}
+
+function capCornerDrag(m){
+  var bnds = L.latLngBounds(_cap.bounds);
+  var n=bnds.getNorth(), s=bnds.getSouth(), e=bnds.getEast(), w=bnds.getWest();
+  var p = m.getLatLng();
+  if(m._corner==='nw'){ n=p.lat; w=p.lng; }
+  else if(m._corner==='ne'){ n=p.lat; e=p.lng; }
+  else if(m._corner==='se'){ s=p.lat; e=p.lng; }
+  else if(m._corner==='sw'){ s=p.lat; w=p.lng; }
+  _cap.bounds = [[Math.min(n,s),Math.min(e,w)],[Math.max(n,s),Math.max(e,w)]];
+  _cap.img.setBounds(_cap.bounds);
+  capSyncHandles(false, m);
+}
+
+function capCenterDrag(cm){
+  var prev = cm._prev || cm.getLatLng(), now = cm.getLatLng();
+  var dLat = now.lat-prev.lat, dLng = now.lng-prev.lng;
+  var bnds = L.latLngBounds(_cap.bounds);
+  _cap.bounds = [[bnds.getSouth()+dLat, bnds.getWest()+dLng],[bnds.getNorth()+dLat, bnds.getEast()+dLng]];
+  _cap.img.setBounds(_cap.bounds);
+  cm._prev = now;
+  capSyncHandles(true);
+}
+
+function capSyncHandles(skipCenter, skipMarker){
+  if(!_cap.img) return;
+  var bnds = L.latLngBounds(_cap.bounds);
+  var corners = { nw:[bnds.getNorth(),bnds.getWest()], ne:[bnds.getNorth(),bnds.getEast()],
+                  se:[bnds.getSouth(),bnds.getEast()], sw:[bnds.getSouth(),bnds.getWest()] };
+  _cap.handles.forEach(function(m){ if(m!==skipMarker) m.setLatLng(corners[m._corner]); });
+  if(!skipCenter && _cap.center){ var c=bnds.getCenter(); _cap.center.setLatLng([c.lat,c.lng]); }
+}
+
+function capClearHandles(){
+  _cap.handles.forEach(function(m){ if(_leafMap) _leafMap.removeLayer(m); });
+  _cap.handles = [];
+  if(_cap.center && _leafMap){ _leafMap.removeLayer(_cap.center); }
+  _cap.center = null;
+}
+
+function capSetOpacity(v){
+  document.getElementById('capOpVal').textContent = v+'%';
+  if(_cap.img) _cap.img.setOpacity(v/100);
+}
+
+function capToggleLock(){
+  if(!_cap.img) return;
+  _cap.locked = !_cap.locked;
+  document.getElementById('capLockBtn').textContent = _cap.locked ? '🔓 잠금해제' : '🔒 잠금';
+  if(_cap.locked){ capClearHandles(); toast('캡처 잠금 — 위치 고정','ok'); }
+  else capBuildHandles();
+}
+
+function capRemove(silent){
+  capClearHandles();
+  if(_cap.img && _leafMap){ _leafMap.removeLayer(_cap.img); }
+  _cap.img=null; _cap.bounds=null; _cap.theme=null; _cap.locked=false;
+  if(!silent){ document.getElementById('capCtrl').style.display='none'; }
+}
 
 /* 초기 캔버스 크기 */
 resizeCanvas();
