@@ -30,14 +30,6 @@ KAKAO_APP_KEY = "c670e0bc85874ef6267220f09882b379"  # REST API 키 (JS키 0f432d
 # ── KIGAM 수치지질도 ──────────────────────────────────────────────
 KIGAM_KEY = "mzt5lyC51EuMLE1FlKz1Xvk7inmlKd"
 
-# ── 산사태위험지도 (행정안전부 생활안전지도, WMS 전용) ─────────────────
-# ⚠️ 아래 키를 본인의 실제 산사태 서비스키로 반드시 교체하세요. (placeholder로는 안 뜸)
-#   발급 방법 (둘 중 하나):
-#   1) safemap.go.kr 회원가입 → 오픈API → 'IF_0046 산사태위험지도' 신청 후 발급된 인증키
-#   2) 공공데이터포털(data.go.kr) '행정안전부_생활안전지도 산사태위험지도'(15149602) 신청
-#      → '일반 인증키(Decoding)' 사용 (Encoding 키는 이중인코딩되니 사용 금지)
-SAFEMAP_KEY = "K7JMZ9N6-K7JM-K7JM-K7JM-K7JMZ9N6D1"
-
 @app.route('/api/kigam-wms')
 @cache.cached(timeout=3600, query_string=True)
 def kigam_wms_proxy():
@@ -52,7 +44,7 @@ def kigam_wms_proxy():
         r = req.get(
             'https://data.kigam.re.kr/openapi/wms',
             params=params,
-            headers={"Referer": "https://168-107-15-68.nip.io", "User-Agent": "Mozilla/5.0"},
+            headers={"Referer": "https://data.kigam.re.kr", "User-Agent": "Mozilla/5.0"},
             timeout=15
         )
         resp = make_response(r.content)
@@ -103,7 +95,7 @@ def kigam_featureinfo_proxy():
             params = dict(base_params); params['INFO_FORMAT'] = fmt
             try:
                 r = req.get('https://data.kigam.re.kr/openapi/wms', params=params,
-                            headers={"Referer": "https://168-107-15-68.nip.io",
+                            headers={"Referer": "https://data.kigam.re.kr",
                                      "User-Agent": "Mozilla/5.0"}, timeout=12)
             except Exception as fe:
                 logger.warning(f"[kigam-info] {fmt} request failed: {fe}")
@@ -156,33 +148,6 @@ def kigam_featureinfo_proxy():
     except Exception as e:
         logger.error(f"[kigam-info] {e}")
         return jsonify({'ok': False, 'msg': str(e)}), 500
-
-
-@app.route('/api/safemap-wms')
-@cache.cached(timeout=3600, query_string=True)
-def safemap_wms_proxy():
-    """산사태위험지도 WMS 프록시 (CORS·HTTPS 우회)
-    upstream: http://safemap.go.kr/openapi2/IF_0046_WMS
-    클라이언트가 보내는 표준 WMS 파라미터(srs, bbox, width, height, format, transparent)에
-    serviceKey만 추가해 그대로 중계한다.
-    """
-    try:
-        params = dict(request.args)        # srs, bbox, format, width, height, transparent ...
-        params['serviceKey'] = SAFEMAP_KEY
-        r = req.get(
-            'http://safemap.go.kr/openapi2/IF_0046_WMS',
-            params=params,
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=20
-        )
-        resp = make_response(r.content)
-        resp.headers['Content-Type'] = r.headers.get('Content-Type', 'image/png')
-        resp.headers['Access-Control-Allow-Origin'] = '*'
-        logger.info(f"[safemap-wms] {r.status_code} {len(r.content)}bytes ct={r.headers.get('Content-Type')}")
-        return resp
-    except Exception as e:
-        logger.error(f"[safemap-wms] {e}")
-        return b'', 404
 
 
 def tm5186_to_wgs84(x, y):
@@ -766,6 +731,55 @@ def vworld_proxy():
             return jsonify(r.json())
         except:
             return r.content, r.status_code, {'Content-Type': r.headers.get('Content-Type', 'application/json')}
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/vw-diag')
+def vw_diag():
+    """VWorld 응답 진단 — 토양 등 WMS가 실제로 뭘 주는지 흑백 판정.
+    path(기본 req/wms) + 나머지 WMS 파라미터 그대로 전달, 응답 분석해서 리턴."""
+    import io
+    try:
+        path = request.args.get('path', 'req/wms')
+        params = dict(request.args)
+        params.pop('path', None)
+        params['key'] = VWORLD_KEY
+        params['domain'] = VWORLD_DOMAIN
+        url = f"https://api.vworld.kr/{path}"
+        r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
+        ct = r.headers.get('Content-Type', '')
+        out = {
+            "request_url": r.url,
+            "status_code": r.status_code,
+            "content_type": ct,
+            "bytes": len(r.content),
+        }
+        if 'image' in ct:
+            out["is_image"] = True
+            try:
+                from PIL import Image
+                im = Image.open(io.BytesIO(r.content)).convert("RGBA")
+                data = list(im.getdata())
+                non_blank = 0
+                sample = {}
+                for (rr, gg, bb, aa) in data:
+                    if aa > 10 and not (rr > 245 and gg > 245 and bb > 245):
+                        non_blank += 1
+                        k = f"{rr},{gg},{bb}"
+                        sample[k] = sample.get(k, 0) + 1
+                out["total_px"] = len(data)
+                out["colored_px"] = non_blank
+                out["top_colors"] = sorted(sample.items(), key=lambda x: -x[1])[:8]
+                out["verdict"] = ("데이터 있음 (색칠된 픽셀 존재)"
+                                  if non_blank > 50 else "빈 이미지 (투명/흰색만)")
+            except Exception as pe:
+                out["pixel_check"] = (f"PIL 실패: {pe} → bytes로 판단 "
+                                      f"({'데이터 가능성' if len(r.content) > 3000 else '빈 이미지 가능성'})")
+        else:
+            out["is_image"] = False
+            out["text_preview"] = r.text[:800]
+        return jsonify(out)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
