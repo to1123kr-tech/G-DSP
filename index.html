@@ -6238,18 +6238,42 @@
               _byCoord(doc.x, doc.y);
             }
           } else {
-            // 키워드 검색 fallback
-            var _ps = new kakao.maps.services.Places();
-            _ps.keywordSearch('화성시 ' + q, function(kdocs, kst){
-              if (kst === kakao.maps.services.Status.OK && kdocs.length) {
-                _byCoord(kdocs[0].x, kdocs[0].y);
-              } else { applySearch(''); }
+            // ⭐ 산(임야) 지번 등 카카오 주소검색 실패분 → VWorld 필지 지오코더로 보강
+            _vworldParcelSearch('화성시 ' + q, function (vx, vy, vtext) {
+              if (vtext) searchJibun = vtext;
+              _byCoord(vx, vy);
+            }, function () {
+              // VWorld도 실패 → POI 키워드 검색 fallback
+              var _ps = new kakao.maps.services.Places();
+              _ps.keywordSearch('화성시 ' + q, function(kdocs, kst){
+                if (kst === kakao.maps.services.Status.OK && kdocs.length) {
+                  _byCoord(kdocs[0].x, kdocs[0].y);
+                } else { applySearch(''); }
+              });
             });
           }
         });
       } else {
         applySearch('');
       }
+    }
+    // ⭐ VWorld 필지 지오코더 (산/임야 지번 포함) — Oracle 프록시 경유. 카카오 주소검색이 산지번을 못 찾을 때 보강.
+    function _vworldParcelSearch(addr, onHit, onMiss) {
+      try {
+        var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+        var url = PROXY + '/api/vworld?path=req/address&service=address&request=getcoord'
+          + '&version=2.0&crs=EPSG:4326&type=parcel'
+          + '&address=' + encodeURIComponent(addr)
+          + '&format=json&domain=168.107.15.68';
+        fetch(url).then(function (r) { return r.json(); }).then(function (d) {
+          var resp = d && d.response;
+          var pt = resp && resp.status === 'OK' && resp.result && resp.result.point;
+          if (pt && pt.x && pt.y) {
+            var vtext = (resp.refined && resp.refined.text) || '';
+            onHit(parseFloat(pt.x), parseFloat(pt.y), vtext);
+          } else { onMiss(); }
+        }).catch(function () { onMiss(); });
+      } catch (e) { onMiss(); }
     }
     function setText(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
     function addAct(txt, time) { var list = document.getElementById('actList'); if (!list) return; var d = document.createElement('div'); d.className = 'act'; d.innerHTML = '<div class="act-d" style="background:var(--neon)"></div><div class="act-t">' + txt + '</div><div class="act-tm">' + time + '</div>'; list.insertBefore(d, list.firstChild); if (list.children.length > 8) list.removeChild(list.lastChild); }
