@@ -8104,7 +8104,11 @@
           }
           if (!bCode) return;
           // 좌클릭 시 우클릭과 동일하게 검색 함수 사용 (PNU 정확도)
-          var simpleJibun = jibun.split(' ').slice(-2).join(' ');
+          // ⭐ 산(임야) 지번은 "산"+번지가 별도 토큰 → 끝2개만 자르면 읍면동/리가 날아가 엉뚱한 동의 산N로 검색됨. 산이면 끝3개 유지.
+          var _jp = jibun.split(' ');
+          var simpleJibun = (_jp.length >= 3 && _jp[_jp.length - 2] === '산')
+            ? _jp.slice(-3).join(' ')
+            : _jp.slice(-2).join(' ');
           var searchInput = document.getElementById('mainSearch');
           if (searchInput && typeof hdrSearch === 'function') {
             searchInput.value = simpleJibun;
@@ -8112,7 +8116,7 @@
             toast('✓ ' + jibun, 'ok');
           } else {
             // 폴백: 기존 방식
-            var pnu = bCode + '1' + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
+            var pnu = bCode + (addr && addr.mountain_yn === 'Y' ? '2' : '1') + String(parseInt(mainNo)||0).padStart(4,'0') + String(parseInt(subNo)||0).padStart(4,'0');
             currentPnu = pnu; currentJibun = jibun; armed = true;
             setText('mapD', '📍 ' + jibun);
             setText('mapT', jibun);
