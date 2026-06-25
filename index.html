@@ -6275,6 +6275,29 @@
         }).catch(function () { onMiss(); });
       } catch (e) { onMiss(); }
     }
+    // ⭐ VWorld 검색 API (연속지적도, 산/임야 지번 포함) — 서버 /api/vw-search 사용. PNU+좌표(EPSG:3857) 직접 반환.
+    function _vwMerc2LL(x, y) {
+      var R = 6378137.0;
+      return [ (x / R) * 180 / Math.PI, (2 * Math.atan(Math.exp(y / R)) - Math.PI / 2) * 180 / Math.PI ];
+    }
+    function _vwSearchParcel(query, onHit, onMiss) {
+      try {
+        var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+        fetch(PROXY + '/api/vw-search?query=' + encodeURIComponent(query))
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d && d.ok && d.items && d.items.length) {
+              var it = d.items[0], p = it.point || {};
+              if (p.x != null && p.y != null) {
+                var ll = _vwMerc2LL(parseFloat(p.x), parseFloat(p.y));   // EPSG:3857 → 4326
+                onHit(ll[0], ll[1], it.pnu || '', it.parcel || '');
+                return;
+              }
+            }
+            onMiss();
+          }).catch(function () { onMiss(); });
+      } catch (e) { onMiss(); }
+    }
     function setText(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
     function addAct(txt, time) { var list = document.getElementById('actList'); if (!list) return; var d = document.createElement('div'); d.className = 'act'; d.innerHTML = '<div class="act-d" style="background:var(--neon)"></div><div class="act-t">' + txt + '</div><div class="act-tm">' + time + '</div>'; list.insertBefore(d, list.firstChild); if (list.children.length > 8) list.removeChild(list.lastChild); }
     function addTile(code) { var box = document.getElementById('tileBox'); if (!box || box.querySelector('[data-c="' + code + '"]')) return; var d = document.createElement('div'); d.className = 'tile-row'; d.dataset.c = code; d.innerHTML = '<span style="color:var(--neon);font-size:10px">▪</span><span>' + code + '</span><button onclick="this.parentNode.remove()" style="margin-left:auto;color:var(--txt3);font-size:12px;background:none;border:none;cursor:pointer">×</button>'; box.appendChild(d); }
@@ -8346,12 +8369,18 @@
         // 원래 입력어로 재시도
         gc.addressSearch(q, function(res2, st2){
           if (st2 === kakao.maps.services.Status.OK && res2.length) { applyDoc(res2[0], q); return; }
-          // 키워드 검색 fallback (장소명 등)
-          var ps = new kakao.maps.services.Places();
-          ps.keywordSearch(searchAddr, function(res3, st3){
-            if (st3 === kakao.maps.services.Status.OK && res3.length) {
-              ndDoSearchByCoord(parseFloat(res3[0].x), parseFloat(res3[0].y), q, q);
-            } else { toast('검색 결과 없음', 'err'); }
+          // ⭐ 산(임야) 지번 등 카카오 주소검색 실패분 → VWorld 검색(연속지적도, PNU 직접 반환)으로 보강
+          _vwSearchParcel(searchAddr, function(lng, lat, pnu, parcel){
+            if (pnu && pnu.length >= 19) ndApplySearch(lng, lat, parcel || q, pnu);
+            else ndDoSearchByCoord(lng, lat, q, parcel || q);
+          }, function(){
+            // VWorld도 실패 → POI 키워드 검색 fallback (장소명 등)
+            var ps = new kakao.maps.services.Places();
+            ps.keywordSearch(searchAddr, function(res3, st3){
+              if (st3 === kakao.maps.services.Status.OK && res3.length) {
+                ndDoSearchByCoord(parseFloat(res3[0].x), parseFloat(res3[0].y), q, q);
+              } else { toast('검색 결과 없음', 'err'); }
+            });
           });
         });
       });
