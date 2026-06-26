@@ -1579,6 +1579,32 @@ def favicon():
     return ("", 204)
 
 
+# === 산림청 FGIS 다운로드 테스트 (server.py의 @app.route('/api/health') 위에 붙여넣기) ===
+@app.route('/api/forest-test')
+def forest_test():
+    import zipfile
+    data_code = request.args.get('data', 'DATA016')
+    doyeop    = request.args.get('doyeop', '376161')
+    url = f"https://map.forest.go.kr/fgisfile/fgisData/{data_code}/doyeop/{doyeop}.zip"
+    out = {"url": url}
+    try:
+        r = req.get(url, headers={"User-Agent":"Mozilla/5.0",
+                    "Referer":"https://map.forest.go.kr/forest/"}, timeout=120)
+        out["status"] = r.status_code
+        out["content_type"] = r.headers.get("Content-Type","")
+        body = r.content
+        out["bytes"] = len(body)
+        out["is_zip"] = body[:4] == b'PK\x03\x04'
+        if out["is_zip"]:
+            out["files"] = zipfile.ZipFile(io.BytesIO(body)).namelist()
+            out["verdict"] = "OK: 로그 없이 직접 GET 으로 zip 다운로드 성공"
+        else:
+            out["body_head"] = body[:300].decode('utf-8','replace')
+            out["verdict"] = "FAIL: zip 아님 (로그인/에러?)"
+    except Exception as e:
+        out["error"] = str(e); out["verdict"] = "FAIL: 요청 실패"
+    return jsonify(out)
+
 @app.route('/api/health')
 def health():
     return jsonify({"status": "ok", "message": "G-DSP 서버 실행 중", "version": "3.0", "ok": True})
