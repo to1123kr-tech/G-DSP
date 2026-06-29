@@ -336,6 +336,18 @@
         <input type="range" id="wmsOpacity" min="10" max="100" value="60" oninput="setWmsOpacity(this.value)">
       </div>
 
+      <!-- ── 산림청 FGIS 자료 (산사태·임상·토양) [방11] ── -->
+      <div class="fgis-box">
+        <h5>🌲 산림청 자료 올리기</h5>
+        <p class="fgis-hint">산림청에서 받은 zip을 넣으면 자동 판별해서 지도에 올려요 (정합 불필요·좌표 자동).</p>
+        <label class="fgis-drop" id="fgisDrop">
+          <input type="file" id="fgisInput" accept=".zip" multiple hidden>
+          <span id="fgisDropTxt">📁 zip 파일 선택 / 끌어다 놓기<br><small>산사태·임상·토양 한 번에 여러 개 OK</small></span>
+        </label>
+        <div id="fgisStatus" class="fgis-status"></div>
+        <div id="fgisLayers" class="fgis-layers"></div>
+      </div>
+
       <style>
       .cap-types{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 8px}
       .cap-btn{flex:1 1 30%;min-width:62px;padding:7px 4px;font-size:11px;border:1px solid var(--line);
@@ -353,6 +365,28 @@
       .leaflet-div-icon.cap-c{background:transparent;border:none;display:flex;align-items:center;
         justify-content:center;color:#2b6cff;font-size:22px;font-weight:bold;
         text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff}
+      /* 산림청 FGIS [방11] */
+      .fgis-box{border-top:1px dashed var(--line);margin-top:10px;padding-top:10px}
+      .fgis-box h5{margin:0 0 4px;font-size:12px}
+      .fgis-hint{font-size:10px;color:var(--mut,#8a8a8a);line-height:1.45;margin:0 0 8px}
+      .fgis-drop{display:block;border:2px dashed var(--line);border-radius:9px;padding:14px 8px;
+        text-align:center;font-size:11px;color:var(--mut,#777);cursor:pointer;transition:.15s;line-height:1.5}
+      .fgis-drop:hover,.fgis-drop.drag{border-color:var(--pri);color:var(--pri);background:rgba(43,108,255,.04)}
+      .fgis-drop small{font-size:9px;opacity:.8}
+      .fgis-status{font-size:11px;margin-top:7px;line-height:1.5}
+      .fgis-status .ok{color:#1a9d4b}
+      .fgis-status .er{color:#d33}
+      .fgis-status .busy{color:var(--pri)}
+      .fgis-layers{margin-top:7px}
+      .fgis-lyr{display:flex;align-items:center;gap:6px;padding:5px 7px;border:1px solid var(--line);
+        border-radius:7px;margin-bottom:5px;font-size:11px;background:var(--card,#fff)}
+      .fgis-lyr .sw{width:13px;height:13px;border-radius:3px;flex:0 0 auto}
+      .fgis-lyr .nm{flex:1;font-weight:600}
+      .fgis-lyr .cnt{font-size:10px;color:var(--mut,#888)}
+      .fgis-lyr button{padding:3px 7px;font-size:10px;border:1px solid var(--line);
+        background:#fff;border-radius:5px;cursor:pointer}
+      .fgis-lyr button:hover{border-color:var(--pri);color:var(--pri)}
+      .fgis-lyr.off{opacity:.5}
       </style>
       <div class="wms-cap">
         <h5 style="margin:12px 0 4px;font-size:12px">📷 주제도 캡처 (이미지 정합)</h5>
@@ -910,6 +944,156 @@ function initLeafMap(){
   );
   centerWmsMap();
 }
+
+/* ══════════════════════════════════════════════
+   산림청 FGIS 자료 (산사태·임상·토양) 업로드→표시 [방11]
+   서버 /api/forest-parse 가 zip 판별·변환·좌표(WGS84)까지 처리
+   ══════════════════════════════════════════════ */
+var _fgisLayers = {};  // kind → {layer, meta}
+var FGIS_STYLE = {
+  imsang: { color:'#1f8a3b', label:'임상도',   fill:'#1f8a3b' },
+  toyang: { color:'#1456c7', label:'산림입지토양도', fill:'#1456c7' },
+};
+function _fgisStatus(html){ document.getElementById('fgisStatus').innerHTML = html; }
+
+function fgisUpload(files){
+  if(!files || !files.length) return;
+  if(!_leafMap){ initLeafMap(); }
+  var FGIS_PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+  var fd = new FormData();
+  for(var i=0;i<files.length;i++){ fd.append('f'+i, files[i]); }
+  _fgisStatus('<span class="busy">⏳ 분석 중… ('+files.length+'개 파일)</span>');
+
+  fetch(FGIS_PROXY + '/api/forest-parse', { method:'POST', body:fd })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if(!res.ok && (!res.results || !res.results.length)){
+        _fgisStatus('<span class="er">✕ 실패: '+((res.errors&&res.errors[0])||res.msg||'알 수 없음')+'</span>');
+        return;
+      }
+      var msgs=[];
+      (res.results||[]).forEach(function(item){ msgs.push(fgisAddLayer(item)); });
+      (res.errors||[]).forEach(function(e){ msgs.push('<span class="er">✕ '+e+'</span>'); });
+      _fgisStatus(msgs.join('<br>'));
+      fgisRenderList();
+      fgisFit();
+    })
+    .catch(function(e){
+      _fgisStatus('<span class="er">✕ 서버 연결 실패: '+e+'</span>');
+    });
+}
+
+function fgisAddLayer(item){
+  var kind = item.kind;
+  // 기존 같은 종류 있으면 제거(새로 교체)
+  if(_fgisLayers[kind]){ _leafMap.removeLayer(_fgisLayers[kind].layer); }
+
+  if(kind === 'sansatae'){
+    var url = 'data:image/png;base64,' + item.png_base64;
+    var lyr = L.imageOverlay(url, item.bounds, { opacity:0.65, interactive:false });
+    lyr.addTo(_leafMap);
+    _fgisLayers[kind] = { layer:lyr, meta:item, bounds:L.latLngBounds(item.bounds) };
+    var total = Object.values(item.grade_counts||{}).reduce(function(a,b){return a+b;},0);
+    return '<span class="ok">✅ 산사태위험지도 ('+total.toLocaleString()+'셀, 5등급)</span>';
+  }
+
+  // 임상/토양 = GeoJSON 폴리곤
+  var st = FGIS_STYLE[kind] || { color:'#e67e22', label:kind, fill:'#e67e22' };
+  var gj = L.geoJSON(item.geojson, {
+    style: function(){ return { color:st.color, weight:1.2, opacity:0.9,
+                                fillColor:st.fill, fillOpacity:0.12 }; },
+    onEachFeature: function(f, layer){
+      layer.bindPopup(fgisPopupHtml(kind, f.properties), {maxWidth:260});
+    }
+  });
+  gj.addTo(_leafMap);
+  _fgisLayers[kind] = { layer:gj, meta:item, bounds:gj.getBounds() };
+  return '<span class="ok">✅ '+st.label+' ('+item.count+'개 구역)</span>';
+}
+
+function fgisPopupHtml(kind, p){
+  function row(k,v){ return v!=null&&v!==''? '<div><b>'+k+'</b> '+v+'</div>' : ''; }
+  if(kind==='imsang'){
+    return '<div style="font-size:12px;line-height:1.6">'
+      + '<div style="font-weight:700;margin-bottom:3px;color:#1f8a3b">🌳 임상</div>'
+      + row('임상', p.FRTP_NM) + row('수종', p.KOFTR_NM)
+      + row('경급', p.DMCLS_NM) + row('영급', p.AGCLS_NM)
+      + row('밀도', p.DNST_NM) + row('임분고', p.HEIGHT_NM)
+      + row('갱신', p['갱신년도']) + '</div>';
+  }
+  if(kind==='toyang'){
+    return '<div style="font-size:12px;line-height:1.6">'
+      + '<div style="font-weight:700;margin-bottom:3px;color:#1456c7">🪨 토양·입지</div>'
+      + row('토심코드', p.SLDPT_TPCD) + row('모암(대/중)', (p.PRRCK_LARG||'')+' / '+(p.PRRCK_MDDL||''))
+      + row('표고', p.LOCTN_ALTT) + row('경사', p.LOCTN_GRDN)
+      + row('사면형', p.SLANT_TYP) + row('토성', p.SCSTX_CD)
+      + row('토양형', p.SLTP_CD) + row('도면기호', p.MAP_LABEL) + '</div>';
+  }
+  // unknown: 전체 속성 덤프(상위 10개)
+  var html='<div style="font-size:11px;line-height:1.5">';
+  var n=0; for(var k in p){ if(p[k]!=null&&p[k]!==''){ html+=row(k,p[k]); if(++n>=10)break; } }
+  return html+'</div>';
+}
+
+function fgisRenderList(){
+  var box=document.getElementById('fgisLayers'); box.innerHTML='';
+  var labels={ sansatae:'산사태위험지도', imsang:'임상도', toyang:'산림입지토양도' };
+  var colors={ sansatae:'#e60000', imsang:'#1f8a3b', toyang:'#1456c7' };
+  Object.keys(_fgisLayers).forEach(function(kind){
+    var L0=_fgisLayers[kind]; var on=_leafMap.hasLayer(L0.layer);
+    var cnt = kind==='sansatae'
+      ? (Object.values(L0.meta.grade_counts||{}).reduce(function(a,b){return a+b;},0).toLocaleString()+'셀')
+      : (L0.meta.count+'구역');
+    var row=document.createElement('div');
+    row.className='fgis-lyr'+(on?'':' off');
+    row.innerHTML='<span class="sw" style="background:'+colors[kind]+'"></span>'
+      +'<span class="nm">'+(labels[kind]||kind)+'</span>'
+      +'<span class="cnt">'+cnt+'</span>'
+      +'<button onclick="fgisToggle(\''+kind+'\')">'+(on?'끄기':'켜기')+'</button>'
+      +'<button onclick="fgisRemove(\''+kind+'\')">✕</button>';
+    box.appendChild(row);
+  });
+}
+function fgisToggle(kind){
+  var L0=_fgisLayers[kind]; if(!L0)return;
+  if(_leafMap.hasLayer(L0.layer)) _leafMap.removeLayer(L0.layer);
+  else L0.layer.addTo(_leafMap);
+  fgisRenderList();
+}
+function fgisRemove(kind){
+  var L0=_fgisLayers[kind]; if(!L0)return;
+  _leafMap.removeLayer(L0.layer); delete _fgisLayers[kind];
+  fgisRenderList();
+}
+function fgisFit(){
+  var bounds=null;
+  Object.values(_fgisLayers).forEach(function(L0){
+    if(!L0.bounds||!L0.bounds.isValid)return;
+    if(L0.bounds.isValid()){ bounds = bounds? bounds.extend(L0.bounds) : L.latLngBounds(L0.bounds.getSouthWest(),L0.bounds.getNorthEast()); }
+  });
+  if(bounds && bounds.isValid()){ _leafMap.fitBounds(bounds, {padding:[20,20]}); }
+}
+
+/* 업로드 입력·드래그 바인딩 */
+(function(){
+  function bind(){
+    var inp=document.getElementById('fgisInput');
+    var drop=document.getElementById('fgisDrop');
+    if(!inp||!drop) return;
+    inp.addEventListener('change', function(){ fgisUpload(this.files); this.value=''; });
+    ['dragenter','dragover'].forEach(function(ev){
+      drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('drag'); });
+    });
+    ['dragleave','drop'].forEach(function(ev){
+      drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('drag'); });
+    });
+    drop.addEventListener('drop', function(e){
+      var fs=e.dataTransfer&&e.dataTransfer.files; if(fs&&fs.length) fgisUpload(fs);
+    });
+  }
+  if(document.readyState!=='loading') bind();
+  else document.addEventListener('DOMContentLoaded', bind);
+})();
 
 /* TM(EPSG:5186) → WGS84 정확 변환 (proj4 사용) */
 (function(){
