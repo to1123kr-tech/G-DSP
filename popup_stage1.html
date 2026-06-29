@@ -387,6 +387,8 @@
         background:#fff;border-radius:5px;cursor:pointer}
       .fgis-lyr button:hover{border-color:var(--pri);color:var(--pri)}
       .fgis-lyr.off{opacity:.5}
+      /* 산사태 격자 또렷하게 (보간 끄기) */
+      .fgis-sansatae-img{image-rendering:pixelated;image-rendering:crisp-edges;}
       </style>
       <div class="wms-cap">
         <h5 style="margin:12px 0 4px;font-size:12px">📷 주제도 캡처 (이미지 정합)</h5>
@@ -990,7 +992,7 @@ function fgisAddLayer(item){
 
   if(kind === 'sansatae'){
     var url = 'data:image/png;base64,' + item.png_base64;
-    var lyr = L.imageOverlay(url, item.bounds, { opacity:0.65, interactive:false });
+    var lyr = L.imageOverlay(url, item.bounds, { opacity:0.78, interactive:false, className:'fgis-sansatae-img' });
     lyr.addTo(_leafMap);
     _fgisLayers[kind] = { layer:lyr, meta:item, bounds:L.latLngBounds(item.bounds) };
     var total = Object.values(item.grade_counts||{}).reduce(function(a,b){return a+b;},0);
