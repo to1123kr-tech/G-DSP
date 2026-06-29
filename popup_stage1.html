@@ -348,6 +348,32 @@
         <div id="fgisLayers" class="fgis-layers"></div>
       </div>
 
+      <!-- ── 과거항공 시계열 (국토정보플랫폼) [방11] ── -->
+      <div class="air-box">
+        <h5>🛰 과거항공 시계열 만들기</h5>
+        <p class="air-hint">같은 위치를 여러 연도로 비교한 한 장을 만들어요 (의견서용). 허가지선은 필지 기능 붙으면 자동으로 얹혀요.</p>
+        <div class="air-row">
+          <label>칸 수</label>
+          <div class="air-seg" id="airCols">
+            <button data-n="2" onclick="airSetCols(2)">2칸</button>
+            <button data-n="3" onclick="airSetCols(3)">3칸</button>
+            <button data-n="4" class="on" onclick="airSetCols(4)">4칸</button>
+          </div>
+        </div>
+        <div class="air-row">
+          <label>화각</label>
+          <div class="air-seg" id="airZoom">
+            <button data-z="16" onclick="airSetZoom(16)">좁게</button>
+            <button data-z="15" class="on" onclick="airSetZoom(15)">보통</button>
+            <button data-z="14" onclick="airSetZoom(14)">넓게</button>
+          </div>
+        </div>
+        <div id="airYearPicks" class="air-picks"></div>
+        <button class="air-make" id="airMakeBtn" onclick="airMake()">🖼 시계열 만들기</button>
+        <div id="airStatus" class="fgis-status"></div>
+        <div id="airResult" class="air-result"></div>
+      </div>
+
       <style>
       .cap-types{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 8px}
       .cap-btn{flex:1 1 30%;min-width:62px;padding:7px 4px;font-size:11px;border:1px solid var(--line);
@@ -389,6 +415,30 @@
       .fgis-lyr.off{opacity:.5}
       /* 산사태 격자 또렷하게 (보간 끄기) */
       .fgis-sansatae-img{image-rendering:pixelated;image-rendering:crisp-edges;}
+      /* 과거항공 시계열 [방11] */
+      .air-box{border-top:1px dashed var(--line);margin-top:10px;padding-top:10px}
+      .air-box h5{margin:0 0 4px;font-size:12px}
+      .air-hint{font-size:10px;color:var(--mut,#8a8a8a);line-height:1.45;margin:0 0 8px}
+      .air-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+      .air-row > label{font-size:11px;color:var(--mut,#888);width:34px;flex:0 0 auto}
+      .air-seg{display:flex;gap:4px;flex:1}
+      .air-seg button{flex:1;padding:5px 4px;font-size:11px;border:1px solid var(--line);
+        background:var(--card,#fff);border-radius:6px;cursor:pointer}
+      .air-seg button.on{background:var(--pri,#2b6cff);color:#fff;border-color:var(--pri,#2b6cff)}
+      .air-picks{display:flex;flex-direction:column;gap:5px;margin:8px 0}
+      .air-pick{display:flex;align-items:center;gap:7px;font-size:11px}
+      .air-pick .lab{width:42px;color:var(--mut,#888);flex:0 0 auto}
+      .air-pick select{flex:1;padding:5px 7px;font-size:11px;border:1px solid var(--line);
+        border-radius:6px;background:var(--card,#fff)}
+      .air-make{width:100%;padding:9px;font-size:12px;font-weight:700;margin-top:4px;
+        border:none;border-radius:8px;background:var(--pri,#2b6cff);color:#fff;cursor:pointer}
+      .air-make:hover{filter:brightness(1.08)}
+      .air-make:disabled{opacity:.5;cursor:default}
+      .air-result{margin-top:9px}
+      .air-result img{width:100%;border-radius:8px;border:1px solid var(--line)}
+      .air-result .dl{display:inline-block;margin-top:6px;padding:6px 12px;font-size:11px;
+        border:1px solid var(--pri,#2b6cff);color:var(--pri,#2b6cff);border-radius:6px;
+        text-decoration:none;cursor:pointer}
       </style>
       <div class="wms-cap">
         <h5 style="margin:12px 0 4px;font-size:12px">📷 주제도 캡처 (이미지 정합)</h5>
@@ -1075,6 +1125,161 @@ function fgisFit(){
   });
   if(bounds && bounds.isValid()){ _leafMap.fitBounds(bounds, {padding:[20,20]}); }
 }
+
+/* ══════════════════════════════════════════════
+   과거항공 시계열 [방11]
+   국토정보플랫폼 항공사진(2011~2024)을 연도별로 받아 한 장으로 합침
+   위치: 지금은 화성 남양 고정(나중에 지번검색 붙임)
+   ══════════════════════════════════════════════ */
+var AIR = {
+  cols: 4, zoom: 15,
+  years: [],            // 사용가능 연도 목록
+  picks: [2015,2018,2021,2024],  // 칸별 선택 연도 (기본)
+  // 위치: 화성 남양 (나중에 허가지 중심으로 교체)
+  center: { lng:126.83, lat:37.21 },
+};
+function _airProxy(){ return localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io'; }
+
+function airSetCols(n){
+  AIR.cols=n;
+  document.querySelectorAll('#airCols button').forEach(function(b){
+    b.classList.toggle('on', +b.dataset.n===n);
+  });
+  airRenderPicks();
+}
+function airSetZoom(z){
+  AIR.zoom=z;
+  document.querySelectorAll('#airZoom button').forEach(function(b){
+    b.classList.toggle('on', +b.dataset.z===z);
+  });
+}
+
+function airLoadYears(){
+  fetch(_airProxy()+'/api/air-years')
+    .then(function(r){return r.json();})
+    .then(function(res){
+      AIR.years = (res.years&&res.years.length)? res.years : [];
+      if(!AIR.years.length){ for(var y=2011;y<=2024;y++) AIR.years.push(y); }
+      airRenderPicks();
+    })
+    .catch(function(){
+      AIR.years=[]; for(var y=2011;y<=2024;y++) AIR.years.push(y);
+      airRenderPicks();
+    });
+}
+
+function airRenderPicks(){
+  var box=document.getElementById('airYearPicks'); if(!box) return;
+  if(!AIR.years.length){ box.innerHTML='<small style="color:#888">연도 목록 불러오는 중…</small>'; return; }
+  // 기본 선택값: 최근 연도들로 균등 분배
+  var ys=AIR.years.slice(); var last=ys[ys.length-1];
+  var def=[];
+  for(var i=0;i<AIR.cols;i++){
+    // 오래된→최근 순으로 고르게
+    var idx=Math.round(i*(ys.length-1)/(AIR.cols-1||1));
+    def.push(ys[idx]);
+  }
+  AIR.picks = def.slice(0, AIR.cols);
+  var html='';
+  for(var c=0;c<AIR.cols;c++){
+    html+='<div class="air-pick"><span class="lab">'+(c+1)+'번째</span><select data-i="'+c+'" onchange="airPickChange(this)">';
+    for(var j=0;j<AIR.years.length;j++){
+      var y=AIR.years[j];
+      html+='<option value="'+y+'"'+(y===AIR.picks[c]?' selected':'')+'>'+y+'년</option>';
+    }
+    html+='</select></div>';
+  }
+  box.innerHTML=html;
+}
+function airPickChange(sel){
+  var i=+sel.dataset.i; AIR.picks[i]=+sel.value;
+}
+
+function airStatus(html){ var e=document.getElementById('airStatus'); if(e) e.innerHTML=html; }
+
+function airMake(){
+  var btn=document.getElementById('airMakeBtn');
+  var n=AIR.cols, picks=AIR.picks.slice(0,n);
+  airStatus('<span class="busy">⏳ '+n+'개 연도 항공사진 받는 중… (조금 걸려요)</span>');
+  btn.disabled=true;
+  document.getElementById('airResult').innerHTML='';
+
+  var size=512;
+  var proxy=_airProxy();
+  // 각 연도 이미지를 순차/병렬로 받기
+  var jobs = picks.map(function(year){
+    var url=proxy+'/api/air-photo?lng='+AIR.center.lng+'&lat='+AIR.center.lat
+           +'&year='+year+'&z='+AIR.zoom+'&size='+size;
+    return fetch(url).then(function(r){
+      if(!r.ok) return {year:year, img:null};
+      return r.blob().then(function(b){ return {year:year, img:URL.createObjectURL(b)}; });
+    }).catch(function(){ return {year:year, img:null}; });
+  });
+
+  Promise.all(jobs).then(function(items){
+    airCompose(items, size);
+    btn.disabled=false;
+  });
+}
+
+function airCompose(items, size){
+  // 이미지 로드 → canvas 격자 배치 (2열 기준)
+  var n=items.length;
+  var cols = n<=2? n : 2;          // 2칸=가로2, 3·4칸=2열
+  var rows = Math.ceil(n/cols);
+  var pad=8, labelH=26, gap=6;
+  var cellW=size, cellH=size+labelH;
+  var W = pad*2 + cols*cellW + (cols-1)*gap;
+  var H = pad*2 + rows*cellH + (rows-1)*gap;
+
+  var cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  var ctx=cv.getContext('2d');
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+
+  var loaded=0, fail=0;
+  function done(){
+    if(loaded+fail<n) return;
+    var dataUrl=cv.toDataURL('image/png');
+    var box=document.getElementById('airResult');
+    box.innerHTML='<img src="'+dataUrl+'" alt="과거항공 시계열">'
+      +'<a class="dl" download="과거항공_시계열.png" href="'+dataUrl+'">⬇ 이미지 저장</a>';
+    airStatus('<span class="ok">✅ 완료'+(fail? ' (일부 연도 사진없음 '+fail+'개)':'')+'</span>');
+  }
+
+  items.forEach(function(it, idx){
+    var cIdx=idx%cols, rIdx=Math.floor(idx/cols);
+    var x=pad + cIdx*(cellW+gap);
+    var y=pad + rIdx*(cellH+gap);
+    // 라벨
+    ctx.fillStyle='#1a2233'; ctx.fillRect(x, y, cellW, labelH);
+    ctx.fillStyle='#fff'; ctx.font='bold 14px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('정사영상 ('+it.year+'년)', x+cellW/2, y+labelH/2);
+    // 이미지
+    if(it.img){
+      var im=new Image();
+      im.onload=function(){
+        ctx.drawImage(im, x, y+labelH, cellW, size);
+        // 허가지선 자리(나중에): 중앙에 옅은 안내
+        loaded++; done();
+      };
+      im.onerror=function(){ fail++; ctx.fillStyle='#eee'; ctx.fillRect(x,y+labelH,cellW,size);
+        ctx.fillStyle='#999'; ctx.fillText('사진 없음', x+cellW/2, y+labelH+size/2); done(); };
+      im.src=it.img;
+    } else {
+      fail++; ctx.fillStyle='#eee'; ctx.fillRect(x,y+labelH,cellW,size);
+      ctx.fillStyle='#999'; ctx.font='13px sans-serif';
+      ctx.fillText(it.year+'년 사진 없음', x+cellW/2, y+labelH+size/2); done();
+    }
+  });
+}
+
+/* 페이지 로드 시 연도 목록 미리 불러오기 */
+(function(){
+  function init(){ if(document.getElementById('airYearPicks')) airLoadYears(); }
+  if(document.readyState!=='loading') init();
+  else document.addEventListener('DOMContentLoaded', init);
+})();
 
 /* 업로드 입력·드래그 바인딩 */
 (function(){

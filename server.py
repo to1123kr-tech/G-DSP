@@ -2178,5 +2178,108 @@ def forest_parse():
     return jsonify({'ok':len(results)>0,'results':results,'errors':errors})
 
 
+
+# ============================================================
+# 국토정보플랫폼 항공사진 프록시 라우트  [방11]
+#   연도별 항공사진 WMTS 타일 (키 숨김 + CORS 우회)
+#   엔드포인트: map.ngii.go.kr/airmapprime/map/wmts
+#   TileMatrixSet=NGIS_AIR (EPSG:5179, origin -200000/4000000), 레이어 mapprime:air_{연도}
+#   연도: 2011~2024 (전국 공통)
+# ============================================================
+NGII_KEY = "1FF267EF92D38E0F472E32DB6DB7A1A5B92F185F1D"
+NGII_AIR_WMTS = "https://map.ngii.go.kr/airmapprime/map/wmts"
+NGII_YEAR_API = "https://map.ngii.go.kr/openapi/AirPhotoYearList.do"
+
+# 항공 WMTS 타일 격자 (GetCapabilities NGIS_AIR 기준)
+_AIR_ORIGIN = (-200000.0, 4000000.0)
+_AIR_RES = [66846.72,33423.36,16711.68,8355.84,4177.92,2088.96,1044.48,522.24,
+            261.12,130.56,65.28,32.64,16.32,8.16,4.08,2.04,1.02,0.51,0.255,0.1275,0.06375]
+_AIR_TILE = 256
+_WGS84_TO_5179 = Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True)
+
+def _air_lnglat_to_tile(lng, lat, z):
+    """WGS84 → NGIS_AIR 타일 좌표 (col,row) + 타일 내 픽셀 위치."""
+    x, y = _WGS84_TO_5179.transform(lng, lat)
+    span = _AIR_TILE * _AIR_RES[z]
+    col = (x - _AIR_ORIGIN[0]) / span
+    row = (_AIR_ORIGIN[1] - y) / span
+    return col, row  # float (정수부=타일번호, 소수부=타일내 위치)
+
+@app.route('/api/air-years')
+def air_years():
+    """항공사진 가능 연도 목록."""
+    try:
+        r = req.get(NGII_YEAR_API, params={"apikey": NGII_KEY}, timeout=12)
+        data = r.json()
+        years = [it["year"] for it in data.get("RESULT", [])]
+        return jsonify({"ok": True, "years": years})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": str(e), "years": list(range(2011, 2025))}), 200
+
+def _air_fetch_tile(year, z, col, row):
+    """단일 항공 타일 bytes (없으면 None)."""
+    params = {
+        "SERVICE": "WMTS", "VERSION": "1.0.0", "REQUEST": "GetTile",
+        "LAYER": f"mapprime:air_{year}", "STYLE": "",
+        "TILEMATRIXSET": "NGIS_AIR", "TILEMATRIX": str(z),
+        "TILEROW": str(int(row)), "TILECOL": str(int(col)),
+        "FORMAT": "image/jpeg", "apikey": NGII_KEY,
+    }
+    r = req.get(NGII_AIR_WMTS, params=params, timeout=15)
+    ct = r.headers.get('Content-Type', '')
+    if r.status_code == 200 and 'image' in ct:
+        return r.content
+    return None
+
+@app.route('/api/air-photo')
+def air_photo():
+    """허가지 위치의 연도별 항공사진 1장 (지정 크기, 중심좌표 기준).
+    params: lng, lat (WGS84 중심), year, z(줌, 기본15), size(출력 px, 기본512)
+    중심 주변 타일들을 모자이크해서 size×size로 잘라 PNG 반환.
+    """
+    from PIL import Image
+    try:
+        lng = float(request.args['lng']); lat = float(request.args['lat'])
+        year = int(request.args['year'])
+        z = int(request.args.get('z', 15))
+        size = int(request.args.get('size', 512))
+        z = max(10, min(z, 18))
+
+        colf, rowf = _air_lnglat_to_tile(lng, lat, z)
+        c0, r0 = int(colf), int(rowf)
+        # 중심이 size를 덮도록 충분한 타일 범위 (size/256 + 여유)
+        nt = size // _AIR_TILE + 2
+        half = nt // 2 + 1
+        canvas = Image.new('RGB', ((2*half+1)*_AIR_TILE, (2*half+1)*_AIR_TILE), (40,40,40))
+        got = 0
+        for dc in range(-half, half+1):
+            for dr in range(-half, half+1):
+                tb = _air_fetch_tile(year, z, c0+dc, r0+dr)
+                if tb:
+                    try:
+                        tile = Image.open(io.BytesIO(tb)).convert('RGB')
+                        canvas.paste(tile, ((dc+half)*_AIR_TILE, (dr+half)*_AIR_TILE))
+                        got += 1
+                    except Exception:
+                        pass
+        if got == 0:
+            return jsonify({"ok": False, "msg": f"{year}년 항공사진 없음(이 위치)"}), 404
+        # 중심 픽셀 = (colf - c0 + half)*256 , (rowf - r0 + half)*256
+        cx = (colf - c0 + half) * _AIR_TILE
+        cy = (rowf - r0 + half) * _AIR_TILE
+        left = int(cx - size/2); top = int(cy - size/2)
+        left = max(0, min(left, canvas.width - size))
+        top = max(0, min(top, canvas.height - size))
+        crop = canvas.crop((left, top, left+size, top+size))
+        buf = io.BytesIO(); crop.save(buf, format='PNG')
+        resp = make_response(buf.getvalue())
+        resp.headers['Content-Type'] = 'image/png'
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        return resp
+    except Exception as e:
+        logger.error(f"[air-photo] {e}")
+        return jsonify({"ok": False, "msg": str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050)
