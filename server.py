@@ -16,6 +16,8 @@ from shapely.geometry import Point, box as Box, shape as shapely_shape, mapping 
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 import concurrent.futures
+import base64
+import numpy as np
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -2059,6 +2061,122 @@ def neins_analyze_direct_v4():
         return jsonify({"ok": True, "data": result})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ============================================================
+# 산림청 FGIS 자료 파싱 라우트  [방11]
+#   산사태 GeoTIFF(EPSG:5181) → 등급색 PNG + WGS84 bounds
+#   임상/토양 Shapefile(EPSG:5179) → WGS84 GeoJSON + 속성
+# ============================================================
+_FGIS_T_5181 = Transformer.from_crs("EPSG:5181", "EPSG:4326", always_xy=True)
+_FGIS_T_5179 = Transformer.from_crs("EPSG:5179", "EPSG:4326", always_xy=True)
+_FGIS_CLR = {1:(255,0,0),2:(255,201,0),3:(182,255,142),4:(48,194,255),5:(0,0,255)}
+
+def _fgis_detect(names):
+    low=[n.lower() for n in names]
+    if any(n.endswith('.tif') for n in low) and any(n.endswith('.tfw') for n in low): return 'sansatae'
+    if any(n.endswith('.shp') for n in low): return 'shapefile'
+    return None
+
+def _fgis_classify(field_names):
+    f=set(field_names)
+    if {'FRTP_NM','KOFTR_NM'} & f or 'KOFTR_GROU' in f: return 'imsang'
+    if {'SLDPT_TPCD','PRRCK_LARG'} & f: return 'toyang'
+    return 'unknown'
+
+def _fgis_safe(v):
+    if isinstance(v, bytes):
+        try: return v.decode('cp949').strip()
+        except: return v.decode('utf-8','ignore').strip()
+    return v
+
+def _fgis_reproj(geom, T):
+    gtype=geom['type']; coords=geom['coordinates']
+    def pt(xy):
+        lng,lat=T.transform(xy[0],xy[1]); return [lng,lat]
+    def ring(r): return [pt(c) for c in r]
+    if gtype=='Point': new=pt(coords)
+    elif gtype in ('LineString','MultiPoint'): new=ring(coords)
+    elif gtype in ('Polygon','MultiLineString'): new=[ring(r) for r in coords]
+    elif gtype=='MultiPolygon': new=[[ring(r) for r in poly] for poly in coords]
+    else: new=coords
+    return {'type':gtype,'coordinates':new}
+
+def _fgis_parse_tif(tif_bytes, tfw_text):
+    from PIL import Image
+    import numpy as np
+    v=[float(x) for x in tfw_text.split()]
+    pxW,_,_,pxH,x0,y0=v
+    img=Image.open(io.BytesIO(tif_bytes)); arr=np.array(img)
+    if arr.ndim==3: arr=arr[:,:,0]
+    H,W=arr.shape
+    rgba=np.zeros((H,W,4),dtype=np.uint8); gc={}
+    for g,(r,gg,b) in _FGIS_CLR.items():
+        m=(arr==g); c=int(m.sum())
+        if c: rgba[m]=[r,gg,b,200]; gc[g]=c
+    out=Image.fromarray(rgba,'RGBA'); buf=io.BytesIO(); out.save(buf,format='PNG')
+    b64=base64.b64encode(buf.getvalue()).decode('ascii')
+    x1=x0+W*pxW; y1=y0+H*pxH
+    sw=_FGIS_T_5181.transform(min(x0,x1),min(y0,y1))
+    ne=_FGIS_T_5181.transform(max(x0,x1),max(y0,y1))
+    return {'kind':'sansatae','png_base64':b64,
+            'bounds':[[sw[1],sw[0]],[ne[1],ne[0]]],
+            'width':W,'height':H,'grade_counts':gc,
+            'legend':{str(k):list(v) for k,v in _FGIS_CLR.items()}}
+
+def _fgis_parse_shp(shp_path):
+    import shapefile
+    sf=shapefile.Reader(shp_path, encoding='cp949')
+    fns=[f[0] for f in sf.fields[1:]]
+    kind=_fgis_classify(fns)
+    feats=[]
+    for sr in sf.iterShapeRecords():
+        geom=_fgis_reproj(sr.shape.__geo_interface__, _FGIS_T_5179)
+        props={k:_fgis_safe(val) for k,val in zip(fns, list(sr.record))}
+        feats.append({'type':'Feature','geometry':geom,'properties':props})
+    return {'kind':kind,'geojson':{'type':'FeatureCollection','features':feats},
+            'count':len(feats),'fields':fns}
+
+@app.route('/api/forest-parse', methods=['POST','OPTIONS'])
+def forest_parse():
+    """산림청 FGIS zip 업로드 → 종류 자동판별 → 지도용 데이터(JSON)."""
+    if request.method=='OPTIONS': return '', 200
+    import tempfile, shutil
+    results, errors = [], []
+    files=list(request.files.values())
+    if not files:
+        return jsonify({'ok':False,'msg':'zip 파일을 업로드하세요'}), 400
+    for fs in files:
+        fname=fs.filename or 'upload.zip'
+        try:
+            data=fs.read()
+            zf=_zip_san.ZipFile(io.BytesIO(data))
+            names=zf.namelist()
+            typ=_fgis_detect(names)
+            if typ=='sansatae':
+                tif=zf.read(next(n for n in names if n.lower().endswith('.tif')))
+                tfw=zf.read(next(n for n in names if n.lower().endswith('.tfw'))).decode('ascii','ignore')
+                r=_fgis_parse_tif(tif,tfw); r['source_file']=fname; results.append(r)
+            elif typ=='shapefile':
+                tmp=tempfile.mkdtemp(prefix='fgis_'); base=None
+                try:
+                    for n in names:
+                        ln=n.lower()
+                        if ln.endswith(('.shp','.dbf','.shx','.prj','.cpg')):
+                            op=os.path.join(tmp, os.path.basename(n))
+                            with open(op,'wb') as w: w.write(zf.read(n))
+                            if ln.endswith('.shp'): base=op
+                    if not base:
+                        errors.append(f'{fname}: .shp 없음'); continue
+                    r=_fgis_parse_shp(base); r['source_file']=fname; results.append(r)
+                finally:
+                    shutil.rmtree(tmp, ignore_errors=True)
+            else:
+                errors.append(f'{fname}: 산사태(tif)/임상·토양(shp) 아님 — {names[:3]}')
+        except Exception as e:
+            errors.append(f'{fname}: {e}')
+    return jsonify({'ok':len(results)>0,'results':results,'errors':errors})
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050)
