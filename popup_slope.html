@@ -1963,6 +1963,31 @@ document.getElementById('fileIn').addEventListener('change',function(){
 
 window.addEventListener('resize',resize);
 resize();
+
+/* ══ G-DSP 책(재해·우수분석) 연동 — iframe 임베드 시 데이터 자동 주입 ══ */
+window.addEventListener('message', function(ev){
+  var d=ev.data; if(!d || d.type!=='gdsp-slope-data') return;
+  try{
+    applyParsed(d.name||'책 도면', {contours:d.contours||[], surveys:d.surveys||[], polys:d.polys||[]});
+    /* 책에서 확정한 허가지선이 있으면 그대로 사용 (자동감지 덮어씀) */
+    if(d.permitPts && d.permitPts.length>=3){
+      var _pp=d.permitPts.map(function(p){return{x:p.x,y:p.y};});
+      S.permit={pts:_pp, area:polyArea2(_pp)};
+      setDet('detPermit', true, Math.round(S.permit.area).toLocaleString()+'㎡');
+      document.getElementById('btnRun').disabled = !(S.contours.length && S.permit);
+      computeBounds(); fitView(); render();
+    }
+  }catch(e){ toast('책 데이터 수신 오류: '+e.message,'err'); }
+});
+/* 분석 결과를 책으로 회신 (재해 채점 연동) */
+(function(){
+  var _origShow=showResult;
+  showResult=function(avgSlope,bins,totalArea){
+    _origShow(avgSlope,bins,totalArea);
+    try{ if(window.parent!==window) window.parent.postMessage({type:'gdsp-slope-result',
+      avgSlope:avgSlope, bins:bins, totalArea:totalArea, nCells:(S.gridCells||[]).length}, '*'); }catch(e){}
+  };
+})();
 </script>
 </body>
 </html>
