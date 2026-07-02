@@ -172,6 +172,14 @@
   .soonbox .tag{display:inline-block;margin-top:9px;font-size:10px;font-weight:700;color:var(--warn);
     background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:3px 9px}
 </style>
+<!-- 지적 기능용: proj4(좌표변환) + 카카오(주소↔좌표). 서버에서 열 때만 동작 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
+<script>
+(function(){
+  var jsKey = localStorage.getItem('gdsp_kakao_js') || 'c670e0bc85874ef6267220f09882b379';
+  document.write('<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey='+jsKey+'&libraries=services&autoload=false">\x3C/script>');
+})();
+</script>
 </head>
 <body>
 
@@ -210,6 +218,19 @@
       <input type="file" id="file" accept=".dxf" style="display:none">
       <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.5">
         변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식
+      </div>
+      <!-- 🗺 지적(VWorld) — 서버에서 열 때만 동작 -->
+      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:11px">
+        <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:3px">🗺 지적도 <span style="font-size:9.5px;color:var(--tx3);font-weight:400">(EPSG:5186 · 서버 전용)</span></div>
+        <div style="font-size:10px;color:var(--tx3);line-height:1.5;margin-bottom:8px">지형도가 실좌표(5186)면 지적이 제자리에 얹혀요. 필지 클릭 → 허가지선 또는 DXF 다운로드.</div>
+        <button class="btn btn-ghost" id="cadSelBtn" onclick="toggleCadSelect()">📍 지적 선택</button>
+        <div id="cadDoneBar" style="display:none;margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px">
+          <div id="cadSelInfo" style="font-size:11px;color:var(--tx2);margin-bottom:7px">필지를 클릭하세요</div>
+          <button class="btn btn-primary" id="cadUsePermitBtn" onclick="cadUseAsPermit()" disabled style="margin-bottom:6px">✓ 선택 완료 → 허가지선</button>
+          <button class="btn btn-ghost" id="cadDxfBtn" onclick="cadDownloadDxf()" disabled style="margin-bottom:6px">📐 지적 DXF 다운로드</button>
+          <button class="thr" onclick="cadClearSel()" style="width:100%">선택 초기화</button>
+          <div style="font-size:9.5px;color:var(--tx3);margin-top:7px;line-height:1.5">DXF: CAD에서 허가선 그려 다시 올릴 때 사용(좌표 깨진 도면 대비)</div>
+        </div>
       </div>
     </div>
 
@@ -356,9 +377,27 @@
         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);cursor:pointer">
           <input type="checkbox" id="streamToggle" checked onchange="S.showStreams=this.checked;render()"> 하천망 보기
         </label>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;margin-left:18px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx2);cursor:pointer">
+            <input type="checkbox" id="streamArrowToggle" onchange="S.streamArrows=this.checked;render()"> ➤ 물길 방향 화살표
+          </label>
+          <span style="display:inline-flex;align-items:center;gap:3px;margin-left:auto">
+            <button class="thr" onclick="bumpStreamArrow(-1)" style="padding:2px 7px;font-size:13px;line-height:1">−</button>
+            <span id="streamArrowSzVal" style="font-size:10px;color:var(--tx3);min-width:26px;text-align:center">100%</span>
+            <button class="thr" onclick="bumpStreamArrow(1)" style="padding:2px 7px;font-size:13px;line-height:1">+</button>
+          </span>
+        </div>
         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:8px;cursor:pointer">
           <input type="checkbox" id="arrowToggle" onchange="S.showArrows=this.checked;render()"> 흐름 화살표 (D8) <span style="color:var(--tx3);font-size:11px">(확대 시)</span>
         </label>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:6px;margin-left:18px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--tx3)">모양</span>
+          <button class="thr on" id="arrSty_line" onclick="setArrowStyle('line')" title="선 화살표" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><line x1="1" y1="6" x2="18" y2="6" stroke="currentColor" stroke-width="1.4"/><path d="M13 2 L18 6 L13 10" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
+          <button class="thr" id="arrSty_solid" onclick="setArrowStyle('solid')" title="속찬 화살표(캐드)" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.4"/><path d="M11 2 L20 6 L11 10 Z" fill="currentColor"/></svg></button>
+          <button class="thr" id="arrSty_tri" onclick="setArrowStyle('tri')" title="삼각형" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><path d="M4 2 L18 6 L4 10 Z" fill="currentColor"/></svg></button>
+          <button class="thr" id="arrSty_chevron" onclick="setArrowStyle('chevron')" title="갈매기" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><path d="M6 2 L12 6 L6 10 M12 2 L18 6 L12 10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+          <button class="thr" id="arrSty_dot" onclick="setArrowStyle('dot')" title="물방울" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><line x1="2" y1="6" x2="15" y2="6" stroke="currentColor" stroke-width="1.4"/><circle cx="17" cy="6" r="3.2" fill="currentColor"/></svg></button>
+        </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:7px">
           <span style="font-size:11px;color:var(--tx3);white-space:nowrap">격자 간격</span>
           <input type="range" id="arrowStep" min="5" max="50" step="5" value="10" oninput="setArrowGrid(this.value)" style="flex:1">
@@ -551,6 +590,10 @@
     <div class="hint" id="hint" style="display:none">휠=확대 · 드래그=이동</div>
     <!-- 레이어 토글 바 (좌측 상단) -->
     <div id="layerBar" style="display:none;position:absolute;left:12px;top:12px;display:none;gap:5px;z-index:6;flex-wrap:wrap;max-width:340px">
+      <span style="display:inline-flex;align-items:center;gap:4px">
+        <button class="lyrBtn" id="lyrBg" onclick="toggleLayer('bg')" title="지형도 배경(도로·하천·시설 등) 표시/숨김">지형도</button>
+        <input type="range" id="bgAlphaSl" min="10" max="100" step="5" value="45" oninput="setBgAlpha(this.value)" title="지형도 배경 농도" style="width:52px;display:none">
+      </span>
       <button class="lyrBtn on" id="lyrContour" onclick="toggleLayer('contour')" title="등고선 표시/숨김">등고선</button>
       <button class="lyrBtn on" id="lyrDem" onclick="toggleLayer('dem')" title="음영기복 표시/숨김">음영기복</button>
       <button class="lyrBtn on" id="lyrStream" onclick="toggleLayer('stream')" title="하천망 표시/숨김">하천망</button>
@@ -585,6 +628,9 @@
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#9fb0c8;cursor:pointer">
           <input type="checkbox" id="demToggle" checked onchange="S.showDEM=this.checked;render()"> 음영기복 표시
         </label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:7px;cursor:pointer">
+          <input type="checkbox" id="rainToggle" onchange="toggleRain(this.checked)"> 🌧️ 비 내리기 <span style="color:#7c8aa0;font-size:9.5px">(D8 물길 애니메이션)</span>
+        </label>
         <div style="display:flex;gap:4px">
           <button class="thr2 on" id="demRes10b" onclick="changeDEMRes(10)">10m</button>
           <button class="thr2" id="demRes5b" onclick="changeDEMRes(5)">5m</button>
@@ -598,6 +644,10 @@
         <button class="thr" id="pal_terrain" onclick="setHsPalette('terrain')">🏔️ 자연색</button>
         <button class="thr" id="pal_shade" onclick="setHsPalette('shade')">⬜ 회색</button>
         <button class="thr" id="pal_gray-blue" onclick="setHsPalette('gray-blue')">🔵 청회색</button>
+        <button class="thr" id="pal_sepia" onclick="setHsPalette('sepia')">📜 갈색지도</button>
+        <button class="thr" id="pal_forest" onclick="setHsPalette('forest')">🌲 산림</button>
+        <button class="thr" id="pal_autumn" onclick="setHsPalette('autumn')">🍁 단풍</button>
+        <button class="thr" id="pal_pastel" onclick="setHsPalette('pastel')">🎨 파스텔</button>
       </div>
       <!-- 태양 방향 다이얼 -->
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
@@ -654,6 +704,18 @@
           oninput="setHsSmooth(this.value)" style="width:100%;margin-top:4px">
         <div style="font-size:9px;color:#5b7290;margin-top:2px">삼각형 각짐 완화 (0=원본, 과하면 뭉개짐)</div>
       </div>
+      <!-- 🌧️ 비 조절 (비 내리기 켜면 유효) -->
+      <div style="border-top:1px solid #223049;margin-top:12px;padding-top:10px">
+        <div style="font-size:10.5px;color:#9fb0c8;margin-bottom:6px">🌧️ 비 조절 <span style="color:#5b7290;font-size:9px">(비 내리기 ON일 때)</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8">
+          <span>속도</span><span id="rainSpeedVal" style="color:#7cc5ff;font-weight:600">×1.0</span>
+        </div>
+        <input type="range" min="20" max="300" value="100" step="10" oninput="setRainSpeed(this.value)" style="width:100%;margin-top:3px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8;margin-top:6px">
+          <span>빗물량</span><span id="rainAmtVal" style="color:#7cc5ff;font-weight:600">×1.0</span>
+        </div>
+        <input type="range" min="20" max="300" value="100" step="10" oninput="setRainAmount(this.value)" style="width:100%;margin-top:3px">
+      </div>
     </div>
 
     <!-- 플로팅 범례 (우측 하단) -->
@@ -697,7 +759,7 @@
 <div id="d3dlay" style="display:none;position:fixed;inset:0;z-index:80;background:#06080f">
   <canvas id="d3dcanvas" style="display:block;width:100%;height:100%"></canvas>
   <div id="d3dmsg" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#9fb0c8;font-size:14px"></div>
-  <div style="position:absolute;top:12px;left:14px;color:#9fb0c8;font-size:12px;background:rgba(11,18,32,.7);padding:7px 11px;border-radius:8px;pointer-events:none">드래그=회전 · 휠=확대</div>
+  <div style="position:absolute;top:12px;left:14px;color:#9fb0c8;font-size:12px;background:rgba(11,18,32,.7);padding:7px 11px;border-radius:8px;pointer-events:none">좌드래그=회전 · 휠=확대 · <b style="color:#cde">가운데(또는 우클릭) 드래그=이동</b></div>
   <!-- ★ 3D 독립 컨트롤 (닫지 않고 바로 조정) -->
   <div id="d3dctrl" style="position:absolute;left:14px;bottom:14px;background:rgba(11,18,32,.92);border:1px solid #1e2b45;border-radius:12px;padding:13px 15px;backdrop-filter:blur(6px);min-width:190px;box-shadow:0 10px 30px rgba(0,0,0,.45)">
     <div style="font-size:11px;color:#9fb0c8;font-weight:700;letter-spacing:.4px;margin-bottom:7px">색상</div>
@@ -705,10 +767,29 @@
       <button class="thr" id="c3d_hypso" onclick="set3DColorMode('hypso')">무지개</button>
       <button class="thr" id="c3d_terrain" onclick="set3DColorMode('terrain')">자연색</button>
       <button class="thr" id="c3d_shade" onclick="set3DColorMode('shade')">회색</button>
+      <button class="thr" id="c3d_sepia" onclick="set3DColorMode('sepia')">갈색</button>
+      <button class="thr" id="c3d_forest" onclick="set3DColorMode('forest')">산림</button>
+      <button class="thr" id="c3d_autumn" onclick="set3DColorMode('autumn')">단풍</button>
+      <button class="thr" id="c3d_pastel" onclick="set3DColorMode('pastel')">파스텔</button>
     </div>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:10px;cursor:pointer">
       <input type="checkbox" id="c3d_wire" onchange="set3DWire(this.checked)"> 골격(와이어프레임)
     </label>
+    <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
+      <input type="checkbox" id="c3d_flow" onchange="set3DFlow(this.checked)"> 💧 우수 흐름 (화살표·격자·숫자)
+    </label>
+    <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:#9fb0c8;margin-top:5px;margin-left:18px;cursor:pointer">
+      <input type="checkbox" id="c3d_flowNum" checked onchange="set3DFlowNum(this.checked)"> 누적 숫자 표시
+    </label>
+    <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
+      <input type="checkbox" id="c3d_rain" onchange="toggle3DRain(this.checked)"> 🌧️ 비 내리기 <span style="color:#7c8aa0;font-size:9.5px">(물길 확인용)</span>
+    </label>
+    <div id="c3d_rainCtrl" style="margin-left:18px;margin-top:4px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8"><span>속도</span><span id="c3d_rainSpVal" style="color:#7cc5ff;font-weight:600">×1.0</span></div>
+      <input type="range" min="20" max="300" value="100" step="10" oninput="set3DRainSpeed(this.value)" style="width:100%">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8;margin-top:3px"><span>빗물량</span><span id="c3d_rainAmtVal" style="color:#7cc5ff;font-weight:600">×1.0</span></div>
+      <input type="range" min="20" max="300" value="100" step="10" oninput="set3DRainAmt(this.value)" style="width:100%">
+    </div>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:#9fb0c8;margin-top:11px">
       <span>높이 강조</span><span id="c3d_exagVal" style="color:#4ade80;font-weight:700">×2.2</span>
     </div>
@@ -787,7 +868,7 @@ function isElevLayer(lay){ lay=(lay||'').toUpperCase();
 
 /* ---------- DXF 파서 (검증 완료) ---------- */
 function parseDXF(text){
-  var lines=text.split(/\r\n|\n/), contours=[],surveys=[],texts=[],polys=[];
+  var lines=text.split(/\r\n|\n/), contours=[],surveys=[],texts=[],polys=[],bgLines=[],bgTexts=[];
   var i=0,n=lines.length;
   function next(){ if(i>=n-1)return null; var c=parseInt(lines[i].trim(),10); var v=lines[i+1]; i+=2; return {c:c,v:v}; }
   var inEnt=false;
@@ -820,6 +901,9 @@ function parseDXF(text){
         var closed=(cur.flags&1)||(Math.hypot(f.x-l.x,f.y-l.y)<5);
         if(closed&&cur.pts.length>=3&&!isC)
           polys.push({layer:cur.layer,pts:cur.pts,area:polyArea(cur.pts)});
+        /* ★ 지형도 배경: 등고선도 폐합선(허가지선 후보)도 아닌 잡선(도로·하천·계곡·시설 외곽선) */
+        if(!isC && !(closed&&cur.pts.length>=3))
+          bgLines.push({layer:cur.layer,pts:cur.pts});
       }
     } else if(cur.type==='INSERT'&&isElevLayer(cur.layer)){
       surveys.push({x:cur.ix,y:cur.iy,z:(cur.iz||0),val:null});
@@ -836,7 +920,13 @@ function parseDXF(text){
       if(tm){
         var tv=parseFloat(tm[0]);
         if(tv>0&&tv<9999) texts.push({x:cur.ix,y:cur.iy,val:tv});
+      } else if(cur.text && cur.ix!=null && cur.iy!=null){
+        var _tt=(cur.text||'').trim();
+        if(_tt && _tt.length<=20) bgTexts.push({x:cur.ix,y:cur.iy,t:_tt});   /* 지명 등 */
       }
+    } else if(cur.type==='LINE'){
+      if(cur.lx1!=null&&cur.ly1!=null&&cur.lx2!=null&&cur.ly2!=null)
+        bgLines.push({layer:cur.layer,pts:[{x:cur.lx1,y:cur.ly1},{x:cur.lx2,y:cur.ly2}]});
     }
     cur=null; vmode=false; vx=null;
   }
@@ -852,6 +942,7 @@ function parseDXF(text){
       if(t==='LWPOLYLINE') cur={type:t,pts:[],flags:0,elev:0,_px:null};
       else if(t==='POLYLINE') cur={type:t,pts:[],zs:[],flags:0,layer:null};
       else if(t==='INSERT'||t==='TEXT'||t==='POINT') cur={type:t};
+      else if(t==='LINE') cur={type:t};
       else cur=null;
       vmode=false; vx=null; continue;
     }
@@ -870,18 +961,22 @@ function parseDXF(text){
       case 10:
         if(cur.type==='LWPOLYLINE') cur._px=parseFloat(v);
         else if(cur.type==='INSERT'||cur.type==='TEXT'||cur.type==='POINT') cur.ix=parseFloat(v);
+        else if(cur.type==='LINE') cur.lx1=parseFloat(v);
         break;
       case 20:
         if(cur.type==='LWPOLYLINE'&&cur._px!=null){ cur.pts.push({x:cur._px,y:parseFloat(v)}); cur._px=null; }
         else if(cur.type==='INSERT'||cur.type==='TEXT'||cur.type==='POINT') cur.iy=parseFloat(v);
+        else if(cur.type==='LINE') cur.ly1=parseFloat(v);
         break;
       case 30: if(cur.type==='INSERT'||cur.type==='TEXT'||cur.type==='POINT') cur.iz=parseFloat(v); break;
+      case 11: if(cur.type==='LINE') cur.lx2=parseFloat(v); break;
+      case 21: if(cur.type==='LINE') cur.ly2=parseFloat(v); break;
       case 1: if(cur.type==='TEXT') cur.text=v; break;
     }
   }
   flush();
   surveys.forEach(function(s){var best=null,bd=1e18;texts.forEach(function(t){var d=Math.hypot(t.x-s.x,t.y-s.y);if(d<bd){bd=d;best=t;}});if(best&&bd<30)s.val=best.val;});
-  return {contours:contours,surveys:surveys,polys:polys};
+  return {contours:contours,surveys:surveys,polys:polys,bgLines:bgLines,bgTexts:bgTexts};
 }
 
 /* ---------- 파일 열기 (버튼 + 드래그앤드롭 공용) ---------- */
@@ -918,6 +1013,7 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
 function applyParsed(r){
   S.origContours=r.contours; S.origSurveys=r.surveys; S.origPolys=r.polys||[];
   S.contours=r.contours; S.surveys=r.surveys; S.polys=r.polys||[];
+  S.bgLines=r.bgLines||[]; S.bgTexts=r.bgTexts||[]; S.showBg=false; S.bgAlpha=(S.bgAlpha!=null?S.bgAlpha:0.45);
 
   /* ★ 새 파일 로드 — 이전 작업 상태 모두 초기화 (작업구역 clip 잔류 버그 방지) */
   S.cropRect=null; S.cropPt1=null; S.cropPt2=null; S.cropGhost=null;
@@ -1101,6 +1197,8 @@ window.addEventListener('mousemove',function(e){
 window.addEventListener('mouseup',function(){ S.isDown=false; cv.classList.remove('grabbing'); });
 cv.addEventListener('click',function(e){
   if(S.dragStarted) return; // 실제 드래그(패닝)였으면 무시 — 10px 이내 미동은 클릭으로 인정
+  /* ★ 지적 선택 모드 — 최우선 */
+  if(CAD.selMode){ var wc=evWorld(e); cadHandleClick(wc); return; }
   /* ★ 단면 삭제 X 뱃지 클릭 (모드 무관 최우선) */
   if(_secDelHits && _secDelHits.length){
     var rr=cv.getBoundingClientRect(), mxp=e.clientX-rr.left, myp=e.clientY-rr.top;
@@ -1171,6 +1269,34 @@ function render(){
     ctx.rect(Math.floor(crtl.x), Math.floor(crtl.y),
              Math.ceil(crbr.x-crtl.x)+1, Math.ceil(crbr.y-crtl.y)+1);
     ctx.clip();
+  }
+
+  /* ★ 지형도 배경 (도로·하천·시설 잡선 + 지명) — 맨 밑, 농도 조절 */
+  if(S.showBg && (S.bgLines&&S.bgLines.length || S.bgTexts&&S.bgTexts.length)){
+    ctx.save(); ctx.globalAlpha=S.bgAlpha||0.45;
+    ctx.strokeStyle='#8fa3bd'; ctx.lineWidth=0.7; ctx.setLineDash([]);
+    var _bgM=40;
+    ctx.beginPath();
+    for(var bi=0;bi<S.bgLines.length;bi++){
+      var bl=S.bgLines[bi], bp=bl.pts; if(!bp||bp.length<2) continue;
+      var s0=w2s(bp[0]);
+      /* 간단 컬링: 첫점이 화면 멀리 밖이고 짧으면 스킵 (정밀 컬링은 비용) */
+      var vis=false;
+      for(var bk=0;bk<bp.length;bk++){ var sb=w2s(bp[bk]); if(sb.x>-_bgM&&sb.x<cv.width+_bgM&&sb.y>-_bgM&&sb.y<cv.height+_bgM){vis=true;break;} }
+      if(!vis) continue;
+      ctx.moveTo(s0.x,s0.y);
+      for(var bj=1;bj<bp.length;bj++){ var sj=w2s(bp[bj]); ctx.lineTo(sj.x,sj.y); }
+    }
+    ctx.stroke();
+    if(S.bgTexts && S.scale>0.25){
+      ctx.fillStyle='#aebdd2'; ctx.font='11px sans-serif';
+      for(var ti2=0;ti2<S.bgTexts.length;ti2++){
+        var bt=S.bgTexts[ti2], pt=w2s(bt);
+        if(pt.x<-30||pt.x>cv.width+30||pt.y<-20||pt.y>cv.height+20) continue;
+        ctx.fillText(bt.t, pt.x, pt.y);
+      }
+    }
+    ctx.restore();
   }
 
   // DEM 음영기복 (가장 아래 배경)
@@ -1286,6 +1412,29 @@ function render(){
       ctx.stroke();
     });
     ctx.lineCap='butt'; ctx.setLineDash([]);
+    /* ★ 하천 방향 화살촉 (토글) — 물길 위에서 잘 보이게 흰색+테두리, 크기 조절 */
+    if(S.streamArrows){
+      var _saz=S.streamArrowSz||1;                                   // 크기 배율
+      var _saStep=Math.max(2, Math.round(34*_saz/ (S.scale*fl.cell) ));  // 크면 간격도 넓게(겹침 방지)
+      for(var si2=0;si2<sm.length;si2++){
+        if(!sm[si2]||fa[si2]<thr*2) continue;                        // 물길(2차수 이상)
+        var cc2=si2%fl.cols, rr2=(si2/fl.cols)|0;
+        if((cc2+rr2)%_saStep!==0) continue;                          // 공간 주기(모든 지류에 고르게)
+        var code2=fl.fdir[si2]; if(code2<=0) continue;
+        var dd=_step(code2); if(!dd) continue;
+        var pa2=w2s({x:fl.minX+cc2*fl.cell,y:fl.minY+rr2*fl.cell});
+        var pb2=w2s({x:fl.minX+(cc2+dd[0])*fl.cell,y:fl.minY+(rr2+dd[1])*fl.cell});
+        var mang=Math.atan2(pb2.y-pa2.y,pb2.x-pa2.x);
+        var mx=(pa2.x+pb2.x)/2, my=(pa2.y+pb2.y)/2, ah=Math.max(6,Math.min(22,S.scale*fl.cell*0.65))*_saz;
+        ctx.beginPath();
+        ctx.moveTo(mx+ah*Math.cos(mang), my+ah*Math.sin(mang));
+        ctx.lineTo(mx-ah*0.75*Math.cos(mang-0.5), my-ah*0.75*Math.sin(mang-0.5));
+        ctx.lineTo(mx-ah*0.75*Math.cos(mang+0.5), my-ah*0.75*Math.sin(mang+0.5));
+        ctx.closePath();
+        ctx.fillStyle='#ffffff'; ctx.fill();
+        ctx.lineWidth=Math.max(1,_saz); ctx.strokeStyle='rgba(20,40,80,0.9)'; ctx.stroke();
+      }
+    }
   }
 
   // 강수시 우수흐름도: 격자 히트맵(누적 색칠) + 화살표
@@ -1359,11 +1508,48 @@ function render(){
           var cx2=af.minX+(ccx2+0.5)*af.cell, cy2=af.minY+(ccy2+0.5)*af.cell;
           var q1=w2s({x:cx2-d2[0]*Lw,y:cy2-d2[1]*Lw}), q2=w2s({x:cx2+d2[0]*Lw,y:cy2+d2[1]*Lw});
           var hl2=Math.max(2.5,Math.min(9,cellPx*0.18)), ang2=Math.atan2(q2.y-q1.y,q2.x-q1.x);
-          ctx.beginPath();
-          ctx.moveTo(q1.x,q1.y); ctx.lineTo(q2.x,q2.y);
-          ctx.moveTo(q2.x,q2.y); ctx.lineTo(q2.x-hl2*Math.cos(ang2-0.42),q2.y-hl2*Math.sin(ang2-0.42));
-          ctx.moveTo(q2.x,q2.y); ctx.lineTo(q2.x-hl2*Math.cos(ang2+0.42),q2.y-hl2*Math.sin(ang2+0.42));
-          ctx.stroke();
+          var _fillRmp='rgba('+rmp[0]+','+rmp[1]+','+rmp[2]+','+(0.8+0.2*lv).toFixed(2)+')';
+          var asty=S.arrowStyle||'line';
+          if(asty==='solid'){
+            /* 캐드식: 몸통 선 + 속찬 삼각형 촉 */
+            ctx.beginPath(); ctx.moveTo(q1.x,q1.y); ctx.lineTo(q2.x,q2.y); ctx.stroke();
+            ctx.fillStyle=_fillRmp; var hs2=hl2*1.25;
+            ctx.beginPath();
+            ctx.moveTo(q2.x+hs2*0.35*Math.cos(ang2), q2.y+hs2*0.35*Math.sin(ang2));
+            ctx.lineTo(q2.x-hs2*Math.cos(ang2-0.5), q2.y-hs2*Math.sin(ang2-0.5));
+            ctx.lineTo(q2.x-hs2*Math.cos(ang2+0.5), q2.y-hs2*Math.sin(ang2+0.5));
+            ctx.closePath(); ctx.fill();
+          } else if(asty==='tri'){
+            /* 큰 삼각형 — 셀 중앙에 방향 표시 (쏠림 없음) */
+            var mcx=w2s({x:cx2,y:cy2});   // 셀 중앙 화면좌표
+            ctx.fillStyle=_fillRmp; var ts=hl2*1.7;
+            ctx.beginPath();
+            ctx.moveTo(mcx.x+ts*Math.cos(ang2), mcx.y+ts*Math.sin(ang2));
+            ctx.lineTo(mcx.x-ts*0.7*Math.cos(ang2-0.62), mcx.y-ts*0.7*Math.sin(ang2-0.62));
+            ctx.lineTo(mcx.x-ts*0.7*Math.cos(ang2+0.62), mcx.y-ts*0.7*Math.sin(ang2+0.62));
+            ctx.closePath(); ctx.fill();
+          } else if(asty==='chevron'){
+            /* 갈매기(>>) — 몸통 선 + 열린 두 겹 촉 */
+            ctx.beginPath(); ctx.moveTo(q1.x,q1.y); ctx.lineTo(q2.x,q2.y); ctx.stroke();
+            ctx.beginPath();
+            for(var kk=0;kk<2;kk++){ var off=kk*hl2*0.55;
+              var tipx=q2.x-off*Math.cos(ang2), tipy=q2.y-off*Math.sin(ang2);
+              ctx.moveTo(tipx,tipy); ctx.lineTo(tipx-hl2*Math.cos(ang2-0.5),tipy-hl2*Math.sin(ang2-0.5));
+              ctx.moveTo(tipx,tipy); ctx.lineTo(tipx-hl2*Math.cos(ang2+0.5),tipy-hl2*Math.sin(ang2+0.5)); }
+            ctx.stroke();
+          } else if(asty==='dot'){
+            /* 물방울: 시작 원 + 몸통 선 (흐름 시작점 강조) */
+            ctx.beginPath(); ctx.moveTo(q1.x,q1.y); ctx.lineTo(q2.x,q2.y); ctx.stroke();
+            ctx.fillStyle=_fillRmp;
+            ctx.beginPath(); ctx.arc(q2.x,q2.y, Math.max(1.5,hl2*0.5), 0, 6.283); ctx.fill();
+          } else {
+            /* 기본 선 화살표 */
+            ctx.beginPath();
+            ctx.moveTo(q1.x,q1.y); ctx.lineTo(q2.x,q2.y);
+            ctx.moveTo(q2.x,q2.y); ctx.lineTo(q2.x-hl2*Math.cos(ang2-0.42),q2.y-hl2*Math.sin(ang2-0.42));
+            ctx.moveTo(q2.x,q2.y); ctx.lineTo(q2.x-hl2*Math.cos(ang2+0.42),q2.y-hl2*Math.sin(ang2+0.42));
+            ctx.stroke();
+          }
           if(showNum){ ctx.fillStyle='rgba(232,240,250,0.92)'; ctx.fillText(String(Math.round(acc)), (q1.x+q2.x)/2, (q1.y+q2.y)/2 - cellPx*0.30); }
         }
         ctx.textAlign='left'; ctx.textBaseline='alphabetic';
@@ -1384,6 +1570,9 @@ function render(){
     }
     ctx.stroke(); ctx.setLineDash([]);
   }
+
+  // 지적 (선택된 필지 — 빨간선) : 허가지선 아래
+  if(CAD.parcels.length) drawCadastral();
 
   // 허가지선 (분홍 점선 · 산지전용예정지)
   if(S.permit && S.permit.length>=3){
@@ -1792,6 +1981,9 @@ function buildHillshade(dem, mode){
       } else if(mode==='terrain'){
         var col2=terrainRGB(t), sh2=0.3+ill*0.7;
         d[o]=Math.round(col2[0]*sh2); d[o+1]=Math.round(col2[1]*sh2); d[o+2]=Math.round(col2[2]*sh2); d[o+3]=255;
+      } else if(_EXTRA_PALS[mode]){
+        var col4=paletteRGB(mode,t), sh4=0.35+ill*0.65;
+        d[o]=Math.round(col4[0]*sh4); d[o+1]=Math.round(col4[1]*sh4); d[o+2]=Math.round(col4[2]*sh4); d[o+3]=255;
       } else if(mode==='gray-blue'){
         var g2=Math.round(25+ill*205);
         d[o]=g2; d[o+1]=g2; d[o+2]=Math.min(255,g2+18); d[o+3]=255;
@@ -1810,6 +2002,24 @@ function terrainRGB(t){
   t=Math.max(0,Math.min(1,t));
   var stops=[[0,[80,140,70]],[0.3,[150,170,90]],[0.55,[170,140,90]],
              [0.78,[150,110,80]],[0.92,[180,170,165]],[1,[245,245,245]]];
+  for(var i=1;i<stops.length;i++){
+    if(t<=stops[i][0]){
+      var a=stops[i-1],b=stops[i],f=(t-a[0])/(b[0]-a[0]||1);
+      return [a[1][0]+(b[1][0]-a[1][0])*f, a[1][1]+(b[1][1]-a[1][1])*f, a[1][2]+(b[1][2]-a[1][2])*f];
+    }
+  }
+  return stops[stops.length-1][1];
+}
+/* 추가 색상 프리셋 4종 (스톱 보간) — 2D 음영·3D 공용 */
+var _EXTRA_PALS={
+  sepia:  [[0,[246,238,222]],[0.35,[222,199,160]],[0.65,[187,152,108]],[0.85,[142,106,72]],[1,[92,66,45]]],      /* 종이지도풍 갈색 */
+  forest: [[0,[26,74,44]],[0.3,[52,116,62]],[0.55,[108,158,78]],[0.78,[178,190,110]],[1,[236,228,170]]],          /* 산림 녹색 */
+  autumn: [[0,[250,222,120]],[0.35,[244,164,66]],[0.65,[224,98,52]],[0.85,[176,52,66]],[1,[112,32,72]]],          /* 가을 단풍 */
+  pastel: [[0,[214,236,250]],[0.3,[204,214,246]],[0.55,[226,204,240]],[0.8,[250,214,224]],[1,[254,240,214]]]      /* 파스텔 */
+};
+function paletteRGB(name,t){
+  var stops=_EXTRA_PALS[name]; if(!stops) return hypsoRGB(t);
+  t=Math.max(0,Math.min(1,t));
   for(var i=1;i<stops.length;i++){
     if(t<=stops[i][0]){
       var a=stops[i-1],b=stops[i],f=(t-a[0])/(b[0]-a[0]||1);
@@ -1868,7 +2078,7 @@ function setHsAlt(v){ _hs.alt=parseFloat(v); var e=document.getElementById('hsAl
 function setHsZ(v){ _hs.zFactor=parseFloat(v); var e=document.getElementById('hsZVal'); if(e)e.textContent='×'+_hs.zFactor.toFixed(1); updateHillshade(); }
 function setHsPalette(p){
   _hs.palette=p;
-  ['hypso','terrain','shade','gray-blue'].forEach(function(k){
+  ['hypso','terrain','shade','gray-blue','sepia','forest','autumn','pastel'].forEach(function(k){
     var b=document.getElementById('pal_'+k); if(b) b.className='thr'+(k===p?' on':'');
   });
   S.reliefMode=p;
@@ -1876,6 +2086,14 @@ function setHsPalette(p){
 }
 /* 레이어 표시/숨김 토글 */
 function toggleLayer(which){
+  if(which==='bg'){
+    S.showBg=!S.showBg;
+    var bb=document.getElementById('lyrBg'); if(bb) bb.className='lyrBtn'+(S.showBg?' on':'');
+    var sl=document.getElementById('bgAlphaSl'); if(sl) sl.style.display=S.showBg?'':'none';
+    if(S.showBg && (!S.bgLines||!S.bgLines.length) && (!S.bgTexts||!S.bgTexts.length))
+      toast('이 도면엔 배경 요소(도로·하천 등 잡선)가 없어요','err');
+    render(); return;
+  }
   var map={contour:'showContours', dem:'showDEM', stream:'showStreams', survey:'showSurvey', tin:'showTIN'};
   var btnMap={contour:'lyrContour', dem:'lyrDem', stream:'lyrStream', survey:'lyrSurvey', tin:'lyrTin'};
   var key=map[which];
@@ -1888,11 +2106,99 @@ function toggleLayer(which){
   if(which==='tin'){ var t=document.getElementById('tinToggle'); if(t)t.checked=(S.showTIN!==false); }
   render();
 }
+/* 지형도 배경 농도 */
+function setBgAlpha(v){ S.bgAlpha=Math.max(0.1,Math.min(1,(parseFloat(v)||45)/100)); render(); }
 /* 레이어바 삼각망 버튼 상태 동기화 (TIN 생성/DEM 생성 후 호출) */
 function _syncTinLyrBtn(){ var b=document.getElementById('lyrTin'); if(b) b.className='lyrBtn'+(S.showTIN!==false?' on':''); }
 /* D8 화살표 격자 배율 (크게/드물게) */
 /* D8 격자 간격(미터) — 격자·화살표·누적값 숫자 */
 function setArrowGrid(v){ S.arrowMeters=Math.max(1,parseFloat(v)||10); var e=document.getElementById('arrowStepVal'); if(e)e.textContent=S.arrowMeters+'m'; if(!S.showArrows){var t=document.getElementById('arrowToggle'); if(t&&!t.checked){t.checked=true; S.showArrows=true;}} if(!S.flow){ toast('흐름누적도는 7번 「흐름·하천 분석(D8)」을 먼저 실행해야 나와요','err'); } render(); }
+
+/* ══ 🌧️ 비 내리기 — D8 흐름 따라 물방울이 흘러내리는 애니메이션 (꾸미기존·결과 무관) ══ */
+var _rain={on:false, drops:[], raf:null, layer:null, speed:1.0, amount:1.0};
+function setRainSpeed(v){ _rain.speed=Math.max(0.2,Math.min(3,(parseFloat(v)||100)/100)); var e=document.getElementById('rainSpeedVal'); if(e)e.textContent='×'+_rain.speed.toFixed(1); }
+function setRainAmount(v){ _rain.amount=Math.max(0.2,Math.min(3,(parseFloat(v)||100)/100)); var e=document.getElementById('rainAmtVal'); if(e)e.textContent='×'+_rain.amount.toFixed(1); if(_rain.on) _rainRefill(); }
+function _rainRefill(){
+  if(!S.flow) return;
+  var af=S.flow, N=Math.round(Math.min(700, Math.max(200, af.cols*af.rows/6)) * _rain.amount);
+  N=Math.max(30, Math.min(2500, N));
+  while(_rain.drops.length<N) _rain.drops.push(_rainSpawn());
+  if(_rain.drops.length>N) _rain.drops.length=N;
+}
+function toggleRain(on){
+  _rain.on=(on!==undefined)?!!on:!_rain.on;
+  var b=document.getElementById('rainToggle'); if(b) b.checked=_rain.on;
+  if(_rain.on){
+    if(!S.flow){ toast('비 내리기는 흐름 분석(D8) 후에 볼 수 있어요 — 6번에서 실행','err'); _rain.on=false; if(b)b.checked=false; return; }
+    _rainStart();
+  } else { _rainStop(); }
+}
+function _rainStart(){
+  if(_rain.raf) return;
+  /* 물방울 초기 생성 (양 반영) */
+  _rain.drops=[];
+  var af=S.flow, N=Math.round(Math.min(700, Math.max(200, af.cols*af.rows/6)) * _rain.amount);
+  N=Math.max(30, Math.min(2500, N));
+  for(var i=0;i<N;i++) _rain.drops.push(_rainSpawn());
+  _rainLoop();
+}
+function _rainSpawn(){
+  var af=S.flow;
+  for(var t=0;t<30;t++){
+    var c=(Math.random()*af.cols)|0, r=(Math.random()*af.rows)|0;
+    if(af.fdir[r*af.cols+c]>0) return {c:c+Math.random(), r:r+Math.random(), life:120+Math.random()*220};
+  }
+  return {c:af.cols/2, r:af.rows/2, life:150};
+}
+function _rainStop(){
+  if(_rain.raf){ cancelAnimationFrame(_rain.raf); _rain.raf=null; }
+  _rain.drops=[]; render();   // 물방울 지우기
+}
+function _rainLoop(){
+  if(!_rain.on){ _rain.raf=null; return; }
+  var af=S.flow; if(!af){ _rainStop(); return; }
+  /* 이동: 현재 셀의 fdir 방향으로 */
+  for(var i=0;i<_rain.drops.length;i++){
+    var dp=_rain.drops[i];
+    var ci=Math.max(0,Math.min(af.cols-1,dp.c|0)), ri=Math.max(0,Math.min(af.rows-1,dp.r|0));
+    var code=af.fdir[ri*af.cols+ci];
+    var d=code>0?_step(code):null;
+    if(!d || (dp.life--)<=0){ _rain.drops[i]=_rainSpawn(); continue; }
+    var sp=(0.22+Math.random()*0.12)*_rain.speed;                    // 셀/프레임 (속도 조절)
+    dp.c+=d[0]*sp; dp.r+=d[1]*sp;
+    if(dp.c<0||dp.c>=af.cols||dp.r<0||dp.r>=af.rows){ _rain.drops[i]=_rainSpawn(); }
+  }
+  render();
+  _rainDraw();                                                        // render 위에 물방울 덧그림
+  _rain.raf=requestAnimationFrame(_rainLoop);
+}
+function _rainDraw(){
+  var cv=document.getElementById('cv'); if(!cv) return;
+  var ctx=cv.getContext('2d'); var af=S.flow;
+  ctx.save();
+  for(var i=0;i<_rain.drops.length;i++){
+    var dp=_rain.drops[i];
+    var p=w2s({x:af.minX+dp.c*af.cell, y:af.minY+dp.r*af.cell});
+    if(p.x<-5||p.x>cv.width+5||p.y<-5||p.y>cv.height+5) continue;
+    ctx.fillStyle='rgba(120,200,255,0.9)';
+    ctx.beginPath(); ctx.arc(p.x,p.y, 1.6, 0, 6.283); ctx.fill();
+    /* 꼬리 */
+    ctx.strokeStyle='rgba(120,200,255,0.35)'; ctx.lineWidth=1;
+    var ci=Math.max(0,Math.min(af.cols-1,dp.c|0)), ri=Math.max(0,Math.min(af.rows-1,dp.r|0));
+    var code=af.fdir[ri*af.cols+ci]; var d=code>0?_step(code):null;
+    if(d){ ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-d[0]*5*(S.scale*af.cell/10||1), p.y+d[1]*5*(S.scale*af.cell/10||1)); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+
+function setArrowStyle(s){ S.arrowStyle=s; ['line','solid','tri','chevron','dot'].forEach(function(k){ var b=document.getElementById('arrSty_'+k); if(b)b.className='thr'+(k===s?' on':''); }); if(!S.showArrows){var t=document.getElementById('arrowToggle'); if(t){t.checked=true; S.showArrows=true;}} render(); }
+function bumpStreamArrow(dir){
+  var v=(S.streamArrowSz||1)+dir*0.25; v=Math.max(0.5,Math.min(3,Math.round(v*100)/100)); S.streamArrowSz=v;
+  var e=document.getElementById('streamArrowSzVal'); if(e)e.textContent=Math.round(v*100)+'%';
+  if(!S.streamArrows){ var t=document.getElementById('streamArrowToggle'); if(t){t.checked=true; S.streamArrows=true;} }
+  render();
+}
 /* 무지개 7색 램프 (옅음→진함) */
 function _rampOf(name,lv){
   var M={ red:[[254,202,202],[185,20,20]], orange:[[254,215,170],[194,65,12]],
@@ -2432,6 +2738,8 @@ function open3D(){
 }
 function close3D(){
   document.getElementById('d3dlay').style.display='none';
+  _rain3d.on=false; _rain3dClear();
+  var _cr=document.getElementById('c3d_rain'); if(_cr)_cr.checked=false;
   if(_three){
     if(_three.raf) cancelAnimationFrame(_three.raf);
     if(_three.onResize) window.removeEventListener('resize',_three.onResize);
@@ -2472,13 +2780,13 @@ function _rebuild3D(){
   geo.setAttribute('position', new THREE.BufferAttribute(hp.pos,3));
   geo.setIndex(gridIndices(dem.cols, dem.rows));
   var material;
-  if(_three.colorMode==='hypso'||_three.colorMode==='terrain'){
-    var useTerrain=(_three.colorMode==='terrain');
+  if(_three.colorMode==='hypso'||_three.colorMode==='terrain'||_EXTRA_PALS[_three.colorMode]){
+    var useTerrain=(_three.colorMode==='terrain'), _palName=_EXTRA_PALS[_three.colorMode]?_three.colorMode:null;
     var cols3=new Float32Array(dem.cols*dem.rows*3);
     for(var vi=0;vi<dem.cols*dem.rows;vi++){
       var zv=dem.z[vi]; if(!(zv===zv)) zv=hp.zmin;
       var t=(zv-hp.zmin)/(hp.zmax-hp.zmin||1);
-      var rgb=useTerrain?terrainRGB(t):hypsoRGB(t);
+      var rgb=_palName?paletteRGB(_palName,t):(useTerrain?terrainRGB(t):hypsoRGB(t));
       cols3[vi*3]=rgb[0]/255; cols3[vi*3+1]=rgb[1]/255; cols3[vi*3+2]=rgb[2]/255;
     }
     geo.setAttribute('color', new THREE.BufferAttribute(cols3,3));
@@ -2536,12 +2844,94 @@ function _rebuild3D(){
       scene.add(_wLines); _three.objs.push(_wLines);
     }
   }
+  /* 우수 흐름 (화살표·격자·누적숫자) — 토글 */
+  if(S.show3DFlow && S.flow){ _add3DFlow(scene, dem, hp, exag); }
 }
+
+/* 3D 우수 흐름: 화살표(누적색) + 격자 + 누적숫자(스프라이트) — 표면 드레이프 */
+function _add3DFlow(scene, dem, hp, exag){
+  var af=S.flow; if(!af) return;
+  var gm=Math.max(1, Math.round((S.arrowMeters||10)/af.cell));
+  // 안전 상한: 너무 많으면 간격 자동 확대 (3D 프리즈 방지)
+  var approx=(af.cols/gm)*(af.rows/gm);
+  while(approx>3500 && gm<40){ gm++; approx=(af.cols/gm)*(af.rows/gm); }
+  var fa=af.acc, Lw=af.cell*gm*0.34;
+  var arrowPts=[], arrowCols=[];
+  function push2(a,b,rgb){ arrowPts.push(a,b); arrowCols.push(rgb[0]/255,rgb[1]/255,rgb[2]/255, rgb[0]/255,rgb[1]/255,rgb[2]/255); }
+  var numPts=[];  // {x,y,acc}
+  for(var ar=Math.floor(gm/2); ar<af.rows; ar+=gm){
+    for(var ac=Math.floor(gm/2); ac<af.cols; ac+=gm){
+      var ai=ar*af.cols+ac, code=af.fdir[ai]; if(code<=0) continue;
+      var d=_step(code); if(!d) continue;
+      var acc=fa?(fa[ai]||0):0;
+      var lv=Math.log10(acc+1)/4; lv=lv<0?0:(lv>1?1:lv);
+      var rgb=_flowRamp(lv);
+      var cx=af.minX+(ac+0.5)*af.cell, cy=af.minY+(ar+0.5)*af.cell;
+      var t1=tmTo3DPt(cx-d[0]*Lw, cy-d[1]*Lw, dem, hp, exag); t1.y+=3;
+      var t2=tmTo3DPt(cx+d[0]*Lw, cy+d[1]*Lw, dem, hp, exag); t2.y+=3;
+      push2(t1,t2,rgb);
+      // 화살촉 (끝점에서 뒤로 두 선)
+      var dx=t2.x-t1.x, dz=t2.z-t1.z, len=Math.hypot(dx,dz)||1; dx/=len; dz/=len;
+      var hlen=Lw*0.5, ca=Math.cos(0.5), sa=Math.sin(0.5);
+      var h1=new THREE.Vector3(t2.x-hlen*(dx*ca - dz*sa), t2.y, t2.z-hlen*(dx*sa + dz*ca));
+      var h2=new THREE.Vector3(t2.x-hlen*(dx*ca + dz*sa), t2.y, t2.z-hlen*(-dx*sa + dz*ca));
+      push2(t2,h1,rgb); push2(t2,h2,rgb);
+      if(acc>0) numPts.push({x:cx,y:cy,acc:acc});
+    }
+  }
+  if(arrowPts.length){
+    var ag=new THREE.BufferGeometry().setFromPoints(arrowPts);
+    ag.setAttribute('color', new THREE.Float32BufferAttribute(arrowCols,3));
+    var aLines=new THREE.LineSegments(ag, new THREE.LineBasicMaterial({vertexColors:true}));
+    scene.add(aLines); _three.objs.push(aLines);
+  }
+  // 격자선 (draped)
+  var gridPts=[];
+  var c0=af.minX, c1=af.minX+af.cols*af.cell, r0=af.minY, r1=af.minY+af.rows*af.cell;
+  for(var gc=0; gc<=af.cols; gc+=gm){ var gx=af.minX+gc*af.cell;
+    for(var yy=r0; yy<r1; yy+=af.cell*2){ var ga=tmTo3DPt(gx,yy,dem,hp,exag), gb=tmTo3DPt(gx,Math.min(yy+af.cell*2,r1),dem,hp,exag); ga.y+=1.5; gb.y+=1.5; gridPts.push(ga,gb); } }
+  for(var gr=0; gr<=af.rows; gr+=gm){ var gy=af.minY+gr*af.cell;
+    for(var xx=c0; xx<c1; xx+=af.cell*2){ var gc2=tmTo3DPt(xx,gy,dem,hp,exag), gd2=tmTo3DPt(Math.min(xx+af.cell*2,c1),gy,dem,hp,exag); gc2.y+=1.5; gd2.y+=1.5; gridPts.push(gc2,gd2); } }
+  if(gridPts.length){
+    var gg=new THREE.BufferGeometry().setFromPoints(gridPts);
+    var gLines=new THREE.LineSegments(gg, new THREE.LineBasicMaterial({color:0x9cacc8, transparent:true, opacity:0.22}));
+    scene.add(gLines); _three.objs.push(gLines);
+  }
+  // 누적 숫자 (스프라이트) — 상한 초과 시 생략
+  if(S.show3DFlowNum!==false && numPts.length<=6000){
+    numPts.forEach(function(n){
+      var sp=_makeNumSprite(Math.round(n.acc));
+      if(!sp) return;
+      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=6;
+      sp.position.set(p.x,p.y,p.z);
+      var sc=af.cell*gm*0.5; sp.scale.set(sc,sc*0.5,1);
+      scene.add(sp); _three.objs.push(sp);
+    });
+  } else if(S.show3DFlowNum!==false && numPts.length>6000){
+    toast('격자 숫자가 너무 많아 3D에선 생략됨('+numPts.length+'개) — 격자 간격을 키우세요','err');
+  }
+}
+/* 숫자 → 캔버스 스프라이트 */
+function _makeNumSprite(num){
+  try{
+    var cv=document.createElement('canvas'); cv.width=64; cv.height=32;
+    var c=cv.getContext('2d'); c.clearRect(0,0,64,32);
+    c.font='bold 20px sans-serif'; c.textAlign='center'; c.textBaseline='middle';
+    /* 검은 배경 없이 글자만 — 외곽선(어두운 테두리)으로 가독성 확보 */
+    c.lineWidth=4; c.strokeStyle='rgba(0,0,0,0.85)'; c.strokeText(''+num,32,16);
+    c.fillStyle='#ffffff'; c.fillText(''+num,32,16);
+    var tex=new THREE.CanvasTexture(cv);
+    var mat=new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false});
+    return new THREE.Sprite(mat);
+  }catch(e){ return null; }
+}
+function set3DFlow(on){ S.show3DFlow=!!on; if(_three) _rebuild3D(); }
+function set3DFlowNum(on){ S.show3DFlowNum=!!on; if(_three && S.show3DFlow) _rebuild3D(); }
 
 /* 3D 컨트롤 UI 상태 동기화 */
 function _sync3DCtrlUI(){
   var m=_three?_three.colorMode:'shade';
-  [['c3d_hypso','hypso'],['c3d_terrain','terrain'],['c3d_shade','shade']].forEach(function(p){
+  [['c3d_hypso','hypso'],['c3d_terrain','terrain'],['c3d_shade','shade'],['c3d_sepia','sepia'],['c3d_forest','forest'],['c3d_autumn','autumn'],['c3d_pastel','pastel']].forEach(function(p){
     var b=document.getElementById(p[0]); if(b) b.className='thr'+(m===p[1]?' on':'');
   });
   var wc=document.getElementById('c3d_wire'); if(wc) wc.checked=_three?!!_three.wire:false;
@@ -2569,11 +2959,32 @@ function init3DScene(){
   var tgt=new THREE.Vector3(0,(hp0.zmax-hp0.zmin)*exag*0.3,0);
   function cam(){ camera.position.set(tgt.x+rad*Math.sin(phi)*Math.sin(theta),tgt.y+rad*Math.cos(phi),tgt.z+rad*Math.sin(phi)*Math.cos(theta)); camera.lookAt(tgt); }
   cam();
-  var drag=false,lx=0,ly=0;
-  canvas.onmousedown=function(e){ drag=true; lx=e.clientX; ly=e.clientY; };
-  canvas.onmousemove=function(e){ if(!drag)return; theta-=(e.clientX-lx)*0.006; phi=Math.max(0.15,Math.min(Math.PI-0.15,phi-(e.clientY-ly)*0.006)); lx=e.clientX; ly=e.clientY; cam(); };
+  var drag=false, panning=false, lx=0, ly=0;
+  canvas.oncontextmenu=function(e){ e.preventDefault(); };
+  canvas.onmousedown=function(e){
+    lx=e.clientX; ly=e.clientY;
+    if(e.button===1 || e.button===2){ panning=true; e.preventDefault(); }   // 가운데/오른쪽 = 이동
+    else { drag=true; }                                                     // 왼쪽 = 회전
+  };
+  canvas.onmousemove=function(e){
+    var dx=e.clientX-lx, dy=e.clientY-ly;
+    if(panning){
+      /* 화면 평면으로 tgt 이동 — 카메라 right/up 벡터 기준 */
+      var fx=Math.sin(phi)*Math.sin(theta), fy=Math.cos(phi), fz=Math.sin(phi)*Math.cos(theta); // tgt→cam 단위
+      var rl=Math.hypot(fz,fx)||1;
+      var rx=fz/rl, ry=0, rz=-fx/rl;                        // right = norm(cross(up,f))
+      var ux=(fy*rz - fz*ry), uy=(fz*rx - fx*rz), uz=(fx*ry - fy*rx);   // up = cross(f,right)
+      var k=rad*0.0016;
+      tgt.x += (-rx*dx + ux*dy)*k;
+      tgt.y += (           uy*dy)*k;
+      tgt.z += (-rz*dx + uz*dy)*k;
+      lx=e.clientX; ly=e.clientY; cam(); return;
+    }
+    if(!drag)return;
+    theta-=dx*0.006; phi=Math.max(0.15,Math.min(Math.PI-0.15,phi-dy*0.006)); lx=e.clientX; ly=e.clientY; cam();
+  };
   canvas.onwheel=function(e){ e.preventDefault(); rad*=(e.deltaY>0?1.1:0.9); rad=Math.max(ext*0.2,Math.min(ext*4,rad)); cam(); };
-  var onUp=function(){ drag=false; };
+  var onUp=function(){ drag=false; panning=false; };
   var onResize=function(){ var w=lay.clientWidth,h=lay.clientHeight; camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h,false); };
   window.addEventListener('mouseup',onUp);
   window.addEventListener('resize',onResize);
@@ -2581,7 +2992,61 @@ function init3DScene(){
   _3dColorMode=initMode;
   _rebuild3D();
   _sync3DCtrlUI();
-  (function loop(){ if(!_three)return; _three.raf=requestAnimationFrame(loop); renderer.render(scene,camera); })();
+  (function loop(){ if(!_three)return; _three.raf=requestAnimationFrame(loop); if(_rain3d.on) _rain3dStep(); renderer.render(scene,camera); })();
+}
+
+/* ══ 🌧️ 3D 비 내리기 — 지형 표면 위 물방울이 D8 따라 흘러내림 ══ */
+var _rain3d={on:false, pts:null, data:[], speed:1.0, amount:1.0};
+function toggle3DRain(on){
+  _rain3d.on=(on!==undefined)?!!on:!_rain3d.on;
+  var b=document.getElementById('c3d_rain'); if(b)b.checked=_rain3d.on;
+  if(!_three){ return; }
+  if(_rain3d.on){
+    if(!S.flow){ toast('비는 흐름 분석(D8) 후에 볼 수 있어요','err'); _rain3d.on=false; if(b)b.checked=false; return; }
+    _rain3dInit();
+  } else { _rain3dClear(); }
+}
+function set3DRainSpeed(v){ _rain3d.speed=Math.max(0.2,Math.min(3,(parseFloat(v)||100)/100)); var e=document.getElementById('c3d_rainSpVal'); if(e)e.textContent='×'+_rain3d.speed.toFixed(1); }
+function set3DRainAmt(v){ _rain3d.amount=Math.max(0.2,Math.min(3,(parseFloat(v)||100)/100)); var e=document.getElementById('c3d_rainAmtVal'); if(e)e.textContent='×'+_rain3d.amount.toFixed(1); if(_rain3d.on) _rain3dInit(); }
+function _rain3dClear(){
+  if(_rain3d.pts && _three){ _three.scene.remove(_rain3d.pts); if(_rain3d.pts.geometry)_rain3d.pts.geometry.dispose(); if(_rain3d.pts.material)_rain3d.pts.material.dispose(); }
+  _rain3d.pts=null; _rain3d.data=[];
+}
+function _rain3dSpawn(af){
+  for(var t=0;t<30;t++){ var c=(Math.random()*af.cols)|0, r=(Math.random()*af.rows)|0; if(af.fdir[r*af.cols+c]>0) return {c:c+Math.random(), r:r+Math.random(), life:120+Math.random()*220}; }
+  return {c:af.cols/2, r:af.rows/2, life:150};
+}
+function _rain3dInit(){
+  _rain3dClear();
+  var af=S.flow, dem=_three.dem, hp=demPositions(dem,_three.exag);
+  var N=Math.round(Math.min(1500, Math.max(300, af.cols*af.rows/4)) * _rain3d.amount);
+  N=Math.max(50, Math.min(4000, N));
+  _rain3d.data=[]; for(var i=0;i<N;i++) _rain3d.data.push(_rain3dSpawn(af));
+  var pos=new Float32Array(N*3);
+  var geo=new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  var mat=new THREE.PointsMaterial({color:0x9be0ff, size:Math.max(4, dem.cell*1.3), transparent:true, opacity:0.95, depthTest:true, sizeAttenuation:true});
+  _rain3d.pts=new THREE.Points(geo,mat); _rain3d.hp=hp;
+  _three.scene.add(_rain3d.pts);
+  _rain3dStep();
+}
+function _rain3dStep(){
+  if(!_three||!_rain3d.pts) return;
+  var af=S.flow; if(!af){ return; }
+  var dem=_three.dem, hp=_rain3d.hp||demPositions(dem,_three.exag), exag=_three.exag;
+  var pos=_rain3d.pts.geometry.attributes.position.array;
+  for(var i=0;i<_rain3d.data.length;i++){
+    var dp=_rain3d.data[i];
+    var ci=Math.max(0,Math.min(af.cols-1,dp.c|0)), ri=Math.max(0,Math.min(af.rows-1,dp.r|0));
+    var code=af.fdir[ri*af.cols+ci]; var d=code>0?_step(code):null;
+    if(!d || (dp.life--)<=0){ _rain3d.data[i]=_rain3dSpawn(af); dp=_rain3d.data[i]; }
+    else { var sp=(0.22+Math.random()*0.12)*_rain3d.speed; dp.c+=d[0]*sp; dp.r+=d[1]*sp;
+      if(dp.c<0||dp.c>=af.cols||dp.r<0||dp.r>=af.rows) _rain3d.data[i]=_rain3dSpawn(af); dp=_rain3d.data[i]; }
+    var wx=af.minX+dp.c*af.cell, wy=af.minY+dp.r*af.cell;
+    var p3=tmTo3DPt(wx,wy,dem,hp,exag); p3.y+=3;
+    pos[i*3]=p3.x; pos[i*3+1]=p3.y; pos[i*3+2]=p3.z;
+  }
+  _rain3d.pts.geometry.attributes.position.needsUpdate=true;
 }
 
 /* ══ 버퍼선 색상 ══ */
@@ -3469,6 +3934,171 @@ function updateNav(){
 
 /* 초기 사이즈 */
 resize();
+/* ═══════════════════════════════════════════════════════════════
+   지적(VWorld) — 캔버스 배경/선택 → 허가지선 · DXF 다운로드
+   (서버에서 열 때만 동작: proj4·카카오·/api/wfs·/api/wfs-dxf-circle)
+   좌표: DXF 지형도=EPSG:5186 캔버스. 지적=경위도(4326)로 옴 → 5186 변환해 그림.
+   ═══════════════════════════════════════════════════════════════ */
+var CAD = { selMode:false, parcels:[], geocoder:null, ready:false, bgOn:false, bgImg:null, bgAlpha:0.6 };
+
+/* proj4 정의 (일지 검증본) */
+function _cadInitProj(){
+  if(typeof proj4==='undefined') return false;
+  if(!proj4.defs['EPSG:5186']){
+    try{ proj4.defs('EPSG:5186','+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'); }catch(e){ return false; }
+  }
+  return true;
+}
+function tm5186toWgs84(E,N){ if(!_cadInitProj())return null; try{ return proj4('EPSG:5186','WGS84',[E,N]); }catch(e){ return null; } }  // [lon,lat]
+function wgs84toTm5186(lng,lat){ if(!_cadInitProj())return null; try{ return proj4('WGS84','EPSG:5186',[lng,lat]); }catch(e){ return null; } }  // [E,N]
+
+function _cadKakaoReady(cb){
+  if(CAD.geocoder){ cb(true); return; }
+  if(typeof kakao==='undefined'||!kakao.maps){ cb(false); return; }
+  kakao.maps.load(function(){ try{ CAD.geocoder=new kakao.maps.services.Geocoder(); cb(true); }catch(e){ cb(false); } });
+}
+
+/* 지적 선택 모드 토글 */
+function toggleCadSelect(){
+  if(!_cadInitProj()){ toast('좌표 변환(proj4) 로드 실패 — 서버에서 열어주세요','err'); return; }
+  if(!S.bounds){ toast('먼저 지형도(DXF)를 올리세요','err'); return; }
+  CAD.selMode=!CAD.selMode;
+  var b=document.getElementById('cadSelBtn');
+  if(b){ b.classList.toggle('active',CAD.selMode); b.textContent=CAD.selMode?'✓ 지적 선택 중 (필지 클릭)':'📍 지적 선택'; }
+  document.getElementById('cadDoneBar').style.display=CAD.selMode?'':'none';
+  if(CAD.selMode){
+    _cadKakaoReady(function(ok){ if(!ok) toast('카카오 지도 API 로드 실패 — 서버에서 열어야 해요','err'); });
+    toast('필지를 클릭하세요 (여러 개 가능, 다시 클릭=해제)','ok');
+  }
+}
+
+/* 캔버스 클릭 → 필지 선택 (S.mode 처리부에서 호출) */
+function cadHandleClick(worldPt){
+  if(!CAD.selMode) return false;
+  var ll=tm5186toWgs84(worldPt.x, worldPt.y);
+  if(!ll){ toast('좌표 변환 실패','err'); return true; }
+  var lng=ll[0], lat=ll[1];
+  if(!CAD.geocoder){ _cadKakaoReady(function(ok){ if(ok) _cadFetchParcel(lng,lat); }); return true; }
+  _cadFetchParcel(lng,lat);
+  return true;
+}
+function _cadFetchParcel(lng,lat){
+  CAD.geocoder.coord2RegionCode(lng,lat,function(rr,rs){
+    if(rs!==kakao.maps.services.Status.OK||!rr.length){ toast('주소 조회 실패','err'); return; }
+    var bt=rr.find(function(r){return r.region_type==='B';}); if(!bt){ toast('법정동코드 없음','err'); return; }
+    var bcode=bt.code;
+    CAD.geocoder.coord2Address(lng,lat,function(ar,as){
+      if(as!==kakao.maps.services.Status.OK||!ar.length||!ar[0].address){ toast('지번 조회 실패','err'); return; }
+      var addr=ar[0].address;
+      var mtYn=(addr.mountain_yn==='Y')?'2':'1';
+      var pnu=bcode+mtYn+String(addr.main_address_no||'0').padStart(4,'0')+String(addr.sub_address_no||'0').padStart(4,'0');
+      fetch('/api/wfs?pnu='+pnu+'&lng='+lng+'&lat='+lat).then(function(r){return r.json();}).then(function(data){
+        var fs=(data&&data.response&&data.response.result&&data.response.result.featureCollection&&data.response.result.featureCollection.features)||(data&&data.features)||[];
+        if(!fs.length){ toast('필지 정보를 못 찾았어요','err'); return; }
+        var f=fs[0], p=f.properties||{}, geom=f.geometry, thisPnu=p.pnu||pnu;
+        var idx=CAD.parcels.findIndex(function(sp){return sp.pnu===thisPnu;});
+        if(idx>=0){ CAD.parcels.splice(idx,1); toast('필지 해제: '+(p.jibun||thisPnu),'ok'); }
+        else {
+          /* geom(경위도) → 5186 링들로 변환해 저장 */
+          var rings5186=_cadGeomTo5186(geom);
+          CAD.parcels.push({pnu:thisPnu, jibun:p.jibun||(addr.address_name||'').split(' ').pop()||'', lng:lng, lat:lat, geom:geom, rings:rings5186});
+          toast('필지 추가: '+(p.jibun||'선택됨')+' (총 '+CAD.parcels.length+'개)','ok');
+        }
+        _cadUpdateBar(); render();
+      }).catch(function(e){ toast('필지 조회 실패','err'); });
+    });
+  });
+}
+/* GeoJSON 경위도 geometry → 5186 링 배열 [[{x,y}...], ...] */
+function _cadGeomTo5186(geom){
+  if(!geom) return [];
+  var polys=[];
+  if(geom.type==='MultiPolygon') polys=geom.coordinates.map(function(pp){return pp[0];});
+  else if(geom.type==='Polygon') polys=[geom.coordinates[0]];
+  else return [];
+  return polys.map(function(ring){
+    return ring.map(function(c){ var tm=wgs84toTm5186(c[0],c[1]); return tm?{x:tm[0],y:tm[1]}:null; }).filter(Boolean);
+  }).filter(function(r){return r.length>=3;});
+}
+function _cadUpdateBar(){
+  var n=CAD.parcels.length;
+  var el=document.getElementById('cadSelInfo'); if(el) el.textContent=n?(n+'개 필지 선택됨'):'필지를 클릭하세요';
+  var dl=document.getElementById('cadDxfBtn'); if(dl) dl.disabled=!n;
+  var dn=document.getElementById('cadUsePermitBtn'); if(dn) dn.disabled=!n;
+}
+
+/* 캔버스에 지적 그리기 (render에서 호출) */
+function drawCadastral(){
+  if(!CAD.parcels.length) return;
+  ctx.save();
+  CAD.parcels.forEach(function(sp){
+    (sp.rings||[]).forEach(function(ring){
+      ctx.beginPath();
+      for(var i=0;i<ring.length;i++){ var s=w2s(ring[i]); if(i===0)ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y); }
+      ctx.closePath();
+      ctx.fillStyle='rgba(255,45,45,0.10)'; ctx.fill();
+      ctx.strokeStyle='#ff2d2d'; ctx.lineWidth=2; ctx.stroke();
+    });
+    /* 지번 라벨 (첫 링 중심) */
+    if(sp.jibun && sp.rings && sp.rings[0] && sp.rings[0].length){
+      var cx=0,cy=0,r0=sp.rings[0]; r0.forEach(function(pt){cx+=pt.x;cy+=pt.y;}); cx/=r0.length; cy/=r0.length;
+      var sc=w2s({x:cx,y:cy});
+      ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.strokeText(sp.jibun,sc.x,sc.y);
+      ctx.fillStyle='#fff'; ctx.fillText(sp.jibun,sc.x,sc.y);
+    }
+  });
+  ctx.restore();
+}
+
+/* 선택 지적 → 허가지선 확정 */
+function cadUseAsPermit(){
+  if(!CAD.parcels.length){ toast('먼저 필지를 선택하세요','err'); return; }
+  /* 복수 필지: 각 필지 외곽 링을 이어붙이지 않고, 첫 필지(또는 전체 외곽)를 허가지선으로.
+     실무: 보통 1필지. 복수면 첫 필지 외곽을 기본 사용하고 안내. */
+  var target=CAD.parcels[0].rings[0];
+  if(CAD.parcels.length>1) toast('복수 필지 — 첫 필지 외곽을 허가지선으로 사용(필요시 편집)','ok');
+  if(!target||target.length<3){ toast('필지 경계가 유효하지 않아요','err'); return; }
+  S.permit=target.map(function(p){return {x:p.x,y:p.y};});
+  S.daejangArea=null;
+  var dj=document.getElementById('daejangArea'); if(dj) dj.value='';
+  var pin=document.getElementById('permitInfo'); if(pin) pin.style.display='';
+  if(typeof updatePermitAreaDisplay==='function') updatePermitAreaDisplay();
+  if(typeof _afterPermitSet==='function') _afterPermitSet();
+  CAD.selMode=false;
+  var b=document.getElementById('cadSelBtn'); if(b){ b.classList.remove('active'); b.textContent='📍 지적 선택'; }
+  document.getElementById('cadDoneBar').style.display='none';
+  updateNav && updateNav(); render();
+  toast('지적 → 허가지선 확정 (2번에서 확인·편집)','ok');
+  goToPage(2);
+}
+
+/* 선택 지적 DXF 다운로드 (5186, CAD 왕복용) */
+function cadDownloadDxf(){
+  if(!CAD.parcels.length){ toast('먼저 필지를 선택하세요','err'); return; }
+  var btn=document.getElementById('cadDxfBtn');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ DXF 생성 중...'; }
+  var cLng=0,cLat=0; CAD.parcels.forEach(function(sp){cLng+=sp.lng;cLat+=sp.lat;}); cLng/=CAD.parcels.length; cLat/=CAD.parcels.length;
+  var last=CAD.parcels[CAD.parcels.length-1];
+  var body={ lng:cLng, lat:cLat, radius:0, layers:['cadastra'], jibun:last.jibun||'',
+    pnus:CAD.parcels.map(function(sp){return sp.pnu;}),
+    parcel_geoms:CAD.parcels.map(function(sp){return sp.geom;}).filter(Boolean) };
+  fetch('/api/wfs-dxf-circle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+   .then(function(r){ if(!r.ok)throw new Error('HTTP '+r.status); var cnt=r.headers.get('X-Feature-Count')||'?'; return r.blob().then(function(b){return {blob:b,cnt:cnt};}); })
+   .then(function(ret){
+     var url=URL.createObjectURL(ret.blob), a=document.createElement('a');
+     var name=(last.jibun||'parcel').replace(/\s+/g,'_'); if(CAD.parcels.length>1)name+='_외'+(CAD.parcels.length-1);
+     a.href=url; a.download='gdsp_지적_'+name+'.dxf'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+     setTimeout(function(){URL.revokeObjectURL(url);},2000);
+     toast('지적 DXF 다운로드 완료 ('+ret.cnt+'개 피처)','ok');
+   })
+   .catch(function(e){ toast('DXF 생성 실패: '+e.message,'err'); })
+   .finally(function(){ if(btn){ btn.disabled=false; btn.textContent='📐 지적 DXF 다운로드'; } });
+}
+
+/* 선택 초기화 */
+function cadClearSel(){ CAD.parcels=[]; _cadUpdateBar(); render(); }
+
 /* 책 1페이지로 시작 */
 buildAllLineStyles();
 goToPage(1);
