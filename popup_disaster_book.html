@@ -1307,8 +1307,8 @@ function render(){
     ctx.clip();
   }
 
-  /* ★ 지도·지적 배경 (VWorld WMS) — 최하단 */
-  drawCadBg();
+  /* ★ 지도·지적 배경 (VWorld) — 최하단. 에러 나도 나머지 렌더 계속 */
+  try{ drawCadBg(); }catch(_e){ /* 지도 오류는 무시하고 계속 */ }
 
   /* ★ 지형도 배경 (수치지도 레이어별) — 맨 밑. 중심선 제외, 건물·도로·식생 색상, bbox 컬링 */
   if(S.showBg && (S.bgLines&&S.bgLines.length || (S.polys&&S.polys.length) || S.bgTexts&&S.bgTexts.length)){
@@ -3991,6 +3991,10 @@ function updateNav(){
 
 /* 초기 사이즈 */
 resize();
+/* 진단: 예기치 못한 에러를 화면에 표시 (지도 안 움직임 등 원인 파악용) */
+window.addEventListener('error', function(ev){
+  try{ var m=(ev && (ev.message || (ev.error&&ev.error.message))) || '알수없는 오류'; if(typeof toast==='function') toast('⚠ 오류: '+(''+m).slice(0,90),'err'); }catch(e){}
+});
 /* ═══════════════════════════════════════════════════════════════
    지적(VWorld) — 캔버스 배경/선택 → 허가지선 · DXF 다운로드
    (서버에서 열 때만 동작: proj4·카카오·/api/wfs·/api/wfs-dxf-circle)
