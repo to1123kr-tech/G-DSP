@@ -226,8 +226,8 @@
         <button class="btn btn-ghost" id="cadBgBtn" onclick="toggleCadBg()">🗺 지도·지적 배경</button>
         <div id="cadBgCtrl" style="display:none;margin-top:7px">
           <div style="display:flex;gap:5px;margin-bottom:6px">
-            <button class="thr on" id="cadBgL_base" onclick="setCadBgLayers('base')">일반지도+지적</button>
-            <button class="thr" id="cadBgL_sat" onclick="setCadBgLayers('sat')">위성+지적</button>
+            <button class="thr on" id="cadBgL_sat" onclick="setCadBgLayers('sat')">위성+지적</button>
+            <button class="thr" id="cadBgL_base" onclick="setCadBgLayers('base')">일반지도+지적</button>
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:10px;color:var(--tx3);white-space:nowrap">농도</span>
@@ -1118,6 +1118,7 @@ function applyParsed(r){
 
   var matched=S.surveys.filter(function(s){return s.val!=null;}).length;
   toast('인식 완료 · 등고선 '+S.contours.length+' · 표고점 '+S.surveys.length+(matched?' (값 '+matched+')':''),'ok');
+  if(typeof cadBgAutoOn==='function') setTimeout(cadBgAutoOn, 200);   // 지도 배경 자동 표시(서버 전용)
 }
 
 /* ---------- 경계 / 뷰 ---------- */
@@ -4114,59 +4115,114 @@ function cadDownloadDxf(){
 /* 선택 초기화 */
 function cadClearSel(){ CAD.parcels=[]; _cadUpdateBar(); render(); }
 
-/* ── 지적도 배경 (VWorld WMS · EPSG:5186 · 현재 화면 한 장) ── */
-var cadBg = { on:false, img:null, alpha:0.85, bbox:null, loading:false, layers:'base' };
+/* ── 지도·지적 배경 (VWorld 타일 모자이크) ──
+   위성/일반=WMTS(z/y/x, 웹메르카토르), 지적=WMS 타일. 각 타일을 5186 캔버스에 얹음.
+   VWorld는 단일 WMS(5186)를 안 주므로 타일 방식(map.html 검증본)을 씀. */
+var cadBg = { on:false, alpha:1.0, layers:'sat', cache:{}, tiles:[], loadingN:0 };
 var VWORLD_KEY_BOOK = '16B90D39-90BB-3197-987A-54983A46F250';
 var CAD_BG_DOMAIN = (location.hostname && location.hostname.indexOf('nip.io')>=0) ? location.hostname : '168-107-15-68.nip.io';
+var _MERC_R = 20037508.342789244;
 
 function toggleCadBg(){
   if(!S.bounds){ toast('먼저 지형도(DXF)를 올리세요','err'); return; }
   cadBg.on=!cadBg.on;
-  var b=document.getElementById('cadBgBtn'); if(b){ b.classList.toggle('active',cadBg.on); b.textContent=cadBg.on?'🗺 지도 배경 끄기':'🗺 지도·지적 배경'; }
-  var sl=document.getElementById('cadBgCtrl'); if(sl) sl.style.display=cadBg.on?'':'none';
+  _cadBgSyncBtn();
   if(cadBg.on) _cadBgFetch(); else render();
 }
-function setCadBgLayers(v){ cadBg.layers=v; ['base','sat'].forEach(function(k){ var b=document.getElementById('cadBgL_'+k); if(b)b.className='thr'+(k===v?' on':''); }); if(cadBg.on) _cadBgFetch(); }
-function setCadBgAlpha(v){ cadBg.alpha=Math.max(0.1,Math.min(1,(parseFloat(v)||85)/100)); render(); }
-
-function _cadBgViewBBox(){
-  /* 캔버스 화면 네 모서리 → 5186 월드 bbox */
-  var tl=s2w(0,0), br=s2w(cv.width,cv.height);
-  return { minX:Math.min(tl.x,br.x), minY:Math.min(tl.y,br.y), maxX:Math.max(tl.x,br.x), maxY:Math.max(tl.y,br.y) };
+function _cadBgSyncBtn(){
+  var b=document.getElementById('cadBgBtn'); if(b){ b.classList.toggle('active',cadBg.on); b.textContent=cadBg.on?'🗺 지도 배경 끄기':'🗺 지도·지적 배경'; }
+  var sl=document.getElementById('cadBgCtrl'); if(sl) sl.style.display=cadBg.on?'':'none';
 }
+function setCadBgLayers(v){ cadBg.layers=v; ['sat','base'].forEach(function(k){ var b=document.getElementById('cadBgL_'+k); if(b)b.className='thr'+(k===v?' on':''); }); cadBg.cache={}; if(cadBg.on) _cadBgFetch(); }
+function setCadBgAlpha(v){ cadBg.alpha=Math.max(0.1,Math.min(1,(parseFloat(v)||100)/100)); render(); }
+
+/* 타일 좌표 유틸 (웹메르카토르 z/x/y) */
+function _tileLL(x,y,z){ var n=Math.pow(2,z); var lng=x/n*360-180; var lat=Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI; return [lng,lat]; }
+function _tile3857(x,y,z){ var n=Math.pow(2,z); return [ x/n*2*_MERC_R-_MERC_R, _MERC_R-(y+1)/n*2*_MERC_R, (x+1)/n*2*_MERC_R-_MERC_R, _MERC_R-y/n*2*_MERC_R ]; }
+
+/* 현재 화면을 덮는 타일 목록 계산 */
+function _cadBgComputeTiles(){
+  if(!_cadInitProj()) return null;
+  var corners=[s2w(0,0), s2w(cv.width,0), s2w(cv.width,cv.height), s2w(0,cv.height)];
+  var lls=corners.map(function(p){return tm5186toWgs84(p.x,p.y);}).filter(Boolean);
+  if(lls.length<4) return null;
+  var lngs=lls.map(function(l){return l[0];}), lats=lls.map(function(l){return l[1];});
+  var minLng=Math.min.apply(null,lngs),maxLng=Math.max.apply(null,lngs),minLat=Math.min.apply(null,lats),maxLat=Math.max.apply(null,lats);
+  var dLng=(maxLng-minLng)||0.0005;
+  var z=Math.round(Math.log2(360/dLng * cv.width/256));
+  z=Math.max(12,Math.min(19,z));
+  for(var guard=0; guard<6; guard++){
+    var n=Math.pow(2,z);
+    var x0=Math.floor((minLng+180)/360*n), x1=Math.floor((maxLng+180)/360*n);
+    function _y(lat){ var r=lat*Math.PI/180; return Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n); }
+    var y0=_y(maxLat), y1=_y(minLat);
+    if((x1-x0+1)*(y1-y0+1) <= 90 || z<=12){ 
+      var arr=[]; for(var x=x0;x<=x1;x++) for(var y=y0;y<=y1;y++) arr.push({x:x,y:y,z:z}); return arr;
+    }
+    z--; // 타일 너무 많으면 한 단계 축소
+  }
+  return [];
+}
+function _cadBgTileKey(t){ return cadBg.layers+'/'+t.z+'/'+t.x+'/'+t.y; }
 function _cadBgFetch(){
   if(!cadBg.on) return;
-  var bb=_cadBgViewBBox();
-  cadBg.bbox=bb;
-  var W=Math.min(2048,Math.max(256,Math.round(cv.width))), H=Math.min(2048,Math.max(256,Math.round(cv.height)));
-  /* 레이어 선택: base=바로e맵 배경+지적, sat=위성 항공 (VWorld WMS) */
-  var layers, styles;
-  if(cadBg.layers==='sat'){ layers='Satellite,lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun'; styles=',,'; }
-  else { layers='Base,lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun'; styles=',,'; }
-  /* WMS 1.3.0 · EPSG:5186(투영좌표 축순서 E,N) · bbox=minE,minN,maxE,maxN */
-  var url='https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
-    +'&layers='+encodeURIComponent(layers)+'&styles='+encodeURIComponent(styles)
-    +'&crs=EPSG:5186&bbox='+bb.minX+','+bb.minY+','+bb.maxX+','+bb.maxY
-    +'&width='+W+'&height='+H+'&format=image/png&transparent=true'
-    +'&key='+VWORLD_KEY_BOOK+'&domain='+CAD_BG_DOMAIN;
-  var img=new Image();
-  cadBg.loading=true;
-  img.onload=function(){ cadBg.img=img; cadBg.loading=false; render(); };
-  img.onerror=function(){ cadBg.loading=false; toast('지도 배경 로드 실패 — 서버/VWorld 키 확인','err'); };
-  img.src=url;
+  var tiles=_cadBgComputeTiles();
+  if(!tiles){ toast('좌표 변환 실패 — 서버에서 열어주세요','err'); return; }
+  cadBg.tiles=tiles;
+  var baseName=(cadBg.layers==='sat')?'Satellite':'Base';
+  var baseExt=(cadBg.layers==='sat')?'jpeg':'png';
+  tiles.forEach(function(t){
+    var key=_cadBgTileKey(t);
+    if(cadBg.cache[key]) return;
+    var ent={base:null,cad:null,tl:_tileLL(t.x,t.y,t.z),br:_tileLL(t.x+1,t.y+1,t.z)};
+    cadBg.cache[key]=ent;
+    // 바탕(위성/일반) 타일
+    var bimg=new Image(); bimg.crossOrigin='anonymous';
+    bimg.onload=function(){ ent.base=bimg; render(); };
+    bimg.onerror=function(){ ent.baseErr=true; };
+    bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
+    // 지적 타일 (WMS, 해당 타일 3857 bbox)
+    var bb=_tile3857(t.x,t.y,t.z);
+    var cimg=new Image(); cimg.crossOrigin='anonymous';
+    cimg.onload=function(){ ent.cad=cimg; render(); };
+    cimg.onerror=function(){ ent.cadErr=true; };
+    cimg.src='https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
+      +'&layers=lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun&styles=&crs=EPSG:3857'
+      +'&bbox='+bb[0]+','+bb[1]+','+bb[2]+','+bb[3]
+      +'&width=256&height=256&format=image/png&transparent=true&key='+VWORLD_KEY_BOOK+'&domain='+CAD_BG_DOMAIN;
+  });
+  render();
 }
-/* 팬/줌 후 배경 새로고침(디바운스) */
 var _cadBgTimer=null;
-function cadBgRefresh(){ if(!cadBg.on) return; clearTimeout(_cadBgTimer); _cadBgTimer=setTimeout(_cadBgFetch,260); }
+function cadBgRefresh(){ if(!cadBg.on) return; clearTimeout(_cadBgTimer); _cadBgTimer=setTimeout(_cadBgFetch,240); }
 
-/* render 배경 그리기 (5186 bbox에 핀 고정 → 팬/줌 중에도 제자리) */
+/* 타일들을 5186 캔버스에 그림 (각 타일 네 귀퉁이 lng/lat→5186→화면) */
 function drawCadBg(){
-  if(!cadBg.on || !cadBg.img || !cadBg.bbox) return;
-  var b=cadBg.bbox;
-  var tl=w2s({x:b.minX,y:b.maxY}), br=w2s({x:b.maxX,y:b.minY});
-  ctx.save(); ctx.globalAlpha=cadBg.alpha;
-  ctx.drawImage(cadBg.img, tl.x, tl.y, br.x-tl.x, br.y-tl.y);
+  if(!cadBg.on || !cadBg.tiles.length) return;
+  ctx.save();
+  // 1) 바탕(위성/일반)
+  ctx.globalAlpha=cadBg.alpha;
+  cadBg.tiles.forEach(function(t){ var e=cadBg.cache[_cadBgTileKey(t)]; if(!e||!e.base) return; _cadBgBlit(e,e.base); });
+  // 2) 지적 (곱연산으로 올리브 배경 제거 → 선·지번만)
+  ctx.globalAlpha=1;
+  ctx.globalCompositeOperation='multiply';
+  cadBg.tiles.forEach(function(t){ var e=cadBg.cache[_cadBgTileKey(t)]; if(!e||!e.cad) return; _cadBgBlit(e,e.cad); });
+  ctx.globalCompositeOperation='source-over';
   ctx.restore();
+}
+function _cadBgBlit(e, img){
+  var tl5=wgs84toTm5186(e.tl[0],e.tl[1]), br5=wgs84toTm5186(e.br[0],e.br[1]);
+  if(!tl5||!br5) return;
+  var a=w2s({x:tl5[0],y:tl5[1]}), b=w2s({x:br5[0],y:br5[1]});
+  var x=Math.min(a.x,b.x), y=Math.min(a.y,b.y), w=Math.abs(b.x-a.x), h=Math.abs(b.y-a.y);
+  if(w<0.5||h<0.5) return;
+  ctx.drawImage(img, x-0.5, y-0.5, w+1, h+1);   // 0.5px 겹침으로 타일 경계 틈 제거
+}
+/* DXF 열면 지도 자동 표시 */
+function cadBgAutoOn(){
+  if(cadBg.on) { _cadBgFetch(); return; }
+  if(!_cadInitProj()) return;   // proj4 없으면(로컬) 조용히 패스
+  cadBg.on=true; _cadBgSyncBtn(); _cadBgFetch();
 }
 
 /* 책 1페이지로 시작 */
