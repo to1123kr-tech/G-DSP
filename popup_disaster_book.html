@@ -911,7 +911,9 @@ function parseDXF(text){
         var ent={layer:cur.layer,elev:elev,pts:cur.pts,closed:!!(cur.flags&1)};
         /* ★ 표준 등고선 레이어(F0017…)거나, elev≠0이면서 표준 맵 레이어일 때만 등고선.
            레이어 0·사용자 레이어의 폐합선은 elev값이 있어도(예: 허가지선에 높이 50) 등고선으로 오인하지 않음 → 허가지선 후보로 */
-        var isC=isContourLayer(lay)||(elev!==0&&elev>-100&&isStandardMapLayer(cur.layer));
+        /* 등고선 = F0017 계열(isContourLayer) 또는 F계열 지형선에 높이 있을 때만.
+           건물(B)·도로(A)·식생(D)·수계(E)는 높이 있어도 등고선 아님 → 배경으로 그려짐 */
+        var isC=isContourLayer(lay)||(elev!==0&&elev>-100&&/^F00/i.test(cur.layer||'')&&!/^F0027|^F0037|^F0047/i.test(cur.layer||''));
         if(isC) contours.push(ent);
         var f=cur.pts[0],l=cur.pts[cur.pts.length-1];
         var closed=(cur.flags&1)||(Math.hypot(f.x-l.x,f.y-l.y)<5);
@@ -4216,19 +4218,19 @@ function _cadBgFetch(){
     var ent={base:null,cad:null,tl:_tileLL(t.x,t.y,t.z),br:_tileLL(t.x+1,t.y+1,t.z)};
     cadBg.cache[key]=ent;
     // 바탕(위성/일반) 타일
-    var bimg=new Image(); bimg.crossOrigin='anonymous';
+    var bimg=new Image();  /* crossOrigin 제거 — VWorld가 CORS 헤더 안 줘서 anonymous면 차단됨 */
     bimg.onload=function(){ ent.base=bimg; render(); };
     bimg.onerror=function(){ ent.baseErr=true; };
     bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
-    // 지적 타일 (WMS, 해당 타일 3857 bbox)
+    // 지적 타일 (서버 프록시 /api/vw-wms 경유 — CORS 우회 · 레이어 lt_c_landinfobasemap)
     var bb=_tile3857(t.x,t.y,t.z);
-    var cimg=new Image(); cimg.crossOrigin='anonymous';
+    var cimg=new Image();
     cimg.onload=function(){ ent.cad=cimg; render(); };
     cimg.onerror=function(){ ent.cadErr=true; };
-    cimg.src='https://api.vworld.kr/req/wms?service=WMS&request=GetMap&version=1.3.0'
-      +'&layers=lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun&styles=&crs=EPSG:3857'
+    cimg.src='/api/vw-wms?service=WMS&request=GetMap&version=1.3.0'
+      +'&layers=lt_c_landinfobasemap&styles=lt_c_landinfobasemap&crs=EPSG:3857'
       +'&bbox='+bb[0]+','+bb[1]+','+bb[2]+','+bb[3]
-      +'&width=256&height=256&format=image/png&transparent=true&key='+VWORLD_KEY_BOOK+'&domain='+CAD_BG_DOMAIN;
+      +'&width=256&height=256&format=image/png&transparent=true';
   });
   render();
 }
