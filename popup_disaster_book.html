@@ -602,6 +602,11 @@
     <!-- 레이어 토글 바 (좌측 상단) -->
     <div id="layerBar" style="display:none;position:absolute;left:12px;top:12px;display:none;gap:5px;z-index:6;flex-wrap:wrap;max-width:340px">
       <span style="display:inline-flex;align-items:center;gap:4px">
+        <button class="lyrBtn" id="lyrMap" onclick="mapBtnToggle()" title="배경지도(위성/일반+지적) 표시/숨김">🗺 배경지도</button>
+        <input type="range" id="mapAlphaSl" min="20" max="100" step="5" value="100" oninput="setCadBgAlpha(this.value)" title="배경지도 농도" style="width:52px;display:none">
+      </span>
+      <button class="lyrBtn" id="lyrCad" onclick="cadLineBtnToggle()" title="지적선+지번 표시/숨김">📐 지적선</button>
+      <span style="display:inline-flex;align-items:center;gap:4px">
         <button class="lyrBtn" id="lyrBg" onclick="toggleLayer('bg')" title="지형도 배경(도로·하천·시설 등) 표시/숨김">지형도</button>
         <input type="range" id="bgAlphaSl" min="10" max="100" step="5" value="45" oninput="setBgAlpha(this.value)" title="지형도 배경 농도" style="width:52px;display:none">
       </span>
@@ -1155,6 +1160,22 @@ function zoomAt(sx,sy,f){
   S.oy=(cv.height-sy)-w.y*S.scale;
   render();
 }
+/* 수치지도 레이어 분류 → 색상(그림) / null(제외) */
+function _bgClass(layer){
+  var L=(layer||'').toUpperCase();
+  /* 중심선 제외 (도로중심선 A002x, 하천중심선 E003x) */
+  if(L.indexOf('A002')===0) return null;
+  if(L.indexOf('E003')===0) return null;
+  /* 색상 */
+  var c=L.charAt(0);
+  if(c==='D') return '#3fa350';   /* 식생 — 초록 */
+  if(c==='E') return '#4a9ec8';   /* 수계(하천경계 등) — 파랑 */
+  if(c==='B') return '#c6cfdb';   /* 건물 — 밝은 회 */
+  if(c==='A') return '#96a7bf';   /* 도로경계 등 — 회 */
+  if(c==='C') return '#8fa3bd';   /* 시설 */
+  if(c==='G') return '#7d90ac';   /* 경계 */
+  return '#8fa3bd';
+}
 function w2s(p){ return {x:p.x*S.scale+S.ox, y:cv.height-(p.y*S.scale+S.oy)}; }
 function s2w(x,y){ return {x:(x-S.ox)/S.scale, y:(cv.height-y-S.oy)/S.scale}; }
 function evWorld(e){ var r=cv.getBoundingClientRect(); return s2w(e.clientX-r.left, e.clientY-r.top); }
@@ -1162,7 +1183,7 @@ function evWorld(e){ var r=cv.getBoundingClientRect(); return s2w(e.clientX-r.le
 /* ---------- 마우스 (팬/줌/좌표) ---------- */
 cv.addEventListener('mousedown',function(e){ S.isDown=true; S.dragStarted=false; S.lastM={x:e.clientX,y:e.clientY}; S.dnX=e.clientX; S.dnY=e.clientY; cv.classList.add('grabbing'); });
 window.addEventListener('mousemove',function(e){
-  if(S.bounds){ var w=evWorld(e); document.getElementById('sbXY').textContent='X '+w.x.toFixed(1)+'  Y '+w.y.toFixed(1); }
+  if(S.bounds){ var w=evWorld(e); var _sb=document.getElementById('sbXY'); if(_sb)_sb.textContent='X '+w.x.toFixed(1)+'  Y '+w.y.toFixed(1); }
   if(S.mode==='section' && S.sectionPts && S.sectionPts.length===1){
     S.sectionGhost=evWorld(e); render(); return;
   }
@@ -1172,8 +1193,8 @@ window.addEventListener('mousemove',function(e){
   if(S.mode==='pickPermit'){
     updatePickHover(evWorld(e).x, evWorld(e).y); return;
   }
-  /* ★ 기본(pan) 모드 — 폐합선 보이는 동안 hover 하이라이트 (선택 안내) */
-  if(S.mode==='pan' && S.polys && S.polys.length && !S.permit && !S.isDown){
+  /* ★ 기본(pan) 모드 — 폐합선 보이는 동안 hover 하이라이트 (선택 안내). 폴리 많으면(수치지도) 생략 */
+  if(S.mode==='pan' && S.polys && S.polys.length && S.polys.length<=800 && !S.permit && !S.isDown){
     var pw=evWorld(e); var prevHover=S.pickHover;
     var best=null, bestD=18/S.scale;
     S.polys.forEach(function(p){
@@ -1206,7 +1227,7 @@ window.addEventListener('mousemove',function(e){
   S.ox+=e.clientX-S.lastM.x; S.oy-=e.clientY-S.lastM.y;
   S.lastM={x:e.clientX,y:e.clientY}; render();
 });
-window.addEventListener('mouseup',function(){ S.isDown=false; cv.classList.remove('grabbing'); if(typeof cadBgRefresh==='function') cadBgRefresh(); });
+window.addEventListener('mouseup',function(){ var wasDrag=S.dragStarted; S.isDown=false; cv.classList.remove('grabbing'); if(typeof cadBgRefresh==='function') cadBgRefresh(); if(wasDrag) render(); });
 cv.addEventListener('click',function(e){
   if(S.dragStarted) return; // 실제 드래그(패닝)였으면 무시 — 10px 이내 미동은 클릭으로 인정
   /* ★ 지적 선택 모드 — 최우선 */
@@ -1287,32 +1308,50 @@ function render(){
   /* ★ 지도·지적 배경 (VWorld WMS) — 최하단 */
   drawCadBg();
 
-  /* ★ 지형도 배경 (도로·하천·시설 잡선 + 지명) — 맨 밑, 농도 조절 */
-  if(S.showBg && (S.bgLines&&S.bgLines.length || S.bgTexts&&S.bgTexts.length)){
-    ctx.save(); ctx.globalAlpha=S.bgAlpha||0.45;
-    ctx.strokeStyle='#8fa3bd'; ctx.lineWidth=0.7; ctx.setLineDash([]);
-    var _bgM=40;
-    ctx.beginPath();
-    for(var bi=0;bi<S.bgLines.length;bi++){
-      var bl=S.bgLines[bi], bp=bl.pts; if(!bp||bp.length<2) continue;
-      var s0=w2s(bp[0]);
-      /* 간단 컬링: 첫점이 화면 멀리 밖이고 짧으면 스킵 (정밀 컬링은 비용) */
-      var vis=false;
-      for(var bk=0;bk<bp.length;bk++){ var sb=w2s(bp[bk]); if(sb.x>-_bgM&&sb.x<cv.width+_bgM&&sb.y>-_bgM&&sb.y<cv.height+_bgM){vis=true;break;} }
-      if(!vis) continue;
-      ctx.moveTo(s0.x,s0.y);
-      for(var bj=1;bj<bp.length;bj++){ var sj=w2s(bp[bj]); ctx.lineTo(sj.x,sj.y); }
-    }
-    ctx.stroke();
-    if(S.bgTexts && S.scale>0.25){
-      ctx.fillStyle='#aebdd2'; ctx.font='11px sans-serif';
-      for(var ti2=0;ti2<S.bgTexts.length;ti2++){
-        var bt=S.bgTexts[ti2], pt=w2s(bt);
-        if(pt.x<-30||pt.x>cv.width+30||pt.y<-20||pt.y>cv.height+20) continue;
-        ctx.fillText(bt.t, pt.x, pt.y);
+  /* ★ 지형도 배경 (수치지도 레이어별) — 맨 밑. 중심선 제외, 건물·도로·식생 색상, bbox 컬링 */
+  if(S.showBg && (S.bgLines&&S.bgLines.length || (S.polys&&S.polys.length) || S.bgTexts&&S.bgTexts.length)){
+    var _panning = (S.isDown && S.dragStarted);
+    var _bgHeavy = ((S.bgLines?S.bgLines.length:0)+(S.polys?S.polys.length:0)) > 4000;
+    if(!(_panning && _bgHeavy)){    /* 무거운 도면은 팬 중엔 스킵 → 안 얼게 */
+      ctx.save(); ctx.globalAlpha=S.bgAlpha||0.55; ctx.lineWidth=0.8; ctx.setLineDash([]); ctx.lineJoin='round';
+      /* 화면 → 월드 bbox (컬링 기준, 한 번만) */
+      var _vw0=s2w(-30,-30), _vw1=s2w(cv.width+30,cv.height+30);
+      var _vmnX=Math.min(_vw0.x,_vw1.x), _vmxX=Math.max(_vw0.x,_vw1.x), _vmnY=Math.min(_vw0.y,_vw1.y), _vmxY=Math.max(_vw0.y,_vw1.y);
+      var _bgByColor={};   /* 색상별 모아서 batch stroke */
+      function _bgAdd(pts, col){
+        if(!_bgByColor[col]) _bgByColor[col]=[];
+        _bgByColor[col].push(pts);
       }
+      function _bgCollect(list){
+        for(var i=0;i<list.length;i++){
+          var it=list[i], pp=it.pts; if(!pp||pp.length<2) continue;
+          var col=_bgClass(it.layer); if(col===null) continue;         /* 중심선 등 제외 */
+          if(!it._bb){ var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18; for(var k=0;k<pp.length;k++){var p=pp[k]; if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x; if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y;} it._bb={mnx:mnx,mny:mny,mxx:mxx,mxy:mxy}; }
+          var b=it._bb; if(b.mxx<_vmnX||b.mnx>_vmxX||b.mxy<_vmnY||b.mny>_vmxY) continue;   /* 화면 밖 */
+          _bgAdd(pp, col);
+        }
+      }
+      if(S.bgLines) _bgCollect(S.bgLines);
+      if(S.polys)   _bgCollect(S.polys);      /* 건물 등 닫힌 도형도 배경으로 */
+      /* 색상별 그리기 */
+      for(var col in _bgByColor){
+        ctx.strokeStyle=col; ctx.beginPath();
+        var arr=_bgByColor[col];
+        for(var a=0;a<arr.length;a++){ var pts=arr[a]; var s0=w2s(pts[0]); ctx.moveTo(s0.x,s0.y); for(var j=1;j<pts.length;j++){ var sj=w2s(pts[j]); ctx.lineTo(sj.x,sj.y); } }
+        ctx.stroke();
+      }
+      /* 지명 (일정 배율 이상, 화면 안만) */
+      if(S.bgTexts && S.scale>0.18 && !(_panning&&_bgHeavy)){
+        ctx.globalAlpha=Math.min(1,(S.bgAlpha||0.55)+0.2); ctx.fillStyle='#aebdd2'; ctx.font='11px sans-serif';
+        var _shown=0;
+        for(var ti2=0;ti2<S.bgTexts.length && _shown<400;ti2++){
+          var bt=S.bgTexts[ti2], pt=w2s(bt);
+          if(pt.x<-30||pt.x>cv.width+30||pt.y<-20||pt.y>cv.height+20) continue;
+          ctx.fillText(bt.t, pt.x, pt.y); _shown++;
+        }
+      }
+      ctx.restore();
     }
-    ctx.restore();
   }
 
   // DEM 음영기복 (가장 아래 배경)
@@ -4118,7 +4157,7 @@ function cadClearSel(){ CAD.parcels=[]; _cadUpdateBar(); render(); }
 /* ── 지도·지적 배경 (VWorld 타일 모자이크) ──
    위성/일반=WMTS(z/y/x, 웹메르카토르), 지적=WMS 타일. 각 타일을 5186 캔버스에 얹음.
    VWorld는 단일 WMS(5186)를 안 주므로 타일 방식(map.html 검증본)을 씀. */
-var cadBg = { on:false, alpha:1.0, layers:'sat', cache:{}, tiles:[], loadingN:0 };
+var cadBg = { on:false, alpha:1.0, layers:'sat', cache:{}, tiles:[], loadingN:0, showBase:true, showCad:true };
 var VWORLD_KEY_BOOK = '16B90D39-90BB-3197-987A-54983A46F250';
 var CAD_BG_DOMAIN = (location.hostname && location.hostname.indexOf('nip.io')>=0) ? location.hostname : '168-107-15-68.nip.io';
 var _MERC_R = 20037508.342789244;
@@ -4196,18 +4235,20 @@ function _cadBgFetch(){
 var _cadBgTimer=null;
 function cadBgRefresh(){ if(!cadBg.on) return; clearTimeout(_cadBgTimer); _cadBgTimer=setTimeout(_cadBgFetch,240); }
 
-/* 타일들을 5186 캔버스에 그림 (각 타일 네 귀퉁이 lng/lat→5186→화면) */
+/* 타일들을 5186 캔버스에 그림 */
 function drawCadBg(){
   if(!cadBg.on || !cadBg.tiles.length) return;
   ctx.save();
   // 1) 바탕(위성/일반)
-  ctx.globalAlpha=cadBg.alpha;
-  cadBg.tiles.forEach(function(t){ var e=cadBg.cache[_cadBgTileKey(t)]; if(!e||!e.base) return; _cadBgBlit(e,e.base); });
-  // 2) 지적 (곱연산으로 올리브 배경 제거 → 선·지번만)
-  ctx.globalAlpha=1;
-  ctx.globalCompositeOperation='multiply';
-  cadBg.tiles.forEach(function(t){ var e=cadBg.cache[_cadBgTileKey(t)]; if(!e||!e.cad) return; _cadBgBlit(e,e.cad); });
-  ctx.globalCompositeOperation='source-over';
+  if(cadBg.showBase){
+    ctx.globalAlpha=cadBg.alpha;
+    cadBg.tiles.forEach(function(t){ var e=cadBg.cache[_cadBgTileKey(t)]; if(!e||!e.base) return; _cadBgBlit(e,e.base); });
+  }
+  // 2) 지적 (투명 PNG — 선·지번. 곱연산 없이 그대로 위에)
+  if(cadBg.showCad){
+    ctx.globalAlpha=1;
+    cadBg.tiles.forEach(function(t){ var e=cadBg.cache[_cadBgTileKey(t)]; if(!e||!e.cad) return; _cadBgBlit(e,e.cad); });
+  }
   ctx.restore();
 }
 function _cadBgBlit(e, img){
@@ -4218,16 +4259,77 @@ function _cadBgBlit(e, img){
   if(w<0.5||h<0.5) return;
   ctx.drawImage(img, x-0.5, y-0.5, w+1, h+1);   // 0.5px 겹침으로 타일 경계 틈 제거
 }
-/* DXF 열면 지도 자동 표시 */
+/* DXF 없어도 지도 표시 가능하게 — 화면 기본 범위 세팅 */
+function _cadEnsureView(){
+  if(S.bounds) return true;
+  if(!_cadInitProj()) return false;
+  /* 지형도 없으면 화성 기준으로 기본 화면 잡기 (5186) */
+  var c=wgs84toTm5186(126.84, 37.19); if(!c) return false;
+  var half=1500;  // ±1.5km
+  S.bounds={minX:c[0]-half,minY:c[1]-half,maxX:c[0]+half,maxY:c[1]+half};
+  S.mode='pan';
+  /* 캔버스 크기 확실히 (레이아웃 완료 전이면 부모 크기로) */
+  if(!cv.width || cv.width<10 || !cv.height || cv.height<10){
+    var st=cv.parentElement;
+    cv.width=(st&&st.clientWidth)||900; cv.height=(st&&st.clientHeight)||600;
+  }
+  /* 스케일 직접 세팅 (fitView가 캔버스 0일 때 음수 나는 것 방지) */
+  var dx=S.bounds.maxX-S.bounds.minX, dy=S.bounds.maxY-S.bounds.minY, pad=46;
+  S.scale=Math.min((cv.width-pad*2)/(dx||1),(cv.height-pad*2)/(dy||1));
+  if(!(S.scale>0)) S.scale=0.15;
+  S.ox=(cv.width-dx*S.scale)/2 - S.bounds.minX*S.scale;
+  S.oy=(cv.height-dy*S.scale)/2 - S.bounds.minY*S.scale;
+  return true;
+}
+
+/* 작업창 버튼: 배경지도 켜기/끄기 */
+function mapBtnToggle(){
+  if(!cadBg.on){
+    if(!_cadEnsureView()){ toast('좌표 변환 로드 실패 — 서버에서 열어주세요','err'); return; }
+    cadBg.on=true; cadBg.showBase=true;
+    _cadBgSyncBtn(); _cadBgFetch();
+  } else {
+    cadBg.showBase=!cadBg.showBase;
+    if(!cadBg.showBase && !cadBg.showCad){ cadBg.on=false; }   // 둘 다 끄면 전체 off
+    _cadBgSyncBtn();
+  }
+  _cadMapBtnsSync(); render();
+}
+/* 작업창 버튼: 지적선+지번 켜기/끄기 */
+function cadLineBtnToggle(){
+  if(!_cadEnsureView()){ toast('좌표 변환 로드 실패 — 서버에서 열어주세요','err'); return; }
+  if(!cadBg.on){ cadBg.on=true; cadBg.showBase=false; cadBg.showCad=true; _cadBgSyncBtn(); _cadBgFetch(); }
+  else { cadBg.showCad=!cadBg.showCad; if(!cadBg.showBase && !cadBg.showCad) cadBg.on=false; _cadBgSyncBtn(); }
+  _cadMapBtnsSync(); render();
+}
+function _cadMapBtnsSync(){
+  var m=document.getElementById('lyrMap'); if(m) m.className='lyrBtn'+((cadBg.on&&cadBg.showBase)?' on':'');
+  var c=document.getElementById('lyrCad'); if(c) c.className='lyrBtn'+((cadBg.on&&cadBg.showCad)?' on':'');
+  var sl=document.getElementById('mapAlphaSl'); if(sl) sl.style.display=(cadBg.on&&cadBg.showBase)?'':'none';
+}
+
+/* 실행하면 바로 지도 (지형도 없어도) */
 function cadBgAutoOn(){
-  if(cadBg.on) { _cadBgFetch(); return; }
-  if(!_cadInitProj()) return;   // proj4 없으면(로컬) 조용히 패스
-  cadBg.on=true; _cadBgSyncBtn(); _cadBgFetch();
+  if(!_cadInitProj()) return;   // 로컬(proj4 없음)이면 패스
+  if(!_cadEnsureView()) return;
+  cadBg.on=true; cadBg.showBase=true; cadBg.showCad=true;
+  _cadBgSyncBtn(); _cadMapBtnsSync(); _cadBgFetch();
+}
+/* proj4·캔버스 준비될 때까지 재시도 후 지도 자동 표시 */
+function _cadBgAutoRetry(n){
+  n=n||0;
+  if(cadBg.on) return;
+  if(typeof proj4!=='undefined' && cv && cv.parentElement && cv.parentElement.clientWidth>10){
+    cadBgAutoOn(); return;
+  }
+  if(n<20) setTimeout(function(){ _cadBgAutoRetry(n+1); }, 300);
 }
 
 /* 책 1페이지로 시작 */
 buildAllLineStyles();
 goToPage(1);
+/* 실행 즉시 배경지도 시도 (서버·proj4 준비되면) */
+setTimeout(function(){ _cadBgAutoRetry(0); }, 400);
 </script>
 </body>
 </html>
