@@ -4159,7 +4159,7 @@ function cadClearSel(){ CAD.parcels=[]; _cadUpdateBar(); render(); }
 /* ── 지도·지적 배경 (VWorld 타일 모자이크) ──
    위성/일반=WMTS(z/y/x, 웹메르카토르), 지적=WMS 타일. 각 타일을 5186 캔버스에 얹음.
    VWorld는 단일 WMS(5186)를 안 주므로 타일 방식(map.html 검증본)을 씀. */
-var cadBg = { on:false, alpha:1.0, layers:'sat', cache:{}, tiles:[], loadingN:0, showBase:true, showCad:true };
+var cadBg = { on:false, alpha:1.0, layers:'sat', cache:{}, tiles:[], loadingN:0, showBase:true, showCad:true, vecParcels:[], vecTooWide:false };
 var VWORLD_KEY_BOOK = '16B90D39-90BB-3197-987A-54983A46F250';
 var CAD_BG_DOMAIN = (location.hostname && location.hostname.indexOf('nip.io')>=0) ? location.hostname : '168-107-15-68.nip.io';
 var _MERC_R = 20037508.342789244;
@@ -4207,49 +4207,96 @@ function _cadBgComputeTiles(){
 function _cadBgTileKey(t){ return cadBg.layers+'/'+t.z+'/'+t.x+'/'+t.y; }
 function _cadBgFetch(){
   if(!cadBg.on) return;
-  var tiles=_cadBgComputeTiles();
-  if(!tiles){ toast('좌표 변환 실패 — 서버에서 열어주세요','err'); return; }
-  cadBg.tiles=tiles;
-  var baseName=(cadBg.layers==='sat')?'Satellite':'Base';
-  var baseExt=(cadBg.layers==='sat')?'jpeg':'png';
-  tiles.forEach(function(t){
-    var key=_cadBgTileKey(t);
-    if(cadBg.cache[key]) return;
-    var ent={base:null,cad:null,tl:_tileLL(t.x,t.y,t.z),br:_tileLL(t.x+1,t.y+1,t.z)};
-    cadBg.cache[key]=ent;
-    // 바탕(위성/일반) 타일
-    var bimg=new Image();  /* crossOrigin 제거 — VWorld가 CORS 헤더 안 줘서 anonymous면 차단됨 */
-    bimg.onload=function(){ ent.base=bimg; render(); };
-    bimg.onerror=function(){ ent.baseErr=true; };
-    bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
-    // 지적 타일 (서버 프록시 /api/vw-wms 경유 — CORS 우회 · 레이어 lt_c_landinfobasemap)
-    var bb=_tile3857(t.x,t.y,t.z);
-    var cimg=new Image();
-    cimg.onload=function(){ ent.cad=cimg; render(); };
-    cimg.onerror=function(){ ent.cadErr=true; };
-    cimg.src='/api/vw-wms?service=WMS&request=GetMap&version=1.3.0'
-      +'&layers=lt_c_landinfobasemap&styles=lt_c_landinfobasemap&crs=EPSG:3857'
-      +'&bbox='+bb[0]+','+bb[1]+','+bb[2]+','+bb[3]
-      +'&width=256&height=256&format=image/png&transparent=true';
-  });
+  if(cadBg.showBase){
+    var tiles=_cadBgComputeTiles();
+    if(!tiles){ toast('좌표 변환 실패 — 서버에서 열어주세요','err'); return; }
+    cadBg.tiles=tiles;
+    var baseName=(cadBg.layers==='sat')?'Satellite':'Base';
+    var baseExt=(cadBg.layers==='sat')?'jpeg':'png';
+    tiles.forEach(function(t){
+      var key=_cadBgTileKey(t);
+      if(cadBg.cache[key]) return;
+      var ent={base:null,tl:_tileLL(t.x,t.y,t.z),br:_tileLL(t.x+1,t.y+1,t.z)};
+      cadBg.cache[key]=ent;
+      var bimg=new Image();  /* crossOrigin 없음 — 직접 로드(빠름), 캔버스 표시용 */
+      bimg.onload=function(){ ent.base=bimg; render(); };
+      bimg.onerror=function(){ ent.baseErr=true; };
+      bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
+    });
+  }
+  if(cadBg.showCad) _cadVecFetch();     // 지적선 = 벡터(빠름)
   render();
+}
+/* 지적선 벡터 로드 (/api/cad-box → GeoJSON → 5186) — index.html 방식(빠름) */
+var _cadVecLoading=false, _cadVecKey='';
+function _cadVecFetch(){
+  if(!_cadInitProj()||!S.bounds) return;
+  /* 화면 5186 bbox → 경위도 */
+  var c=[s2w(0,0), s2w(cv.width,0), s2w(cv.width,cv.height), s2w(0,cv.height)];
+  var lls=c.map(function(p){return tm5186toWgs84(p.x,p.y);}).filter(Boolean);
+  if(lls.length<4) return;
+  var lngs=lls.map(function(l){return l[0];}), lats=lls.map(function(l){return l[1];});
+  var mnLng=Math.min.apply(null,lngs),mxLng=Math.max.apply(null,lngs),mnLat=Math.min.apply(null,lats),mxLat=Math.max.apply(null,lats);
+  /* 너무 넓으면(줌 아웃) 필지 과다 → 생략 */
+  if((mxLng-mnLng)>0.02){ cadBg.vecTooWide=true; render(); return; }
+  cadBg.vecTooWide=false;
+  var key=mnLng.toFixed(4)+','+mnLat.toFixed(4)+','+mxLng.toFixed(4)+','+mxLat.toFixed(4);
+  if(key===_cadVecKey||_cadVecLoading) return;
+  _cadVecLoading=true; _cadVecKey=key;
+  fetch('/api/cad-box?minx='+mnLng+'&miny='+mnLat+'&maxx='+mxLng+'&maxy='+mxLat+'&size=1000')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      _cadVecLoading=false;
+      var fs=(d&&d.features)||[]; var out=[];
+      fs.forEach(function(f){
+        var g=f.geometry; if(!g) return;
+        var rings;
+        if(g.type==='MultiPolygon') rings=g.coordinates.map(function(p){return p[0];});
+        else if(g.type==='Polygon') rings=[g.coordinates[0]];
+        else return;
+        var jibun=(f.properties&&(f.properties.jibun||f.properties.JIBUN))||'';
+        rings.forEach(function(ring){
+          var r5=ring.map(function(cc){ var t=wgs84toTm5186(cc[0],cc[1]); return t?{x:t[0],y:t[1]}:null; }).filter(Boolean);
+          if(r5.length>=3) out.push({ring:r5, jibun:jibun});
+        });
+      });
+      cadBg.vecParcels=out; render();
+    })
+    .catch(function(e){ _cadVecLoading=false; });
 }
 var _cadBgTimer=null;
 function cadBgRefresh(){ if(!cadBg.on) return; clearTimeout(_cadBgTimer); _cadBgTimer=setTimeout(_cadBgFetch,240); }
 
-/* 타일들을 5186 캔버스에 그림 */
+/* 타일(위성/일반) + 지적 벡터를 5186 캔버스에 그림 */
 function drawCadBg(){
-  if(!cadBg.on || !cadBg.tiles.length) return;
+  if(!cadBg.on) return;
   ctx.save();
-  // 1) 바탕(위성/일반)
-  if(cadBg.showBase){
+  // 1) 바탕(위성/일반) 타일
+  if(cadBg.showBase && cadBg.tiles.length){
     ctx.globalAlpha=cadBg.alpha;
     cadBg.tiles.forEach(function(t){ var e=cadBg.cache[_cadBgTileKey(t)]; if(!e||!e.base) return; _cadBgBlit(e,e.base); });
   }
-  // 2) 지적 (투명 PNG — 선·지번. 곱연산 없이 그대로 위에)
-  if(cadBg.showCad){
-    ctx.globalAlpha=1;
-    cadBg.tiles.forEach(function(t){ var e=cadBg.cache[_cadBgTileKey(t)]; if(!e||!e.cad) return; _cadBgBlit(e,e.cad); });
+  // 2) 지적선 벡터 (빨간선 + 지번) — DXF/위성 위에 선명
+  if(cadBg.showCad && cadBg.vecParcels && cadBg.vecParcels.length){
+    ctx.globalAlpha=1; ctx.lineWidth=1.4; ctx.strokeStyle='#ff3b3b';
+    ctx.beginPath();
+    for(var i=0;i<cadBg.vecParcels.length;i++){ var rg=cadBg.vecParcels[i].ring; var s0=w2s(rg[0]); ctx.moveTo(s0.x,s0.y); for(var j=1;j<rg.length;j++){ var sj=w2s(rg[j]); ctx.lineTo(sj.x,sj.y); } ctx.closePath(); }
+    ctx.stroke();
+    // 지번 라벨 (배율 충분할 때)
+    if(S.scale>0.35){
+      ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      for(var k=0;k<cadBg.vecParcels.length;k++){
+        var vp=cadBg.vecParcels[k]; if(!vp.jibun) continue;
+        var cx=0,cy=0,rr=vp.ring; for(var m=0;m<rr.length;m++){cx+=rr[m].x;cy+=rr[m].y;} cx/=rr.length; cy/=rr.length;
+        var sc=w2s({x:cx,y:cy}); if(sc.x<0||sc.x>cv.width||sc.y<0||sc.y>cv.height) continue;
+        ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.strokeText(vp.jibun,sc.x,sc.y);
+        ctx.fillStyle='#ffd0d0'; ctx.fillText(vp.jibun,sc.x,sc.y);
+      }
+    }
+  } else if(cadBg.showCad && cadBg.vecTooWide){
+    /* 너무 넓으면 안내 */
+    ctx.globalAlpha=1; ctx.fillStyle='rgba(255,90,90,0.9)'; ctx.font='12px sans-serif'; ctx.textAlign='left';
+    ctx.fillText('지적선 — 더 확대하세요 (필지가 너무 많음)', 14, 24);
   }
   ctx.restore();
 }
