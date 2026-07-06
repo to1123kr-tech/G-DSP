@@ -198,12 +198,7 @@
 </style>
 <!-- 지적 기능용: proj4(좌표변환) + 카카오(주소↔좌표). 서버에서 열 때만 동작 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
-<script>
-(function(){
-  var jsKey = localStorage.getItem('gdsp_kakao_js') || 'c670e0bc85874ef6267220f09882b379';
-  document.write('<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey='+jsKey+'&libraries=services&autoload=false">\x3C/script>');
-})();
-</script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=c670e0bc85874ef6267220f09882b379&libraries=services"></script>
 </head>
 <body>
 
@@ -1104,7 +1099,9 @@ function _applyDoc(doc){
   var lng=parseFloat(doc.x||0), lat=parseFloat(doc.y||0);
   if(!lng||!lat){ _jibunMsg('좌표 없음','#f87171'); return; }
   var label=doc.place_name||doc.address_name||'';
+  var isHs=((doc.address_name||'')+((doc.road_address&&doc.road_address.address_name)||'')).indexOf('화성')>=0;
   _jibunGoTo(lng, lat, label);
+  if(!isHs){ setTimeout(function(){ _jibunMsg('⚠️ '+label+' (화성시 밖) — 맞는 곳인지 확인하세요','#fbbf24'); }, 50); }
 }
 function doJibunSearch(){
   var inp=document.getElementById('jibunInp'); if(!inp) return;
@@ -1137,12 +1134,23 @@ function _kakaoSearch(q){
   var addrDocs=[], poiDocs=[], done=0;
   function finish(){
     done++; if(done<2) return;   // 주소·명칭 둘 다 끝날 때까지 대기
-    /* 주소 우선, 그다음 명칭. PNU 중복 대충 제거(주소끼리만) */
-    var docs=addrDocs.concat(poiDocs);
+    /* 명칭(POI) + 주소 합치고 좌표 근접 중복 제거 */
+    var all=poiDocs.concat(addrDocs);
+    var docs=[];
+    all.forEach(function(d){
+      var lng=parseFloat(d.x||0), lat=parseFloat(d.y||0);
+      if(!lng||!lat) return;
+      var dup=docs.some(function(e){ return Math.abs(parseFloat(e.x)-lng)<0.0008 && Math.abs(parseFloat(e.y)-lat)<0.0008; });
+      if(!dup) docs.push(d);
+    });
     if(!docs.length){ _vwOnlySearch(q); return; }   // 카카오 0건 → VWorld 산 지번
     docs=_sortHwaseongFirst(docs);
-    if(docs.length===1) _applyDoc(docs[0]);
-    else _srchDrop(docs);
+    if(docs.length===1){
+      /* 단일 결과 — 화성 아니면 그냥 이동하되 다른 지역임을 알림 */
+      _applyDoc(docs[0]);
+    } else {
+      _srchDrop(docs);   // 여러 개면 무조건 선택창
+    }
   }
   gc.addressSearch(q,function(d,s){ if(s===OK&&d&&d.length) addrDocs=d; finish(); });
   ps.keywordSearch(q,function(d,s){ if(s===OK&&d&&d.length) poiDocs=d; finish(); });
@@ -4179,10 +4187,21 @@ function _cadInitProj(){
 function tm5186toWgs84(E,N){ if(!_cadInitProj())return null; try{ return proj4('EPSG:5186','WGS84',[E,N]); }catch(e){ return null; } }  // [lon,lat]
 function wgs84toTm5186(lng,lat){ if(!_cadInitProj())return null; try{ return proj4('WGS84','EPSG:5186',[lng,lat]); }catch(e){ return null; } }  // [E,N]
 
-function _cadKakaoReady(cb){
+function _cadKakaoReady(cb, _tries){
   if(CAD.geocoder){ cb(true); return; }
-  if(typeof kakao==='undefined'||!kakao.maps){ cb(false); return; }
-  kakao.maps.load(function(){ try{ CAD.geocoder=new kakao.maps.services.Geocoder(); cb(true); }catch(e){ cb(false); } });
+  _tries=_tries||0;
+  /* SDK 아직 로딩 중이면 잠깐 기다렸다 재시도 (최대 ~3초) */
+  if(typeof kakao==='undefined' || !kakao.maps || !kakao.maps.services){
+    if(_tries<30){ setTimeout(function(){ _cadKakaoReady(cb, _tries+1); }, 100); return; }
+    cb(false); return;
+  }
+  try{
+    /* autoload 기본(true)이라 services 바로 사용 가능. load 콜백도 즉시 실행됨 */
+    if(kakao.maps.services && kakao.maps.services.Geocoder){
+      CAD.geocoder=new kakao.maps.services.Geocoder(); cb(true); return;
+    }
+    kakao.maps.load(function(){ try{ CAD.geocoder=new kakao.maps.services.Geocoder(); cb(true); }catch(e){ cb(false); } });
+  }catch(e){ cb(false); }
 }
 
 /* 지적 선택 모드 토글 */
@@ -4492,12 +4511,13 @@ function _cadBgBlit(e, img){
   var tl5=wgs84toTm5186(e.tl[0],e.tl[1]), br5=wgs84toTm5186(e.br[0],e.br[1]);
   if(!tl5||!br5) return;
   var a=w2s({x:tl5[0],y:tl5[1]}), b=w2s({x:br5[0],y:br5[1]});
-  var x=Math.min(a.x,b.x), y=Math.min(a.y,b.y), w=Math.abs(b.x-a.x), h=Math.abs(b.y-a.y);
-  if(w<0.5||h<0.5) return;
-  /* 5186↔메르카토르 미세 왜곡으로 타일 사이 틈(검은 줄) 생김 → 겹침 여유를 크게. round로 서브픽셀 경계 제거 */
-  var pad=1.5;
-  var xr=Math.floor(x-pad), yr=Math.floor(y-pad);
-  var wr=Math.ceil(w+pad*2), hr=Math.ceil(h+pad*2);
+  var x0=Math.min(a.x,b.x), y0=Math.min(a.y,b.y), x1=Math.max(a.x,b.x), y1=Math.max(a.y,b.y);
+  if((x1-x0)<0.5||(y1-y0)<0.5) return;
+  /* 검은 줄 제거: 시작=floor, 끝=다음타일 시작과 맞물리게 floor + 1px 겹침.
+     이렇게 하면 이웃 타일의 좌변이 이 타일의 우변을 덮어 틈이 안 생김 */
+  var xr=Math.floor(x0), yr=Math.floor(y0);
+  var xe=Math.floor(x1), ye=Math.floor(y1);
+  var wr=(xe-xr)+1, hr=(ye-yr)+1;   // +1 = 이웃과 1px 겹침
   ctx.drawImage(img, xr, yr, wr, hr);
 }
 /* DXF 없어도 지도 표시 가능하게 — 화면 기본 범위 세팅 */
