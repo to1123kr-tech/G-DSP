@@ -854,6 +854,11 @@
     <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:#9fb0c8;margin-top:5px;margin-left:18px;cursor:pointer">
       <input type="checkbox" id="c3d_flowNum" checked onchange="set3DFlowNum(this.checked)"> 누적 숫자 표시
     </label>
+    <div id="c3d_gridWrap" style="margin-left:18px;margin-top:6px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8"><span>🔲 격자 간격</span><span id="c3d_gridVal" style="color:#fbbf24;font-weight:700">10m</span></div>
+      <input type="range" id="c3d_grid" min="2" max="40" step="1" value="10" oninput="set3DGrid(this.value)" style="width:100%;margin-top:3px">
+      <div style="font-size:8.5px;color:#5b7290;margin-top:2px;line-height:1.3">작을수록 화살표·숫자 촘촘 (3D에서 바로 반영)</div>
+    </div>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
       <input type="checkbox" id="c3d_rain" onchange="toggle3DRain(this.checked)"> 🌧️ 비 내리기 <span style="color:#7c8aa0;font-size:9.5px">(물길 확인용)</span>
     </label>
@@ -3322,6 +3327,15 @@ function _makeNumSprite(num){
 }
 function set3DFlow(on){ S.show3DFlow=!!on; if(_three) _rebuild3D(); }
 function set3DFlowNum(on){ S.show3DFlowNum=!!on; if(_three && S.show3DFlow) _rebuild3D(); }
+/* 3D 격자 간격 즉시 조절 (나갔다 올 필요 없이) — 2D와 값 공유(S.arrowMeters) */
+function set3DGrid(v){
+  S.arrowMeters=Math.max(1, parseFloat(v)||10);
+  var lb=document.getElementById('c3d_gridVal'); if(lb) lb.textContent=S.arrowMeters+'m';
+  /* 2D 쪽 슬라이더·라벨도 동기화 */
+  var s2=document.getElementById('arrowStep'); if(s2) s2.value=S.arrowMeters;
+  var l2=document.getElementById('arrowStepVal'); if(l2) l2.textContent=S.arrowMeters+'m';
+  if(_three) _rebuild3D();
+}
 
 /* 3D 컨트롤 UI 상태 동기화 */
 function _sync3DCtrlUI(){
@@ -3333,6 +3347,10 @@ function _sync3DCtrlUI(){
   var ex=_three?_three.exag:2.2;
   var sl=document.getElementById('c3d_exag'); if(sl) sl.value=ex;
   var lb=document.getElementById('c3d_exagVal'); if(lb) lb.textContent='\u00d7'+(+ex).toFixed(1);
+  /* 격자 간격 슬라이더도 현재 값 반영 */
+  var gm=S.arrowMeters||10;
+  var gs=document.getElementById('c3d_grid'); if(gs) gs.value=gm;
+  var gl=document.getElementById('c3d_gridVal'); if(gl) gl.textContent=gm+'m';
 }
 function set3DColorMode(m){ if(!_three)return; _three.colorMode=m; _3dColorMode=m; _sync3DCtrlUI(); _rebuild3D(); }
 function set3DWire(on){ if(!_three)return; _three.wire=!!on; _rebuild3D(); }
