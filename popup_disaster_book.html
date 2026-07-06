@@ -1248,16 +1248,22 @@ function applyParsed(r){
   S.contours=r.contours; S.surveys=r.surveys; S.polys=r.polys||[];
   S.bgLines=r.bgLines||[]; S.bgTexts=r.bgTexts||[]; S.showBg=false; S.bgAlpha=(S.bgAlpha!=null?S.bgAlpha:0.45);
 
-  /* ★ 새 파일 로드 — 이전 작업 상태 모두 초기화 (작업구역 clip 잔류 버그 방지) */
+  /* ★ 새 파일 로드 — 이전 작업 상태 초기화 (작업구역 clip 잔류 버그 방지)
+     단, 허가지선(S.permit/permitParcels)과 선택 필지(CAD.parcels)는 보존:
+     "필지 선택 → 허가지선 만들기 → 지형도 올려서 분석" 순서를 지원하기 위함.
+     (지형도와 허가지선 모두 EPSG:5186 좌표라 그대로 얹힘) */
   S.cropRect=null; S.cropPt1=null; S.cropPt2=null; S.cropGhost=null;
-  S.permit=null; S.permitParcels=null; S.permitDraw=null; S.ghostXY=null; S.pickHover=null;
+  S.permitDraw=null; S.ghostXY=null; S.pickHover=null;
+  var _keepPermit = (S.permit && S.permit.length>=3);   // 기존 허가지선 있으면 살림
   S.dem=null; S.demRaw=null; S.demSmooth=null; S.demHill=null; S.hillCanvas=null; S.slopeTriList=null; S.slopeRes=null;
   S.triList=[]; S.flow=null; S.streamMask=null; S.watershed=null; S.wsCanvas=null;
   S.sectionPts=null; S.daejangArea=null;
   if(typeof _sections!=='undefined'){ _sections=[]; _activeSection=0; }
   S.mode='pan';
-  /* 패널·결과 숨김 초기화 */
-  ['permitInfo','demResult','flowResult','tinResult','wsResult','cropInfo','profileLay','hsPanel'].forEach(function(id){
+  /* 패널·결과 숨김 초기화 (단 허가지선 살아있으면 permitInfo는 유지) */
+  var _hidePanels=['demResult','flowResult','tinResult','wsResult','cropInfo','profileLay','hsPanel'];
+  if(!_keepPermit) _hidePanels.push('permitInfo');
+  _hidePanels.forEach(function(id){
     var el=document.getElementById(id); if(el) el.style.display='none';
   });
   /* 작업구역 버튼 텍스트 리셋 */
@@ -1327,9 +1333,9 @@ function applyParsed(r){
   document.getElementById('p4').className='pi';
   document.getElementById('p5').className='pi';
   document.getElementById('p6').className='pi';
-  S.permit=null; S.permitParcels=null; S.permitDraw=null; S.ghostXY=null;
+  S.permitDraw=null; S.ghostXY=null;
   document.getElementById('btnPermit').disabled=false;
-  document.getElementById('permitInfo').style.display='none';
+  if(!_keepPermit) document.getElementById('permitInfo').style.display='none';
   var bpm=document.getElementById('btnPermit'); bpm.classList.remove('active'); bpm.textContent='✏️ 허가지선 그리기';
   cv.style.cursor='grab';
 
@@ -1339,6 +1345,12 @@ function applyParsed(r){
 
   var matched=S.surveys.filter(function(s){return s.val!=null;}).length;
   toast('인식 완료 · 등고선 '+S.contours.length+' · 표고점 '+S.surveys.length+(matched?' (값 '+matched+')':''),'ok');
+  /* 필지선택으로 만든 허가지선이 있으면 지형도 위에 유지 → 면적 다시 표시 */
+  if(_keepPermit){
+    var _pi=document.getElementById('permitInfo'); if(_pi) _pi.style.display='';
+    if(typeof updatePermitAreaDisplay==='function') updatePermitAreaDisplay();
+    setTimeout(function(){ toast('기존 허가지선 유지됨 — 지형도 위에서 분석하세요','ok'); }, 600);
+  }
   if(typeof cadBgAutoOn==='function') setTimeout(cadBgAutoOn, 200);   // 지도 배경 자동 표시(서버 전용)
 }
 
@@ -1412,8 +1424,47 @@ function evPix(e){
 }
 
 /* ---------- 마우스 (팬/줌/좌표) ---------- */
-cv.addEventListener('mousedown',function(e){ S.isDown=true; S.dragStarted=false; S.lastM={x:e.clientX,y:e.clientY}; S.dnX=e.clientX; S.dnY=e.clientY; cv.classList.add('grabbing'); });
+cv.addEventListener('mousedown',function(e){
+  /* 가운데 버튼(1) = 어느 모드에서든 항상 지도 이동 전용. 브라우저 자동스크롤 차단 */
+  if(e.button===1){
+    e.preventDefault();
+    S.midPan=true; S.isDown=true; S.dragStarted=false;
+    S.lastM={x:e.clientX,y:e.clientY}; S.dnX=e.clientX; S.dnY=e.clientY;
+    cv.classList.add('grabbing'); return;
+  }
+  if(e.button!==0) return;   // 오른쪽 등은 여기서 처리 안 함(contextmenu 별도)
+  S.midPan=false; S.isDown=true; S.dragStarted=false;
+  S.lastM={x:e.clientX,y:e.clientY}; S.dnX=e.clientX; S.dnY=e.clientY; cv.classList.add('grabbing');
+});
+/* 가운데 버튼 기본 자동스크롤 방지 */
+cv.addEventListener('auxclick',function(e){ if(e.button===1) e.preventDefault(); });
+
+/* ESC = 진행 중인 작업(그리기/선택 등) 취소 → pan 모드 복귀 */
+window.addEventListener('keydown',function(e){
+  if(e.key!=='Escape') return;
+  var did=false;
+  if(S.mode==='permit'){ S.mode='pan'; S.permitDraw=null; S.ghostXY=null;
+    var b=document.getElementById('btnPermit'); if(b){ b.classList.remove('active'); b.textContent='✏️ 허가지선 그리기'; }
+    cv.style.cursor='grab'; did=true; }
+  if(CAD.selMode){ if(typeof toggleCadSelect==='function'){ toggleCadSelect(); did=true; } }
+  if(S.mode==='pickPermit'){ S.mode='pan'; S.pickHover=null;
+    var bp=document.getElementById('btnPickMode'); if(bp) bp.classList.remove('active');
+    var ph=document.getElementById('pickHint'); if(ph) ph.style.display='none'; cv.style.cursor='grab'; did=true; }
+  if(S.mode==='pour'){ S.mode='pan'; var bpr=document.getElementById('btnPour'); if(bpr){ bpr.classList.remove('active'); bpr.textContent='📍 유역 추출 (유출구 클릭)'; } cv.style.cursor='grab'; did=true; }
+  if(S.mode==='section'){ S.mode='pan'; S.sectionPts=null; S.sectionGhost=null; cv.style.cursor='grab'; did=true; }
+  if(S.mode==='crop'){ S.mode='pan'; S.cropPt1=null; S.cropGhost=null;
+    var bc=document.getElementById('btnCrop'); if(bc){ bc.classList.remove('active'); bc.textContent='✂️ 작업구역 그리기'; } cv.style.cursor='grab'; did=true; }
+  if(did){ e.preventDefault(); render(); toast('취소됨','ok'); }
+});
 window.addEventListener('mousemove',function(e){
+  /* 가운데 버튼 팬 — 모드 무관 최우선. 어느 작업 중이든 지도만 이동 */
+  if(S.midPan && S.isDown){
+    S.dragStarted=true;
+    S.ox+=e.clientX-S.lastM.x; S.oy-=e.clientY-S.lastM.y;
+    S.lastM={x:e.clientX,y:e.clientY};
+    if(typeof cadBgRefresh==='function') cadBgRefresh();
+    render(); return;
+  }
   if(S.bounds){ var w=evWorld(e); var _sb=document.getElementById('sbXY'); if(_sb)_sb.textContent='X '+w.x.toFixed(1)+'  Y '+w.y.toFixed(1); }
   if(S.mode==='section' && S.sectionPts && S.sectionPts.length===1){
     S.sectionGhost=evWorld(e); render(); return;
@@ -1458,7 +1509,7 @@ window.addEventListener('mousemove',function(e){
   S.ox+=e.clientX-S.lastM.x; S.oy-=e.clientY-S.lastM.y;
   S.lastM={x:e.clientX,y:e.clientY}; render();
 });
-window.addEventListener('mouseup',function(){ var wasDrag=S.dragStarted; S.isDown=false; cv.classList.remove('grabbing'); if(typeof cadBgRefresh==='function') cadBgRefresh(); if(wasDrag) render(); });
+window.addEventListener('mouseup',function(){ var wasDrag=S.dragStarted; S.isDown=false; S.midPan=false; cv.classList.remove('grabbing'); if(typeof cadBgRefresh==='function') cadBgRefresh(); if(wasDrag) render(); });
 cv.addEventListener('click',function(e){
   if(S.dragStarted) return; // 실제 드래그(패닝)였으면 무시 — 10px 이내 미동은 클릭으로 인정
   /* ★ 지적 선택 모드 — 최우선 */
@@ -1540,9 +1591,9 @@ function render(){
   try{ drawCadBg(); }catch(_e){ /* 지도 오류는 무시하고 계속 */ }
 
   /* ★ 지형도 배경 (수치지도 레이어별) — 맨 밑. 중심선 제외, 건물·도로·식생 색상, bbox 컬링 */
-  if(S.showBg && (S.bgLines&&S.bgLines.length || (S.polys&&S.polys.length) || S.bgTexts&&S.bgTexts.length)){
+  if(S.showBg && ((S.bgLines&&S.bgLines.length) || (S.allPolys&&S.allPolys.length) || (S.polys&&S.polys.length) || (S.bgTexts&&S.bgTexts.length))){
     var _panning = (S.isDown && S.dragStarted);
-    var _bgHeavy = ((S.bgLines?S.bgLines.length:0)+(S.polys?S.polys.length:0)) > 4000;
+    var _bgHeavy = ((S.bgLines?S.bgLines.length:0)+(S.allPolys?S.allPolys.length:0)) > 4000;
     if(!(_panning && _bgHeavy)){    /* 무거운 도면은 팬 중엔 스킵 → 안 얼게 */
       ctx.save(); ctx.globalAlpha=S.bgAlpha||0.55; ctx.lineWidth=0.8; ctx.setLineDash([]); ctx.lineJoin='round';
       /* 화면 → 월드 bbox (컬링 기준, 한 번만) */
@@ -1563,7 +1614,10 @@ function render(){
         }
       }
       if(S.bgLines) _bgCollect(S.bgLines);
-      if(S.polys)   _bgCollect(S.polys);      /* 건물 등 닫힌 도형도 배경으로 */
+      /* 배경 지형도는 '허가지선 후보 필터(S.polys)'와 무관하게 전체(S.allPolys)를 그림.
+         → 건물·시설 등 닫힌 폴리곤도 배경으로 보이게 (중심선은 _bgClass가 제외) */
+      if(S.allPolys && S.allPolys.length) _bgCollect(S.allPolys);
+      else if(S.polys) _bgCollect(S.polys);
       /* 색상별 그리기 */
       for(var col in _bgByColor){
         ctx.strokeStyle=col; ctx.beginPath();
@@ -2889,7 +2943,7 @@ function togglePermit(){
     var bpm0=document.getElementById('btnPickMode'); if(bpm0) bpm0.classList.remove('active');
     var ph0=document.getElementById('pickHint'); if(ph0) ph0.style.display='none';
     var bp=document.getElementById('btnPour'); bp.classList.remove('active'); bp.textContent='📍 유역 추출 (유출구 클릭)';
-    b.classList.add('active'); b.textContent='그리는 중… 더블클릭 완료 (취소)'; cv.style.cursor='crosshair'; toast('꼭짓점을 클릭, 더블클릭으로 완료');
+    b.classList.add('active'); b.textContent='그리는 중… 더블클릭 완료 · ESC 취소'; cv.style.cursor='crosshair'; toast('꼭짓점 클릭 → 더블클릭 완료 (ESC=취소)');
   } else { S.permitDraw=null; S.ghostXY=null; b.classList.remove('active'); b.textContent='✏️ 허가지선 그리기'; cv.style.cursor='grab'; }
   render();
 }
