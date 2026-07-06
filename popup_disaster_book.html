@@ -89,6 +89,23 @@
   .lyrBtn.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent;font-weight:600}
   .hint{position:absolute;left:12px;bottom:32px;font-size:11.5px;color:var(--tx3);
     background:rgba(11,18,32,.75);padding:6px 10px;border-radius:8px;border:1px solid var(--line);backdrop-filter:blur(4px)}
+  /* ── 지번검색 + 드롭존 (1페이지) ── */
+  .jibunSearch{display:flex;gap:6px;margin-bottom:2px}
+  .jibunSearch input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--tx);
+    border-radius:8px;padding:8px 10px;font-size:12px;outline:none;transition:.15s}
+  .jibunSearch input:focus{border-color:var(--accent)}
+  .jibunSearch input::placeholder{color:var(--tx3)}
+  .jibunBtn{background:var(--panel2);border:1px solid var(--line);color:var(--tx2);border-radius:8px;
+    padding:0 13px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:.15s}
+  .jibunBtn:hover{color:var(--tx);border-color:var(--accent)}
+  .dropzone{margin-top:11px;border:2px dashed var(--line);border-radius:12px;background:rgba(14,22,38,.4);
+    padding:26px 14px;text-align:center;cursor:pointer;transition:.16s}
+  .dropzone:hover{border-color:var(--accent);background:rgba(56,189,248,.06)}
+  .dropzone.dragover{border-color:var(--accent);background:rgba(56,189,248,.12)}
+  .dropzone .dz-ic{font-size:34px;opacity:.85;margin-bottom:8px}
+  .dropzone .dz-t{font-size:12px;color:var(--tx3);line-height:1.5}
+  .dropzone .dz-t b{color:var(--tx2)}
+
   .statusbar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:18px;
     padding:7px 14px;font-size:11.5px;color:var(--tx3);background:rgba(11,18,32,.8);border-top:1px solid var(--line)}
   .statusbar b{color:var(--tx2);font-weight:700}
@@ -209,13 +226,30 @@
   <aside>
     <div class="sec pgsec" data-page="1">
       <h3>지형 자료</h3>
-      <button class="btn btn-primary" onclick="document.getElementById('file').click()">
+
+      <!-- ① 지번 검색 -->
+      <div class="jibunSearch">
+        <input type="text" id="jibunInp" placeholder="🔍 지번 검색 (예: 송산면 사강리 100-5)"
+          onkeydown="if(event.key==='Enter')doJibunSearch()" autocomplete="off">
+        <button class="jibunBtn" onclick="doJibunSearch()">검색</button>
+      </div>
+      <div id="jibunMsg" style="display:none;font-size:10.5px;margin-top:5px;line-height:1.5"></div>
+
+      <!-- ② 점선 드롭박스 (클릭 = 파일 선택) -->
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('file').click()">
+        <div class="dz-ic">📁</div>
+        <div class="dz-t">DXF를 <b>끌어다 놓거나</b><br>클릭해서 선택</div>
+      </div>
+      <input type="file" id="file" accept=".dxf" style="display:none">
+
+      <!-- ③ 열기 버튼 (유지) -->
+      <button class="btn btn-primary" onclick="document.getElementById('file').click()" style="margin-top:9px">
         ⬆ 수치지형도 DXF 열기
       </button>
-      <input type="file" id="file" accept=".dxf" style="display:none">
-      <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.5">
-        변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식<br>
-        <span style="color:var(--tx3)">💡 작업창으로 <b style="color:var(--tx2)">파일을 끌어다 놓아도</b> 됩니다</span>
+
+      <!-- ④ 안내 정리 -->
+      <div style="font-size:10.5px;color:var(--tx3);margin-top:8px;line-height:1.55">
+        변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식
       </div>
       <!-- 🗺 지적(VWorld) — 서버에서 열 때만 동작 -->
       <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:11px">
@@ -1014,13 +1048,69 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
 /* 드래그앤드롭 (창 어디에 놓아도 불러옴) */
 (function(){
   var lay=document.getElementById('droplay'), depth=0;
+  var dz=document.getElementById('dropzone');
   function hasFile(e){ return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types||[],'Files')>=0; }
   window.addEventListener('dragenter',function(e){ if(!hasFile(e))return; e.preventDefault(); depth++; lay.classList.add('on'); });
   window.addEventListener('dragover', function(e){ if(!hasFile(e))return; e.preventDefault(); });
   window.addEventListener('dragleave',function(e){ e.preventDefault(); depth--; if(depth<=0){ depth=0; lay.classList.remove('on'); } });
   window.addEventListener('drop',     function(e){ e.preventDefault(); depth=0; lay.classList.remove('on');
     var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) loadDXFFile(f); });
+  /* 드롭존 위에서의 시각 피드백 */
+  if(dz){
+    dz.addEventListener('dragover',function(e){ if(hasFile(e)){ e.preventDefault(); dz.classList.add('dragover'); } });
+    dz.addEventListener('dragleave',function(){ dz.classList.remove('dragover'); });
+    dz.addEventListener('drop',function(e){ dz.classList.remove('dragover'); });
+  }
 })();
+
+/* ---------- 지번 검색 → 지도 이동 (VWorld /api/vw-search, 서버 전용) ---------- */
+function _vwMerc2LL(x,y){ var R=6378137.0; return [ (x/R)*180/Math.PI, (2*Math.atan(Math.exp(y/R))-Math.PI/2)*180/Math.PI ]; }
+function _jibunMsg(txt,color){ var m=document.getElementById('jibunMsg'); if(!m)return; if(!txt){ m.style.display='none'; return; } m.style.display=''; m.style.color=color||'var(--tx3)'; m.textContent=txt; }
+function doJibunSearch(){
+  var inp=document.getElementById('jibunInp'); if(!inp) return;
+  var q=(inp.value||'').trim();
+  if(!q){ _jibunMsg('지번을 입력하세요','#fbbf24'); return; }
+  if(!_cadInitProj()){ _jibunMsg('좌표 변환(proj4) 로드 실패 — 서버에서 열어주세요','#f87171'); return; }
+  _jibunMsg('검색 중…','var(--tx2)');
+  fetch('/api/vw-search?query='+encodeURIComponent(q))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d && d.ok && d.items && d.items.length){
+        var it=d.items[0], p=it.point||{};
+        if(p.x!=null && p.y!=null){
+          var ll=_vwMerc2LL(parseFloat(p.x),parseFloat(p.y));   // 3857 → 4326
+          _jibunGoTo(ll[0], ll[1], it.parcel||q);
+          return;
+        }
+      }
+      _jibunMsg('검색 결과가 없어요. 지번을 확인하세요 (예: 송산면 사강리 100-5)','#fbbf24');
+    })
+    .catch(function(){ _jibunMsg('검색 실패 — 서버 연결을 확인하세요','#f87171'); });
+}
+/* 검색된 경위도로 지도 중심 이동 + 배경지도 켜기 */
+function _jibunGoTo(lng, lat, label){
+  var c=wgs84toTm5186(lng,lat);
+  if(!c){ _jibunMsg('좌표 변환 실패','#f87171'); return; }
+  /* 뷰가 없으면(지형도 전) 화면 범위부터 잡기 */
+  if(!S.bounds){ if(!_cadEnsureView()){ _jibunMsg('지도 준비 실패 — 서버에서 열어주세요','#f87171'); return; } }
+  /* 캔버스 크기 확보 */
+  if(!cv.width || cv.width<10 || !cv.height || cv.height<10){
+    var st=cv.parentElement; cv.width=(st&&st.clientWidth)||900; cv.height=(st&&st.clientHeight)||600;
+  }
+  /* 검색지 중심으로 ±400m 창 */
+  var half=400;
+  S.bounds={minX:c[0]-half,minY:c[1]-half,maxX:c[0]+half,maxY:c[1]+half};
+  var dx=S.bounds.maxX-S.bounds.minX, dy=S.bounds.maxY-S.bounds.minY, pad=46;
+  S.scale=Math.min((cv.width-pad*2)/(dx||1),(cv.height-pad*2)/(dy||1));
+  if(!(S.scale>0)) S.scale=0.4;
+  S.ox=(cv.width-dx*S.scale)/2 - S.bounds.minX*S.scale;
+  S.oy=(cv.height-dy*S.scale)/2 - S.bounds.minY*S.scale;
+  /* 배경지도 안 켜져있으면 자동 ON */
+  if(typeof cadBg!=='undefined' && !cadBg.on && typeof cadBgAutoOn==='function'){ cadBgAutoOn(); }
+  else if(typeof _cadBgFetch==='function'){ _cadBgFetch(); }
+  render();
+  _jibunMsg('📍 '+(label||'')+' — 지도 이동 완료', '#34d399');
+}
 
 function applyParsed(r){
   S.origContours=r.contours; S.origSurveys=r.surveys; S.origPolys=r.polys||[];
@@ -4286,8 +4376,8 @@ function drawCadBg(){
         var vp=cadBg.vecParcels[k]; if(!vp.jibun) continue;
         var cx=0,cy=0,rr=vp.ring; for(var m=0;m<rr.length;m++){cx+=rr[m].x;cy+=rr[m].y;} cx/=rr.length; cy/=rr.length;
         var sc=w2s({x:cx,y:cy}); if(sc.x<0||sc.x>cv.width||sc.y<0||sc.y>cv.height) continue;
-        ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.strokeText(vp.jibun,sc.x,sc.y);
-        ctx.fillStyle='#ffd0d0'; ctx.fillText(vp.jibun,sc.x,sc.y);
+        ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.85)'; ctx.strokeText(vp.jibun,sc.x,sc.y);
+        ctx.fillStyle='#ffffff'; ctx.fillText(vp.jibun,sc.x,sc.y);
       }
     }
   } else if(cadBg.showCad && cadBg.vecTooWide){
