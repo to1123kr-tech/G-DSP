@@ -51,6 +51,8 @@
   .thr.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent}
   .thr2{padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--tx3);font-size:10.5px;cursor:pointer}
   .thr2.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent;font-weight:600}
+  .thr3{flex:1;padding:5px 0;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--tx3);font-size:10.5px;cursor:pointer;transition:.12s}
+  .thr3.on{color:#06121f;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-color:transparent;font-weight:700}
   .btn-ghost.active{color:#06121f;background:linear-gradient(135deg,#34d399,#0ea5e9);border-color:transparent}
   .num{width:100%;margin-top:3px;padding:6px 7px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--tx);font-size:13px}
 
@@ -855,9 +857,15 @@
       <input type="checkbox" id="c3d_flowNum" checked onchange="set3DFlowNum(this.checked)"> 누적 숫자 표시
     </label>
     <div id="c3d_gridWrap" style="margin-left:18px;margin-top:6px">
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8"><span>🔲 격자 간격</span><span id="c3d_gridVal" style="color:#fbbf24;font-weight:700">10m</span></div>
-      <input type="range" id="c3d_grid" min="2" max="40" step="1" value="10" oninput="set3DGrid(this.value)" style="width:100%;margin-top:3px">
-      <div style="font-size:8.5px;color:#5b7290;margin-top:2px;line-height:1.3">작을수록 화살표·숫자 촘촘 (3D에서 바로 반영)</div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8;margin-bottom:4px"><span>🔲 격자 간격</span><span id="c3d_gridVal" style="color:#fbbf24;font-weight:700">10m</span></div>
+      <div style="display:flex;gap:3px">
+        <button class="thr3" id="c3d_g3"  onclick="set3DGrid(3)">3m</button>
+        <button class="thr3" id="c3d_g5"  onclick="set3DGrid(5)">5m</button>
+        <button class="thr3 on" id="c3d_g10" onclick="set3DGrid(10)">10m</button>
+        <button class="thr3" id="c3d_g15" onclick="set3DGrid(15)">15m</button>
+        <button class="thr3" id="c3d_g20" onclick="set3DGrid(20)">20m</button>
+      </div>
+      <div style="font-size:8.5px;color:#5b7290;margin-top:3px;line-height:1.3">작을수록 촘촘 · 3·5m는 정밀격자(5m) 자동 생성</div>
     </div>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
       <input type="checkbox" id="c3d_rain" onchange="toggle3DRain(this.checked)"> 🌧️ 비 내리기 <span style="color:#7c8aa0;font-size:9.5px">(물길 확인용)</span>
@@ -3327,13 +3335,44 @@ function _makeNumSprite(num){
 }
 function set3DFlow(on){ S.show3DFlow=!!on; if(_three) _rebuild3D(); }
 function set3DFlowNum(on){ S.show3DFlowNum=!!on; if(_three && S.show3DFlow) _rebuild3D(); }
-/* 3D 격자 간격 즉시 조절 (나갔다 올 필요 없이) — 2D와 값 공유(S.arrowMeters) */
+/* 3D 격자 간격 버튼 (3·5·10·15·20m). 2D와 값 공유(S.arrowMeters).
+   선택값이 현재 DEM 셀보다 작으면 → DEM을 5m로 자동 재생성 → 흐름 재계산 → 3D 갱신 (A 방식) */
 function set3DGrid(v){
-  S.arrowMeters=Math.max(1, parseFloat(v)||10);
-  var lb=document.getElementById('c3d_gridVal'); if(lb) lb.textContent=S.arrowMeters+'m';
-  /* 2D 쪽 슬라이더·라벨도 동기화 */
-  var s2=document.getElementById('arrowStep'); if(s2) s2.value=S.arrowMeters;
-  var l2=document.getElementById('arrowStepVal'); if(l2) l2.textContent=S.arrowMeters+'m';
+  var gm=Math.max(1, parseFloat(v)||10);
+  S.arrowMeters=gm;
+  /* 버튼 활성화 */
+  [3,5,10,15,20].forEach(function(n){ var b=document.getElementById('c3d_g'+n); if(b) b.className='thr3'+(n===gm?' on':''); });
+  var lb=document.getElementById('c3d_gridVal'); if(lb) lb.textContent=gm+'m';
+  /* 2D 슬라이더·라벨 동기화 */
+  var s2=document.getElementById('arrowStep'); if(s2) s2.value=gm;
+  var l2=document.getElementById('arrowStepVal'); if(l2) l2.textContent=gm+'m';
+
+  var curCell=(S.dem&&S.dem.cell)||S.demCell||10;
+  /* 선택 간격이 현재 셀보다 작아서 반영이 안 되면 → 정밀격자(5m)로 재생성 필요 */
+  if(gm < curCell && curCell > 5){
+    if(typeof S.triList!=='undefined' && S.triList && S.triList.length){
+      toast('정밀격자(5m) 생성 중… 잠시만요','ok');
+      S.demCell=5;
+      /* DEM 버튼 UI도 5m로 */
+      ['5','10'].forEach(function(vv){
+        var b=document.getElementById('demRes'+vv); if(b) b.className='thr'+(vv==='5'?' on':'');
+        var b2=document.getElementById('demRes'+vv+'b'); if(b2) b2.className='thr2'+(vv==='5'?' on':'');
+      });
+      /* DEM → 흐름 순차 재계산 후 3D 재빌드 (무거우니 setTimeout으로 UI 안 멈추게) */
+      setTimeout(function(){
+        _runDEMcore();
+        setTimeout(function(){
+          _runFlowcore();
+          if(_three) _rebuild3D();
+          toast('정밀격자 5m 적용 — 격자 '+gm+'m로 촘촘해졌어요','ok');
+        }, 30);
+      }, 30);
+      return;
+    } else {
+      toast('격자 '+gm+'m는 정밀격자 필요 — DEM을 먼저 5m로 생성하세요','err');
+    }
+  }
+  /* 셀 크기 안에서 표현 가능 → 3D만 다시 그림 */
   if(_three) _rebuild3D();
 }
 
@@ -3347,9 +3386,9 @@ function _sync3DCtrlUI(){
   var ex=_three?_three.exag:2.2;
   var sl=document.getElementById('c3d_exag'); if(sl) sl.value=ex;
   var lb=document.getElementById('c3d_exagVal'); if(lb) lb.textContent='\u00d7'+(+ex).toFixed(1);
-  /* 격자 간격 슬라이더도 현재 값 반영 */
+  /* 격자 간격 버튼도 현재 값 반영 */
   var gm=S.arrowMeters||10;
-  var gs=document.getElementById('c3d_grid'); if(gs) gs.value=gm;
+  [3,5,10,15,20].forEach(function(n){ var b=document.getElementById('c3d_g'+n); if(b) b.className='thr3'+(n===gm?' on':''); });
   var gl=document.getElementById('c3d_gridVal'); if(gl) gl.textContent=gm+'m';
 }
 function set3DColorMode(m){ if(!_three)return; _three.colorMode=m; _3dColorMode=m; _sync3DCtrlUI(); _rebuild3D(); }
