@@ -3336,7 +3336,9 @@ function _makeNumSprite(num){
 function set3DFlow(on){ S.show3DFlow=!!on; if(_three) _rebuild3D(); }
 function set3DFlowNum(on){ S.show3DFlowNum=!!on; if(_three && S.show3DFlow) _rebuild3D(); }
 /* 3D 격자 간격 버튼 (3·5·10·15·20m). 2D와 값 공유(S.arrowMeters).
-   선택값이 현재 DEM 셀보다 작으면 → DEM을 5m로 자동 재생성 → 흐름 재계산 → 3D 갱신 (A 방식) */
+   화살표는 DEM 셀 배수로만 찍히므로, 선택 간격에 맞는 DEM 셀이 필요:
+   3m→3m DEM, 5m→5m DEM, 10·15·20m→10m DEM이면 충분(1·1.5·2배).
+   현재 DEM 셀이 목표와 다르면 DEM+흐름 재계산 후 3D 갱신. */
 function set3DGrid(v){
   var gm=Math.max(1, parseFloat(v)||10);
   S.arrowMeters=gm;
@@ -3347,32 +3349,37 @@ function set3DGrid(v){
   var s2=document.getElementById('arrowStep'); if(s2) s2.value=gm;
   var l2=document.getElementById('arrowStepVal'); if(l2) l2.textContent=gm+'m';
 
+  /* 이 간격을 정확히 표현하려면 DEM 셀이 이 값의 약수여야 함.
+     3m·5m는 그 값 자체를, 10m 이상은 10m DEM(넉넉)이면 배수로 표현 가능 */
+  var needCell = (gm<=5) ? gm : 10;
   var curCell=(S.dem&&S.dem.cell)||S.demCell||10;
-  /* 선택 간격이 현재 셀보다 작아서 반영이 안 되면 → 정밀격자(5m)로 재생성 필요 */
-  if(gm < curCell && curCell > 5){
-    if(typeof S.triList!=='undefined' && S.triList && S.triList.length){
-      toast('정밀격자(5m) 생성 중… 잠시만요','ok');
-      S.demCell=5;
-      /* DEM 버튼 UI도 5m로 */
+
+  if(Math.abs(curCell-needCell)>0.01){
+    /* DEM 셀 교체 필요 */
+    if(S.triList && S.triList.length){
+      var lbl = needCell+'m';
+      toast('정밀격자('+lbl+') 생성 중… 잠시만요','ok');
+      S.demCell=needCell;
+      /* DEM 해상도 버튼 UI 갱신 (5·10 버튼은 두 값만 표시하므로 근사표시) */
       ['5','10'].forEach(function(vv){
-        var b=document.getElementById('demRes'+vv); if(b) b.className='thr'+(vv==='5'?' on':'');
-        var b2=document.getElementById('demRes'+vv+'b'); if(b2) b2.className='thr2'+(vv==='5'?' on':'');
+        var on=(needCell<=5 ? vv==='5' : vv==='10');
+        var b=document.getElementById('demRes'+vv); if(b) b.className='thr'+(on?' on':'');
+        var b2=document.getElementById('demRes'+vv+'b'); if(b2) b2.className='thr2'+(on?' on':'');
       });
-      /* DEM → 흐름 순차 재계산 후 3D 재빌드 (무거우니 setTimeout으로 UI 안 멈추게) */
       setTimeout(function(){
         _runDEMcore();
         setTimeout(function(){
           _runFlowcore();
           if(_three) _rebuild3D();
-          toast('정밀격자 5m 적용 — 격자 '+gm+'m로 촘촘해졌어요','ok');
+          toast('정밀격자 '+needCell+'m 적용 — 격자 '+gm+'m로 촘촘해졌어요','ok');
         }, 30);
       }, 30);
       return;
     } else {
-      toast('격자 '+gm+'m는 정밀격자 필요 — DEM을 먼저 5m로 생성하세요','err');
+      toast('격자 '+gm+'m는 지형 분석(DEM)을 먼저 실행해야 반영돼요','err');
     }
   }
-  /* 셀 크기 안에서 표현 가능 → 3D만 다시 그림 */
+  /* 현재 셀로 표현 가능 → 3D만 다시 그림 */
   if(_three) _rebuild3D();
 }
 
