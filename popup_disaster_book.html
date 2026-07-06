@@ -90,6 +90,7 @@
   .hint{position:absolute;left:12px;bottom:32px;font-size:11.5px;color:var(--tx3);
     background:rgba(11,18,32,.75);padding:6px 10px;border-radius:8px;border:1px solid var(--line);backdrop-filter:blur(4px)}
   /* ── 지번검색 + 드롭존 (1페이지) ── */
+  .jibunWrap{position:relative}
   .jibunSearch{display:flex;gap:6px;margin-bottom:2px}
   .jibunSearch input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--tx);
     border-radius:8px;padding:8px 10px;font-size:12px;outline:none;transition:.15s}
@@ -98,6 +99,13 @@
   .jibunBtn{background:var(--panel2);border:1px solid var(--line);color:var(--tx2);border-radius:8px;
     padding:0 13px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:.15s}
   .jibunBtn:hover{color:var(--tx);border-color:var(--accent)}
+  .srchDrop{position:absolute;left:0;right:0;top:calc(100% + 3px);z-index:30;max-height:230px;overflow-y:auto;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 34px rgba(0,0,0,.5)}
+  .srchDrop .sditem{padding:8px 11px;cursor:pointer;border-bottom:1px solid var(--line);transition:.12s}
+  .srchDrop .sditem:last-child{border-bottom:none}
+  .srchDrop .sditem:hover{background:var(--panel2)}
+  .srchDrop .sdname{font-size:12px;color:var(--tx);font-weight:600}
+  .srchDrop .sdaddr{font-size:10px;color:var(--tx3);margin-top:2px}
   .dropzone{margin-top:11px;border:2px dashed var(--line);border-radius:12px;background:rgba(14,22,38,.4);
     padding:26px 14px;text-align:center;cursor:pointer;transition:.16s}
   .dropzone:hover{border-color:var(--accent);background:rgba(56,189,248,.06)}
@@ -227,11 +235,14 @@
     <div class="sec pgsec" data-page="1">
       <h3>지형 자료</h3>
 
-      <!-- ① 지번 검색 -->
-      <div class="jibunSearch">
-        <input type="text" id="jibunInp" placeholder="🔍 지번 검색 (예: 송산면 사강리 100-5)"
-          onkeydown="if(event.key==='Enter')doJibunSearch()" autocomplete="off">
-        <button class="jibunBtn" onclick="doJibunSearch()">검색</button>
+      <!-- ① 통합 검색 (지번·도로명·명칭) -->
+      <div class="jibunWrap">
+        <div class="jibunSearch">
+          <input type="text" id="jibunInp" placeholder="🔍 지번·도로명·명칭 (예: 화성시청)"
+            onkeydown="if(event.key==='Enter')doJibunSearch()" autocomplete="off">
+          <button class="jibunBtn" onclick="doJibunSearch()">검색</button>
+        </div>
+        <div id="srchDrop" class="srchDrop" style="display:none"></div>
       </div>
       <div id="jibunMsg" style="display:none;font-size:10.5px;margin-top:5px;line-height:1.5"></div>
 
@@ -1063,27 +1074,86 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
   }
 })();
 
-/* ---------- 지번 검색 → 지도 이동 (VWorld /api/vw-search, 서버 전용) ---------- */
+/* ---------- 통합 검색 → 지도 이동 (지번·도로명·명칭 자동판별, 결과 여럿이면 목록) ---------- */
 function _vwMerc2LL(x,y){ var R=6378137.0; return [ (x/R)*180/Math.PI, (2*Math.atan(Math.exp(y/R))-Math.PI/2)*180/Math.PI ]; }
 function _jibunMsg(txt,color){ var m=document.getElementById('jibunMsg'); if(!m)return; if(!txt){ m.style.display='none'; return; } m.style.display=''; m.style.color=color||'var(--tx3)'; m.textContent=txt; }
+/* 검색 결과 드롭다운 (여러 개일 때 선택) */
+function _srchDrop(docs){
+  var dd=document.getElementById('srchDrop'); if(!dd) return;
+  dd.innerHTML='';
+  docs.forEach(function(doc){
+    var it=document.createElement('div'); it.className='sditem';
+    var name=doc.place_name||doc.address_name||'';
+    var addr=doc.address_name||'';
+    var road=(doc.road_address&&doc.road_address.address_name)||'';
+    var sub=(road&&road!==name)?road:((addr&&addr!==name)?addr:'');
+    it.innerHTML='<div class="sdname">'+name+'</div>'+(sub?'<div class="sdaddr">'+sub+'</div>':'');
+    it.onclick=function(){ dd.style.display='none'; _applyDoc(doc); };
+    dd.appendChild(it);
+  });
+  dd.style.display='block';
+  _jibunMsg(docs.length+'개 검색됨 — 선택하세요','var(--tx2)');
+}
+function _srchDropHide(){ var dd=document.getElementById('srchDrop'); if(dd) dd.style.display='none'; }
+/* 선택/단일 결과 적용 → 지도 이동 */
+function _applyDoc(doc){
+  var lng=parseFloat(doc.x||0), lat=parseFloat(doc.y||0);
+  if(!lng||!lat){ _jibunMsg('좌표 없음','#f87171'); return; }
+  var label=doc.place_name||doc.address_name||'';
+  _jibunGoTo(lng, lat, label);
+}
 function doJibunSearch(){
   var inp=document.getElementById('jibunInp'); if(!inp) return;
   var q=(inp.value||'').trim();
-  if(!q){ _jibunMsg('지번을 입력하세요','#fbbf24'); return; }
+  if(!q){ _jibunMsg('검색어를 입력하세요 (지번·도로명·명칭)','#fbbf24'); return; }
   if(!_cadInitProj()){ _jibunMsg('좌표 변환(proj4) 로드 실패 — 서버에서 열어주세요','#f87171'); return; }
+  _srchDropHide();
   _jibunMsg('검색 중…','var(--tx2)');
+  /* 카카오 SDK 준비되면 주소+명칭 검색, 아니면 VWorld 폴백 */
+  _cadKakaoReady(function(ok){
+    if(ok && window.kakao && kakao.maps && kakao.maps.services){
+      _kakaoSearch(q);
+    } else {
+      _vwOnlySearch(q);   // 카카오 안 되면 VWorld(산 지번)만
+    }
+  });
+}
+/* ① 카카오 주소검색(도로명·지번) → ② POI 키워드(명칭) → ③ VWorld(산 지번) 폴백 */
+function _kakaoSearch(q){
+  var hasCity=/시$|군$|구$|도$/.test(q.split(' ')[0]);
+  var query=hasCity?q:'화성시 '+q;
+  var gc=new kakao.maps.services.Geocoder();
+  var ps=new kakao.maps.services.Places();
+  var OK=kakao.maps.services.Status.OK;
+  function handle(docs){ if(docs.length===1) _applyDoc(docs[0]); else _srchDrop(docs); }
+  gc.addressSearch(query,function(d1,s1){
+    if(s1===OK && d1.length){ handle(d1); return; }
+    gc.addressSearch(q,function(d2,s2){
+      if(s2===OK && d2.length){ handle(d2); return; }
+      ps.keywordSearch(query,function(d3,s3){
+        if(s3===OK && d3.length){ handle(d3); return; }
+        ps.keywordSearch(q,function(d4,s4){
+          if(s4===OK && d4.length){ handle(d4); return; }
+          _vwOnlySearch(q);   // 카카오 다 실패 → VWorld 산 지번
+        });
+      });
+    });
+  });
+}
+/* VWorld 검색(연속지적, 산/임야 지번) — 카카오 실패분 보강 */
+function _vwOnlySearch(q){
   fetch('/api/vw-search?query='+encodeURIComponent(q))
     .then(function(r){ return r.json(); })
     .then(function(d){
       if(d && d.ok && d.items && d.items.length){
         var it=d.items[0], p=it.point||{};
         if(p.x!=null && p.y!=null){
-          var ll=_vwMerc2LL(parseFloat(p.x),parseFloat(p.y));   // 3857 → 4326
+          var ll=_vwMerc2LL(parseFloat(p.x),parseFloat(p.y));
           _jibunGoTo(ll[0], ll[1], it.parcel||q);
           return;
         }
       }
-      _jibunMsg('검색 결과가 없어요. 지번을 확인하세요 (예: 송산면 사강리 100-5)','#fbbf24');
+      _jibunMsg('검색 결과가 없어요 (지번·도로명·명칭 확인)','#fbbf24');
     })
     .catch(function(){ _jibunMsg('검색 실패 — 서버 연결을 확인하세요','#f87171'); });
 }
@@ -1109,8 +1179,14 @@ function _jibunGoTo(lng, lat, label){
   if(typeof cadBg!=='undefined' && !cadBg.on && typeof cadBgAutoOn==='function'){ cadBgAutoOn(); }
   else if(typeof _cadBgFetch==='function'){ _cadBgFetch(); }
   render();
+  _srchDropHide();
   _jibunMsg('📍 '+(label||'')+' — 지도 이동 완료', '#34d399');
 }
+/* 검색 드롭다운 바깥 클릭 시 닫기 */
+document.addEventListener('click',function(e){
+  var wrap=document.querySelector('.jibunWrap');
+  if(wrap && !wrap.contains(e.target)) _srchDropHide();
+});
 
 function applyParsed(r){
   S.origContours=r.contours; S.origSurveys=r.surveys; S.origPolys=r.polys||[];
@@ -4105,7 +4181,11 @@ function _cadKakaoReady(cb){
 /* 지적 선택 모드 토글 */
 function toggleCadSelect(){
   if(!_cadInitProj()){ toast('좌표 변환(proj4) 로드 실패 — 서버에서 열어주세요','err'); return; }
-  if(!S.bounds){ toast('먼저 지형도(DXF)를 올리세요','err'); return; }
+  /* DXF 없어도 배경지도/검색만으로 지적선택 가능하게 — 뷰 없으면 여기서 잡아줌 */
+  if(!S.bounds){
+    if(!_cadEnsureView()){ toast('지도 준비 실패 — 서버에서 열어주세요','err'); return; }
+    if(typeof cadBg!=='undefined' && !cadBg.on && typeof cadBgAutoOn==='function'){ cadBgAutoOn(); }  // 배경지도 자동 ON
+  }
   CAD.selMode=!CAD.selMode;
   var b=document.getElementById('cadSelBtn');
   if(b){ b.classList.toggle('active',CAD.selMode); b.textContent=CAD.selMode?'✓ 지적 선택 중 (필지 클릭)':'📍 지적 선택'; }
@@ -4113,6 +4193,7 @@ function toggleCadSelect(){
   if(CAD.selMode){
     _cadKakaoReady(function(ok){ if(!ok) toast('카카오 지도 API 로드 실패 — 서버에서 열어야 해요','err'); });
     toast('필지를 클릭하세요 (여러 개 가능, 다시 클릭=해제)','ok');
+    render();
   }
 }
 
@@ -4252,7 +4333,8 @@ var CAD_BG_DOMAIN = (location.hostname && location.hostname.indexOf('nip.io')>=0
 var _MERC_R = 20037508.342789244;
 
 function toggleCadBg(){
-  if(!S.bounds){ toast('먼저 지형도(DXF)를 올리세요','err'); return; }
+  if(!_cadInitProj()){ toast('좌표 변환(proj4) 로드 실패 — 서버에서 열어주세요','err'); return; }
+  if(!S.bounds){ if(!_cadEnsureView()){ toast('지도 준비 실패 — 서버에서 열어주세요','err'); return; } }  // DXF 없어도 화성 기준 뷰
   cadBg.on=!cadBg.on;
   _cadBgSyncBtn();
   if(cadBg.on) _cadBgFetch(); else render();
