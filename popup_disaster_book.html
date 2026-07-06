@@ -89,9 +89,6 @@
   .lyrBtn.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent;font-weight:600}
   .hint{position:absolute;left:12px;bottom:32px;font-size:11.5px;color:var(--tx3);
     background:rgba(11,18,32,.75);padding:6px 10px;border-radius:8px;border:1px solid var(--line);backdrop-filter:blur(4px)}
-  .empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--tx3)}
-  .empty .big{font-size:46px;opacity:.5}
-  .empty .t{font-size:14px}
   .statusbar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:18px;
     padding:7px 14px;font-size:11.5px;color:var(--tx3);background:rgba(11,18,32,.8);border-top:1px solid var(--line)}
   .statusbar b{color:var(--tx2);font-weight:700}
@@ -217,7 +214,8 @@
       </button>
       <input type="file" id="file" accept=".dxf" style="display:none">
       <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.5">
-        변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식
+        변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식<br>
+        <span style="color:var(--tx3)">💡 작업창으로 <b style="color:var(--tx2)">파일을 끌어다 놓아도</b> 됩니다</span>
       </div>
       <!-- 🗺 지적(VWorld) — 서버에서 열 때만 동작 -->
       <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:11px">
@@ -622,10 +620,6 @@
       <button class="tbtn" title="축소" onclick="zoomBy(1/1.25)">－</button>
       <button class="tbtn" title="PNG로 저장" onclick="exportPNG()">📷</button>
       <button class="tbtn" title="PDF 보고서" onclick="exportPDF()">📄</button>
-    </div>
-    <div class="empty" id="empty">
-      <div class="big">🗺️</div>
-      <div class="t">수치지형도 DXF를 열거나, 여기로 <b style="color:var(--accent)">끌어다 놓으세요</b></div>
     </div>
     <div class="statusbar" id="sbar" style="display:none">
       <span><b id="sbName">–</b></span>
@@ -1079,7 +1073,6 @@ function applyParsed(r){
   document.getElementById('sbCont').textContent=S.contours.length;
   document.getElementById('sbSurv').textContent=S.surveys.length;
 
-  document.getElementById('empty').style.display='none';
   document.getElementById('hint').style.display='';
   document.getElementById('tools').style.display='';
   document.getElementById('sbar').style.display='';
