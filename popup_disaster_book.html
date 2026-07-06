@@ -940,6 +940,16 @@ function isElevLayer(lay){ lay=(lay||'').toUpperCase();
   return false; }
 
 /* ---------- DXF 파서 (검증 완료) ---------- */
+/* DXF/MTEXT 서식 제어코드 제거 (\A1; \pxq; {\fFont;...} \P 등) → 순수 글자만 */
+function _cleanDxfText(s){
+  if(!s) return s;
+  var t=String(s);
+  t=t.replace(/\\[Pp]/g,' ');                 // 줄바꿈 코드 → 공백
+  t=t.replace(/\\[A-Za-z]+[^;\\]*;/g,'');      // \A1; \pxq...; \fArial; 등 세미콜론 종료 코드
+  t=t.replace(/[{}]/g,'');                     // 그룹 중괄호
+  t=t.replace(/\\~/g,' ').replace(/\\\\/g,'\\'); // 이스케이프
+  return t.trim();
+}
 function parseDXF(text){
   var lines=text.split(/\r\n|\n/), contours=[],surveys=[],texts=[],polys=[],bgLines=[],bgTexts=[];
   var i=0,n=lines.length;
@@ -1046,7 +1056,7 @@ function parseDXF(text){
       case 30: if(cur.type==='INSERT'||cur.type==='TEXT'||cur.type==='POINT') cur.iz=parseFloat(v); break;
       case 11: if(cur.type==='LINE') cur.lx2=parseFloat(v); break;
       case 21: if(cur.type==='LINE') cur.ly2=parseFloat(v); break;
-      case 1: if(cur.type==='TEXT') cur.text=v; break;
+      case 1: if(cur.type==='TEXT') cur.text=_cleanDxfText(v); break;
     }
   }
   flush();
@@ -1062,7 +1072,9 @@ function loadDXFFile(f){
   var rd=new FileReader();
   rd.onload=function(){
     try{
-      var r=parseDXF(rd.result);
+      var buf=rd.result;
+      var text=_decodeDxf(buf);   // 인코딩 자동감지(UTF-8/EUC-KR)
+      var r=parseDXF(text);
       if(!r.contours.length && !r.surveys.length){
         toast('등고선·표고점을 못 찾았어요. _분석용.dxf 인지 확인하세요','err'); return;
       }
@@ -1070,7 +1082,24 @@ function loadDXFFile(f){
     }catch(err){ toast(err.message||'DXF 분석 실패','err'); }
   };
   rd.onerror=function(){ toast('파일을 읽지 못했어요','err'); };
-  rd.readAsText(f);
+  rd.readAsArrayBuffer(f);   // 바이트로 읽어서 인코딩 직접 판별
+}
+/* DXF 인코딩 자동감지: UTF-8로 디코딩해보고 깨짐(�) 많으면 EUC-KR(CP949)로 재디코딩.
+   한국 CAD 도면은 대부분 EUC-KR이라 한글이 깨지던 문제 해결 */
+function _decodeDxf(buf){
+  var bytes=new Uint8Array(buf);
+  var utf8='';
+  try{ utf8=new TextDecoder('utf-8',{fatal:false}).decode(bytes); }catch(e){ utf8=''; }
+  /* U+FFFD(�) 비율로 판정 */
+  var bad=0, tot=0;
+  for(var i=0;i<utf8.length;i++){ tot++; if(utf8.charCodeAt(i)===0xFFFD) bad++; }
+  if(utf8 && (tot===0 || bad/tot < 0.002)) return utf8;   // 깨짐 거의 없으면 UTF-8
+  /* EUC-KR 재시도 */
+  try{
+    var euc=new TextDecoder('euc-kr',{fatal:false}).decode(bytes);
+    if(euc) return euc;
+  }catch(e){}
+  return utf8||'';   // 둘 다 안되면 UTF-8 그대로
 }
 document.getElementById('file').addEventListener('change',function(e){ loadDXFFile(e.target.files[0]); e.target.value=''; });
 
@@ -1350,9 +1379,13 @@ function zoomAt(sx,sy,f){
 /* 수치지도 레이어 분류 → 색상(그림) / null(제외) */
 function _bgClass(layer){
   var L=(layer||'').toUpperCase();
-  /* 중심선 제외 (도로중심선 A002x, 하천중심선 E003x) */
-  if(L.indexOf('A002')===0) return null;
-  if(L.indexOf('E003')===0) return null;
+  /* ── 중심선 제외 ──
+     표준코드: 도로중심선 A002x, 하천중심선 E003x
+     + 이름 기반: '중심선'/CENTER, 배수/하수 중심선 등 (비표준 도면 대비) */
+  if(L.indexOf('A002')===0) return null;   // 도로중심선
+  if(L.indexOf('E003')===0) return null;   // 하천(배수) 중심선
+  if(L.indexOf('중심선')>=0) return null;
+  if(L.indexOf('CENTER')>=0 && (L.indexOf('ROAD')>=0||L.indexOf('도로')>=0||L.indexOf('배수')>=0||L.indexOf('하수')>=0||L.indexOf('DRAIN')>=0||L.indexOf('SEWER')>=0)) return null;
   /* 색상 */
   var c=L.charAt(0);
   if(c==='D') return '#3fa350';   /* 식생 — 초록 */
@@ -1365,7 +1398,18 @@ function _bgClass(layer){
 }
 function w2s(p){ return {x:p.x*S.scale+S.ox, y:cv.height-(p.y*S.scale+S.oy)}; }
 function s2w(x,y){ return {x:(x-S.ox)/S.scale, y:(cv.height-y-S.oy)/S.scale}; }
-function evWorld(e){ var r=cv.getBoundingClientRect(); return s2w(e.clientX-r.left, e.clientY-r.top); }
+function evWorld(e){
+  var r=cv.getBoundingClientRect();
+  /* 캔버스 CSS 표시크기(r.width)와 내부 픽셀크기(cv.width)가 다르면 클릭이 어긋남 → 비율 보정 */
+  var sx=(r.width>0)?(cv.width/r.width):1, sy=(r.height>0)?(cv.height/r.height):1;
+  return s2w((e.clientX-r.left)*sx, (e.clientY-r.top)*sy);
+}
+/* 마우스 이벤트 → 캔버스 내부 픽셀 좌표 (w2s 결과와 같은 좌표계) */
+function evPix(e){
+  var r=cv.getBoundingClientRect();
+  var sx=(r.width>0)?(cv.width/r.width):1, sy=(r.height>0)?(cv.height/r.height):1;
+  return {x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy};
+}
 
 /* ---------- 마우스 (팬/줌/좌표) ---------- */
 cv.addEventListener('mousedown',function(e){ S.isDown=true; S.dragStarted=false; S.lastM={x:e.clientX,y:e.clientY}; S.dnX=e.clientX; S.dnY=e.clientY; cv.classList.add('grabbing'); });
@@ -1402,8 +1446,8 @@ window.addEventListener('mousemove',function(e){
   if(S.mode==='permit' && S.permitDraw){
     var wp=evWorld(e); S.ghostXY=wp; S.snapClose=false;
     if(S.permitDraw.length>=3){
-      var r=cv.getBoundingClientRect(), fs=w2s(S.permitDraw[0]);
-      if(Math.hypot((e.clientX-r.left)-fs.x, (e.clientY-r.top)-fs.y) < 12){ S.ghostXY={x:S.permitDraw[0].x,y:S.permitDraw[0].y}; S.snapClose=true; }
+      var _ep=evPix(e), fs=w2s(S.permitDraw[0]);
+      if(Math.hypot(_ep.x-fs.x, _ep.y-fs.y) < 12){ S.ghostXY={x:S.permitDraw[0].x,y:S.permitDraw[0].y}; S.snapClose=true; }
     }
     render(); return;
   }
@@ -1421,7 +1465,7 @@ cv.addEventListener('click',function(e){
   if(CAD.selMode){ var wc=evWorld(e); cadHandleClick(wc); return; }
   /* ★ 단면 삭제 X 뱃지 클릭 (모드 무관 최우선) */
   if(_secDelHits && _secDelHits.length){
-    var rr=cv.getBoundingClientRect(), mxp=e.clientX-rr.left, myp=e.clientY-rr.top;
+    var _ep2=evPix(e), mxp=_ep2.x, myp=_ep2.y;
     for(var di=0;di<_secDelHits.length;di++){
       var h=_secDelHits[di];
       if(Math.hypot(mxp-h.x,myp-h.y)<=h.r){ deleteSection(h.idx); return; }
@@ -1460,8 +1504,8 @@ cv.addEventListener('contextmenu',function(e){
 });
 cv.addEventListener('wheel',function(e){
   e.preventDefault();
-  var r=cv.getBoundingClientRect();
-  zoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.15:1/1.15);
+  var _ep=evPix(e);
+  zoomAt(_ep.x, _ep.y, e.deltaY<0?1.15:1/1.15);
   if(typeof cadBgRefresh==='function') cadBgRefresh();
 },{passive:false});
 
