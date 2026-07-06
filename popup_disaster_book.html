@@ -867,6 +867,25 @@
       </div>
       <div style="font-size:8.5px;color:#5b7290;margin-top:3px;line-height:1.3">작을수록 촘촘 · 3·5m는 정밀격자(5m) 자동 생성</div>
     </div>
+    <div id="c3d_permitStyle" style="margin-top:10px;padding-top:9px;border-top:1px solid #1e2b45">
+      <div style="font-size:10.5px;color:#cdd8ea;font-weight:600;margin-bottom:5px">✏️ 허가지선</div>
+      <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:6px">
+        <span style="font-size:9.5px;color:#9fb0c8;width:24px">색</span>
+        <button onclick="set3DPermitColor('#f472b6')" title="분홍" style="width:16px;height:16px;border-radius:50%;cursor:pointer;border:1px solid #2a3a55;background:#f472b6"></button>
+        <button onclick="set3DPermitColor('#ef4444')" title="빨강" style="width:16px;height:16px;border-radius:50%;cursor:pointer;border:1px solid #2a3a55;background:#ef4444"></button>
+        <button onclick="set3DPermitColor('#f97316')" title="주황" style="width:16px;height:16px;border-radius:50%;cursor:pointer;border:1px solid #2a3a55;background:#f97316"></button>
+        <button onclick="set3DPermitColor('#eab308')" title="노랑" style="width:16px;height:16px;border-radius:50%;cursor:pointer;border:1px solid #2a3a55;background:#eab308"></button>
+        <button onclick="set3DPermitColor('#22c55e')" title="초록" style="width:16px;height:16px;border-radius:50%;cursor:pointer;border:1px solid #2a3a55;background:#22c55e"></button>
+        <button onclick="set3DPermitColor('#38bdf8')" title="하늘" style="width:16px;height:16px;border-radius:50%;cursor:pointer;border:1px solid #2a3a55;background:#38bdf8"></button>
+        <button onclick="set3DPermitColor('#ffffff')" title="흰색" style="width:16px;height:16px;border-radius:50%;cursor:pointer;border:1px solid #2a3a55;background:#ffffff"></button>
+        <input type="color" value="#f472b6" oninput="set3DPermitColor(this.value)" title="직접 선택" style="width:22px;height:20px;padding:0;border:1px solid #2a3a55;border-radius:4px;cursor:pointer;background:none" id="c3d_permCol">
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:9.5px;color:#9fb0c8;width:24px">두께</span>
+        <input type="range" min="0.5" max="6" step="0.5" value="2.5" oninput="set3DPermitWidth(this.value)" style="flex:1" id="c3d_permW">
+        <span style="font-size:9.5px;color:#f472b6;font-weight:700;width:24px;text-align:right" id="c3d_permWVal">2.5</span>
+      </div>
+    </div>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
       <input type="checkbox" id="c3d_rain" onchange="toggle3DRain(this.checked)"> 🌧️ 비 내리기 <span style="color:#7c8aa0;font-size:9.5px">(물길 확인용)</span>
     </label>
@@ -3275,8 +3294,8 @@ function _add3DFlow(scene, dem, hp, exag){
       var lv=Math.log10(acc+1)/4; lv=lv<0?0:(lv>1?1:lv);
       var rgb=_flowRamp(lv);
       var cx=af.minX+(ac+0.5)*af.cell, cy=af.minY+(ar+0.5)*af.cell;
-      var t1=tmTo3DPt(cx-d[0]*Lw, cy-d[1]*Lw, dem, hp, exag); t1.y+=3;
-      var t2=tmTo3DPt(cx+d[0]*Lw, cy+d[1]*Lw, dem, hp, exag); t2.y+=3;
+      var t1=tmTo3DPt(cx-d[0]*Lw, cy-d[1]*Lw, dem, hp, exag); t1.y+=1.2;
+      var t2=tmTo3DPt(cx+d[0]*Lw, cy+d[1]*Lw, dem, hp, exag); t2.y+=1.2;
       push2(t1,t2,rgb);
       // 화살촉 (끝점에서 뒤로 두 선)
       var dx=t2.x-t1.x, dz=t2.z-t1.z, len=Math.hypot(dx,dz)||1; dx/=len; dz/=len;
@@ -3310,7 +3329,7 @@ function _add3DFlow(scene, dem, hp, exag){
     numPts.forEach(function(n){
       var sp=_makeNumSprite(Math.round(n.acc));
       if(!sp) return;
-      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=6;
+      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=2;
       sp.position.set(p.x,p.y,p.z);
       var sc=af.cell*gm*0.5; sp.scale.set(sc,sc*0.5,1);
       scene.add(sp); _three.objs.push(sp);
@@ -3335,6 +3354,25 @@ function _makeNumSprite(num){
 }
 function set3DFlow(on){ S.show3DFlow=!!on; if(_three) _rebuild3D(); }
 function set3DFlowNum(on){ S.show3DFlowNum=!!on; if(_three && S.show3DFlow) _rebuild3D(); }
+/* 3D 허가지선 색상·두께 — 2D와 값 공유(S.lineStyle.permit) + 3D 즉시 재빌드 (나갈 필요 없이) */
+function set3DPermitColor(c){
+  if(!S.lineStyle) S.lineStyle={};
+  if(!S.lineStyle.permit) S.lineStyle.permit={width:2.5,dash:'dash'};
+  S.lineStyle.permit.color=c;
+  var cp=document.getElementById('c3d_permCol'); if(cp) cp.value=c;
+  if(typeof _syncLineStyleUI==='function') _syncLineStyleUI('permit');   // 2D 쪽도 동기화
+  if(_three) _rebuild3D();
+  render();
+}
+function set3DPermitWidth(v){
+  if(!S.lineStyle) S.lineStyle={};
+  if(!S.lineStyle.permit) S.lineStyle.permit={color:'#f472b6',dash:'dash'};
+  S.lineStyle.permit.width=parseFloat(v)||2.5;
+  var wv=document.getElementById('c3d_permWVal'); if(wv) wv.textContent=S.lineStyle.permit.width;
+  if(typeof _syncLineStyleUI==='function') _syncLineStyleUI('permit');   // 2D 쪽도 동기화
+  if(_three) _rebuild3D();
+  render();
+}
 /* 3D 격자 간격 버튼 (3·5·10·15·20m). 2D와 값 공유(S.arrowMeters).
    화살표는 DEM 셀 배수로만 찍히므로, 선택 간격에 맞는 DEM 셀이 필요:
    3m→3m DEM, 5m→5m DEM, 10·15·20m→10m DEM이면 충분(1·1.5·2배).
@@ -3397,6 +3435,11 @@ function _sync3DCtrlUI(){
   var gm=S.arrowMeters||10;
   [3,5,10,15,20].forEach(function(n){ var b=document.getElementById('c3d_g'+n); if(b) b.className='thr3'+(n===gm?' on':''); });
   var gl=document.getElementById('c3d_gridVal'); if(gl) gl.textContent=gm+'m';
+  /* 허가지선 색상·두께 UI 반영 */
+  var ps=(S.lineStyle&&S.lineStyle.permit)||{color:'#f472b6',width:2.5};
+  var pc=document.getElementById('c3d_permCol'); if(pc) pc.value=ps.color||'#f472b6';
+  var pw=document.getElementById('c3d_permW'); if(pw) pw.value=ps.width||2.5;
+  var pwv=document.getElementById('c3d_permWVal'); if(pwv) pwv.textContent=ps.width||2.5;
 }
 function set3DColorMode(m){ if(!_three)return; _three.colorMode=m; _3dColorMode=m; _sync3DCtrlUI(); _rebuild3D(); }
 function set3DWire(on){ if(!_three)return; _three.wire=!!on; _rebuild3D(); }
@@ -4635,6 +4678,11 @@ function cadUseAsPermit(){
   if(typeof updatePermitAreaDisplay==='function') updatePermitAreaDisplay();
   if(typeof _afterPermitSet==='function') _afterPermitSet();
   CAD.selMode=false;
+  /* ★ 허가지선으로 확정됐으니 선택 표시(청록 점선)는 지움.
+     허가지선 좌표는 이미 S.permit/permitParcels에 복사됐으므로 parcels 비워도 안전 */
+  CAD.parcels=[];
+  if(typeof _cadRenderParcelList==='function') _cadRenderParcelList();
+  if(typeof _cadUpdateBar==='function') _cadUpdateBar();
   var b=document.getElementById('cadSelBtn'); if(b){ b.classList.remove('active'); b.textContent='📍 지적 선택'; }
   var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display='none';
   document.getElementById('cadDoneBar').style.display='none';
