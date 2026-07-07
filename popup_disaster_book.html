@@ -682,7 +682,10 @@
             📂 산림청 zip을 여기 놓거나 클릭<br><span style="font-size:9.5px">산사태·임상·토양 zip 한 번에 (여러 개 가능)</span>
           </div>
           <input type="file" id="forestFile" accept=".zip" multiple style="display:none" onchange="forestUpload(this.files)">
-          <div class="dhint">🔗 <a href="https://map.forest.go.kr" target="_blank" style="color:#38bdf8">산림공간정보서비스</a>에서 다운로드 · 자동으로 종류 판별 · <a href="#" onclick="openForestGuide();return false;" style="color:#fbbf24;font-weight:700">📖 다운로드 방법</a></div>
+          <div class="dhint" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <a href="https://map.forest.go.kr" target="_blank" style="background:#1e3a5f;color:#38bdf8;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;font-size:10px">🔗 산림공간정보서비스</a>
+            <a href="#" onclick="openForestGuide();return false;" style="background:#fbbf24;color:#1a1400;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;font-size:10px">📖 다운로드 방법</a>
+          </div>
           <div id="forestLayers" style="margin-top:8px;display:none"></div>
           <div id="forestMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
