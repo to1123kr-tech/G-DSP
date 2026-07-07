@@ -981,6 +981,9 @@
       <button class="thr" id="c3d_thermal" onclick="set3DColorMode('thermal')">열지도</button>
     </div>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:10px;cursor:pointer">
+      <input type="checkbox" id="c3d_stream" checked onchange="set3DStream(this.checked)"> 🌊 하천선 (시안)
+    </label>
+    <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
       <input type="checkbox" id="c3d_wire" onchange="set3DWire(this.checked)"> 골격(와이어프레임)
     </label>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
@@ -3476,8 +3479,8 @@ function _rebuild3D(){
       scene.add(bLine); _three.objs.push(bLine);
     }
   }
-  /* 하천망 — 표면 드레이프 (3D는 밝은 시안·지형 위로 띄워 잘 보이게) */
-  if(S.flow && S.showStreams && S.streamMask){
+  /* 하천망 — 표면 드레이프 (3D는 밝은 시안·지형 위로 띄워 잘 보이게) — 3D 전용 토글 */
+  if(S.flow && S.showStreams && S.show3DStream!==false && S.streamMask){
     var _fl=S.flow, _sm=S.streamMask.mask, _fa=_fl.acc, _thr=S.streamMask.thr||1;
     var _segPts=[];
     for(var _si=0;_si<_sm.length;_si++){
@@ -3589,17 +3592,17 @@ function _add3DFlow(scene, dem, hp, exag){
     var gLines=new THREE.LineSegments(gg, new THREE.LineBasicMaterial({color:0x9cacc8, transparent:true, opacity:0.22}));
     scene.add(gLines); _three.objs.push(gLines);
   }
-  // 누적 숫자 (스프라이트) — 상한 초과 시 생략
-  if(S.show3DFlowNum!==false && numPts.length<=6000){
+  // 누적 숫자 (스프라이트) — 화살표와 같은 개수(gm 간격)이므로 상한 넉넉히
+  if(S.show3DFlowNum!==false && numPts.length<=8000){
     numPts.forEach(function(n){
       var sp=_makeNumSprite(Math.round(n.acc));
       if(!sp) return;
-      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=2;
+      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(3, af.cell*gm*0.15);  // 지형 위로 넉넉히 띄움
       sp.position.set(p.x,p.y,p.z);
-      var sc=af.cell*gm*0.5; sp.scale.set(sc,sc*0.5,1);
+      var sc=Math.max(af.cell*gm*0.9, 8); sp.scale.set(sc,sc*0.5,1);  // 크게 (땅 커도 보이게)
       scene.add(sp); _three.objs.push(sp);
     });
-  } else if(S.show3DFlowNum!==false && numPts.length>6000){
+  } else if(S.show3DFlowNum!==false && numPts.length>8000){
     toast('격자 숫자가 너무 많아 3D에선 생략됨('+numPts.length+'개) — 격자 간격을 키우세요','err');
   }
 }
@@ -3618,6 +3621,7 @@ function _makeNumSprite(num){
   }catch(e){ return null; }
 }
 function set3DFlow(on){ S.show3DFlow=!!on; if(_three) _rebuild3D(); }
+function set3DStream(on){ S.show3DStream=!!on; if(_three) _rebuild3D(); }
 function set3DFlowNum(on){ S.show3DFlowNum=!!on; if(_three && S.show3DFlow) _rebuild3D(); }
 function set3DFlowStyle(s){ S.flow3dStyle=s; if(_three){ _three.flowStyle=s;
     var l=document.getElementById('c3d_fs_line'), t=document.getElementById('c3d_fs_tri');
