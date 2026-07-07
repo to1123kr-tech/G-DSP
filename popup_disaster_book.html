@@ -512,6 +512,9 @@
           <span id="arrowStepVal" style="font-size:11px;color:#60a5fa;font-weight:700;min-width:34px;text-align:right">10m</span>
         </div>
         <div style="font-size:9.5px;color:var(--tx3);margin-top:2px;line-height:1.4">격자 간격 m · 클수록 칸이 커지고 누적값 숫자 표시 (음영 격자와 별개)</div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx2);margin-top:6px;cursor:pointer">
+          <input type="checkbox" id="flowNumToggle" checked onchange="S.showFlowNum=this.checked;render()"> 🔢 누적값 숫자 표시
+        </label>
         <div style="display:flex;align-items:center;gap:5px;margin-top:8px;flex-wrap:wrap">
           <span style="font-size:11px;color:var(--tx3);white-space:nowrap;width:46px">화살표 색</span>
           <button onclick="setFlowColor('red')"    title="빨" style="width:18px;height:18px;border-radius:50%;border:2px solid #2a3a55;cursor:pointer;background:linear-gradient(135deg,#fecaca,#b91414)"></button>
@@ -845,6 +848,8 @@
         <button class="thr" id="pal_forest" onclick="setHsPalette('forest')">🌲 산림</button>
         <button class="thr" id="pal_autumn" onclick="setHsPalette('autumn')">🍁 단풍</button>
         <button class="thr" id="pal_pastel" onclick="setHsPalette('pastel')">🎨 파스텔</button>
+        <button class="thr" id="pal_jet" onclick="setHsPalette('jet')">🌈 형광</button>
+        <button class="thr" id="pal_thermal" onclick="setHsPalette('thermal')">🔥 열지도</button>
       </div>
       <!-- 태양 방향 다이얼 -->
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
@@ -968,6 +973,8 @@
       <button class="thr" id="c3d_forest" onclick="set3DColorMode('forest')">산림</button>
       <button class="thr" id="c3d_autumn" onclick="set3DColorMode('autumn')">단풍</button>
       <button class="thr" id="c3d_pastel" onclick="set3DColorMode('pastel')">파스텔</button>
+      <button class="thr" id="c3d_jet" onclick="set3DColorMode('jet')">형광</button>
+      <button class="thr" id="c3d_thermal" onclick="set3DColorMode('thermal')">열지도</button>
     </div>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:10px;cursor:pointer">
       <input type="checkbox" id="c3d_wire" onchange="set3DWire(this.checked)"> 골격(와이어프레임)
@@ -1061,7 +1068,7 @@ var S={ contours:[], surveys:[], polys:[],
         flow:null, streamMask:null, streamHa:1, showStreams:true, showContours:true, showSurvey:true,
         watershed:null, wsCanvas:null, wsSegs:null, showWS:true, mode:'pan', dnX:0, dnY:0,
         permit:null, permitDraw:null, ghostXY:null, snapClose:false,
-        showGrid:false, showArrows:false, demClipToPermit:false, areaUnit:'m2', reliefMode:'hypso', daejangArea:null,
+        showGrid:false, showArrows:false, showFlowNum:true, demClipToPermit:false, areaUnit:'m2', reliefMode:'hypso', daejangArea:null,
         bounds:null, scale:1, ox:0, oy:0,
         zmin:0, zmax:0, isDown:false, lastM:null, name:'',
         /* ★ 선 스타일 시스템 (색·두께·선종류) — 파일 바꿔도 유지 = 사무실별 세팅 */
@@ -1937,7 +1944,7 @@ function render(){
         ctx.lineCap='round'; ctx.lineJoin='round';
         ctx.beginPath();
         for(var ci=0;ci<sm.length;ci++){
-          if(!sm[ci]||fa[ci]<thr*2) continue;
+          if(!sm[ci]||fa[ci]<thr) continue;
           var cc3=ci%fl.cols, rr3=(ci/fl.cols)|0;
           var code3=fl.fdir[ci]; if(code3<=0) continue;
           var dd3=_step(code3); if(!dd3) continue;
@@ -1962,7 +1969,7 @@ function render(){
         var _flSeen={};
         ctx.fillStyle='#dff1ff';
         for(var fi=0;fi<sm.length;fi++){
-          if(!sm[fi]||fa[fi]<thr*2) continue;
+          if(!sm[fi]||fa[fi]<thr) continue;
           var cf=fi%fl.cols, rf=(fi/fl.cols)|0;
           var codef=fl.fdir[fi]; if(codef<=0) continue;
           var ddf=_step(codef); if(!ddf) continue;
@@ -1988,7 +1995,7 @@ function render(){
       var _hdPx=Math.max(8, 12*_saz);                              // 화면상 간격(px) — 이전 22→8
       var _hdSeen={};
       for(var si2=0;si2<sm.length;si2++){
-        if(!sm[si2]||fa[si2]<thr*2) continue;
+        if(!sm[si2]||fa[si2]<thr) continue;
         var cc2=si2%fl.cols, rr2=(si2/fl.cols)|0;
         var code2=fl.fdir[si2]; if(code2<=0) continue;
         var dd=_step(code2); if(!dd) continue;
@@ -2025,7 +2032,7 @@ function render(){
       ac0-=ac0%gm; ar0-=ar0%gm;                                     // 격자 시작을 gm 배수에 맞춤
       var nCells=(Math.floor((ac1-ac0)/gm)+1)*(Math.floor((ar1-ar0)/gm)+1);
       var heavy=nCells>4000;                                        // 너무 많으면 가볍게(균일·숫자생략)
-      var showNum=(cellPx>=20)&&!heavy;
+      var showNum=(cellPx>=20)&&!heavy&&(S.showFlowNum!==false);
       var fa=af.acc;
       /* ★ 격자 히트맵: 칸 배경을 누적값 따라 색칠 (물 많이 모인 칸 진하게) */
       if(S.flowFill && fa){
@@ -2094,8 +2101,9 @@ function render(){
             ctx.lineTo(q2.x-hs2*Math.cos(ang2+0.5), q2.y-hs2*Math.sin(ang2+0.5));
             ctx.closePath(); ctx.fill();
           } else if(asty==='tri'){
-            /* 큰 삼각형 — 셀 중앙에 방향 표시 (쏠림 없음) */
-            var mcx=w2s({x:cx2,y:cy2});   // 셀 중앙 화면좌표
+            /* 큰 삼각형 — 격자 칸 진짜 중앙에 방향 표시 (gm 짝수여도 안 쏠림) */
+            var gcx=af.minX+(ac2+gm/2)*af.cell, gcy=af.minY+(ar2+gm/2)*af.cell;  // 격자 칸 중앙(월드)
+            var mcx=w2s({x:gcx,y:gcy});   // 격자 칸 중앙 화면좌표
             ctx.fillStyle=_fillRmp; var ts=hl2*1.7;
             ctx.beginPath();
             ctx.moveTo(mcx.x+ts*Math.cos(ang2), mcx.y+ts*Math.sin(ang2));
@@ -2630,7 +2638,9 @@ var _EXTRA_PALS={
   sepia:  [[0,[246,238,222]],[0.35,[222,199,160]],[0.65,[187,152,108]],[0.85,[142,106,72]],[1,[92,66,45]]],      /* 종이지도풍 갈색 */
   forest: [[0,[26,74,44]],[0.3,[52,116,62]],[0.55,[108,158,78]],[0.78,[178,190,110]],[1,[236,228,170]]],          /* 산림 녹색 */
   autumn: [[0,[250,222,120]],[0.35,[244,164,66]],[0.65,[224,98,52]],[0.85,[176,52,66]],[1,[112,32,72]]],          /* 가을 단풍 */
-  pastel: [[0,[214,236,250]],[0.3,[204,214,246]],[0.55,[226,204,240]],[0.8,[250,214,224]],[1,[254,240,214]]]      /* 파스텔 */
+  pastel: [[0,[214,236,250]],[0.3,[204,214,246]],[0.55,[226,204,240]],[0.8,[250,214,224]],[1,[254,240,214]]],     /* 파스텔 */
+  jet:    [[0,[0,0,180]],[0.2,[0,120,255]],[0.4,[0,230,230]],[0.55,[60,255,60]],[0.7,[255,240,0]],[0.85,[255,120,0]],[1,[210,0,0]]],  /* 형광 무지개(jet) */
+  thermal:[[0,[10,10,40]],[0.25,[90,20,120]],[0.5,[210,50,60]],[0.72,[255,140,20]],[0.9,[255,235,90]],[1,[255,255,240]]]             /* 열지도(적외선) */
 };
 function paletteRGB(name,t){
   var stops=_EXTRA_PALS[name]; if(!stops) return hypsoRGB(t);
@@ -2693,7 +2703,7 @@ function setHsAlt(v){ _hs.alt=parseFloat(v); var e=document.getElementById('hsAl
 function setHsZ(v){ _hs.zFactor=parseFloat(v); var e=document.getElementById('hsZVal'); if(e)e.textContent='×'+_hs.zFactor.toFixed(1); updateHillshade(); }
 function setHsPalette(p){
   _hs.palette=p;
-  ['hypso','terrain','shade','gray-blue','sepia','forest','autumn','pastel'].forEach(function(k){
+  ['hypso','terrain','shade','gray-blue','sepia','forest','autumn','pastel','jet','thermal'].forEach(function(k){
     var b=document.getElementById('pal_'+k); if(b) b.className='thr'+(k===p?' on':'');
   });
   S.reliefMode=p;
@@ -3633,7 +3643,7 @@ function set3DGrid(v){
 /* 3D 컨트롤 UI 상태 동기화 */
 function _sync3DCtrlUI(){
   var m=_three?_three.colorMode:'shade';
-  [['c3d_hypso','hypso'],['c3d_terrain','terrain'],['c3d_shade','shade'],['c3d_sepia','sepia'],['c3d_forest','forest'],['c3d_autumn','autumn'],['c3d_pastel','pastel']].forEach(function(p){
+  [['c3d_hypso','hypso'],['c3d_terrain','terrain'],['c3d_shade','shade'],['c3d_sepia','sepia'],['c3d_forest','forest'],['c3d_autumn','autumn'],['c3d_pastel','pastel'],['c3d_jet','jet'],['c3d_thermal','thermal']].forEach(function(p){
     var b=document.getElementById(p[0]); if(b) b.className='thr'+(m===p[1]?' on':'');
   });
   var wc=document.getElementById('c3d_wire'); if(wc) wc.checked=_three?!!_three.wire:false;
