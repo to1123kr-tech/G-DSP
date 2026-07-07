@@ -700,15 +700,22 @@
           <input type="checkbox" class="chk" checked onchange="dcardToggle('geo',this.checked)">
           <span class="ic">🪨</span>
           <span class="tt">지질도(모암)</span>
-          <span class="st">KIGAM 캡처</span>
+          <span class="st">자동조회 · KIGAM</span>
         </div>
         <div class="dcard-bd" id="dcb_geo">
-          <button class="dbtn pri" onclick="geoOpenKigam()" style="width:100%;margin-bottom:6px">🔗 KIGAM 지질도 열기</button>
-          <div class="ddrop" id="geoDrop" onclick="document.getElementById('geoImg').click()">
-            📷 지질도 캡처를 여기 놓거나 클릭<br><span style="font-size:9.5px">화면 캡처 이미지 (첨부만·정합 안 함)</span>
-          </div>
+          <button class="dbtn pri" onclick="geoAutoMoam()" style="width:100%;margin-bottom:6px;background:linear-gradient(135deg,#0ea5e9,#0284c7)">🪨 작업위치 모암 자동조회</button>
+          <div id="geoMoamResult" style="display:none;margin-bottom:7px"></div>
+          <details style="margin-bottom:6px">
+            <summary style="font-size:10px;color:var(--tx3);cursor:pointer">＋ 지도 이미지도 첨부 (선택)</summary>
+            <div style="margin-top:6px">
+              <button class="dbtn" onclick="geoOpenKigam()" style="width:100%;margin-bottom:6px">🔗 KIGAM 지질도 열기</button>
+              <div class="ddrop" id="geoDrop" onclick="document.getElementById('geoImg').click()">
+                📷 지질도 캡처를 여기 놓거나 클릭<br><span style="font-size:9.5px">화면 캡처 이미지 (첨부만)</span>
+              </div>
+            </div>
+          </details>
           <input type="file" id="geoImg" accept="image/*" style="display:none" onchange="geoCapture(this.files)">
-          <div class="dhint">위 「작업 위치」로 지질도가 열립니다 · 5만 지질도 켜진 채 화면 캡처 → 여기 올리기</div>
+          <div class="dhint">위 「작업 위치」의 모암을 KIGAM 지질도에서 자동으로 조회 → 채점표 모암에 자동 반영</div>
           <div id="geoMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
       </div>
@@ -1334,22 +1341,39 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
   window.addEventListener('dragenter',function(e){
     if(!hasFile(e))return;
     var cd=_whichCardDrop(e);
-    if(cd){ e.preventDefault(); depth++; _setLayText(cd); lay.classList.add('on'); return; }
+    if(cd){ e.preventDefault(); depth++; _setLayText(cd); lay.classList.add('on'); lay._card=cd; return; }
     if(_overForestDrop(e)) return;   // 8번 페이지 나머지 = DXF 안 받음
-    e.preventDefault(); depth++; _setLayText(null); lay.classList.add('on');
+    e.preventDefault(); depth++; _setLayText(null); lay._card=null; lay.classList.add('on');
   });
   window.addEventListener('dragover', function(e){
     if(!hasFile(e))return;
     var cd=_whichCardDrop(e);
-    if(cd){ e.preventDefault(); return; }
+    if(cd){
+      e.preventDefault();
+      /* 카드 위면 오버레이 계속 유지 (자식 경계로 dragleave 나도 여기서 되살림) */
+      if(!lay.classList.contains('on')){ _setLayText(cd); lay.classList.add('on'); }
+      else if(lay._card!==cd){ _setLayText(cd); lay._card=cd; }  // 다른 카드로 이동 시 문구 교체
+      lay._card=cd;
+      return;
+    }
     if(_overForestDrop(e)){ return; }
     e.preventDefault();
+    if(!lay.classList.contains('on')){ _setLayText(null); lay.classList.add('on'); }
   });
-  window.addEventListener('dragleave',function(e){ e.preventDefault(); depth--; if(depth<=0){ depth=0; lay.classList.remove('on'); } });
+  window.addEventListener('dragleave',function(e){
+    e.preventDefault();
+    /* relatedTarget = 커서가 이동해 들어간 요소. null이면 창(문서) 밖으로 나간 것 = 진짜 종료 */
+    var to = e.relatedTarget;
+    if(to===null || to===undefined){
+      depth=0; lay.classList.remove('on'); lay._card=null;
+      return;
+    }
+    /* 문서 안에서 요소 간 이동은 무시 (오버레이 유지) — depth 방식 폐기 */
+  });
   window.addEventListener('drop',     function(e){
     var cd=_whichCardDrop(e);
     if(cd){
-      e.preventDefault(); depth=0; lay.classList.remove('on');
+      e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null;
       var files=e.dataTransfer&&e.dataTransfer.files;
       if(files&&files.length){
         if(cd.id==='forestDrop') forestUpload(files);
@@ -1360,8 +1384,8 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
       return;
     }
     /* 8번 페이지 나머지 = DXF 안 받음 */
-    if(_overForestDrop(e)){ e.preventDefault(); depth=0; lay.classList.remove('on'); return; }
-    e.preventDefault(); depth=0; lay.classList.remove('on');
+    if(_overForestDrop(e)){ e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; return; }
+    e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null;
     var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) loadDXFFile(f); });
   /* 드래그 지점이 산림청 zip 드롭존(또는 그 안)인지, 또는 8번 페이지 활성 중인지 */
   function _overForestDrop(e){
@@ -4889,6 +4913,54 @@ function _d8GetLoc(){
   return null;
 }
 
+/* ---------- 지질도 카드: 모암 자동조회 (KIGAM GetFeatureInfo via server) ---------- */
+/* 대표암상 → 채점표 모암 점수 매핑 */
+function _moamToScore(rock){
+  var s=String(rock||'');
+  /* 채점표: 퇴적암0 / 화성암(화강암류)5 / 변성암(천매암·점판암)12 / 변성암(편마암·편암)19 / 화성암(반암·안산암)56 */
+  if(/편마암|편암/.test(s)) return {v:'19', label:'변성암 (편마암류·편암류)'};
+  if(/천매암|점판암|슬레이트/.test(s)) return {v:'12', label:'변성암 (천매암·점판암)'};
+  if(/반암|안산암|유문암|현무암|화산암/.test(s)) return {v:'56', label:'화성암 (반암류·안산암류)'};
+  if(/화강암|섬록암|화강섬록암|花崗|섬장암|반려암|염기성암|심성암/.test(s)) return {v:'5', label:'화성암 (화강암류)'};
+  if(/이암|석회암|사암|셰일|역암|퇴적암|규암|처트/.test(s)) return {v:'0', label:'퇴적암'};
+  return null;  /* 판단 불가 */
+}
+
+function geoAutoMoam(){
+  var loc=_d8GetLoc();
+  if(!loc){ _dmsg('geoMsg','위에서 「작업 위치」를 검색하거나 허가지선을 먼저 만드세요','err'); return; }
+  _dmsg('geoMsg','⏳ KIGAM 지질도에서 모암 조회 중…','');
+  fetch('/api/kigam-moam?lat='+loc.lat+'&lng='+loc.lng)
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if(!j.ok){ _dmsg('geoMsg','❌ '+(j.msg||'조회 실패'),'err'); return; }
+      DATA8.geo.moam = j;   // 결과 저장 (보고서용)
+      /* 결과 카드 표시 */
+      var el=document.getElementById('geoMoamResult');
+      if(el){
+        el.style.display='';
+        el.innerHTML='<div style="background:var(--panel2);border:1px solid #0ea5e9;border-radius:8px;padding:9px 11px">'
+          +'<div style="font-size:12px;font-weight:800;color:#38bdf8;margin-bottom:4px">🪨 '+(j['대표암상']||'')+'</div>'
+          +'<div style="font-size:10px;color:var(--tx2);line-height:1.6">'
+          +'<b>지층</b> '+(j['지층']||'-')+'<br>'
+          +'<b>시대</b> '+(j['시대']||'-')+'<br>'
+          +'<b>기호</b> '+(j['기호']||'-')+' · <b>도폭</b> '+(j['도폭']||'-')
+          +'</div></div>';
+      }
+      /* 채점표 모암 드롭다운 자동 반영 */
+      var sc=_moamToScore(j['대표암상']);
+      var sel=document.getElementById('sel_moam');
+      if(sc && sel){
+        sel.value=sc.v;
+        if(typeof updateRiskTotal==='function') updateRiskTotal();
+        _dmsg('geoMsg','✅ 모암 「'+j['대표암상']+'」 → 채점표 '+sc.label+' 자동 반영','ok');
+      } else if(sel){
+        _dmsg('geoMsg','✅ 모암 조회됨 「'+j['대표암상']+'」 — 채점표에서 직접 선택하세요(자동판단 애매)','ok');
+      }
+    })
+    .catch(function(err){ _dmsg('geoMsg','❌ 서버 연결 실패: '+err,'err'); });
+}
+
 /* ---------- 지질도 카드: KIGAM 열기 (공용 작업위치 사용) ---------- */
 function geoOpenKigam(){
   function _open(lng, lat){
@@ -5045,7 +5117,7 @@ function _forestPolyLegend(ov){
   if(!keys.length) return '';
   var h='<div style="margin:2px 0 4px 24px;display:flex;flex-wrap:wrap;gap:4px 8px">';
   keys.slice(0,10).forEach(function(k){
-    h+='<span style="font-size:9px;color:var(--tx2);display:inline-flex;align-items:center;gap:3px"><span style="width:10px;height:10px;border-radius:2px;background:'+_forestColor(k)+';display:inline-block;border:1px solid rgba(255,255,255,.3)"></span>'+k+'</span>';
+    h+='<span style="font-size:9px;color:var(--tx2);display:inline-flex;align-items:center;gap:3px"><span style="width:10px;height:10px;border-radius:2px;background:'+_forestColor(k, ov.field)+';display:inline-block;border:1px solid rgba(255,255,255,.3)"></span>'+k+'</span>';
   });
   if(keys.length>10) h+='<span style="font-size:9px;color:var(--tx3)">외 '+(keys.length-10)+'종</span>';
   return h+'</div>';
@@ -5106,12 +5178,58 @@ function _forestShpToCanvas(r, kind){
 
 /* 속성값 → 색 (범례용, solid와 동일 hue) */
 var _fcolCache={};
-function _forestColor(val){
+/* ★ 산림청 임상도 공식 색표 (FGIS 범례 캡처에서 정밀 추출) — 속성값(한글) → RGB */
+var FOREST_OFFICIAL_COLORS = {
+  FRTP_NM: {  /* 임상별 */
+    '무립목지':'rgb(205,205,205)','비산림':'rgb(205,205,205)','무립목지/비산림':'rgb(205,205,205)',
+    '침엽수림':'rgb(2,123,0)','활엽수림':'rgb(3,211,0)','혼효림':'rgb(90,142,88)','죽림':'rgb(248,240,202)'
+  },
+  DMCLS_NM: {  /* 경급별 */
+    '치수':'rgb(252,213,181)','소경목':'rgb(250,192,144)','중경목':'rgb(228,108,10)','대경목':'rgb(152,72,7)'
+  },
+  DNST_NM: {  /* 밀도별 */
+    '소':'rgb(0,236,118)','중':'rgb(0,196,118)','밀':'rgb(0,156,118)'
+  },
+  AGCLS_NM: {  /* 영급별 */
+    '1영급':'rgb(53,130,53)','2영급':'rgb(63,140,63)','3영급':'rgb(73,150,73)','4영급':'rgb(83,160,83)',
+    '5영급':'rgb(93,170,93)','6영급':'rgb(103,180,103)','7영급':'rgb(129,193,129)','8영급':'rgb(146,202,146)','9영급':'rgb(173,215,173)'
+  },
+  KOFTR_NM: {  /* 수종별 47종 */
+    '기타침엽수':'rgb(129,94,41)','소나무':'rgb(165,145,104)','잣나무':'rgb(198,154,135)','낙엽송':'rgb(191,150,119)',
+    '리기다소나무':'rgb(146,107,44)','곰솔':'rgb(173,135,1)','전나무':'rgb(176,111,0)','편백나무':'rgb(177,91,0)',
+    '삼나무':'rgb(153,81,0)','가문비나무':'rgb(138,66,18)','비자나무':'rgb(198,125,0)','은행나무':'rgb(214,179,0)',
+    '기타활엽수':'rgb(198,235,97)','상수리나무':'rgb(222,248,41)','신갈나무':'rgb(193,220,7)','굴참나무':'rgb(149,169,5)',
+    '기타참나무류':'rgb(207,249,66)','오리나무':'rgb(230,243,0)','고로쇠나무':'rgb(230,233,16)','자작나무':'rgb(230,213,0)',
+    '박달나무':'rgb(230,200,0)','밤나무':'rgb(175,224,7)','물푸레나무':'rgb(137,175,5)','서어나무':'rgb(100,129,3)',
+    '때죽나무':'rgb(78,100,2)','호두나무':'rgb(218,237,154)','백합나무':'rgb(181,230,51)','포플러':'rgb(158,181,2)',
+    '벚나무':'rgb(131,188,34)','느티나무':'rgb(155,186,61)','층층나무':'rgb(118,169,32)','아까시나무':'rgb(0,149,55)',
+    '기타상록활엽수':'rgb(33,102,139)','가시나무':'rgb(179,225,172)','구실잣밤나무':'rgb(179,222,105)','녹나무':'rgb(179,220,16)',
+    '굴거리나무':'rgb(102,184,33)','황칠나무':'rgb(102,189,108)','사스레피나무':'rgb(102,194,165)','후박나무':'rgb(0,153,155)',
+    '새덕이':'rgb(0,146,112)','침활혼효림':'rgb(155,192,41)','죽림':'rgb(217,182,115)','미립목지':'rgb(204,204,204)',
+    '제지':'rgb(228,177,155)','관목덤불':'rgb(236,249,199)','비산림':'rgb(255,255,193)'
+  }
+};
+
+/* 공식 색표에서 조회 (필드+값). 없으면 null → 폴백(해시) */
+function _forestOfficialColor(field, val){
+  var tbl = FOREST_OFFICIAL_COLORS[field]; if(!tbl) return null;
+  var key = String(val==null?'':val).trim();
+  if(tbl[key]) return tbl[key];
+  /* 부분 매칭(공백·괄호 차이 대비): 값이 색표 키를 포함하거나 그 반대 */
+  for(var k in tbl){ if(key===k) return tbl[k]; }
+  for(var k2 in tbl){ if(key.indexOf(k2)>=0 || k2.indexOf(key)>=0){ if(key.length>0) return tbl[k2]; } }
+  return null;
+}
+
+/* 속성값 → 색 (field 주면 공식색 우선, 없으면 해시 폴백) */
+function _forestColor(val, field){
+  var off = field ? _forestOfficialColor(field, val) : null;
+  if(off) return off;
   var key=String(val||'');
   if(_fcolCache[key]) return _fcolCache[key];
   var h=0; for(var i=0;i<key.length;i++){ h=(h*31+key.charCodeAt(i))|0; }
   var hue=((h%360)+360)%360;
-  var c='hsl('+hue+',60%,55%)';   // solid와 같은 채도/명도 → 범례=지도 일치
+  var c='hsl('+hue+',60%,55%)';
   _fcolCache[key]=c; return c;
 }
 
@@ -5139,7 +5257,7 @@ function drawForestOverlays(){
         var s0=w2s(p.ring[0]); ctx.moveTo(s0.x,s0.y);
         for(var j=1;j<p.ring.length;j++){ var sj=w2s(p.ring[j]); ctx.lineTo(sj.x,sj.y); }
         ctx.closePath();
-        ctx.globalAlpha=alpha; ctx.fillStyle=_forestColorSolid(val); ctx.fill();
+        ctx.globalAlpha=alpha; ctx.fillStyle=_forestColorSolid(val, o.field); ctx.fill();
         ctx.globalAlpha=Math.min(1,alpha+0.35); ctx.lineWidth=0.8; ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.stroke();
       });
       /* 2) 값 라벨 (배율 충분할 때만, 폴리곤 중심에) */
@@ -5162,7 +5280,9 @@ function drawForestOverlays(){
 }
 /* 속성값 → 불투명 색 (채움은 globalAlpha로 조절하니 색 자체는 불투명) */
 var _fcolSolidCache={};
-function _forestColorSolid(val){
+function _forestColorSolid(val, field){
+  var off = field ? _forestOfficialColor(field, val) : null;
+  if(off) return off;
   var key=String(val||'');
   if(_fcolSolidCache[key]) return _fcolSolidCache[key];
   var h=0; for(var i=0;i<key.length;i++){ h=(h*31+key.charCodeAt(i))|0; }
