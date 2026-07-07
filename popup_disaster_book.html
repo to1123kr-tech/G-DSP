@@ -4714,6 +4714,7 @@ function forestApply(results, errors){
 /* 겹침 레이어 표시 토글 */
 function _ovToggle(key, on){ if(DATA8.overlays[key]){ DATA8.overlays[key].visible=on; if(typeof render==='function') render(); } }
 
+<<<<<<< HEAD
 /* 산사태 PNG → Image 로드 + bounds를 5186으로 변환 (지도에 얹기 준비) */
 function _forestSansataeToCanvas(r){
   var ov = {kind:'sansatae', bounds:r.bounds, legend:r.legend, grade_counts:r.grade_counts,
@@ -4788,6 +4789,15 @@ function drawForestOverlays(){
       ctx.restore();
     }
   });
+=======
+/* [다음 단계 구현 예정] 산사태 PNG → 캔버스 좌표 매핑 */
+function _forestSansataeToCanvas(r){
+  return {kind:'sansatae', png:r.png_base64, bounds:r.bounds, legend:r.legend, visible:true, _raw:r};
+}
+/* [다음 단계 구현 예정] shp GeoJSON(WGS84) → 캔버스 폴리곤(5186) */
+function _forestShpToCanvas(r, kind){
+  return {kind:kind, geojson:r.geojson, fields:r.fields, visible:true, _raw:r};
+>>>>>>> 4a42262b3db05dfccaaa7380fafd227dfd7866f2
 }
 
 /* ---------- 강우 카드: 관측소 자동 + 엑셀 ---------- */
