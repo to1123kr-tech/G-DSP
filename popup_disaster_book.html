@@ -478,13 +478,21 @@
         </label>
         <div style="display:flex;align-items:center;gap:8px;margin-top:6px;margin-left:18px">
           <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx2);cursor:pointer">
-            <input type="checkbox" id="streamArrowToggle" onchange="S.streamArrows=this.checked;render()"> ➤ 물길 방향 화살표
+            <input type="checkbox" id="streamArrowToggle" onchange="S.streamArrows=this.checked;var w=document.getElementById('streamArrowModeWrap');if(w)w.style.display=this.checked?'block':'none';render()"> ➤ 물길 방향 화살표
           </label>
           <span style="display:inline-flex;align-items:center;gap:3px;margin-left:auto">
             <button class="thr" onclick="bumpStreamArrow(-1)" style="padding:2px 7px;font-size:13px;line-height:1">−</button>
             <span id="streamArrowSzVal" style="font-size:10px;color:var(--tx3);min-width:26px;text-align:center">100%</span>
             <button class="thr" onclick="bumpStreamArrow(1)" style="padding:2px 7px;font-size:13px;line-height:1">+</button>
           </span>
+        </div>
+        <div id="streamArrowModeWrap" style="display:none;margin-top:6px;margin-left:18px">
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+            <span style="font-size:10.5px;color:var(--tx3)">모양</span>
+            <button class="thr on" id="stArrM_head" onclick="setStreamArrowMode('head')" title="화살촉 (선 위에 삼각형)" style="padding:3px 8px;font-size:10px">화살촉</button>
+            <button class="thr" id="stArrM_chevron" onclick="setStreamArrowMode('chevron')" title="화살표선 (선을 따라 연속 갈매기)" style="padding:3px 8px;font-size:10px">화살표선 ›››</button>
+          </div>
+          <div style="font-size:9px;color:#5b7290;margin-top:3px;line-height:1.3">화살표선: 물길 선 자체가 방향을 따라 연속 화살표로 그려짐</div>
         </div>
         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:8px;cursor:pointer">
           <input type="checkbox" id="arrowToggle" onchange="S.showArrows=this.checked;render()"> 흐름 화살표 (D8) <span style="color:var(--tx3);font-size:11px">(확대 시)</span>
@@ -1912,9 +1920,36 @@ function render(){
       ctx.stroke();
     });
     ctx.lineCap='butt'; ctx.setLineDash([]);
-    /* ★ 하천 방향 화살촉 (토글) — 물길 위에서 잘 보이게 흰색+테두리, 크기 조절 */
+    /* ★ 하천 방향 화살촉/화살표선 (토글) — 물길 위에서 잘 보이게 */
     if(S.streamArrows){
       var _saz=S.streamArrowSz||1;                                   // 크기 배율
+      var _saMode=S.streamArrowMode||'head';
+      if(_saMode==='chevron'){
+        /* 화살표선: 물길 선을 따라 갈매기(›)를 촘촘히 그림 → 선 자체가 방향 표시 */
+        var _chGap=Math.max(2, Math.round(12*_saz/(S.scale*fl.cell)));  // 갈매기 간격(셀)
+        var _chSz=Math.max(3.5,Math.min(11,S.scale*fl.cell*0.42))*_saz; // 갈매기 크기
+        ctx.lineWidth=Math.max(1.2, _chSz*0.32); ctx.strokeStyle=_sts.color;
+        ctx.lineCap='round'; ctx.lineJoin='round';
+        ctx.beginPath();
+        for(var ci=0;ci<sm.length;ci++){
+          if(!sm[ci]||fa[ci]<thr*2) continue;                        // 물길(2차수 이상)
+          var cc3=ci%fl.cols, rr3=(ci/fl.cols)|0;
+          if((cc3+rr3)%_chGap!==0) continue;
+          var code3=fl.fdir[ci]; if(code3<=0) continue;
+          var dd3=_step(code3); if(!dd3) continue;
+          var pa3=w2s({x:fl.minX+cc3*fl.cell,y:fl.minY+rr3*fl.cell});
+          var pb3=w2s({x:fl.minX+(cc3+dd3[0])*fl.cell,y:fl.minY+(rr3+dd3[1])*fl.cell});
+          var ang3=Math.atan2(pb3.y-pa3.y,pb3.x-pa3.x);
+          var mx3=(pa3.x+pb3.x)/2, my3=(pa3.y+pb3.y)/2;
+          /* 갈매기: 진행방향 앞쪽 꼭지 + 뒤로 벌어진 두 팔 */
+          var tipx=mx3+_chSz*0.6*Math.cos(ang3), tipy=my3+_chSz*0.6*Math.sin(ang3);
+          ctx.moveTo(tipx-_chSz*Math.cos(ang3-0.5), tipy-_chSz*Math.sin(ang3-0.5));
+          ctx.lineTo(tipx, tipy);
+          ctx.lineTo(tipx-_chSz*Math.cos(ang3+0.5), tipy-_chSz*Math.sin(ang3+0.5));
+        }
+        ctx.stroke();
+        ctx.lineCap='butt'; ctx.lineJoin='miter';
+      } else {
       var _saStep=Math.max(2, Math.round(34*_saz/ (S.scale*fl.cell) ));  // 크면 간격도 넓게(겹침 방지)
       for(var si2=0;si2<sm.length;si2++){
         if(!sm[si2]||fa[si2]<thr*2) continue;                        // 물길(2차수 이상)
@@ -1933,6 +1968,7 @@ function render(){
         ctx.closePath();
         ctx.fillStyle='#ffffff'; ctx.fill();
         ctx.lineWidth=Math.max(1,_saz); ctx.strokeStyle='rgba(20,40,80,0.9)'; ctx.stroke();
+      }
       }
     }
   }
@@ -2737,7 +2773,14 @@ function setArrowStyle(s){ S.arrowStyle=s; ['line','solid','tri','chevron','dot'
 function bumpStreamArrow(dir){
   var v=(S.streamArrowSz||1)+dir*0.25; v=Math.max(0.5,Math.min(3,Math.round(v*100)/100)); S.streamArrowSz=v;
   var e=document.getElementById('streamArrowSzVal'); if(e)e.textContent=Math.round(v*100)+'%';
-  if(!S.streamArrows){ var t=document.getElementById('streamArrowToggle'); if(t){t.checked=true; S.streamArrows=true;} }
+  if(!S.streamArrows){ var t=document.getElementById('streamArrowToggle'); if(t){t.checked=true; S.streamArrows=true;} var w=document.getElementById('streamArrowModeWrap'); if(w)w.style.display='block'; }
+  render();
+}
+/* 하천 화살표 모양: head(화살촉) / chevron(화살표선) */
+function setStreamArrowMode(m){
+  S.streamArrowMode=m;
+  ['head','chevron'].forEach(function(k){ var b=document.getElementById('stArrM_'+k); if(b) b.className='thr'+(k===m?' on':''); });
+  if(!S.streamArrows){ var t=document.getElementById('streamArrowToggle'); if(t){t.checked=true; S.streamArrows=true;} var w=document.getElementById('streamArrowModeWrap'); if(w)w.style.display='block'; }
   render();
 }
 /* 무지개 7색 램프 (옅음→진함) */
