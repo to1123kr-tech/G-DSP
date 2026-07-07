@@ -489,10 +489,11 @@
         <div id="streamArrowModeWrap" style="display:none;margin-top:6px;margin-left:18px">
           <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
             <span style="font-size:10.5px;color:var(--tx3)">모양</span>
-            <button class="thr on" id="stArrM_head" onclick="setStreamArrowMode('head')" title="화살촉 (선 위에 삼각형)" style="padding:3px 8px;font-size:10px">화살촉</button>
-            <button class="thr" id="stArrM_chevron" onclick="setStreamArrowMode('chevron')" title="화살표선 (선을 따라 연속 갈매기)" style="padding:3px 8px;font-size:10px">화살표선 ›››</button>
+            <button class="thr on" id="stArrM_head" onclick="setStreamArrowMode('head')" title="화살촉 (선 위에 삼각형, 작게)" style="padding:3px 8px;font-size:10px">화살촉</button>
+            <button class="thr" id="stArrM_chevron" onclick="setStreamArrowMode('chevron')" title="화살표선 (선을 따라 갈매기)" style="padding:3px 8px;font-size:10px">화살표선 ›››</button>
+            <button class="thr" id="stArrM_flow" onclick="setStreamArrowMode('flow')" title="흐르는 애니메이션 (작은 화살표가 물길 따라 흐름)" style="padding:3px 8px;font-size:10px">흐름 💧</button>
           </div>
-          <div style="font-size:9px;color:#5b7290;margin-top:3px;line-height:1.3">화살표선: 물길 선 자체가 방향을 따라 연속 화살표로 그려짐</div>
+          <div id="stArrModeHint" style="font-size:9px;color:#5b7290;margin-top:3px;line-height:1.3">화살촉: 선 위 작은 삼각형 (정지)</div>
         </div>
         <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--tx2);margin-top:8px;cursor:pointer">
           <input type="checkbox" id="arrowToggle" onchange="S.showArrows=this.checked;render()"> 흐름 화살표 (D8) <span style="color:var(--tx3);font-size:11px">(확대 시)</span>
@@ -1920,19 +1921,19 @@ function render(){
       ctx.stroke();
     });
     ctx.lineCap='butt'; ctx.setLineDash([]);
-    /* ★ 하천 방향 화살촉/화살표선 (토글) — 물길 위에서 잘 보이게 */
+    /* ★ 하천 방향 표시 (토글) — head(작은화살촉) / chevron(화살표선) / flow(흐름) */
     if(S.streamArrows){
       var _saz=S.streamArrowSz||1;                                   // 크기 배율
       var _saMode=S.streamArrowMode||'head';
       if(_saMode==='chevron'){
-        /* 화살표선: 물길 선을 따라 갈매기(›)를 촘촘히 그림 → 선 자체가 방향 표시 */
-        var _chGap=Math.max(2, Math.round(12*_saz/(S.scale*fl.cell)));  // 갈매기 간격(셀)
-        var _chSz=Math.max(3.5,Math.min(11,S.scale*fl.cell*0.42))*_saz; // 갈매기 크기
+        /* 화살표선: 물길 선을 따라 갈매기(›)를 촘촘히 그림 */
+        var _chGap=Math.max(2, Math.round(12*_saz/(S.scale*fl.cell)));
+        var _chSz=Math.max(3.5,Math.min(11,S.scale*fl.cell*0.42))*_saz;
         ctx.lineWidth=Math.max(1.2, _chSz*0.32); ctx.strokeStyle=_sts.color;
         ctx.lineCap='round'; ctx.lineJoin='round';
         ctx.beginPath();
         for(var ci=0;ci<sm.length;ci++){
-          if(!sm[ci]||fa[ci]<thr*2) continue;                        // 물길(2차수 이상)
+          if(!sm[ci]||fa[ci]<thr*2) continue;
           var cc3=ci%fl.cols, rr3=(ci/fl.cols)|0;
           if((cc3+rr3)%_chGap!==0) continue;
           var code3=fl.fdir[ci]; if(code3<=0) continue;
@@ -1941,7 +1942,6 @@ function render(){
           var pb3=w2s({x:fl.minX+(cc3+dd3[0])*fl.cell,y:fl.minY+(rr3+dd3[1])*fl.cell});
           var ang3=Math.atan2(pb3.y-pa3.y,pb3.x-pa3.x);
           var mx3=(pa3.x+pb3.x)/2, my3=(pa3.y+pb3.y)/2;
-          /* 갈매기: 진행방향 앞쪽 꼭지 + 뒤로 벌어진 두 팔 */
           var tipx=mx3+_chSz*0.6*Math.cos(ang3), tipy=my3+_chSz*0.6*Math.sin(ang3);
           ctx.moveTo(tipx-_chSz*Math.cos(ang3-0.5), tipy-_chSz*Math.sin(ang3-0.5));
           ctx.lineTo(tipx, tipy);
@@ -1949,22 +1949,49 @@ function render(){
         }
         ctx.stroke();
         ctx.lineCap='butt'; ctx.lineJoin='miter';
+      } else if(_saMode==='flow'){
+        /* 흐름 애니메이션: 작은 화살표가 물길을 따라 흘러감 (시간에 따라 위치 이동) */
+        var _t=(Date.now()%1600)/1600;                               // 0~1 주기
+        var _flGap=Math.max(3, Math.round(20*_saz/(S.scale*fl.cell)));// 화살표 간격(셀)
+        var _flSz=Math.max(3,Math.min(9,S.scale*fl.cell*0.4))*_saz;   // 작은 화살표 크기
+        ctx.fillStyle='#dff1ff';
+        for(var fi=0;fi<sm.length;fi++){
+          if(!sm[fi]||fa[fi]<thr*2) continue;
+          var cf=fi%fl.cols, rf=(fi/fl.cols)|0;
+          if((cf+rf)%_flGap!==0) continue;
+          var codef=fl.fdir[fi]; if(codef<=0) continue;
+          var ddf=_step(codef); if(!ddf) continue;
+          var paf=w2s({x:fl.minX+cf*fl.cell,y:fl.minY+rf*fl.cell});
+          var pbf=w2s({x:fl.minX+(cf+ddf[0])*fl.cell,y:fl.minY+(rf+ddf[1])*fl.cell});
+          var angf=Math.atan2(pbf.y-paf.y,pbf.x-paf.x);
+          /* 셀 안에서 _t만큼 진행한 위치 (흐르는 효과) */
+          var px=paf.x+(pbf.x-paf.x)*_t, py=paf.y+(pbf.y-paf.y)*_t;
+          /* 작은 삼각형 화살표 */
+          ctx.beginPath();
+          ctx.moveTo(px+_flSz*Math.cos(angf), py+_flSz*Math.sin(angf));
+          ctx.lineTo(px-_flSz*0.7*Math.cos(angf-0.6), py-_flSz*0.7*Math.sin(angf-0.6));
+          ctx.lineTo(px-_flSz*0.7*Math.cos(angf+0.6), py-_flSz*0.7*Math.sin(angf+0.6));
+          ctx.closePath(); ctx.fill();
+        }
+        /* 애니메이션 계속 (흐름 모드일 때만 루프) */
+        if(!S._flowAnim){ S._flowAnim=true; requestAnimationFrame(function(){ S._flowAnim=false; if(S.streamArrows&&S.streamArrowMode==='flow') render(); }); }
       } else {
-      var _saStep=Math.max(2, Math.round(34*_saz/ (S.scale*fl.cell) ));  // 크면 간격도 넓게(겹침 방지)
+      /* head: 작은 화살촉 (기존보다 작게) */
+      var _saStep=Math.max(2, Math.round(30*_saz/ (S.scale*fl.cell) ));
       for(var si2=0;si2<sm.length;si2++){
-        if(!sm[si2]||fa[si2]<thr*2) continue;                        // 물길(2차수 이상)
+        if(!sm[si2]||fa[si2]<thr*2) continue;
         var cc2=si2%fl.cols, rr2=(si2/fl.cols)|0;
-        if((cc2+rr2)%_saStep!==0) continue;                          // 공간 주기(모든 지류에 고르게)
+        if((cc2+rr2)%_saStep!==0) continue;
         var code2=fl.fdir[si2]; if(code2<=0) continue;
         var dd=_step(code2); if(!dd) continue;
         var pa2=w2s({x:fl.minX+cc2*fl.cell,y:fl.minY+rr2*fl.cell});
         var pb2=w2s({x:fl.minX+(cc2+dd[0])*fl.cell,y:fl.minY+(rr2+dd[1])*fl.cell});
         var mang=Math.atan2(pb2.y-pa2.y,pb2.x-pa2.x);
-        var mx=(pa2.x+pb2.x)/2, my=(pa2.y+pb2.y)/2, ah=Math.max(6,Math.min(22,S.scale*fl.cell*0.65))*_saz;
+        var mx=(pa2.x+pb2.x)/2, my=(pa2.y+pb2.y)/2, ah=Math.max(4,Math.min(12,S.scale*fl.cell*0.4))*_saz;  // 작게(0.65→0.4, 상한22→12)
         ctx.beginPath();
         ctx.moveTo(mx+ah*Math.cos(mang), my+ah*Math.sin(mang));
-        ctx.lineTo(mx-ah*0.75*Math.cos(mang-0.5), my-ah*0.75*Math.sin(mang-0.5));
-        ctx.lineTo(mx-ah*0.75*Math.cos(mang+0.5), my-ah*0.75*Math.sin(mang+0.5));
+        ctx.lineTo(mx-ah*0.7*Math.cos(mang-0.55), my-ah*0.7*Math.sin(mang-0.55));
+        ctx.lineTo(mx-ah*0.7*Math.cos(mang+0.55), my-ah*0.7*Math.sin(mang+0.55));
         ctx.closePath();
         ctx.fillStyle='#ffffff'; ctx.fill();
         ctx.lineWidth=Math.max(1,_saz); ctx.strokeStyle='rgba(20,40,80,0.9)'; ctx.stroke();
@@ -2776,10 +2803,12 @@ function bumpStreamArrow(dir){
   if(!S.streamArrows){ var t=document.getElementById('streamArrowToggle'); if(t){t.checked=true; S.streamArrows=true;} var w=document.getElementById('streamArrowModeWrap'); if(w)w.style.display='block'; }
   render();
 }
-/* 하천 화살표 모양: head(화살촉) / chevron(화살표선) */
+/* 하천 화살표 모양: head(작은 화살촉) / chevron(화살표선) / flow(흐름 애니메이션) */
 function setStreamArrowMode(m){
   S.streamArrowMode=m;
-  ['head','chevron'].forEach(function(k){ var b=document.getElementById('stArrM_'+k); if(b) b.className='thr'+(k===m?' on':''); });
+  ['head','chevron','flow'].forEach(function(k){ var b=document.getElementById('stArrM_'+k); if(b) b.className='thr'+(k===m?' on':''); });
+  var hints={head:'화살촉: 선 위 작은 삼각형 (정지)', chevron:'화살표선: 물길 선을 따라 연속 화살표', flow:'흐름: 작은 화살표가 물길 따라 흘러감 (캡처 타이밍마다 위치 달라짐)'};
+  var he=document.getElementById('stArrModeHint'); if(he) he.textContent=hints[m]||'';
   if(!S.streamArrows){ var t=document.getElementById('streamArrowToggle'); if(t){t.checked=true; S.streamArrows=true;} var w=document.getElementById('streamArrowModeWrap'); if(w)w.style.display='block'; }
   render();
 }
