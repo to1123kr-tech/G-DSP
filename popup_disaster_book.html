@@ -219,8 +219,8 @@
   .dbtn:hover{border-color:#2a6ea8;color:var(--tx)}
   .dbtn.pri{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#06121f;font-weight:700;border-color:transparent}
   .dbtn.pri:hover{opacity:.9}
-  .ddrop{border:1.5px dashed #2b4a6b;border-radius:9px;padding:14px;text-align:center;font-size:11px;color:var(--tx3);
-    cursor:pointer;transition:.12s;background:rgba(56,189,248,.02)}
+  .ddrop{border:1.5px dashed #2b4a6b;border-radius:9px;padding:7px 14px;text-align:center;font-size:11px;color:var(--tx3);
+    cursor:pointer;transition:.12s;background:rgba(56,189,248,.02);line-height:1.35}
   .ddrop:hover,.ddrop.drag{border-color:#38bdf8;background:rgba(56,189,248,.08);color:var(--tx2)}
   .dhint{font-size:9.5px;color:#5b7290;line-height:1.5;margin-top:5px}
   .dinp{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:11px;color:var(--tx);width:100%}
@@ -703,12 +703,12 @@
           <span class="st">KIGAM 캡처</span>
         </div>
         <div class="dcard-bd" id="dcb_geo">
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <button class="dbtn pri" onclick="geoOpenKigam()">🔗 KIGAM 지질도 열기</button>
-            <button class="dbtn" onclick="document.getElementById('geoImg').click()">📷 캡처 올리기</button>
+          <button class="dbtn pri" onclick="geoOpenKigam()" style="width:100%;margin-bottom:6px">🔗 KIGAM 지질도 열기</button>
+          <div class="ddrop" id="geoDrop" onclick="document.getElementById('geoImg').click()">
+            📷 지질도 캡처를 여기 놓거나 클릭<br><span style="font-size:9.5px">화면 캡처 이미지 (첨부만·정합 안 함)</span>
           </div>
           <input type="file" id="geoImg" accept="image/*" style="display:none" onchange="geoCapture(this.files)">
-          <div class="dhint">위 「작업 위치」로 지질도가 열립니다 · 5만 지질도 켜진 채 → 화면 캡처 후 올리기</div>
+          <div class="dhint">위 「작업 위치」로 지질도가 열립니다 · 5만 지질도 켜진 채 화면 캡처 → 여기 올리기</div>
           <div id="geoMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
       </div>
@@ -722,18 +722,17 @@
           <span class="st">WAMIS 확률강우량</span>
         </div>
         <div class="dcard-bd off" id="dcb_rain">
-          <div id="rainStation" style="font-size:10.5px;color:var(--tx2);margin-bottom:7px;display:none"></div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px">
-            <button class="dbtn" onclick="rainFindStation()">📍 가까운 관측소 찾기</button>
-            <button class="dbtn" onclick="document.getElementById('rainXlsx').click()">📂 확률강우량 엑셀</button>
+          <button class="dbtn pri" onclick="rainOpenWamis()" style="width:100%;margin-bottom:6px">🔗 WAMIS 열기 (확률강우량 다운로드)</button>
+          <div class="ddrop" id="rainDrop" onclick="document.getElementById('rainXlsx').click()">
+            📂 받은 엑셀을 여기 놓거나 클릭<br><span style="font-size:9.5px">확률강우량_지역빈도해석_.xlsx</span>
           </div>
           <input type="file" id="rainXlsx" accept=".xlsx,.xls" style="display:none" onchange="rainUpload(this.files)">
-          <div id="rainResult" style="display:none"></div>
-          <div class="dhint" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <a href="http://www.wamis.go.kr/wsc/wsc_frequency.do" target="_blank" style="background:#1e3a5f;color:#38bdf8;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;font-size:10px">🔗 WAMIS 강우분석</a>
+          <div class="dhint" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px">
             <a href="#" onclick="openRainGuide();return false;" style="background:#fbbf24;color:#1a1400;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;font-size:10px">📖 다운로드 방법</a>
+            <span style="font-size:9.5px;color:#5b7290">뭘 받아야 할지 모르면 클릭</span>
           </div>
-          <div class="dhint" style="margin-top:5px">① 관측소 찾기 → ② WAMIS에서 「확률강우량」 받기 → ③ 엑셀 올리면 자동 (100년 빈도)</div>
+          <div id="rainStation" style="font-size:10.5px;color:var(--tx2);margin-top:8px;display:none"></div>
+          <div id="rainResult" style="display:none;margin-top:6px"></div>
           <div id="rainMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
       </div>
@@ -747,12 +746,12 @@
           <span class="st">참고 (있을 시)</span>
         </div>
         <div class="dcard-bd off" id="dcb_ground">
-          <div style="display:flex;gap:5px;flex-wrap:wrap">
-            <a class="dbtn pri" href="https://www.geoinfo.or.kr" target="_blank">🔗 국토지반정보 열기</a>
-            <button class="dbtn" onclick="document.getElementById('groundImg').click()">📷 캡처 올리기</button>
+          <a class="dbtn pri" href="https://www.geoinfo.or.kr" target="_blank" style="display:block;width:100%;box-sizing:border-box;margin-bottom:6px">🔗 국토지반정보 열기</a>
+          <div class="ddrop" id="groundDrop" onclick="document.getElementById('groundImg').click()">
+            📷 시추 기록 캡처를 여기 놓거나 클릭<br><span style="font-size:9.5px">화면 캡처 이미지 (첨부만·정합 안 함)</span>
           </div>
           <input type="file" id="groundImg" accept="image/*" style="display:none" onchange="groundCapture(this.files)">
-          <div class="dhint">인근 시추 기록이 있으면 캡처해서 올리세요 (첨부만·정합 안 함) · 대부분 산지는 자료 없음(스킵 가능) · 재해검토 필수 아님</div>
+          <div class="dhint">인근 시추 기록 있으면 캡처해서 올리기 · 대부분 산지는 자료 없음(스킵 가능) · 필수 아님</div>
           <div id="groundMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
       </div>
@@ -1298,17 +1297,75 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
   var lay=document.getElementById('droplay'), depth=0;
   var dz=document.getElementById('dropzone');
   function hasFile(e){ return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types||[],'Files')>=0; }
-  window.addEventListener('dragenter',function(e){ if(!hasFile(e))return; if(_overForestDrop(e))return; e.preventDefault(); depth++; lay.classList.add('on'); });
-  window.addEventListener('dragover', function(e){ if(!hasFile(e))return; if(_overForestDrop(e)){ return; } e.preventDefault(); });
+  /* 8번 카드 드롭존 정의: id → {handler, accept, 오버레이문구} */
+  var CARD_DROPS=[
+    {id:'forestDrop', ic:'🌲', t:'산림청 zip을 놓으세요', s:'산사태·임상·토양 (여러 개 가능)'},
+    {id:'geoDrop',    ic:'🪨', t:'지질도 캡처를 놓으세요', s:'KIGAM 화면 캡처 이미지'},
+    {id:'rainDrop',   ic:'🌧️', t:'확률강우량 엑셀을 놓으세요', s:'WAMIS에서 받은 .xlsx'},
+    {id:'groundDrop', ic:'⛏️', t:'시추 기록 캡처를 놓으세요', s:'국토지반정보 화면 캡처'}
+  ];
+  /* 드래그가 어느 카드 드롭존 위인지 (없으면 null) */
+  function _whichCardDrop(e){
+    var t=e.target;
+    while(t){
+      for(var i=0;i<CARD_DROPS.length;i++){
+        if(t.id===CARD_DROPS[i].id) return CARD_DROPS[i];
+      }
+      /* 카드 본문(dcb_*) 전체를 드롭존으로 — 칸 작으니 카드 어디든 OK */
+      if(t.id==='dcb_forest') return CARD_DROPS[0];
+      if(t.id==='dcb_geo')    return CARD_DROPS[1];
+      if(t.id==='dcb_rain')   return CARD_DROPS[2];
+      if(t.id==='dcb_ground') return CARD_DROPS[3];
+      /* 카드 래퍼(dc_*)도 포함 */
+      if(t.id==='dc_forest') return CARD_DROPS[0];
+      if(t.id==='dc_geo')    return CARD_DROPS[1];
+      if(t.id==='dc_rain')   return CARD_DROPS[2];
+      if(t.id==='dc_ground') return CARD_DROPS[3];
+      t=t.parentNode;
+    }
+    return null;
+  }
+  /* 오버레이 문구를 카드별로 바꿈 */
+  function _setLayText(cd){
+    var ic=lay.querySelector('.ic'), tt=lay.querySelector('.t'), ss=lay.querySelector('.s');
+    if(cd){ if(ic)ic.textContent=cd.ic; if(tt)tt.textContent=cd.t; if(ss)ss.textContent=cd.s; }
+    else  { if(ic)ic.textContent='⬇'; if(tt)tt.textContent='여기에 DXF를 놓으세요'; if(ss)ss.textContent='수치지형도 _분석용.dxf'; }
+  }
+  window.addEventListener('dragenter',function(e){
+    if(!hasFile(e))return;
+    var cd=_whichCardDrop(e);
+    if(cd){ e.preventDefault(); depth++; _setLayText(cd); lay.classList.add('on'); return; }
+    if(_overForestDrop(e)) return;   // 8번 페이지 나머지 = DXF 안 받음
+    e.preventDefault(); depth++; _setLayText(null); lay.classList.add('on');
+  });
+  window.addEventListener('dragover', function(e){
+    if(!hasFile(e))return;
+    var cd=_whichCardDrop(e);
+    if(cd){ e.preventDefault(); return; }
+    if(_overForestDrop(e)){ return; }
+    e.preventDefault();
+  });
   window.addEventListener('dragleave',function(e){ e.preventDefault(); depth--; if(depth<=0){ depth=0; lay.classList.remove('on'); } });
   window.addEventListener('drop',     function(e){
-    /* 8번 산림청 zip 드롭존 위면 전역 DXF 처리 안 함 (그쪽 핸들러가 받음) */
-    if(_overForestDrop(e)){ return; }
+    var cd=_whichCardDrop(e);
+    if(cd){
+      e.preventDefault(); depth=0; lay.classList.remove('on');
+      var files=e.dataTransfer&&e.dataTransfer.files;
+      if(files&&files.length){
+        if(cd.id==='forestDrop') forestUpload(files);
+        else if(cd.id==='geoDrop') geoCapture(files);
+        else if(cd.id==='rainDrop') rainUpload(files);
+        else if(cd.id==='groundDrop') groundCapture(files);
+      }
+      return;
+    }
+    /* 8번 페이지 나머지 = DXF 안 받음 */
+    if(_overForestDrop(e)){ e.preventDefault(); depth=0; lay.classList.remove('on'); return; }
     e.preventDefault(); depth=0; lay.classList.remove('on');
     var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) loadDXFFile(f); });
   /* 드래그 지점이 산림청 zip 드롭존(또는 그 안)인지, 또는 8번 페이지 활성 중인지 */
   function _overForestDrop(e){
-    /* 8번(자료 겹치기) 페이지에서는 DXF 안 받음 — 산림청 zip 전용 */
+    /* 8번(자료 겹치기) 페이지에서는 DXF 안 받음 — 카드 드롭 전용 */
     if(typeof BOOK!=='undefined' && BOOK.page===8) return true;
     var fd=document.getElementById('forestDrop');
     if(!fd) return false;
@@ -4876,22 +4933,7 @@ function groundCapture(files){
 }
 
 /* ---------- 산림청 카드: zip 업로드 → /api/forest-parse ---------- */
-/* 드롭존에 드래그&드롭 연결 (페이지 로드 시 1회) */
-(function _initForestDrop(){
-  function bind(){
-    var fd=document.getElementById('forestDrop');
-    if(!fd){ setTimeout(bind, 300); return; }
-    fd.addEventListener('dragover', function(e){ e.preventDefault(); e.stopPropagation(); fd.classList.add('drag'); });
-    fd.addEventListener('dragleave', function(e){ e.preventDefault(); e.stopPropagation(); fd.classList.remove('drag'); });
-    fd.addEventListener('drop', function(e){
-      e.preventDefault(); e.stopPropagation(); fd.classList.remove('drag');
-      var files=e.dataTransfer && e.dataTransfer.files;
-      if(files && files.length) forestUpload(files);
-    });
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', bind);
-  else bind();
-})();
+/* (드롭 처리는 전역 카드 드롭 핸들러가 통합 관리 — 개별 핸들러 제거해 오버레이·일관성 확보) */
 
 function forestUpload(files){
   if(!files || !files.length) return;
@@ -5176,12 +5218,23 @@ function rainSelectStation(idx){
   if(DATA8.rain.data){ rainShowResult(); }
 }
 
-/* 확률강우량 엑셀 업로드 → 관측소코드로 값 찾기 (SheetJS 필요) */
+/* WAMIS 강우분석 페이지 열기 (확률강우량 다운로드 안내) */
+function rainOpenWamis(){
+  window.open('http://www.wamis.go.kr/wsc/wsc_frequency.do','_blank');
+  _dmsg('rainMsg','🔗 WAMIS를 열었어요 — 「확률 강우량 다운로드」 받아서 아래에 올리세요 (모르면 📖 다운로드 방법)','ok');
+}
+
+/* 확률강우량 엑셀 업로드 → 관측소 자동 찾기 → 값 분석 (원스톱) */
 function rainUpload(files){
   if(!files || !files.length) return;
-  if(!DATA8.rain.station){ _dmsg('rainMsg','먼저 「가까운 관측소 찾기」를 하세요','err'); return; }
+  /* 관측소 아직 안 찾았으면 작업위치로 자동 찾기 */
+  if(!DATA8.rain.station){
+    var loc=_d8GetLoc();
+    if(!loc){ _dmsg('rainMsg','먼저 위 「작업 위치」를 검색하거나 허가지선을 만드세요','err'); return; }
+    _rainFindAt(loc.lng, loc.lat);   // 관측소 2곳 찾고 0번 선택
+    if(!DATA8.rain.station){ _dmsg('rainMsg','관측소를 찾지 못했어요','err'); return; }
+  }
   _dmsg('rainMsg','⏳ 엑셀 분석 중…','');
-  // SheetJS 동적 로드
   _ensureXLSX(function(ok){
     if(!ok){ _dmsg('rainMsg','엑셀 라이브러리 로드 실패','err'); return; }
     var rd=new FileReader();
@@ -5222,6 +5275,25 @@ function rainShowResult(){
   var pick = d.find(function(x){return +x.rt===100;}) || d[d.length-1];
   var I = pick.h[0];   // 1시간 값 (mm) = 강우강도 mm/hr
   DATA8.rain.I = I; DATA8.rain.rt = pick.rt;
+
+  /* 관측소 선택 근거 표시 (후보 2곳 거리 비교 + 왜 이걸 골랐나) */
+  var stEl=document.getElementById('rainStation');
+  var cand=DATA8.rain.candidates, chosen=DATA8.rain.station;
+  if(stEl && cand && cand.length){
+    stEl.style.display='';
+    var rows = cand.map(function(t,idx){
+      var isSel=(chosen && t.s.c===chosen.c);
+      return '<label style="display:flex;align-items:flex-start;gap:7px;padding:6px 8px;border:1px solid '+(isSel?'#0ea5e9':'var(--line)')+';border-radius:7px;margin-bottom:4px;background:'+(isSel?'rgba(56,189,248,0.1)':'var(--panel)')+';cursor:pointer">'
+        + '<input type="radio" name="rainSt" '+(isSel?'checked':'')+' onchange="rainSelectStation('+idx+')" style="margin-top:2px">'
+        + '<span style="flex:1"><b style="color:var(--tx)">'+t.s.n+'</b>'
+        + (idx===0?' <span style="color:#34d399;font-size:9px">← 가장 가까움</span>':'')
+        + '<br><span style="font-size:9.5px;color:var(--tx3)">직선거리 '+t.d.toFixed(1)+'km · 코드 '+t.s.c+'</span></span></label>';
+    }).join('');
+    stEl.innerHTML = '<div style="font-size:10px;color:var(--tx3);margin-bottom:5px">📍 작업위치 기준 가까운 관측소 (거리순 · 클릭해서 변경 가능)</div>'
+      + rows
+      + '<div style="font-size:9px;color:#5b7290;margin-top:3px">→ 가장 가까운 <b style="color:#7cc5ff">'+(chosen?chosen.n:'')+'</b> 관측소로 분석했습니다</div>';
+  }
+
   var el=document.getElementById('rainResult');
   if(el){
     el.style.display='';
