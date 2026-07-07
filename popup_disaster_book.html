@@ -1258,8 +1258,10 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
     if(_overForestDrop(e)){ return; }
     e.preventDefault(); depth=0; lay.classList.remove('on');
     var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) loadDXFFile(f); });
-  /* 드래그 지점이 산림청 zip 드롭존(또는 그 안)인지 */
+  /* 드래그 지점이 산림청 zip 드롭존(또는 그 안)인지, 또는 8번 페이지 활성 중인지 */
   function _overForestDrop(e){
+    /* 8번(자료 겹치기) 페이지에서는 DXF 안 받음 — 산림청 zip 전용 */
+    if(typeof BOOK!=='undefined' && BOOK.page===8) return true;
     var fd=document.getElementById('forestDrop');
     if(!fd) return false;
     var t=e.target;
@@ -4726,16 +4728,105 @@ function forestApply(results, errors){
       msg.push('토양 '+r.count+'개 ✓');
     }
   });
-  // 레이어 토글 UI
-  var lw=document.getElementById('forestLayers');
-  if(lw){
-    lw.style.display='';
-    lw.innerHTML='<div style="font-size:10px;color:var(--tx3);margin-bottom:4px">레이어 표시</div>'+
-      (DATA8.overlays.forest_sansatae?'<label class="dlayer"><input type="checkbox" checked onchange="_ovToggle(\'forest_sansatae\',this.checked)"> 🔴 산사태위험등급</label>':'')+
-      (DATA8.overlays.forest_imsang?'<label class="dlayer"><input type="checkbox" checked onchange="_ovToggle(\'forest_imsang\',this.checked)"> 🌳 임상도</label>':'')+
-      (DATA8.overlays.forest_toyang?'<label class="dlayer"><input type="checkbox" checked onchange="_ovToggle(\'forest_toyang\',this.checked)"> 🟫 토양도</label>':'');
-  }
+  _forestRenderLayerUI();
   _dmsg('forestMsg','✅ '+msg.join(' · ')+(errors&&errors.length?' · ⚠️'+errors.join('/'):''),'ok');
+  if(typeof render==='function') render();
+}
+
+/* 속성 코드 → 한글 이름 (분포도 종류) */
+var FOREST_FIELDS = {
+  imsang: [
+    {f:'FRTP_NM',  n:'임상'}, {f:'KOFTR_NM', n:'수종'}, {f:'DMCLS_NM', n:'경급'},
+    {f:'AGCLS_NM', n:'영급'}, {f:'DNST_NM',  n:'밀도'}, {f:'HEIGHT_NM',n:'임분고'}
+  ],
+  toyang: [
+    {f:'SLDPT_TPCD',n:'토심'}, {f:'PRRCK_LARG',n:'모암(대)'}, {f:'PRRCK_MDDL',n:'모암(중)'},
+    {f:'SLANT_TYP', n:'사면형'}, {f:'LOCTN_ALTT',n:'표고'}, {f:'LOCTN_GRDN',n:'경사'}
+  ]
+};
+
+/* 산림청 레이어 전체 UI 다시 그림 (토글 + 농도 + 속성선택 + 범례) */
+function _forestRenderLayerUI(){
+  var lw=document.getElementById('forestLayers'); if(!lw) return;
+  var ov=DATA8.overlays;
+  if(!ov.forest_sansatae && !ov.forest_imsang && !ov.forest_toyang){ lw.style.display='none'; return; }
+  lw.style.display='';
+  var h='<div style="font-size:10px;color:var(--tx3);margin-bottom:5px">레이어 표시 · 농도</div>';
+
+  /* 공통 농도 슬라이더 */
+  if(DATA8.forestAlpha===undefined) DATA8.forestAlpha=0.5;
+  h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">'+
+     '<span style="font-size:10px;color:var(--tx3)">농도</span>'+
+     '<input type="range" min="10" max="100" step="5" value="'+Math.round(DATA8.forestAlpha*100)+'" oninput="setForestAlpha(this.value)" style="flex:1">'+
+     '<span id="forestAlphaVal" style="font-size:10px;color:#38bdf8;font-weight:700;width:30px;text-align:right">'+Math.round(DATA8.forestAlpha*100)+'%</span></div>';
+
+  /* 산사태 */
+  if(ov.forest_sansatae){
+    h+='<label class="dlayer" style="margin-top:3px"><input type="checkbox" '+(ov.forest_sansatae.visible?'checked':'')+' onchange="_ovToggle(\'forest_sansatae\',this.checked)"> 🔴 <b>산사태위험등급</b></label>';
+    h+=_forestSansataeLegend();
+  }
+  /* 임상 — 속성 선택 드롭다운 */
+  if(ov.forest_imsang){
+    h+='<label class="dlayer" style="margin-top:6px"><input type="checkbox" '+(ov.forest_imsang.visible?'checked':'')+' onchange="_ovToggle(\'forest_imsang\',this.checked)"> 🌳 <b>임상도</b> ('+ov.forest_imsang.polys.length+')</label>';
+    h+=_forestFieldSelect('imsang', ov.forest_imsang);
+    h+=_forestPolyLegend(ov.forest_imsang);
+  }
+  /* 토양 — 속성 선택 드롭다운 */
+  if(ov.forest_toyang){
+    h+='<label class="dlayer" style="margin-top:6px"><input type="checkbox" '+(ov.forest_toyang.visible?'checked':'')+' onchange="_ovToggle(\'forest_toyang\',this.checked)"> 🟫 <b>토양도</b> ('+ov.forest_toyang.polys.length+')</label>';
+    h+=_forestFieldSelect('toyang', ov.forest_toyang);
+    h+=_forestPolyLegend(ov.forest_toyang);
+  }
+  lw.innerHTML=h;
+}
+
+/* 속성 선택 드롭다운 (임상/토양 분포도 종류) */
+function _forestFieldSelect(kind, ov){
+  var list=FOREST_FIELDS[kind]||[];
+  /* 실제 데이터에 있는 필드만 */
+  var avail=list.filter(function(x){ return ov.fields && ov.fields.indexOf(x.f)>=0; });
+  if(!avail.length) return '';
+  var opts=avail.map(function(x){ return '<option value="'+x.f+'"'+(x.f===ov.field?' selected':'')+'>'+x.n+'</option>'; }).join('');
+  return '<div style="margin:3px 0 3px 24px;font-size:10px;color:var(--tx3)">색칠 기준: '+
+    '<select onchange="setForestField(\''+kind+'\',this.value)" style="background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font-size:10px">'+opts+'</select></div>';
+}
+
+/* 산사태 범례 (등급색 고정) */
+function _forestSansataeLegend(){
+  var grades=[['1','최고위험','rgb(255,0,0)'],['2','고위험','rgb(255,201,0)'],['3','중위험','rgb(182,255,142)'],['4','저위험','rgb(48,194,255)'],['5','최저','rgb(0,0,255)']];
+  var h='<div style="margin:2px 0 4px 24px;display:flex;flex-wrap:wrap;gap:4px 8px">';
+  grades.forEach(function(g){
+    h+='<span style="font-size:9px;color:var(--tx2);display:inline-flex;align-items:center;gap:3px"><span style="width:10px;height:10px;border-radius:2px;background:'+g[2]+';display:inline-block"></span>'+g[0]+'등급('+g[1]+')</span>';
+  });
+  return h+'</div>';
+}
+
+/* 임상/토양 범례 (현재 속성의 값별 색) — 폴리곤에서 값 수집 */
+function _forestPolyLegend(ov){
+  var vals={};
+  ov.polys.forEach(function(p){ var v=String(p.props[ov.field]||'(없음)'); vals[v]=(vals[v]||0)+1; });
+  var keys=Object.keys(vals).sort(function(a,b){ return vals[b]-vals[a]; });
+  if(!keys.length) return '';
+  var h='<div style="margin:2px 0 4px 24px;display:flex;flex-wrap:wrap;gap:4px 8px">';
+  keys.slice(0,10).forEach(function(k){
+    h+='<span style="font-size:9px;color:var(--tx2);display:inline-flex;align-items:center;gap:3px"><span style="width:10px;height:10px;border-radius:2px;background:'+_forestColor(k)+';display:inline-block;border:1px solid rgba(255,255,255,.3)"></span>'+k+'</span>';
+  });
+  if(keys.length>10) h+='<span style="font-size:9px;color:var(--tx3)">외 '+(keys.length-10)+'종</span>';
+  return h+'</div>';
+}
+
+/* 농도 조절 */
+function setForestAlpha(v){
+  DATA8.forestAlpha=Math.max(0.1, Math.min(1, (parseFloat(v)||50)/100));
+  var el=document.getElementById('forestAlphaVal'); if(el) el.textContent=Math.round(DATA8.forestAlpha*100)+'%';
+  if(typeof render==='function') render();
+}
+/* 속성(분포도 종류) 전환 */
+function setForestField(kind, field){
+  var key='forest_'+kind, ov=DATA8.overlays[key];
+  if(!ov) return;
+  ov.field=field;
+  _forestRenderLayerUI();   // 범례도 갱신
   if(typeof render==='function') render();
 }
 
@@ -4777,45 +4868,71 @@ function _forestShpToCanvas(r, kind){
   return {kind:kind, polys:polys, field:field, fields:r.fields, visible:true, _raw:r};
 }
 
-/* 속성값 → 색상 (문자열 해시 기반 파스텔, 같은 값=같은 색) */
+/* 속성값 → 색 (범례용, solid와 동일 hue) */
 var _fcolCache={};
 function _forestColor(val){
   var key=String(val||'');
   if(_fcolCache[key]) return _fcolCache[key];
   var h=0; for(var i=0;i<key.length;i++){ h=(h*31+key.charCodeAt(i))|0; }
   var hue=((h%360)+360)%360;
-  var c='hsla('+hue+',55%,55%,0.5)';
+  var c='hsl('+hue+',60%,55%)';   // solid와 같은 채도/명도 → 범례=지도 일치
   _fcolCache[key]=c; return c;
 }
 
 /* ★ 산림청 겹침 레이어 렌더 (render에서 호출) — 지형도 위에 얹기 */
 function drawForestOverlays(){
   var ov=DATA8.overlays;
+  var alpha=(DATA8.forestAlpha!==undefined)?DATA8.forestAlpha:0.5;
   /* 그리는 순서: 산사태(면) → 토양(면) → 임상(면). 켜진 것만 */
   ['forest_sansatae','forest_toyang','forest_imsang'].forEach(function(key){
     var o=ov[key]; if(!o || !o.visible) return;
     if(o.kind==='sansatae'){
       if(!o.ready || !o.img || !o.tm) return;
       var tl=w2s({x:o.tm.x0, y:o.tm.y1}), br=w2s({x:o.tm.x1, y:o.tm.y0});
-      ctx.save(); ctx.globalAlpha=1; ctx.imageSmoothingEnabled=false;
+      ctx.save(); ctx.globalAlpha=alpha; ctx.imageSmoothingEnabled=false;
       ctx.drawImage(o.img, tl.x, tl.y, br.x-tl.x, br.y-tl.y);
       ctx.restore();
     } else {
-      /* 임상/토양 폴리곤 채움 + 외곽선 */
+      /* 임상/토양 폴리곤 채움 + 외곽선 + 값 라벨 */
       if(!o.polys || !o.polys.length) return;
       ctx.save();
+      /* 1) 면 채움 */
       o.polys.forEach(function(p){
         var val=p.props[o.field];
         ctx.beginPath();
         var s0=w2s(p.ring[0]); ctx.moveTo(s0.x,s0.y);
         for(var j=1;j<p.ring.length;j++){ var sj=w2s(p.ring[j]); ctx.lineTo(sj.x,sj.y); }
         ctx.closePath();
-        ctx.fillStyle=_forestColor(val); ctx.fill();
-        ctx.lineWidth=0.8; ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.stroke();
+        ctx.globalAlpha=alpha; ctx.fillStyle=_forestColorSolid(val); ctx.fill();
+        ctx.globalAlpha=Math.min(1,alpha+0.35); ctx.lineWidth=0.8; ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.stroke();
       });
+      /* 2) 값 라벨 (배율 충분할 때만, 폴리곤 중심에) */
+      if(S.scale>0.25){
+        ctx.globalAlpha=1; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        o.polys.forEach(function(p){
+          var val=p.props[o.field]; if(val==null||val==='') return;
+          /* 폴리곤 중심 (화면 밖이면 skip) */
+          var cx=0,cy=0,rg=p.ring; for(var m=0;m<rg.length;m++){cx+=rg[m].x;cy+=rg[m].y;} cx/=rg.length; cy/=rg.length;
+          var sc=w2s({x:cx,y:cy});
+          if(sc.x<-20||sc.x>cv.width+20||sc.y<-10||sc.y>cv.height+10) return;
+          var txt=String(val);
+          ctx.lineWidth=2.5; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.strokeText(txt,sc.x,sc.y);
+          ctx.fillStyle='#fff'; ctx.fillText(txt,sc.x,sc.y);
+        });
+      }
       ctx.restore();
     }
   });
+}
+/* 속성값 → 불투명 색 (채움은 globalAlpha로 조절하니 색 자체는 불투명) */
+var _fcolSolidCache={};
+function _forestColorSolid(val){
+  var key=String(val||'');
+  if(_fcolSolidCache[key]) return _fcolSolidCache[key];
+  var h=0; for(var i=0;i<key.length;i++){ h=(h*31+key.charCodeAt(i))|0; }
+  var hue=((h%360)+360)%360;
+  var c='hsl('+hue+',60%,55%)';
+  _fcolSolidCache[key]=c; return c;
 }
 
 /* ---------- 강우 카드: 관측소 자동 + 엑셀 ---------- */
