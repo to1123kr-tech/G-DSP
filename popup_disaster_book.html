@@ -964,7 +964,11 @@
   <div style="position:absolute;top:12px;left:14px;color:#9fb0c8;font-size:12px;background:rgba(11,18,32,.7);padding:7px 11px;border-radius:8px;pointer-events:none">좌드래그=회전 · 휠=확대 · <b style="color:#cde">가운데(또는 우클릭) 드래그=이동</b></div>
   <!-- ★ 3D 독립 컨트롤 (닫지 않고 바로 조정) -->
   <div id="d3dctrl" style="position:absolute;left:14px;bottom:14px;background:rgba(11,18,32,.92);border:1px solid #1e2b45;border-radius:12px;padding:13px 15px;backdrop-filter:blur(6px);min-width:190px;box-shadow:0 10px 30px rgba(0,0,0,.45)">
-    <div style="font-size:11px;color:#9fb0c8;font-weight:700;letter-spacing:.4px;margin-bottom:7px">색상</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+      <span style="font-size:11px;color:#9fb0c8;font-weight:700;letter-spacing:.4px">색상</span>
+      <button onclick="toggle3DPanel()" id="d3d_hideBtn" title="메뉴 숨기기 (캡처용)" style="background:rgba(40,55,85,.7);border:1px solid #2a3b5c;color:#cdd8ea;border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer">🙈 숨기기</button>
+    </div>
+    <div id="d3d_body">
     <div style="display:flex;gap:5px;flex-wrap:wrap">
       <button class="thr" id="c3d_hypso" onclick="set3DColorMode('hypso')">무지개</button>
       <button class="thr" id="c3d_terrain" onclick="set3DColorMode('terrain')">자연색</button>
@@ -985,6 +989,18 @@
     <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:#9fb0c8;margin-top:5px;margin-left:18px;cursor:pointer">
       <input type="checkbox" id="c3d_flowNum" checked onchange="set3DFlowNum(this.checked)"> 누적 숫자 표시
     </label>
+    <div id="c3d_flowStyleWrap" style="margin-left:18px;margin-top:7px">
+      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+        <span style="font-size:10px;color:#9fb0c8">모양</span>
+        <button class="thr3 on" id="c3d_fs_line" onclick="set3DFlowStyle('line')" title="선 화살표">→ 선</button>
+        <button class="thr3" id="c3d_fs_tri" onclick="set3DFlowStyle('tri')" title="삼각형">▲ 삼각</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px">
+        <span style="font-size:10px;color:#9fb0c8">색</span>
+        <button class="thr3 on" id="c3d_fc_acc" onclick="set3DFlowColorFixed(false)" title="누적량 따라 색 변함">누적색</button>
+        <button class="thr3" id="c3d_fc_fix" onclick="set3DFlowColorFixed(true)" title="선택색 한 가지로">단색</button>
+      </div>
+    </div>
     <div id="c3d_gridWrap" style="margin-left:18px;margin-top:6px">
       <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8;margin-bottom:4px"><span>🔲 격자 간격</span><span id="c3d_gridVal" style="color:#fbbf24;font-weight:700">10m</span></div>
       <div style="display:flex;gap:3px">
@@ -1028,6 +1044,7 @@
       <span>높이 강조</span><span id="c3d_exagVal" style="color:#4ade80;font-weight:700">×2.2</span>
     </div>
     <input type="range" id="c3d_exag" min="1" max="6" step="0.2" value="2.2" oninput="set3DExag(this.value)" style="width:100%;margin-top:4px">
+    </div><!-- /d3d_body -->
   </div>
   <button onclick="close3D()" style="position:absolute;top:12px;right:14px;width:40px;height:40px;border-radius:10px;background:rgba(17,26,46,.92);border:1px solid #1e2b45;color:#e8eef7;font-size:18px;cursor:pointer">✕</button>
 </div>
@@ -3502,8 +3519,13 @@ function _add3DFlow(scene, dem, hp, exag){
   var approx=(af.cols/gm)*(af.rows/gm);
   while(approx>3500 && gm<40){ gm++; approx=(af.cols/gm)*(af.rows/gm); }
   var fa=af.acc, Lw=af.cell*gm*0.34;
-  var arrowPts=[], arrowCols=[];
+  var _fstyle=(_three&&_three.flowStyle)||'line';           // 'line' | 'tri'
+  var _fixed=(_three&&_three.flowColorFixed)||false;         // true=선택색 고정
+  var _fixRgb=_flowRamp(0.75);                               // 고정색(중간톤)
+  var arrowPts=[], arrowCols=[];                             // 선(line 몸통/촉)
+  var triPos=[], triCol=[];                                  // 삼각형(면) 정점
   function push2(a,b,rgb){ arrowPts.push(a,b); arrowCols.push(rgb[0]/255,rgb[1]/255,rgb[2]/255, rgb[0]/255,rgb[1]/255,rgb[2]/255); }
+  function pushTri(p0,p1,p2,rgb){ triPos.push(p0.x,p0.y,p0.z, p1.x,p1.y,p1.z, p2.x,p2.y,p2.z); var r=rgb[0]/255,g=rgb[1]/255,b=rgb[2]/255; triCol.push(r,g,b, r,g,b, r,g,b); }
   var numPts=[];  // {x,y,acc}
   for(var ar=Math.floor(gm/2); ar<af.rows; ar+=gm){
     for(var ac=Math.floor(gm/2); ac<af.cols; ac+=gm){
@@ -3511,17 +3533,33 @@ function _add3DFlow(scene, dem, hp, exag){
       var d=_step(code); if(!d) continue;
       var acc=fa?(fa[ai]||0):0;
       var lv=Math.log10(acc+1)/4; lv=lv<0?0:(lv>1?1:lv);
-      var rgb=_flowRamp(lv);
+      var rgb=_fixed?_fixRgb:_flowRamp(lv);
+      // ★ 격자 칸 진짜 중앙 (셀 중앙 ai와 별개로 gm칸 중앙 좌표)
+      var gcx=af.minX+(ar-Math.floor(gm/2)+gm/2)*0;  // placeholder(미사용)
       var cx=af.minX+(ac+0.5)*af.cell, cy=af.minY+(ar+0.5)*af.cell;
-      var t1=tmTo3DPt(cx-d[0]*Lw, cy-d[1]*Lw, dem, hp, exag); t1.y+=1.2;
-      var t2=tmTo3DPt(cx+d[0]*Lw, cy+d[1]*Lw, dem, hp, exag); t2.y+=1.2;
-      push2(t1,t2,rgb);
-      // 화살촉 (끝점에서 뒤로 두 선)
-      var dx=t2.x-t1.x, dz=t2.z-t1.z, len=Math.hypot(dx,dz)||1; dx/=len; dz/=len;
-      var hlen=Lw*0.5, ca=Math.cos(0.5), sa=Math.sin(0.5);
-      var h1=new THREE.Vector3(t2.x-hlen*(dx*ca - dz*sa), t2.y, t2.z-hlen*(dx*sa + dz*ca));
-      var h2=new THREE.Vector3(t2.x-hlen*(dx*ca + dz*sa), t2.y, t2.z-hlen*(-dx*sa + dz*ca));
-      push2(t2,h1,rgb); push2(t2,h2,rgb);
+      // 방향 끝점 3D — 지형 표면을 따르도록 각 점을 개별 샘플(경사 반영)
+      var t1=tmTo3DPt(cx-d[0]*Lw, cy-d[1]*Lw, dem, hp, exag);
+      var t2=tmTo3DPt(cx+d[0]*Lw, cy+d[1]*Lw, dem, hp, exag);
+      var mid=tmTo3DPt(cx, cy, dem, hp, exag);      // 중앙점(면 삼각형 기준)
+      t1.y+=1.4; t2.y+=1.4; mid.y+=1.4;
+      if(_fstyle==='tri'){
+        // 큰 삼각형(면): 셀 중앙에서 진행방향으로 뾰족, 표면 위에 떠서 위를 향함
+        var dx=t2.x-t1.x, dz=t2.z-t1.z, ln=Math.hypot(dx,dz)||1; dx/=ln; dz/=ln;
+        var px=-dz, pz=dx;                           // 진행방향 수직(폭 방향)
+        var ts=Lw*0.95, wd=Lw*0.5;
+        var tip=new THREE.Vector3(mid.x+dx*ts, mid.y+0.6, mid.z+dz*ts);
+        var bl =new THREE.Vector3(mid.x-dx*ts*0.55+px*wd, mid.y+0.6, mid.z-dz*ts*0.55+pz*wd);
+        var br =new THREE.Vector3(mid.x-dx*ts*0.55-px*wd, mid.y+0.6, mid.z-dz*ts*0.55-pz*wd);
+        pushTri(tip,bl,br,rgb);
+      } else {
+        // 선 화살표: 몸통 + V자 촉 (촉도 지형 표면 따름 — 끝점 t2에서 뒤로 두 선, y는 t2와 동일)
+        push2(t1,t2,rgb);
+        var dx2=t2.x-t1.x, dz2=t2.z-t1.z, len=Math.hypot(dx2,dz2)||1; dx2/=len; dz2/=len;
+        var hlen=Lw*0.5, ca=Math.cos(0.5), sa=Math.sin(0.5);
+        var h1=new THREE.Vector3(t2.x-hlen*(dx2*ca - dz2*sa), t2.y, t2.z-hlen*(dx2*sa + dz2*ca));
+        var h2=new THREE.Vector3(t2.x-hlen*(dx2*ca + dz2*sa), t2.y, t2.z-hlen*(-dx2*sa + dz2*ca));
+        push2(t2,h1,rgb); push2(t2,h2,rgb);
+      }
       if(acc>0) numPts.push({x:cx,y:cy,acc:acc});
     }
   }
@@ -3530,6 +3568,14 @@ function _add3DFlow(scene, dem, hp, exag){
     ag.setAttribute('color', new THREE.Float32BufferAttribute(arrowCols,3));
     var aLines=new THREE.LineSegments(ag, new THREE.LineBasicMaterial({vertexColors:true}));
     scene.add(aLines); _three.objs.push(aLines);
+  }
+  if(triPos.length){
+    var tg=new THREE.BufferGeometry();
+    tg.setAttribute('position', new THREE.Float32BufferAttribute(triPos,3));
+    tg.setAttribute('color', new THREE.Float32BufferAttribute(triCol,3));
+    var tMat=new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide});
+    var tMesh=new THREE.Mesh(tg, tMat);
+    scene.add(tMesh); _three.objs.push(tMesh);
   }
   // 격자선 (draped)
   var gridPts=[];
@@ -3573,6 +3619,23 @@ function _makeNumSprite(num){
 }
 function set3DFlow(on){ S.show3DFlow=!!on; if(_three) _rebuild3D(); }
 function set3DFlowNum(on){ S.show3DFlowNum=!!on; if(_three && S.show3DFlow) _rebuild3D(); }
+function set3DFlowStyle(s){ S.flow3dStyle=s; if(_three){ _three.flowStyle=s;
+    var l=document.getElementById('c3d_fs_line'), t=document.getElementById('c3d_fs_tri');
+    if(l)l.className='thr3'+(s==='line'?' on':''); if(t)t.className='thr3'+(s==='tri'?' on':'');
+    if(S.show3DFlow) _rebuild3D(); } }
+function set3DFlowColorFixed(fx){ S.flow3dColorFixed=!!fx; if(_three){ _three.flowColorFixed=!!fx;
+    var a=document.getElementById('c3d_fc_acc'), f=document.getElementById('c3d_fc_fix');
+    if(a)a.className='thr3'+(!fx?' on':''); if(f)f.className='thr3'+(fx?' on':'');
+    if(S.show3DFlow) _rebuild3D(); } }
+/* 3D 메뉴 접기/펴기 (캡처용) — 내용 숨기고 작은 "메뉴 보이기"만 남김 */
+function toggle3DPanel(){
+  var body=document.getElementById('d3d_body'), btn=document.getElementById('d3d_hideBtn');
+  if(!body||!btn) return;
+  var hidden=body.style.display==='none';
+  body.style.display=hidden?'':'none';
+  btn.textContent=hidden?'🙈 숨기기':'👁 메뉴';
+  btn.title=hidden?'메뉴 숨기기 (캡처용)':'메뉴 다시 보이기';
+}
 /* 3D 허가지선 색상·두께 — 2D와 값 공유(S.lineStyle.permit) + 3D 즉시 재빌드 (나갈 필요 없이) */
 function set3DPermitColor(c){
   if(!S.lineStyle) S.lineStyle={};
@@ -3709,7 +3772,7 @@ function init3DScene(){
   var onResize=function(){ var w=lay.clientWidth,h=lay.clientHeight; camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h,false); };
   window.addEventListener('mouseup',onUp);
   window.addEventListener('resize',onResize);
-  _three={renderer:renderer, raf:0, onResize:onResize, onUp:onUp, scene:scene, camera:camera, dem:dem, exag:exag, colorMode:initMode, wire:false, objs:[]};
+  _three={renderer:renderer, raf:0, onResize:onResize, onUp:onUp, scene:scene, camera:camera, dem:dem, exag:exag, colorMode:initMode, wire:false, objs:[], flowStyle:(S.flow3dStyle||'line'), flowColorFixed:(S.flow3dColorFixed||false)};
   _3dColorMode=initMode;
   _rebuild3D();
   _sync3DCtrlUI();
