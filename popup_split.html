@@ -1323,7 +1323,8 @@ function _srchDrop(docs){
     dd.appendChild(it);
   });
   dd.style.display='block';
-  _jibunMsg(docs.length+'개 검색됨 — 선택하세요 (화성시 우선 정렬)','var(--tx2)');
+  var anyHs=docs.some(_isHwaseongDoc);
+  _jibunMsg(docs.length+'개 검색됨 — 선택하세요'+(anyHs?' (화성시 우선 정렬)':' · 화성시 결과 없음 → 지역명 붙여 재검색 가능'),'var(--tx2)');
 }
 function _srchDropHide(){ var dd=document.getElementById('srchDrop'); if(dd) dd.style.display='none'; }
 /* 선택/단일 결과 적용 → 지도 이동 */
@@ -1358,24 +1359,42 @@ function _sortHwaseongFirst(docs){
     return aH-bH;
   });
 }
-/* 카카오 주소검색(도로명·지번)만 — 잡다한 POI(아파트·상호) 제외 → 화성 우선 정렬 → 목록 */
+/* 카카오 주소검색(도로명·지번)만 — 잡다한 POI 제외 → 화성 우선 정렬 → 목록
+   ★ 같은 이름 리(예: 남양리 = 화성·강릉 둘 다)가 있을 때, 검색어에 지역명이 없으면
+     '화성시 …' 질의를 함께 던져서 화성 것도 후보로 올려준다. */
 function _kakaoSearch(q){
   var gc=new kakao.maps.services.Geocoder();
   var OK=kakao.maps.services.Status.OK;
-  gc.addressSearch(q,function(d,s){
-    var docs=(s===OK&&d&&d.length)?d.slice():[];
-    /* 좌표 근접 중복 제거 */
-    var uniq=[];
-    docs.forEach(function(it){
-      var lng=parseFloat(it.x||0), lat=parseFloat(it.y||0); if(!lng||!lat) return;
-      var dup=uniq.some(function(e){ return Math.abs(parseFloat(e.x)-lng)<0.0008 && Math.abs(parseFloat(e.y)-lat)<0.0008; });
-      if(!dup) uniq.push(it);
+  var queries=[q];
+  if(q.indexOf('화성')<0){
+    queries.push('화성시 '+q);
+    queries.push('경기도 화성시 '+q);
+  }
+  var all=[], pending=queries.length;
+  queries.forEach(function(qq){
+    gc.addressSearch(qq,function(d,s){
+      if(s===OK && d && d.length) all=all.concat(d);
+      if(--pending===0) _finishKakao(all, q);
     });
-    if(!uniq.length){ _vwOnlySearch(q); return; }   // 주소 0건 → VWorld(산 지번) 폴백
-    uniq=_sortHwaseongFirst(uniq);
-    if(uniq.length===1) _applyDoc(uniq[0]);
-    else _srchDrop(uniq);   // 여러 개면 선택창(도로명도 목록으로)
   });
+}
+function _isHwaseongDoc(doc){
+  return (((doc.address_name||'')+((doc.road_address&&doc.road_address.address_name)||'')).indexOf('화성')>=0);
+}
+function _finishKakao(docs, q){
+  /* 좌표 근접 중복 제거 */
+  var uniq=[];
+  docs.forEach(function(it){
+    var lng=parseFloat(it.x||0), lat=parseFloat(it.y||0); if(!lng||!lat) return;
+    var dup=uniq.some(function(e){ return Math.abs(parseFloat(e.x)-lng)<0.0008 && Math.abs(parseFloat(e.y)-lat)<0.0008; });
+    if(!dup) uniq.push(it);
+  });
+  if(!uniq.length){ _vwOnlySearch(q); return; }   // 주소 0건 → VWorld(산 지번) 폴백
+  uniq=_sortHwaseongFirst(uniq);
+  /* 결과 1개 + 그게 화성이면 바로 적용. 그 외(여러 개거나 화성 밖 단일)는 선택창으로 확인받음
+     → 강릉 남양리가 조용히 자동선택되던 문제 해결 */
+  if(uniq.length===1 && _isHwaseongDoc(uniq[0])) _applyDoc(uniq[0]);
+  else _srchDrop(uniq);
 }
 /* VWorld 검색(연속지적, 산/임야 지번) — 카카오 실패분 보강 */
 function _vwOnlySearch(q){
