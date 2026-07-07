@@ -800,6 +800,7 @@
       </span>
       <button class="lyrBtn on" id="lyrContour" onclick="toggleLayer('contour')" title="등고선 표시/숨김">등고선</button>
       <button class="lyrBtn on" id="lyrDem" onclick="toggleLayer('dem')" title="음영기복 표시/숨김">음영기복</button>
+      <button class="lyrBtn" id="lyrHsAdjust" onclick="toggleHsPanel()" title="음영기복 조정 패널 열기/닫기 (색상·태양·입체)" style="padding:6px 8px">🎨</button>
       <button class="lyrBtn on" id="lyrStream" onclick="toggleLayer('stream')" title="하천망 표시/숨김">하천망</button>
       <button class="lyrBtn on" id="lyrSurvey" onclick="toggleLayer('survey')" title="표고점 표시/숨김">표고점</button>
       <button class="lyrBtn on" id="lyrTin" onclick="toggleLayer('tin')" title="삼각망(TIN) 표시/숨김 · 느리면 끄기">삼각망</button>
@@ -2897,6 +2898,8 @@ function toggleHsPanel(){
   open=!open;
   p.setAttribute('data-open', open?'1':'0');
   p.style.display=open?'':'none';
+  /* 작업창 레이어바 🎨 버튼 상태 반영 */
+  var hb=document.getElementById('lyrHsAdjust'); if(hb) hb.className='lyrBtn'+(open?' on':'');
   if(open) updateSunDial();
 }
 /* 태양 다이얼 클릭 → 방위각 설정 */
@@ -3517,11 +3520,19 @@ function _rebuild3D(){
 /* 3D 우수 흐름: 화살표(누적색) + 격자 + 누적숫자(스프라이트) — 표면 드레이프 */
 function _add3DFlow(scene, dem, hp, exag){
   var af=S.flow; if(!af) return;
-  var gm=Math.max(1, Math.round((S.arrowMeters||10)/af.cell));
-  // 안전 상한: 너무 많으면 간격 자동 확대 (3D 프리즈 방지)
-  var approx=(af.cols/gm)*(af.rows/gm);
-  while(approx>3500 && gm<40){ gm++; approx=(af.cols/gm)*(af.rows/gm); }
-  var fa=af.acc, Lw=af.cell*gm*0.34;
+  var wantM=(S.arrowMeters||10);                             // 사용자가 고른 간격(m)
+  var landW=af.cols*af.cell, landH=af.rows*af.cell;          // 땅 크기(m)
+  // ★ 실제 간격을 '고정 사다리'에서 선택 → wantM 이상이면서 화살표 6000개 이하인 첫 값
+  //    (셀 밀도·반올림과 무관하게 wantM이 클수록 실제간격도 큼 = 순서 절대 안 뒤바뀜)
+  var LADDER=[3,5,8,10,15,20,25,30,40,50,75,100,150,200];
+  var effM=wantM;
+  for(var _li=0;_li<LADDER.length;_li++){
+    if(LADDER[_li]<wantM) continue;                          // 선택값보다 촘촘하겐 안 함
+    effM=LADDER[_li];
+    if((landW/effM)*(landH/effM)<=6500) break;               // 개수 OK면 확정(6500=경계오차 완충)
+  }
+  var gm=Math.max(1, Math.round(effM/af.cell));              // 참고용(격자선에 사용)
+  var fa=af.acc, Lw=effM*0.34;                               // 화살표 반길이 = 실제간격 기준
   var _fstyle=(_three&&_three.flowStyle)||'line';           // 'line' | 'tri'
   var _fixed=(_three&&_three.flowColorFixed)||false;         // true=선택색 고정
   var _fixRgb=_flowRamp(0.75);                               // 고정색(중간톤)
@@ -3530,16 +3541,20 @@ function _add3DFlow(scene, dem, hp, exag){
   function push2(a,b,rgb){ arrowPts.push(a,b); arrowCols.push(rgb[0]/255,rgb[1]/255,rgb[2]/255, rgb[0]/255,rgb[1]/255,rgb[2]/255); }
   function pushTri(p0,p1,p2,rgb){ triPos.push(p0.x,p0.y,p0.z, p1.x,p1.y,p1.z, p2.x,p2.y,p2.z); var r=rgb[0]/255,g=rgb[1]/255,b=rgb[2]/255; triCol.push(r,g,b, r,g,b, r,g,b); }
   var numPts=[];  // {x,y,acc}
-  for(var ar=Math.floor(gm/2); ar<af.rows; ar+=gm){
-    for(var ac=Math.floor(gm/2); ac<af.cols; ac+=gm){
+  // ★ 미터 좌표로 순회 (effM 간격 정확 — 셀 밀도·반올림 무관)
+  var _y0=af.minY+effM/2, _yEnd=af.minY+af.rows*af.cell;
+  var _x0=af.minX+effM/2, _xEnd=af.minX+af.cols*af.cell;
+  for(var wy=_y0; wy<_yEnd; wy+=effM){
+    for(var wx=_x0; wx<_xEnd; wx+=effM){
+      // 이 월드좌표에 해당하는 셀 인덱스
+      var ac=Math.floor((wx-af.minX)/af.cell), ar=Math.floor((wy-af.minY)/af.cell);
+      if(ac<0||ar<0||ac>=af.cols||ar>=af.rows) continue;
       var ai=ar*af.cols+ac, code=af.fdir[ai]; if(code<=0) continue;
       var d=_step(code); if(!d) continue;
       var acc=fa?(fa[ai]||0):0;
       var lv=Math.log10(acc+1)/4; lv=lv<0?0:(lv>1?1:lv);
       var rgb=_fixed?_fixRgb:_flowRamp(lv);
-      // ★ 격자 칸 진짜 중앙 (셀 중앙 ai와 별개로 gm칸 중앙 좌표)
-      var gcx=af.minX+(ar-Math.floor(gm/2)+gm/2)*0;  // placeholder(미사용)
-      var cx=af.minX+(ac+0.5)*af.cell, cy=af.minY+(ar+0.5)*af.cell;
+      var cx=wx, cy=wy;                             // 화살표 중심 = 격자점(미터)
       // 방향 끝점 3D — 지형 표면을 따르도록 각 점을 개별 샘플(경사 반영)
       var t1=tmTo3DPt(cx-d[0]*Lw, cy-d[1]*Lw, dem, hp, exag);
       var t2=tmTo3DPt(cx+d[0]*Lw, cy+d[1]*Lw, dem, hp, exag);
@@ -3597,9 +3612,9 @@ function _add3DFlow(scene, dem, hp, exag){
     numPts.forEach(function(n){
       var sp=_makeNumSprite(Math.round(n.acc));
       if(!sp) return;
-      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(3, af.cell*gm*0.15);  // 지형 위로 넉넉히 띄움
+      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(3, effM*0.15);  // 지형 위로 넉넉히 띄움
       sp.position.set(p.x,p.y,p.z);
-      var sc=Math.max(af.cell*gm*0.9, 8); sp.scale.set(sc,sc*0.5,1);  // 크게 (땅 커도 보이게)
+      var sc=Math.max(effM*0.9, 8); sp.scale.set(sc,sc*0.5,1);  // 크게 (땅 커도 보이게)
       scene.add(sp); _three.objs.push(sp);
     });
   } else if(S.show3DFlowNum!==false && numPts.length>8000){
