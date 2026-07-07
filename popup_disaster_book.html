@@ -1955,30 +1955,39 @@ function render(){
         ctx.stroke();
         ctx.lineCap='butt'; ctx.lineJoin='miter';
       } else if(_saMode==='flow'){
-        /* 흐름 애니메이션: 작은 화살표가 물길을 따라 흘러감 (화면좌표 버킷으로 균일 간격) */
+        /* 흐름 애니메이션: 작은 화살표가 물길을 따라 흘러감 (누적거리 방식 — 방향무관 균등) */
         var _t=(Date.now()%1600)/1600;                               // 0~1 주기
-        var _flPx=Math.max(16, 20*_saz);                             // 화면상 간격(px)
+        var _flSpacing=Math.max(16, 20*_saz);                        // 화면상 목표 간격(px)
         var _flSz=Math.max(3,Math.min(9,S.scale*fl.cell*0.4))*_saz;  // 작은 화살표 크기
-        var _flSeen={};
         ctx.fillStyle='#dff1ff';
+        
+        /* 물길을 따라가며 누적거리 계산 → 간격마다 화살표 */
+        var _accum=0;
         for(var fi=0;fi<sm.length;fi++){
-          if(!sm[fi]||fa[fi]<thr*2) continue;
+          if(!sm[fi]||fa[fi]<thr*2){ _accum=0; continue; }
           var cf=fi%fl.cols, rf=(fi/fl.cols)|0;
-          var codef=fl.fdir[fi]; if(codef<=0) continue;
-          var ddf=_step(codef); if(!ddf) continue;
+          var codef=fl.fdir[fi]; if(codef<=0){ _accum=0; continue; }
+          var ddf=_step(codef); if(!ddf){ _accum=0; continue; }
+          
           var paf=w2s({x:fl.minX+cf*fl.cell,y:fl.minY+rf*fl.cell});
           var pbf=w2s({x:fl.minX+(cf+ddf[0])*fl.cell,y:fl.minY+(rf+ddf[1])*fl.cell});
-          var bkf=Math.round(paf.x/_flPx)+','+Math.round(paf.y/_flPx);
-          if(_flSeen[bkf]) continue; _flSeen[bkf]=1;
-          var angf=Math.atan2(pbf.y-paf.y,pbf.x-paf.x);
-          /* 셀 안에서 _t만큼 진행한 위치 (흐르는 효과) */
-          var px=paf.x+(pbf.x-paf.x)*_t, py=paf.y+(pbf.y-paf.y)*_t;
-          /* 작은 삼각형 화살표 */
-          ctx.beginPath();
-          ctx.moveTo(px+_flSz*Math.cos(angf), py+_flSz*Math.sin(angf));
-          ctx.lineTo(px-_flSz*0.7*Math.cos(angf-0.6), py-_flSz*0.7*Math.sin(angf-0.6));
-          ctx.lineTo(px-_flSz*0.7*Math.cos(angf+0.6), py-_flSz*0.7*Math.sin(angf+0.6));
-          ctx.closePath(); ctx.fill();
+          var distf=Math.hypot(pbf.x-paf.x, pbf.y-paf.y);
+          _accum+=distf;
+          
+          /* 누적거리가 간격을 넘으면 화살표 그리기 */
+          while(_accum>=_flSpacing){
+            var ratio=(_accum-_flSpacing)/distf;
+            var angf=Math.atan2(pbf.y-paf.y,pbf.x-paf.x);
+            var px=paf.x+(pbf.x-paf.x)*(1-ratio)+(pbf.x-paf.x)*_t*0.5, py=paf.y+(pbf.y-paf.y)*(1-ratio)+(pbf.y-paf.y)*_t*0.5;
+            
+            ctx.beginPath();
+            ctx.moveTo(px+_flSz*Math.cos(angf), py+_flSz*Math.sin(angf));
+            ctx.lineTo(px-_flSz*0.7*Math.cos(angf-0.6), py-_flSz*0.7*Math.sin(angf-0.6));
+            ctx.lineTo(px-_flSz*0.7*Math.cos(angf+0.6), py-_flSz*0.7*Math.sin(angf+0.6));
+            ctx.closePath(); ctx.fill();
+            
+            _accum-=_flSpacing;
+          }
         }
         /* 애니메이션 계속 (흐름 모드일 때만 루프) */
         if(!S._flowAnim){ S._flowAnim=true; requestAnimationFrame(function(){ S._flowAnim=false; if(S.streamArrows&&S.streamArrowMode==='flow') render(); }); }
