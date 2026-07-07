@@ -209,9 +209,9 @@
   .dcard.on{border-color:#2a6ea8;background:rgba(56,189,248,.05)}
   .dcard-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
   .dcard-hd .chk{width:17px;height:17px;cursor:pointer;flex-shrink:0;accent-color:#38bdf8}
-  .dcard-hd .ic{font-size:16px}
-  .dcard-hd .tt{font-size:12.5px;font-weight:800;color:var(--tx);flex:1}
-  .dcard-hd .st{font-size:9.5px;color:var(--tx3)}
+  .dcard-hd .ic{font-size:16px;flex-shrink:0}
+  .dcard-hd .tt{font-size:12.5px;font-weight:800;color:var(--tx);white-space:nowrap;flex-shrink:0}
+  .dcard-hd .st{font-size:9.5px;color:var(--tx3);flex:1;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .dcard-bd{padding-left:25px}
   .dcard-bd.off{opacity:.4;pointer-events:none}
   .dbtn{display:inline-flex;align-items:center;gap:5px;background:var(--panel);border:1px solid var(--line);
@@ -726,11 +726,14 @@
           <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px">
             <button class="dbtn" onclick="rainFindStation()">📍 가까운 관측소 찾기</button>
             <button class="dbtn" onclick="document.getElementById('rainXlsx').click()">📂 확률강우량 엑셀</button>
-            <a class="dbtn" href="http://www.wamis.go.kr/wsc/wsc_frequency.do" target="_blank">🔗 WAMIS</a>
           </div>
           <input type="file" id="rainXlsx" accept=".xlsx,.xls" style="display:none" onchange="rainUpload(this.files)">
           <div id="rainResult" style="display:none"></div>
-          <div class="dhint">위 「작업 위치」 기준으로 가까운 관측소 자동 → WAMIS 엑셀 올리면 확률강우량 자동 (재현기간 100년)</div>
+          <div class="dhint" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <a href="http://www.wamis.go.kr/wsc/wsc_frequency.do" target="_blank" style="background:#1e3a5f;color:#38bdf8;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;font-size:10px">🔗 WAMIS 강우분석</a>
+            <a href="#" onclick="openRainGuide();return false;" style="background:#fbbf24;color:#1a1400;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;font-size:10px">📖 다운로드 방법</a>
+          </div>
+          <div class="dhint" style="margin-top:5px">① 관측소 찾기 → ② WAMIS에서 「확률강우량」 받기 → ③ 엑셀 올리면 자동 (100년 빈도)</div>
           <div id="rainMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
       </div>
@@ -744,8 +747,13 @@
           <span class="st">참고 (있을 시)</span>
         </div>
         <div class="dcard-bd off" id="dcb_ground">
-          <a class="dbtn pri" href="https://www.geoinfo.or.kr" target="_blank">🔗 국토지반정보 열기</a>
-          <div class="dhint">인근 시추 기록이 있으면 참고 · 로그인 필요할 수 있음 · 대부분 산지는 자료 없음(스킵 가능) · 재해검토 필수 아님</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            <a class="dbtn pri" href="https://www.geoinfo.or.kr" target="_blank">🔗 국토지반정보 열기</a>
+            <button class="dbtn" onclick="document.getElementById('groundImg').click()">📷 캡처 올리기</button>
+          </div>
+          <input type="file" id="groundImg" accept="image/*" style="display:none" onchange="groundCapture(this.files)">
+          <div class="dhint">인근 시추 기록이 있으면 캡처해서 올리세요 (첨부만·정합 안 함) · 대부분 산지는 자료 없음(스킵 가능) · 재해검토 필수 아님</div>
+          <div id="groundMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
       </div>
     </div>
@@ -4856,6 +4864,17 @@ function geoCapture(files){
   rd.readAsDataURL(f);
 }
 
+/* 지반정보 캡처 업로드 — 시추 기록 이미지 첨부 (좌표 없으니 참고용, 정합 안 함) */
+function groundCapture(files){
+  if(!files || !files.length) return;
+  var f=files[0], rd=new FileReader();
+  rd.onload=function(e){
+    DATA8.ground.capture = e.target.result;   // dataURL
+    _dmsg('groundMsg','📷 지반정보 캡처 저장됨 (결과보고서에 첨부)','ok');
+  };
+  rd.readAsDataURL(f);
+}
+
 /* ---------- 산림청 카드: zip 업로드 → /api/forest-parse ---------- */
 /* 드롭존에 드래그&드롭 연결 (페이지 로드 시 1회) */
 (function _initForestDrop(){
@@ -5859,6 +5878,75 @@ function _forestCopyToast(){
 }
 /* 모달 밖 클릭 시 닫기 */
 document.addEventListener('click',function(e){ if(e.target && e.target.id==='forestGuideModal') closeForestGuide(); });
+</script>
+
+<!-- 🌧️ 강우강도 다운로드 설명서 모달 -->
+<div id="rainGuideModal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);overflow-y:auto">
+  <div style="max-width:760px;margin:24px auto;background:#0e1a2e;border:1px solid #2a3b5c;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:linear-gradient(135deg,#1a3a5c,#0e2540);border-bottom:1px solid #2a3b5c">
+      <div style="font-size:15px;font-weight:800;color:#fff">📖 강우강도(확률강우량) 다운로드 방법</div>
+      <button onclick="closeRainGuide()" style="background:none;border:none;color:#9fb0c8;font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div style="padding:16px 18px;color:#cdd8ea;font-size:12.5px;line-height:1.7" id="rainGuideBody"></div>
+    <div style="padding:12px 18px;border-top:1px solid #2a3b5c;text-align:right">
+      <button onclick="closeRainGuide()" style="background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#06121f;font-weight:700;border:none;border-radius:8px;padding:9px 20px;cursor:pointer">닫기</button>
+    </div>
+  </div>
+</div>
+<script>
+function openRainGuide(){
+  var h = ''
+   + '<div style="background:#12233d;border:1px solid #2a3b5c;border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+   +   '<div style="font-size:13px;font-weight:800;color:#7cc5ff;margin-bottom:6px">한 줄 요약</div>'
+   +   'WAMIS 강우분석 페이지에서 <b style="color:#fbbf24">「확률 강우량(지역빈도해석)」의 다운로드</b> 버튼 하나만 받아서 여기 올리면 끝이에요. (파일 1개, 전국 관측소가 다 들어있음)'
+   + '</div>'
+
+   + '<div style="font-size:13px;font-weight:800;color:#e8eef7;margin:16px 0 8px">📋 순서대로 따라하기</div>'
+
+   + _rstep('1', 'WAMIS 강우분석 페이지 열기',
+       '카드의 <b style="color:#38bdf8">「🔗 WAMIS 강우분석」</b> 버튼을 누르면 열립니다.<br>'
+       + '<span style="color:#9fb0c8;font-size:11px">주소: www.wamis.go.kr → 수문기상 → 강우분석</span>')
+
+   + _rstep('2', '「확률 강우량(지역빈도해석)」 찾기',
+       '페이지 「강우분석」 목록에서 <b>▶ 확률 강우량(지역빈도해석)</b> 줄을 찾으세요.<br>'
+       + '<span style="color:#9fb0c8;font-size:11px">다른 항목(강우 시계열, 강우강도식 등)은 안 받아도 됩니다. 이것만!</span>')
+
+   + _rstep('3', '「확률 강우량 다운로드」 버튼 클릭',
+       '그 줄 오른쪽의 <b style="color:#fbbf24">「확률 강우량 다운로드」</b> 버튼을 누르면 엑셀(.xlsx)이 받아집니다.<br>'
+       + '<span style="color:#9fb0c8;font-size:11px">파일명 예: 확률강우량_지역빈도해석_.xlsx</span>')
+
+   + _rstep('4', '받은 엑셀을 도구에 올리기',
+       '카드의 <b style="color:#38bdf8">「📂 확률강우량 엑셀」</b> 버튼을 누르고 받은 파일을 선택하세요.<br>'
+       + '<span style="color:#9fb0c8;font-size:11px">먼저 「📍 가까운 관측소 찾기」를 눌러두면, 올리자마자 자동으로 값이 나와요.</span>')
+
+   + '<div style="background:#12233d;border-left:3px solid #34d399;border-radius:6px;padding:10px 12px;margin-top:14px">'
+   +   '<div style="font-size:12px;font-weight:700;color:#34d399;margin-bottom:4px">✅ 자동으로 되는 것</div>'
+   +   '<div style="font-size:11.5px;color:#cdd8ea;line-height:1.6">'
+   +     '· 작업위치에서 <b>가까운 관측소 2곳</b>을 거리순으로 찾아줍니다<br>'
+   +     '· 그 관측소의 <b>재현기간 100년 · 1시간</b> 확률강우량을 자동으로 뽑아 합리식 I 값에 넣습니다<br>'
+   +     '· 2순위 관측소로 바꿔볼 수도 있어요 (거리 비교해서 선택)'
+   +   '</div>'
+   + '</div>'
+
+   + '<div style="background:#2a1a12;border-left:3px solid #fbbf24;border-radius:6px;padding:10px 12px;margin-top:10px">'
+   +   '<div style="font-size:12px;font-weight:700;color:#fbbf24;margin-bottom:4px">💡 참고</div>'
+   +   '<div style="font-size:11.5px;color:#cdd8ea;line-height:1.6">'
+   +     '· 이 엑셀은 <b>전국 615개 관측소</b>가 한 파일에 다 들어있어서, 한 번 받으면 어느 지역이든 재사용할 수 있어요<br>'
+   +     '· WAMIS는 로그인 없이 누구나 받을 수 있습니다'
+   +   '</div>'
+   + '</div>';
+
+  document.getElementById('rainGuideBody').innerHTML = h;
+  document.getElementById('rainGuideModal').style.display = 'block';
+}
+function _rstep(num, title, body){
+  return '<div style="display:flex;gap:11px;margin-bottom:12px;align-items:flex-start">'
+    + '<div style="flex-shrink:0;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#06121f;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center">'+num+'</div>'
+    + '<div style="flex:1"><div style="font-weight:700;color:#e8eef7;font-size:12.5px;margin-bottom:2px">'+title+'</div>'
+    + '<div style="color:#cdd8ea;font-size:11.5px;line-height:1.6">'+body+'</div></div></div>';
+}
+function closeRainGuide(){ document.getElementById('rainGuideModal').style.display='none'; }
+document.addEventListener('click',function(e){ if(e.target && e.target.id==='rainGuideModal') closeRainGuide(); });
 </script>
 
 </body>
