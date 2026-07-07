@@ -1250,11 +1250,22 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
   var lay=document.getElementById('droplay'), depth=0;
   var dz=document.getElementById('dropzone');
   function hasFile(e){ return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types||[],'Files')>=0; }
-  window.addEventListener('dragenter',function(e){ if(!hasFile(e))return; e.preventDefault(); depth++; lay.classList.add('on'); });
-  window.addEventListener('dragover', function(e){ if(!hasFile(e))return; e.preventDefault(); });
+  window.addEventListener('dragenter',function(e){ if(!hasFile(e))return; if(_overForestDrop(e))return; e.preventDefault(); depth++; lay.classList.add('on'); });
+  window.addEventListener('dragover', function(e){ if(!hasFile(e))return; if(_overForestDrop(e)){ return; } e.preventDefault(); });
   window.addEventListener('dragleave',function(e){ e.preventDefault(); depth--; if(depth<=0){ depth=0; lay.classList.remove('on'); } });
-  window.addEventListener('drop',     function(e){ e.preventDefault(); depth=0; lay.classList.remove('on');
+  window.addEventListener('drop',     function(e){
+    /* 8번 산림청 zip 드롭존 위면 전역 DXF 처리 안 함 (그쪽 핸들러가 받음) */
+    if(_overForestDrop(e)){ return; }
+    e.preventDefault(); depth=0; lay.classList.remove('on');
     var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) loadDXFFile(f); });
+  /* 드래그 지점이 산림청 zip 드롭존(또는 그 안)인지 */
+  function _overForestDrop(e){
+    var fd=document.getElementById('forestDrop');
+    if(!fd) return false;
+    var t=e.target;
+    while(t){ if(t===fd) return true; t=t.parentNode; }
+    return false;
+  }
   /* 드롭존 위에서의 시각 피드백 */
   if(dz){
     dz.addEventListener('dragover',function(e){ if(hasFile(e)){ e.preventDefault(); dz.classList.add('dragover'); } });
@@ -4669,6 +4680,23 @@ function geoCapture(files){
 }
 
 /* ---------- 산림청 카드: zip 업로드 → /api/forest-parse ---------- */
+/* 드롭존에 드래그&드롭 연결 (페이지 로드 시 1회) */
+(function _initForestDrop(){
+  function bind(){
+    var fd=document.getElementById('forestDrop');
+    if(!fd){ setTimeout(bind, 300); return; }
+    fd.addEventListener('dragover', function(e){ e.preventDefault(); e.stopPropagation(); fd.classList.add('drag'); });
+    fd.addEventListener('dragleave', function(e){ e.preventDefault(); e.stopPropagation(); fd.classList.remove('drag'); });
+    fd.addEventListener('drop', function(e){
+      e.preventDefault(); e.stopPropagation(); fd.classList.remove('drag');
+      var files=e.dataTransfer && e.dataTransfer.files;
+      if(files && files.length) forestUpload(files);
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', bind);
+  else bind();
+})();
+
 function forestUpload(files){
   if(!files || !files.length) return;
   _dmsg('forestMsg','⏳ 업로드·분석 중… (산사태·임상·토양 자동판별)','');
