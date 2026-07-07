@@ -2281,5 +2281,56 @@ def air_photo():
         return jsonify({"ok": False, "msg": str(e)}), 500
 
 
+# ═══ KIGAM 지질도 모암 자동조회 ═══
+KIGAM_WMS = "https://data.kigam.re.kr/mgeo/geoserver/wms"
+KIGAM_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+    "Referer": "https://data.kigam.re.kr/map/",
+    "Accept": "application/json",
+}
+
+@app.route('/api/kigam-moam')
+def kigam_moam():
+    try:
+        lat = float(request.args.get('lat', ''))
+        lng = float(request.args.get('lng', ''))
+    except (ValueError, TypeError):
+        return jsonify({'ok': False, 'msg': '좌표(lat,lng) 필요'}), 400
+    d = 0.005
+    bbox = "%f,%f,%f,%f" % (lng-d, lat-d, lng+d, lat+d)
+    W, H = 256, 256
+    params = {
+        'service': 'WMS', 'version': '1.1.1', 'request': 'GetFeatureInfo',
+        'layers': 'geoOpen:L_50K_Geology_Map',
+        'query_layers': 'geoOpen:L_50K_Geology_Map',
+        'srs': 'EPSG:4326', 'bbox': bbox,
+        'width': W, 'height': H, 'x': W//2, 'y': H//2,
+        'info_format': 'application/json', 'feature_count': 5,
+    }
+    try:
+        r = req.get(KIGAM_WMS, params=params, headers=KIGAM_HEADERS, timeout=10)
+        if r.status_code != 200:
+            return jsonify({'ok': False, 'msg': 'KIGAM 응답 %d' % r.status_code}), 502
+        data = r.json()
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': 'KIGAM 실패: %s' % e}), 502
+    geo_feat = None
+    for f in data.get('features', []):
+        if '대표암상' in f.get('properties', {}):
+            geo_feat = f
+            break
+    if not geo_feat:
+        return jsonify({'ok': False, 'msg': '이 지점에 지질 정보 없음'})
+    p = geo_feat.get('properties', {})
+    dopok = p.get('도폭', '')
+    if '<' in dopok:
+        dopok = dopok.split('<')[0].strip()
+    return jsonify({
+        'ok': True, '시대': p.get('시대', ''), '지층': p.get('지층', ''),
+        '대표암상': p.get('대표암상', ''), '기호': p.get('기호', ''),
+        '도폭': dopok, 'symnum': p.get('symnum', ''),
+    })
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050)
