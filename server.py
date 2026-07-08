@@ -105,6 +105,41 @@ def geo_map_proxy():
         logger.error(f"[geo-map] {e}")
         return b'', 404
 
+@app.route('/api/geo-legend')
+@cache.cached(timeout=86400, query_string=True)
+def geo_legend_proxy():
+    """KIGAM 지질도 범례 이미지 (GetLegendGraphic) — 암종별 색+이름
+    scale: '50k'(기본) | '250k'
+    returns: PNG (세로로 긴 범례)
+    """
+    try:
+        layer = 'geoOpen:L_250K_Geology_Map' if request.args.get('scale') == '250k' else 'geoOpen:L_50K_Geology_Map'
+        params = {
+            'service': 'WMS', 'version': '1.1.1', 'request': 'GetLegendGraphic',
+            'layer': layer, 'format': 'image/png',
+        }
+        r = req.get(
+            'https://data.kigam.re.kr/mgeo/geoserver/wms',
+            params=params,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+                "Referer": "https://data.kigam.re.kr/map/",
+            },
+            timeout=20
+        )
+        ct = r.headers.get('Content-Type', '')
+        if 'image' not in ct or len(r.content) < 500:
+            logger.warning(f"[geo-legend] not image: {r.status_code} {ct} {len(r.content)}bytes")
+            return b'', 502
+        resp = make_response(r.content)
+        resp.headers['Content-Type'] = 'image/png'
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        logger.info(f"[geo-legend] {r.status_code} {len(r.content)}bytes {layer}")
+        return resp
+    except Exception as e:
+        logger.error(f"[geo-legend] {e}")
+        return b'', 404
+
 @app.route('/api/kigam-info')
 def kigam_featureinfo_proxy():
     """KIGAM GetFeatureInfo — 허가지선 centroid의 지질 정보 조회

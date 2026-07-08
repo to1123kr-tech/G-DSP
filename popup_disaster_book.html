@@ -5115,6 +5115,9 @@ function geoOverlayLoad(){
     DATA8.overlays.geo_map={ kind:'geomap', img:im, ready:true, visible:true,
       tm:{x0:minX, y0:minY, x1:maxX, y1:maxY}, bbox:bbox };
     if(DATA8.forestAlpha===undefined) DATA8.forestAlpha=0.5;
+    /* 지질도 중심으로 화면 자동 이동 (센터링) */
+    S.ox=cv.width/2 - cx*S.scale;
+    S.oy=(cv.height/2) - cy*S.scale;
     _geoOverlayCtl();
     _dmsg('geoMsg','✅ 지질도 겹침 완료'+(loc&&loc.label?' ('+loc.label+' 중심)':''),'ok');
     if(typeof render==='function') render();
@@ -5133,9 +5136,24 @@ function _geoOverlayCtl(){
     '<div style="display:flex;align-items:center;gap:6px;margin-top:5px"><span style="font-size:10px;color:var(--tx3)">농도</span>'+
     '<input type="range" min="10" max="100" step="5" value="'+a+'" oninput="setForestAlpha(this.value)" style="flex:1">'+
     '<span id="forestAlphaVal" style="font-size:10px;color:#38bdf8;font-weight:700;width:30px;text-align:right">'+a+'%</span></div>'+
-    '<div style="font-size:9px;color:var(--tx3);margin-top:3px">KIGAM 1:5만 수치지질도 · 지형 범위에 자동 정합</div>';
+    '<div style="font-size:9px;color:var(--tx3);margin-top:3px">KIGAM 1:5만 수치지질도 · 지형 범위에 자동 정합</div>'+
+    '<button class="dbtn" onclick="geoLegendToggle()" style="width:100%;margin-top:6px;font-size:11px">📋 지질 범례 보기 (암종 색·이름)</button>'+
+    '<div id="geoLegendBox" style="display:none;margin-top:6px;max-height:280px;overflow-y:auto;background:#0e1626;border:1px solid #2a3b5c;border-radius:8px;padding:6px;text-align:center"></div>';
 }
 function _geoOvToggle(on){ if(DATA8.overlays.geo_map){ DATA8.overlays.geo_map.visible=on; if(typeof render==='function') render(); } }
+/* 지질 범례 이미지 접기/펼치기 (KIGAM GetLegendGraphic) */
+function geoLegendToggle(){
+  var box=document.getElementById('geoLegendBox'); if(!box) return;
+  if(box.style.display!=='none'){ box.style.display='none'; return; }
+  box.style.display='';
+  if(!box.dataset.loaded){
+    box.innerHTML='<div style="font-size:10px;color:var(--tx3);padding:10px">⏳ 범례 불러오는 중…</div>';
+    var im=new Image();
+    im.onload=function(){ box.innerHTML=''; im.style.maxWidth='100%'; im.style.borderRadius='4px'; box.appendChild(im); box.dataset.loaded='1'; };
+    im.onerror=function(){ box.innerHTML='<div style="font-size:10px;color:#f87171;padding:10px">범례 로드 실패</div>'; };
+    im.src='/api/geo-legend';
+  }
+}
 
 function geoAutoMoam(){
   var loc=_d8GetLoc();
