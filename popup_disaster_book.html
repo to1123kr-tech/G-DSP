@@ -354,6 +354,7 @@
       <div id="pickHint" style="display:none;font-size:10.5px;color:#fbbf24;margin-top:6px;line-height:1.5;padding:6px 9px;background:rgba(251,191,36,0.1);border-radius:6px;border:1px solid rgba(251,191,36,0.3)">
         지도에서 노란 점선(폐합선)을 클릭하세요
       </div>
+      <button class="btn btn-primary" id="btnPermitDone" onclick="commitPermitBuild()" style="display:none;margin-top:6px">✓ 허가지선 확정</button>
       <div id="permitInfo" style="display:none;margin-top:9px">
         <!-- 면적 좌우 분할: CAD실측 | 보정(공부) -->
         <div style="display:flex;gap:6px">
@@ -453,8 +454,8 @@
       <div style="font-size:10.5px;color:var(--tx3);margin-bottom:8px;line-height:1.5">삼각망(4번)을 격자로 만들어 음영기복을 생성합니다. 삼각망이 없으면 자동 생성됩니다.</div>
       <!-- 격자 해상도 (DEM 생성 전 선택) -->
       <div style="display:flex;gap:6px;margin-top:6px;margin-bottom:6px">
-        <button class="thr on" id="demRes10" onclick="changeDEMRes(10)">격자 10m</button>
-        <button class="thr" id="demRes5" onclick="changeDEMRes(5)">격자 5m</button>
+        <button class="thr" id="demRes10" onclick="changeDEMRes(10)">격자 10m</button>
+        <button class="thr on" id="demRes5" onclick="changeDEMRes(5)">격자 5m</button>
       </div>
       <button class="btn btn-ghost" id="btnDEM" onclick="runDEM()">▦ DEM 생성 (음영기복)</button>
       <div id="demResult" style="display:none;margin-top:10px">
@@ -892,8 +893,8 @@
           <input type="checkbox" id="rainToggle" onchange="toggleRain(this.checked)"> 🌧️ 비 내리기 <span style="color:#7c8aa0;font-size:9.5px">(D8 물길 애니메이션)</span>
         </label>
         <div style="display:flex;gap:4px">
-          <button class="thr2 on" id="demRes10b" onclick="changeDEMRes(10)">10m</button>
-          <button class="thr2" id="demRes5b" onclick="changeDEMRes(5)">5m</button>
+          <button class="thr2" id="demRes10b" onclick="changeDEMRes(10)">10m</button>
+          <button class="thr2 on" id="demRes5b" onclick="changeDEMRes(5)">5m</button>
         </div>
       </div>
       <div style="border-top:1px solid #2a3b5c;margin-bottom:10px"></div>
@@ -934,35 +935,35 @@
       <!-- 빛 높이 -->
       <div style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
-          <span>📐 빛 높이(고도)</span><span id="hsAltVal" style="color:#93c5fd;font-weight:600">45°</span>
+          <span>📐 빛 높이(고도)</span><span id="hsAltVal" style="color:#93c5fd;font-weight:600">35°</span>
         </div>
-        <input type="range" min="10" max="80" value="45" step="5"
+        <input type="range" min="10" max="80" value="35" step="5"
           oninput="setHsAlt(this.value)" style="width:100%;margin-top:4px">
       </div>
       <!-- 음영 격자 (음영 전용 — 수계 결과에 영향 없음) -->
       <div style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
-          <span>🔲 음영 격자</span><span id="hsCellVal" style="color:#fbbf24;font-weight:600">기본</span>
+          <span>🔲 음영 격자</span><span id="hsCellVal" style="color:#fbbf24;font-weight:600">1m</span>
         </div>
-        <input type="range" min="0" max="10" value="0" step="1"
+        <input type="range" min="0" max="10" value="1" step="1"
           oninput="setHsCell(this.value)" style="width:100%;margin-top:4px">
         <div style="font-size:9px;color:#5b7290;margin-top:2px">작을수록 또렷 (0=수계격자 그대로 · 음영에만 적용, 수계 결과 불변)</div>
       </div>
       <!-- 입체 강조 -->
       <div style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
-          <span>⛰️ 입체 강조(Z)</span><span id="hsZVal" style="color:#4ade80;font-weight:600">×1.0</span>
+          <span>⛰️ 입체 강조(Z)</span><span id="hsZVal" style="color:#4ade80;font-weight:600">×5.0</span>
         </div>
-        <input type="range" min="0.5" max="5" value="1" step="0.5"
+        <input type="range" min="0.5" max="5" value="5" step="0.5"
           oninput="setHsZ(this.value)" style="width:100%;margin-top:4px">
         <div style="font-size:9px;color:#5b7290;margin-top:2px">높일수록 산이 뚜렷해집니다</div>
       </div>
       <!-- 부드럽게 (스무딩) -->
       <div>
         <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9fb0c8">
-          <span>🌫️ 부드럽게</span><span id="hsSmoothVal" style="color:#c4b5fd;font-weight:600">2회</span>
+          <span>🌫️ 부드럽게</span><span id="hsSmoothVal" style="color:#c4b5fd;font-weight:600">4회</span>
         </div>
-        <input type="range" min="0" max="4" value="2" step="1"
+        <input type="range" min="0" max="4" value="4" step="1"
           oninput="setHsSmooth(this.value)" style="width:100%;margin-top:4px">
         <div style="font-size:9px;color:#5b7290;margin-top:2px">삼각형 각짐 완화 (0=원본, 과하면 뭉개짐)</div>
       </div>
@@ -1171,8 +1172,8 @@ var S={ contours:[], surveys:[], polys:[],
         dem:null, showDEM:true, hillCanvas:null,
         flow:null, streamMask:null, streamHa:1, showStreams:true, showContours:true, showSurvey:true,
         watershed:null, wsCanvas:null, wsSegs:null, showWS:true, mode:'pan', dnX:0, dnY:0,
-        permit:null, permitDraw:null, ghostXY:null, snapClose:false,
-        showGrid:false, showArrows:false, showFlowNum:true, demClipToPermit:false, areaUnit:'m2', reliefMode:'hypso', daejangArea:null,
+        permit:null, permitDraw:null, ghostXY:null, snapClose:false, _bufferRings:null, _bufKey:'', permitBuild:[], _permitBk:null,
+        showGrid:false, showArrows:false, showFlowNum:true, demClipToPermit:false, areaUnit:'m2', reliefMode:'hypso', daejangArea:null, demCell:5,
         bounds:null, scale:1, ox:0, oy:0,
         zmin:0, zmax:0, isDown:false, lastM:null, name:'',
         /* ★ 선 스타일 시스템 (색·두께·선종류) — 파일 바꿔도 유지 = 사무실별 세팅 */
@@ -1808,13 +1809,11 @@ cv.addEventListener('auxclick',function(e){ if(e.button===1) e.preventDefault();
 window.addEventListener('keydown',function(e){
   if(e.key!=='Escape') return;
   var did=false;
-  if(S.mode==='permit'){ S.mode='pan'; S.permitDraw=null; S.ghostXY=null;
+  if(S.mode==='permit'){ S.mode='pan'; _cancelPermitBuild();
     var b=document.getElementById('btnPermit'); if(b){ b.classList.remove('active'); b.textContent='✏️ 허가지선 그리기'; }
     cv.style.cursor='grab'; did=true; }
   if(CAD.selMode){ if(typeof toggleCadSelect==='function'){ toggleCadSelect(); did=true; } }
-  if(S.mode==='pickPermit'){ S.mode='pan'; S.pickHover=null;
-    var bp=document.getElementById('btnPickMode'); if(bp) bp.classList.remove('active');
-    var ph=document.getElementById('pickHint'); if(ph) ph.style.display='none'; cv.style.cursor='grab'; did=true; }
+  if(S.mode==='pickPermit'){ S.mode='pan'; _cancelPermitBuild(); cv.style.cursor='grab'; did=true; }
   if(S.mode==='pour'){ S.mode='pan'; var bpr=document.getElementById('btnPour'); if(bpr){ bpr.classList.remove('active'); bpr.textContent='📍 유역 추출 (유출구 클릭)'; } cv.style.cursor='grab'; did=true; }
   if(S.mode==='section'){ S.mode='pan'; S.sectionPts=null; S.sectionGhost=null; cv.style.cursor='grab'; did=true; }
   if(S.mode==='crop'){ S.mode='pan'; S.cropPt1=null; S.cropGhost=null;
@@ -1904,7 +1903,7 @@ cv.addEventListener('click',function(e){
       applyCropRect({x1:S.cropPt1.x,y1:S.cropPt1.y,x2:w.x,y2:w.y});
     }
   }
-  else if(S.mode==='pickPermit'){ pickPermitAtClick(w.x,w.y); }
+  else if(S.mode==='pickPermit'){ pickPermitAccumulate(w.x,w.y); }
   else if(S.mode==='section'){
     S.sectionPts=S.sectionPts||[];
     S.sectionPts.push({x:w.x,y:w.y});
@@ -1912,11 +1911,11 @@ cv.addEventListener('click',function(e){
     else { render(); toast('B 지점을 클릭하세요'); }
   }
   else if(S.mode==='permit' && S.permitDraw){
-    if(S.snapClose && S.permitDraw.length>=3){ finishPermit(); }   // 첫 점에 스냅 → 닫기
-    else { S.permitDraw.push({x:w.x,y:w.y}); render(); }
+    if(S.snapClose && S.permitDraw.length>=3){ addDrawnPolygon(); }   // 첫 점에 스냅 → 이 폴리곤 완료(누적)
+    else { S.permitDraw.push({x:w.x,y:w.y}); _updatePermitDoneBtn(); render(); }
   }
 });
-cv.addEventListener('dblclick',function(e){ e.preventDefault(); if(S.mode==='permit') finishPermit(); });
+cv.addEventListener('dblclick',function(e){ e.preventDefault(); if(S.mode==='permit') addDrawnPolygon(); });
 cv.addEventListener('contextmenu',function(e){
   e.preventDefault();
   /* 작업구역/허가지선 그리는 중이면 이전 점 취소 (기존 동작 유지) */
@@ -2452,17 +2451,34 @@ function render(){
     });
   }
 
-  // ★ 버퍼선 (색·두께·선종류)
-  if(S.permit && S.permit.length>=3 && S.bufferDist>0){
-    var bPts=offsetPolygon(S.permit, S.bufferDist);
-    if(bPts && bPts.length>=3){
-      ctx.save();
-      var _bs=applyLineStyle(ctx,'buffer'); ctx.lineJoin='round';
+  // ★ 허가지선 만드는 중 — 선택/그린 폴리곤 미리보기(분홍)
+  if(S.permitBuild && S.permitBuild.length){
+    ctx.save(); ctx.lineJoin='round'; ctx.setLineDash([]);
+    S.permitBuild.forEach(function(e){
+      var poly=e.ring; if(!poly||poly.length<3) return;
       ctx.beginPath();
-      for(var bi=0;bi<bPts.length;bi++){ var bs=w2s(bPts[bi]); if(bi===0)ctx.moveTo(bs.x,bs.y); else ctx.lineTo(bs.x,bs.y); }
-      ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
-      ctx.restore();
-    }
+      for(var pbi=0;pbi<poly.length;pbi++){ var s=w2s(poly[pbi]); if(pbi===0)ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y); }
+      ctx.closePath();
+      ctx.fillStyle='rgba(244,114,182,0.16)'; ctx.fill();
+      ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=4; ctx.stroke();
+      ctx.strokeStyle='#f472b6'; ctx.lineWidth=2.4; ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  // ★ 버퍼선 (거리장 방식 — 리본 없음, 복수필지 전체 감쌈) (색·두께·선종류)
+  ensureBufferRings();
+  if(S._bufferRings && S._bufferRings.length){
+    ctx.save();
+    var _bs=applyLineStyle(ctx,'buffer'); ctx.lineJoin='round';
+    S._bufferRings.forEach(function(bRing){
+      if(!bRing || bRing.length<3) return;
+      ctx.beginPath();
+      for(var bi=0;bi<bRing.length;bi++){ var bs=w2s(bRing[bi]); if(bi===0)ctx.moveTo(bs.x,bs.y); else ctx.lineTo(bs.x,bs.y); }
+      ctx.closePath(); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 
   // ★ 누적 단면선들 (번호 표시) + 삭제 X 뱃지
@@ -2775,7 +2791,7 @@ function hypsoRGB(t){
 }
 
 /* 음영기복 설정 (전역) */
-var _hs = { az: 315, alt: 45, zFactor: 1.0, palette: 'hypso', smooth: 2, hillCell: 0 };  // hillCell:0 = 수계격자와 동일(기본)
+var _hs = { az: 315, alt: 35, zFactor: 5.0, palette: 'hypso', smooth: 4, hillCell: 1 };  // 기본값=제일 잘 보이는 세팅(서광호님 확인). hillCell:1=음영 1m격자
 
 /* 음영기복 → 오프스크린 캔버스
    mode: 'shade' 회색 | 'hypso' 무지개 | 'terrain' 자연색 | 'gray-blue' 청회색
@@ -3457,15 +3473,21 @@ function togglePour(){
 /* ---------- 허가지선 그리기 (산지전용예정지) ---------- */
 function togglePermit(){
   if(!S.bounds){ toast('먼저 DXF를 여세요','err'); return; }
-  S.mode=(S.mode==='permit')?'pan':'permit';
   var b=document.getElementById('btnPermit');
-  if(S.mode==='permit'){
-    S.permitDraw=[]; S.ghostXY=null;
-    var bpm0=document.getElementById('btnPickMode'); if(bpm0) bpm0.classList.remove('active');
-    var ph0=document.getElementById('pickHint'); if(ph0) ph0.style.display='none';
-    var bp=document.getElementById('btnPour'); bp.classList.remove('active'); bp.textContent='📍 유역 추출 (유출구 클릭)';
-    b.classList.add('active'); b.textContent='그리는 중… 더블클릭 완료 · ESC 취소'; cv.style.cursor='crosshair'; toast('꼭짓점 클릭 → 더블클릭 완료 (ESC=취소)');
-  } else { S.permitDraw=null; S.ghostXY=null; b.classList.remove('active'); b.textContent='✏️ 허가지선 그리기'; cv.style.cursor='grab'; }
+  if(S.mode==='permit'){   // 나가기(취소) — 백업 복원
+    S.mode='pan'; _cancelPermitBuild();
+    b.classList.remove('active'); b.textContent='✏️ 허가지선 그리기'; cv.style.cursor='grab'; render(); return;
+  }
+  /* 진입 — 복수 그리기: 기존 허가지선 백업, 화면 비움 */
+  S._permitBk={permit:S.permit, parcels:S.permitParcels};
+  S.permit=null; S.permitParcels=null; S.permitBuild=[]; S.permitDraw=[]; S.ghostXY=null;
+  S.mode='permit';
+  var bpm0=document.getElementById('btnPickMode'); if(bpm0) bpm0.classList.remove('active');
+  var ph0=document.getElementById('pickHint'); if(ph0){ ph0.style.display=''; ph0.innerHTML='꼭짓점 클릭 → <b>더블클릭=폴리곤 완료</b> · 여러 개 그린 뒤 <b>확정</b> (ESC=취소)'; }
+  var bp=document.getElementById('btnPour'); bp.classList.remove('active'); bp.textContent='📍 유역 추출 (유출구 클릭)';
+  b.classList.add('active'); b.textContent='그리는 중… 더블클릭=폴리곤 완료'; cv.style.cursor='crosshair';
+  _updatePermitDoneBtn();
+  toast('꼭짓점 클릭 → 더블클릭=폴리곤 하나 완료, 여러 개 그리면 각각 담겨요');
   render();
 }
 function finishPermit(){
@@ -3486,8 +3508,87 @@ function finishPermit(){
   /* ★ 허가지선 완성 → 경사도 자동 계산 */
   if(S.dem) setTimeout(function(){ autoCalcRisk(); toast('경사도 자동 계산 완료 — 나머지 3인자를 입력하세요','ok'); },200);
 }
+/* ══ 허가지선 복수 만들기 — 픽·그리기 공용 ══
+   누적 버퍼(S.permitBuild)에 폴리곤을 모았다가 "확정"에서 한번에 permitParcels로.
+   지적 선택(cadUseAsPermit)과 같은 구조라 버퍼·면적 합산·DXF·2D/3D 표시가 그대로 동작. */
+function _updatePermitDoneBtn(){
+  var b=document.getElementById('btnPermitDone'); if(!b) return;
+  var active=(S.mode==='pickPermit'||S.mode==='permit');
+  var n=(S.permitBuild?S.permitBuild.length:0);
+  var pend=(S.mode==='permit' && S.permitDraw && S.permitDraw.length>=3)?1:0;  // 그리는 중 폴리곤도 계산
+  var total=n+pend;
+  b.style.display=active?'':'none';
+  b.disabled=(total<1);
+  b.textContent='✓ 허가지선 확정'+(total>0?(' ('+total+'개)'):'');
+}
+/* 취소/ESC — 백업 복원 + 세션 정리 */
+function _cancelPermitBuild(){
+  if(S._permitBk){ S.permit=S._permitBk.permit; S.permitParcels=S._permitBk.parcels; S._permitBk=null; }
+  S.permitBuild=[]; S.permitDraw=null; S.ghostXY=null; S.snapClose=false; S.pickHover=null;
+  var ph=document.getElementById('pickHint'); if(ph) ph.style.display='none';
+  var done=document.getElementById('btnPermitDone'); if(done) done.style.display='none';
+  var bpk=document.getElementById('btnPickMode'); if(bpk) bpk.classList.remove('active');
+}
+/* DXF 폐합선 픽 — 누적(토글) */
+function pickPermitAccumulate(wx,wy){
+  if(!S.polys||!S.polys.length) return;
+  var best=null, bestDist=30/S.scale;
+  S.polys.forEach(function(p){
+    var n=p.pts.length;
+    for(var i=0;i<n;i++){ var a=p.pts[i],b=p.pts[(i+1)%n],dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy)||1;
+      var t=Math.max(0,Math.min(1,((wx-a.x)*dx+(wy-a.y)*dy)/(l*l)));
+      var d=Math.hypot(wx-(a.x+t*dx), wy-(a.y+t*dy)); if(d<bestDist){ bestDist=d; best=p; } }
+  });
+  if(!best){ toast('가까운 폐합선이 없어요 — 좀 더 가까이','err'); return; }
+  if(!S.permitBuild) S.permitBuild=[];
+  var idx=S.permitBuild.findIndex(function(e){return e.src===best;});
+  if(idx>=0){ S.permitBuild.splice(idx,1); toast('해제 (총 '+S.permitBuild.length+'개)'); }
+  else { S.permitBuild.push({ring:best.pts.slice(), src:best}); toast('추가 (총 '+S.permitBuild.length+'개)','ok'); }
+  _updatePermitDoneBtn(); render();
+}
+/* 직접 그리기 — 폴리곤 하나 완료 → 누적에 담고 다음 폴리곤 준비(모드 유지) */
+function addDrawnPolygon(){
+  var pts=(S.permitDraw||[]).slice();
+  while(pts.length>=2){ var a=pts[pts.length-1],b=pts[pts.length-2]; if(Math.hypot(a.x-b.x,a.y-b.y) < 4/S.scale) pts.pop(); else break; }
+  if(pts.length<3){ toast('꼭짓점을 3개 이상 찍어주세요','err'); return; }
+  if(!S.permitBuild) S.permitBuild=[];
+  S.permitBuild.push({ring:pts.slice(), src:null});
+  S.permitDraw=[]; S.ghostXY=null; S.snapClose=false;
+  _updatePermitDoneBtn(); render();
+  toast('폴리곤 '+S.permitBuild.length+'개 · 계속 그리거나 [확정]','ok');
+}
+/* 확정 — 누적(+그리는 중 폴리곤)을 permitParcels로 커밋 */
+function commitPermitBuild(){
+  var rings=(S.permitBuild||[]).map(function(e){return e.ring;});
+  if(S.mode==='permit' && S.permitDraw && S.permitDraw.length>=3){   // 그리는 중이던 폴리곤도 포함
+    var pts=S.permitDraw.slice();
+    while(pts.length>=2){ var a=pts[pts.length-1],b=pts[pts.length-2]; if(Math.hypot(a.x-b.x,a.y-b.y) < 4/S.scale) pts.pop(); else break; }
+    if(pts.length>=3) rings.push(pts);
+  }
+  if(!rings.length){ toast('허가지선을 1개 이상 선택/그리세요','err'); return; }
+  var parcelsPolys=rings.map(function(r,i){ return {jibun:'허가지'+(i+1), ring:r.slice()}; });
+  S.permit=parcelsPolys[0].ring.slice();
+  S.permitParcels=(parcelsPolys.length>1)?parcelsPolys:null;
+  S.daejangArea=null; var dj=document.getElementById('daejangArea'); if(dj) dj.value='';
+  /* 세션 정리 */
+  S.permitBuild=[]; S.permitDraw=null; S.ghostXY=null; S.snapClose=false; S.pickHover=null; S._permitBk=null;
+  S.mode='pan'; cv.style.cursor='grab';
+  var bpk=document.getElementById('btnPickMode'); if(bpk) bpk.classList.remove('active');
+  var bdr=document.getElementById('btnPermit'); if(bdr){ bdr.classList.remove('active'); bdr.textContent='✏️ 허가지선 그리기'; }
+  var ph=document.getElementById('pickHint'); if(ph) ph.style.display='none';
+  var done=document.getElementById('btnPermitDone'); if(done) done.style.display='none';
+  document.getElementById('permitInfo').style.display='';
+  updatePermitAreaDisplay(); render(); _afterPermitSet();
+  var A=(typeof permitTotalArea==='function')?permitTotalArea():polyArea(S.permit);
+  toast('허가지선 확정 · '+parcelsPolys.length+'개 · '+fmtArea(A),'ok');
+  /* 단일이면 경사 자동계산(기존 동작). 복수면 대표(첫)필지 기준임을 안내(잘못된 자동값 방지) */
+  if(S.dem && !S.permitParcels){ setTimeout(function(){ autoCalcRisk(); toast('경사도 자동 계산 완료 — 나머지 3인자를 입력하세요','ok'); },200); }
+  else if(S.permitParcels){ toast('복수 필지 확정 — 경사·분석은 대표(첫) 필지 기준이에요','ok'); }
+}
 function clearPermit(){
   S.permit=null; S.permitParcels=null; S.permitDraw=null; S.ghostXY=null; S.pickHover=null;
+  S.permitBuild=[]; S._permitBk=null;
+  var _pd=document.getElementById('btnPermitDone'); if(_pd) _pd.style.display='none';
   S.daejangArea=null;
   var dj=document.getElementById('daejangArea'); if(dj) dj.value='';
   document.getElementById('permitInfo').style.display='none';
@@ -3690,15 +3791,16 @@ function _rebuild3D(){
       scene.add(pLine); _three.objs.push(pLine);
     }
   });
-  /* 버퍼선 — 표면 드레이프 */
-  if(S.permit&&S.permit.length>=3&&S.bufferDist>0){
-    var bPoly=offsetPolygon(S.permit,S.bufferDist);
-    if(bPoly&&bPoly.length>=3){
-      var bPts=densify3DLine(bPoly, dem, hp, exag, 1.5);
-      var bColor=parseInt((_bufColor||'#fbbf24').replace('#',''),16);
+  /* 버퍼선 — 표면 드레이프 (거리장 방식 — 리본 없음, 복수필지 전체) */
+  ensureBufferRings();
+  if(S._bufferRings && S._bufferRings.length){
+    var bColor=parseInt((_bufColor||'#fbbf24').replace('#',''),16);
+    S._bufferRings.forEach(function(bRing){
+      if(!bRing || bRing.length<3) return;
+      var bPts=densify3DLine(bRing.concat([bRing[0]]), dem, hp, exag, 1.5);
       var bLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(bPts), new THREE.LineBasicMaterial({color:bColor}));
       scene.add(bLine); _three.objs.push(bLine);
-    }
+    });
   }
   /* 하천망 — 표면 드레이프 (3D는 밝은 시안·지형 위로 띄워 잘 보이게) — 3D 전용 토글 */
   if(S.flow && S.showStreams && S.show3DStream!==false && S.streamMask){
@@ -4237,13 +4339,17 @@ function enterPickMode(){
   /* 그리던 중이었으면 그리기 완전 취소 */
   S.permitDraw=null; S.ghostXY=null; S.snapClose=false;
   var bperm=document.getElementById('btnPermit'); if(bperm){ bperm.classList.remove('active'); bperm.textContent='✏️ 허가지선 그리기'; }
+  /* ★ 복수 선택: 기존 허가지선은 백업(취소 시 복원), 화면은 후보 보이게 비움 */
+  S._permitBk={permit:S.permit, parcels:S.permitParcels};
+  S.permit=null; S.permitParcels=null; S.permitBuild=[];
   S.mode='pickPermit'; S.pickHover=null;
   cv.style.cursor='crosshair';
   var bp=document.getElementById('btnPickMode');
   if(bp){ bp.classList.add('active'); }
-  document.getElementById('pickHint').style.display='';
+  var ph=document.getElementById('pickHint'); if(ph){ ph.style.display=''; ph.innerHTML='폐합선을 <b>여러 개</b> 클릭 (다시 클릭=해제) → 아래 <b>확정</b>'; }
+  _updatePermitDoneBtn();
   render();
-  toast('폐합선을 클릭하세요');
+  toast('폐합선을 클릭하세요 (여러 개 가능)');
 }
 
 /* ══ 대장(공부)면적 입력 → 보정 ══ */
@@ -4409,6 +4515,78 @@ function offsetPolygon(pts, d){
     out.push({x:curr.x+bx/bl*sc,y:curr.y+by/bl*sc});
   }
   return out;
+}
+
+/* ══ 버퍼 링 (거리장 signed-distance + 마칭스퀘어) — 리본 없음, 복수필지 union 자동 ══
+   miter 방식(offsetPolygon)은 좁은 오목부/날카로운 노치(2·이격거리보다 좁은 홈)에서
+   오프셋 모서리가 되접혀 자기교차(리본)가 생김. 여기선 신청지 경계까지의 부호거리장을
+   격자로 만들고 "거리=이격거리" 등치선을 마칭스퀘어로 뽑음 → 스칼라장 등치선이라
+   자기교차가 물리적으로 불가능. 복수 필지는 자동 union(이격거리 정석). 모서리는 살짝
+   둥긂(디스크 반경=이격거리, Minkowski — 이격거리엔 오히려 정석).
+   좌표=world(EPSG:5186, m), d=이격거리(m). node.js 15개 험한케이스+needle노치 검증. */
+function bufferRings(polys, d){
+  var minX=1e18,minY=1e18,maxX=-1e18,maxY=-1e18;
+  polys.forEach(function(r){ r.forEach(function(p){ if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y; if(p.x>maxX)maxX=p.x; if(p.y>maxY)maxY=p.y; }); });
+  var diag=Math.hypot(maxX-minX,maxY-minY)||1;
+  var cell=Math.max(d/7, diag/500);           /* 셀=매끄러움 vs 격자수 균형(상한 ~500/축) */
+  var pad=d+cell*3;
+  minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
+  var nx=Math.ceil((maxX-minX)/cell)+1, ny=Math.ceil((maxY-minY)/cell)+1;
+  var edges=[]; polys.forEach(function(r){ var m=r.length; for(var i=0,j=m-1;i<m;j=i++) edges.push([r[j].x,r[j].y,r[i].x,r[i].y]); });
+  function dseg(px,py,ax,ay,bx,by){ var dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy; if(l2<1e-12) return Math.hypot(px-ax,py-ay); var t=((px-ax)*dx+(py-ay)*dy)/l2; if(t<0)t=0; else if(t>1)t=1; return Math.hypot(px-(ax+t*dx),py-(ay+t*dy)); }
+  function pin(px,py,r){ var ins=false,m=r.length; for(var i=0,j=m-1;i<m;j=i++){ var xi=r[i].x,yi=r[i].y,xj=r[j].x,yj=r[j].y; if(((yi>py)!==(yj>py)) && (px<(xj-xi)*(py-yi)/(yj-yi)+xi)) ins=!ins; } return ins; }
+  var g=new Float64Array(nx*ny);
+  for(var gy=0;gy<ny;gy++){ for(var gx=0;gx<nx;gx++){
+    var X=minX+gx*cell, Y=minY+gy*cell, dm=1e18;
+    for(var e=0;e<edges.length;e++){ var q=dseg(X,Y,edges[e][0],edges[e][1],edges[e][2],edges[e][3]); if(q<dm)dm=q; }
+    var insG=false; for(var pi=0;pi<polys.length;pi++){ if(pin(X,Y,polys[pi])){ insG=true; break; } }
+    g[gy*nx+gx]=(insG?-dm:dm)-d;              /* 부호거리 - 이격거리: <0=버퍼 내부 */
+  }}
+  var pts={}, adj={};
+  function cr(x0,y0,v0,x1,y1,v1){ var t=v0/(v0-v1); return {x:x0+t*(x1-x0), y:y0+t*(y1-y0)}; }
+  function lk(a,b){ (adj[a]||(adj[a]=[])).push(b); (adj[b]||(adj[b]=[])).push(a); }
+  function pH(gx,gy){ var k='H'+gx+'_'+gy; if(!pts[k]){ var i0=gy*nx+gx,i1=gy*nx+(gx+1); pts[k]=cr(minX+gx*cell,minY+gy*cell,g[i0],minX+(gx+1)*cell,minY+gy*cell,g[i1]); } return k; }
+  function pV(gx,gy){ var k='V'+gx+'_'+gy; if(!pts[k]){ var i0=gy*nx+gx,i1=(gy+1)*nx+gx; pts[k]=cr(minX+gx*cell,minY+gy*cell,g[i0],minX+gx*cell,minY+(gy+1)*cell,g[i1]); } return k; }
+  for(var gy=0;gy<ny-1;gy++){ for(var gx=0;gx<nx-1;gx++){
+    var i00=gy*nx+gx,i10=gy*nx+(gx+1),i11=(gy+1)*nx+(gx+1),i01=(gy+1)*nx+gx;
+    var c=(g[i00]<0?1:0)+(g[i10]<0?2:0)+(g[i11]<0?4:0)+(g[i01]<0?8:0);
+    if(c===0||c===15) continue;
+    var B=pH(gx,gy), T=pH(gx,gy+1), L=pV(gx,gy), R=pV(gx+1,gy);
+    switch(c){
+      case 1: lk(L,B); break; case 2: lk(B,R); break; case 3: lk(L,R); break; case 4: lk(R,T); break;
+      case 6: lk(B,T); break; case 7: lk(L,T); break; case 8: lk(T,L); break; case 9: lk(T,B); break;
+      case 11: lk(T,R); break; case 12: lk(R,L); break; case 13: lk(B,R); break; case 14: lk(L,B); break;
+      case 5: { var ct=(g[i00]+g[i10]+g[i11]+g[i01])/4; if(ct<0){ lk(L,T); lk(R,B); } else { lk(L,B); lk(R,T); } } break;
+      case 10:{ var ct=(g[i00]+g[i10]+g[i11]+g[i01])/4; if(ct<0){ lk(T,R); lk(B,L); } else { lk(T,L); lk(B,R); } } break;
+    }
+  }}
+  var rings=[], used={};
+  for(var sk in adj){
+    if(used[sk] || !adj[sk].length) continue;
+    var ring=[], cur=sk, prev=null, gd=0;
+    while(cur && !used[cur] && gd++<2000000){
+      used[cur]=1; ring.push(pts[cur]);
+      var nb=adj[cur], nxt=null;
+      for(var t=0;t<nb.length;t++){ if(nb[t]!==prev && !used[nb[t]]){ nxt=nb[t]; break; } }
+      prev=cur; cur=nxt;
+    }
+    if(ring.length>=3) rings.push(ring);
+  }
+  return rings;
+}
+/* 버퍼 링 캐시 — 신청지/이격거리 바뀔 때만 재계산(격자 계산이 무거우므로 매 프레임 X).
+   폴리곤=복수필지면 전부(union), 아니면 대표필지 하나. 키=이격거리+필지수+각 링 좌표체크섬. */
+function ensureBufferRings(){
+  var polys=(S.permitParcels&&S.permitParcels.length)
+    ? S.permitParcels.map(function(p){return p.ring;})
+    : ((S.permit&&S.permit.length>=3)?[S.permit]:[]);
+  if(!polys.length || !(S.bufferDist>0)){ S._bufferRings=null; S._bufKey='none'; return; }
+  var ck=S.bufferDist+'|'+polys.length;
+  for(var i=0;i<polys.length;i++){ var r=polys[i],sum=0; for(var j=0;j<r.length;j++){ sum+=r[j].x*31+r[j].y*17; } ck+='|'+r.length+':'+sum.toFixed(1); }
+  if(ck===S._bufKey) return;
+  S._bufKey=ck;
+  try{ S._bufferRings=bufferRings(polys, S.bufferDist); }
+  catch(e){ S._bufferRings=null; }
 }
 
 /* ── 단면도 ── */
