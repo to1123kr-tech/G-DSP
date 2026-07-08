@@ -32,6 +32,12 @@ KAKAO_APP_KEY = "c670e0bc85874ef6267220f09882b379"  # REST API 키 (JS키 0f432d
 # ── KIGAM 수치지질도 ──────────────────────────────────────────────
 KIGAM_KEY = "mzt5lyC51EuMLE1FlKz1Xvk7inmlKd"
 
+# ── 흙토람(농진청) 토양특성 = 토심 ────────────────────────────────
+# ★ http 전용(https는 Forbidden). PNU_CD 19자리로 조회. 유효토심 Vldsoildep_Cd(01~04)
+SOIL_KEY = "09b819905e0a70316749fb91c03a216633ad3e75196a6aa25e6a9f273d9116f8"
+# 유효토심코드 → 한글(흙토람 4등급과 동일)
+SOIL_DEPTH_NAME = {'01':'매우얕음(0~25cm)','02':'얕음(25~50cm)','03':'보통(50~100cm)','04':'깊음(100cm이상)'}
+
 @app.route('/api/kigam-wms')
 @cache.cached(timeout=3600, query_string=True)
 def kigam_wms_proxy():
@@ -139,6 +145,38 @@ def geo_legend_proxy():
     except Exception as e:
         logger.error(f"[geo-legend] {e}")
         return b'', 404
+
+@app.route('/api/soil-depth')
+@cache.cached(timeout=86400, query_string=True)
+def soil_depth_proxy():
+    """흙토람 토양특성 → 유효토심 조회 (검토의견서 토심 항목)
+    ★ http 전용 (https는 Forbidden). PNU_CD 19자리.
+    params: pnu (19자리) — 우리 도구가 지적선택/검색에서 뽑은 PNU
+    returns: JSON {ok, pnu, depth_code, depth_name, raw:{27종 코드}}
+    """
+    import xml.etree.ElementTree as ET
+    try:
+        pnu = (request.args.get('pnu') or '').strip()
+        if len(pnu) != 19 or not pnu.isdigit():
+            return jsonify({'ok': False, 'error': f'PNU 19자리 아님: {pnu}'}), 400
+        url = 'http://apis.data.go.kr/1390802/SoilEnviron/SoilCharac/V3/getSoilCharacter'
+        r = req.get(url, params={'serviceKey': SOIL_KEY, 'PNU_CD': pnu}, timeout=15)
+        body = r.text or ''
+        if r.status_code != 200 or '<item>' not in body:
+            logger.warning(f"[soil-depth] {r.status_code} no item pnu={pnu} body={body[:120]}")
+            return jsonify({'ok': False, 'error': '토양자료 없음(임야/특수지번일 수 있음)', 'pnu': pnu})
+        root = ET.fromstring(body)
+        item = root.find('.//item')
+        if item is None:
+            return jsonify({'ok': False, 'error': '항목 없음', 'pnu': pnu})
+        raw = {ch.tag: (ch.text or '').strip() for ch in item}
+        dc = raw.get('Vldsoildep_Cd', '')
+        dn = SOIL_DEPTH_NAME.get(dc, '알수없음' if dc else '없음')
+        logger.info(f"[soil-depth] pnu={pnu} depth={dc}({dn})")
+        return jsonify({'ok': True, 'pnu': pnu, 'depth_code': dc, 'depth_name': dn, 'raw': raw})
+    except Exception as e:
+        logger.error(f"[soil-depth] {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/kigam-info')
 def kigam_featureinfo_proxy():
