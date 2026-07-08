@@ -2189,7 +2189,7 @@ function render(){
           var ccx=ac+(gm>>1), ccy=ar+(gm>>1); if(ccx>=af.cols||ccy>=af.rows||ccx<0||ccy<0) continue;
           var ai=ccy*af.cols+ccx, code=af.fdir[ai]; if(code<=0) continue;
           var d=_step(code); if(!d) continue;
-          var cx=af.minX+(ccx+0.5)*af.cell, cy=af.minY+(ccy+0.5)*af.cell;
+          var cx=af.minX+(ac+gm/2)*af.cell, cy=af.minY+(ar+gm/2)*af.cell;  // ★격자 정중앙
           var p1=w2s({x:cx-d[0]*Lw,y:cy-d[1]*Lw}), p2=w2s({x:cx+d[0]*Lw,y:cy+d[1]*Lw});
           var hl=Math.max(2,Math.min(7,cellPx*0.16)), ang=Math.atan2(p2.y-p1.y,p2.x-p1.x);
           ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
@@ -2209,7 +2209,7 @@ function render(){
           var rmp=_flowRamp(lv);
           ctx.strokeStyle='rgba('+rmp[0]+','+rmp[1]+','+rmp[2]+','+(0.55+0.4*lv).toFixed(2)+')';
           ctx.lineWidth=Math.max(1, Math.min(cellPx*0.16, 0.8+2.8*lv));
-          var cx2=af.minX+(ccx2+0.5)*af.cell, cy2=af.minY+(ccy2+0.5)*af.cell;
+          var cx2=af.minX+(ac2+gm/2)*af.cell, cy2=af.minY+(ar2+gm/2)*af.cell;  // ★격자 정중앙 (gm 짝수 어긋남 수정)
           var q1=w2s({x:cx2-d2[0]*Lw,y:cy2-d2[1]*Lw}), q2=w2s({x:cx2+d2[0]*Lw,y:cy2+d2[1]*Lw});
           var hl2=Math.max(2.5,Math.min(9,cellPx*0.18)), ang2=Math.atan2(q2.y-q1.y,q2.x-q1.x);
           var _fillRmp='rgba('+rmp[0]+','+rmp[1]+','+rmp[2]+','+(0.8+0.2*lv).toFixed(2)+')';
