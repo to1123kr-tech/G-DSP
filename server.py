@@ -189,6 +189,45 @@ def soil_depth_proxy():
         logger.error(f"[soil-depth] {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
 
+@app.route('/api/soil-map')
+@cache.cached(timeout=3600, query_string=True)
+def soil_map_proxy():
+    """VWorld 유효토심 WMS 이미지 (지형 위에 겹치기용)
+    레이어: lt_c_asitsoildep (유효토심) — 실데이터 확인됨
+    params:
+        bbox — 'minLat,minLng,maxLat,maxLng' (EPSG:4326, VWorld 1.3.0은 lat,lng 순). 프론트가 5186→WGS84 변환해 전달
+        w, h — 픽셀 크기 (기본 800x600)
+        layer — 'depth'(기본 유효토심) | 'drain'(배수) | 'deep'(심토토성) | 'stone'(자갈)
+    returns: PNG (RGBA 투명)
+    """
+    try:
+        bbox = request.args.get('bbox', '')
+        if not bbox or len(bbox.split(',')) != 4:
+            return b'', 400
+        w = request.args.get('w', '800'); h = request.args.get('h', '600')
+        lmap = {'depth':'lt_c_asitsoildep','drain':'lt_c_asitsoildra','deep':'lt_c_asitdeepsoil','stone':'lt_c_asitsurston'}
+        layer = lmap.get(request.args.get('layer'), 'lt_c_asitsoildep')
+        params = {
+            'SERVICE':'WMS','REQUEST':'GetMap','VERSION':'1.3.0',
+            'LAYERS':layer,'CRS':'EPSG:4326','BBOX':bbox,
+            'WIDTH':w,'HEIGHT':h,'FORMAT':'image/png','TRANSPARENT':'true',
+            'KEY':VWORLD_KEY,'DOMAIN':f'http://{VWORLD_DOMAIN}',
+        }
+        r = req.get('http://api.vworld.kr/req/wms', params=params,
+                    headers={"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}, timeout=20)
+        ct = r.headers.get('Content-Type', '')
+        if 'image' not in ct or len(r.content) < 400:
+            logger.warning(f"[soil-map] not image: {r.status_code} {ct} {len(r.content)}bytes body={r.text[:120]}")
+            return b'', 502
+        resp = make_response(r.content)
+        resp.headers['Content-Type'] = 'image/png'
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        logger.info(f"[soil-map] {r.status_code} {len(r.content)}bytes {layer}")
+        return resp
+    except Exception as e:
+        logger.error(f"[soil-map] {e}")
+        return b'', 404
+
 @app.route('/api/kigam-info')
 def kigam_featureinfo_proxy():
     """KIGAM GetFeatureInfo — 허가지선 centroid의 지질 정보 조회

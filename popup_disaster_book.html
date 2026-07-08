@@ -743,8 +743,10 @@
           <span class="st">자동조회 · 흙토람</span>
         </div>
         <div class="dcard-bd" id="dcb_soil">
-          <button class="dbtn pri" onclick="soilDepthAuto()" style="width:100%;margin-bottom:6px;background:linear-gradient(135deg,#a16207,#854d0e)">🟫 작업위치 토심 자동조회</button>
+          <button class="dbtn pri" onclick="soilDepthAuto()" style="width:100%;margin-bottom:6px;background:linear-gradient(135deg,#a16207,#854d0e)">🟫 작업위치 토심 자동조회 (값)</button>
           <div id="soilResult" style="display:none;margin-bottom:7px"></div>
+          <button class="dbtn pri" onclick="soilMapLoad()" style="width:100%;margin-bottom:6px;background:linear-gradient(135deg,#65a30d,#4d7c0f)">🗺️ 유효토심 지형 위에 겹치기 (그림)</button>
+          <div id="soilMapCtl" style="display:none;margin-bottom:7px"></div>
           <div class="dhint">선택 필지(또는 「작업 위치」)의 유효토심을 흙토람에서 자동조회 → 매우얕음/얕음/보통/깊음 4등급 (검토의견서 토심 항목)</div>
           <div id="soilMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
@@ -5220,6 +5222,57 @@ function _soilFetch(pnu){
     .catch(function(e){ _dmsg('soilMsg','네트워크 오류: '+e,'err'); });
 }
 
+/* 유효토심 지도 겹치기 (VWorld WMS lt_c_asitsoildep) — 지질도와 동일 방식, 단 VWorld는 BBOX=lat,lng 순 */
+function soilMapLoad(){
+  var loc=_d8GetLoc();
+  var b=S.bounds;
+  var cx, cy, halfW, halfH;
+  if(b){ halfW=(b.maxX-b.minX)/2; halfH=(b.maxY-b.minY)/2; }
+  else { halfW=400; halfH=300; }
+  if(loc && loc.lng){
+    var c5=wgs84toTm5186(loc.lng, loc.lat);
+    if(!c5){ _dmsg('soilMsg','좌표변환 실패 (proj4)','err'); return; }
+    cx=c5[0]; cy=c5[1];
+  } else if(b){ cx=(b.minX+b.maxX)/2; cy=(b.minY+b.maxY)/2; }
+  else { _dmsg('soilMsg','먼저 「작업 위치」를 검색하거나 지형도를 올리세요','err'); return; }
+  var minX=cx-halfW, maxX=cx+halfW, minY=cy-halfH, maxY=cy+halfH;
+  var corners=[[minX,minY],[maxX,minY],[minX,maxY],[maxX,maxY]];
+  var lngs=[], lats=[];
+  for(var i=0;i<corners.length;i++){ var w=tm5186toWgs84(corners[i][0],corners[i][1]); if(!w){ _dmsg('soilMsg','좌표변환 실패','err'); return; } lngs.push(w[0]); lats.push(w[1]); }
+  var minLng=Math.min.apply(null,lngs), maxLng=Math.max.apply(null,lngs);
+  var minLat=Math.min.apply(null,lats), maxLat=Math.max.apply(null,lats);
+  /* ★ VWorld 1.3.0 EPSG:4326 = BBOX(minLat,minLng,maxLat,maxLng) 순서 */
+  var bbox=minLat+','+minLng+','+maxLat+','+maxLng;
+  var wRatio=(maxLng-minLng), hRatio=(maxLat-minLat);
+  var W=900, H=Math.max(100, Math.min(1400, Math.round(W*(hRatio/wRatio))));
+  _dmsg('soilMsg','⏳ 유효토심 지도 불러오는 중…','');
+  var im=new Image();
+  im.onload=function(){
+    DATA8.overlays.soil_map={ kind:'soilmap', img:im, ready:true, visible:true,
+      tm:{x0:minX, y0:minY, x1:maxX, y1:maxY} };
+    if(DATA8.forestAlpha===undefined) DATA8.forestAlpha=0.5;
+    S.ox=cv.width/2 - cx*S.scale; S.oy=(cv.height/2) - cy*S.scale;
+    _soilMapCtl();
+    _dmsg('soilMsg','✅ 유효토심 겹침 완료','ok');
+    if(typeof render==='function') render();
+  };
+  im.onerror=function(){ _dmsg('soilMsg','유효토심 이미지 로드 실패 — 범위 밖이거나 서버 오류','err'); };
+  im.src='/api/soil-map?bbox='+encodeURIComponent(bbox)+'&w='+W+'&h='+H;
+}
+function _soilMapCtl(){
+  var el=document.getElementById('soilMapCtl'); if(!el) return;
+  var o=DATA8.overlays.soil_map; if(!o){ el.style.display='none'; return; }
+  el.style.display='';
+  var a=Math.round((DATA8.forestAlpha!==undefined?DATA8.forestAlpha:0.5)*100);
+  el.innerHTML=
+    '<label class="dlayer" style="margin-top:2px"><input type="checkbox" '+(o.visible?'checked':'')+' onchange="_soilMapToggle(this.checked)"> 🗺️ <b>유효토심(지도)</b></label>'+
+    '<div style="display:flex;align-items:center;gap:6px;margin-top:5px"><span style="font-size:10px;color:var(--tx3)">농도</span>'+
+    '<input type="range" min="10" max="100" step="5" value="'+a+'" oninput="setForestAlpha(this.value)" style="flex:1">'+
+    '<span id="forestAlphaVal" style="font-size:10px;color:#38bdf8;font-weight:700;width:30px;text-align:right">'+a+'%</span></div>'+
+    '<div style="font-size:9px;color:var(--tx3);margin-top:3px">VWorld 유효토심 · 지형 범위에 자동 정합</div>';
+}
+function _soilMapToggle(on){ if(DATA8.overlays.soil_map){ DATA8.overlays.soil_map.visible=on; if(typeof render==='function') render(); } }
+
 function geoAutoMoam(){
   var loc=_d8GetLoc();
   if(!loc){ _dmsg('geoMsg','위에서 「작업 위치」를 검색하거나 허가지선을 먼저 만드세요','err'); return; }
@@ -5537,6 +5590,14 @@ function drawForestOverlays(){
     var gtl=w2s({x:gm.tm.x0, y:gm.tm.y1}), gbr=w2s({x:gm.tm.x1, y:gm.tm.y0});
     ctx.save(); ctx.globalAlpha=alpha;
     ctx.drawImage(gm.img, gtl.x, gtl.y, gbr.x-gtl.x, gbr.y-gtl.y);
+    ctx.restore();
+  }
+  /* 유효토심(이미지) — 지질도 위, 산림청 아래 */
+  var sm=ov.soil_map;
+  if(sm && sm.visible && sm.ready && sm.img && sm.tm){
+    var stl=w2s({x:sm.tm.x0, y:sm.tm.y1}), sbr=w2s({x:sm.tm.x1, y:sm.tm.y0});
+    ctx.save(); ctx.globalAlpha=alpha;
+    ctx.drawImage(sm.img, stl.x, stl.y, sbr.x-stl.x, sbr.y-stl.y);
     ctx.restore();
   }
   /* 그리는 순서: 산사태(면) → 토양(면) → 임상(면). 켜진 것만 */
