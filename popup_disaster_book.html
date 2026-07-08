@@ -49,6 +49,9 @@
   .thr{flex:1;padding:7px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);
     color:var(--tx3);font-size:12px;font-weight:700;cursor:pointer}
   .thr.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent}
+  .palBtn{padding:4.5px 4px !important;font-size:10.5px !important;line-height:1.2}
+  .lctx{padding:7px 12px;font-size:12px;color:#cdd8ea;cursor:pointer;border-radius:6px;white-space:nowrap;user-select:none}
+  .lctx:hover{background:rgba(56,189,248,0.18);color:#e8f4ff}
   .thr2{padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--tx3);font-size:10.5px;cursor:pointer}
   .thr2.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent;font-weight:600}
   .thr3{flex:1;padding:5px 0;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--tx3);font-size:10.5px;cursor:pointer;transition:.12s}
@@ -806,6 +809,19 @@
     <canvas id="cv"></canvas>
     <div class="hint" id="hint" style="display:none">휠=확대 · 드래그=이동</div>
     <!-- 레이어 토글 바 (좌측 상단) — 한 줄 유지 -->
+    <!-- 우클릭 레이어 컨텍스트 메뉴 (툴바와 동일 항목) -->
+    <div id="layerCtxMenu" style="display:none;position:absolute;z-index:50;background:rgba(14,22,38,0.98);border:1px solid #2a3b5c;border-radius:10px;padding:5px;min-width:150px;box-shadow:0 10px 40px rgba(0,0,0,0.6);backdrop-filter:blur(6px)">
+      <div class="lctx" onclick="layerCtxRun('map')">🗺 배경지도</div>
+      <div class="lctx" onclick="layerCtxRun('dem')">음영기복</div>
+      <div class="lctx" onclick="layerCtxRun('contour')">등고선</div>
+      <div class="lctx" onclick="layerCtxRun('stream')">하천망</div>
+      <div class="lctx" onclick="layerCtxRun('bg')">지형도</div>
+      <div class="lctx" onclick="layerCtxRun('cad')">📐 지적선</div>
+      <div class="lctx" onclick="layerCtxRun('tin')">삼각망</div>
+      <div class="lctx" onclick="layerCtxRun('survey')">표고점</div>
+      <div style="height:1px;background:#2a3b5c;margin:4px 2px"></div>
+      <div class="lctx" onclick="layerCtxRun('hs')">🎨 음영조절</div>
+    </div>
     <div id="layerBar" style="display:none;position:absolute;left:12px;top:12px;gap:4px;z-index:6;flex-wrap:nowrap;align-items:center;overflow-x:auto;max-width:calc(100% - 120px);white-space:nowrap;scrollbar-width:thin;padding-bottom:2px">
       <span style="display:inline-flex;align-items:center;gap:3px;flex-shrink:0">
         <button class="lyrBtn" id="lyrMap" onclick="mapBtnToggle()" title="배경지도(위성/일반+지적) 표시/숨김">🗺 배경지도</button>
@@ -837,7 +853,7 @@
       <span class="cursor-xy" id="sbXY">–</span>
     </div>
     <!-- 🎨 음영기복 조정 팝업 (우측) -->
-    <div id="hsPanel" style="display:none;position:absolute;right:14px;top:14px;width:260px;background:rgba(14,22,38,0.96);border:1px solid #2a3b5c;border-radius:12px;padding:14px;z-index:8;backdrop-filter:blur(6px);box-shadow:0 10px 40px rgba(0,0,0,0.5)">
+    <div id="hsPanel" style="display:none;position:absolute;right:14px;top:14px;width:260px;max-height:calc(100vh - 40px);overflow-y:auto;background:rgba(14,22,38,0.96);border:1px solid #2a3b5c;border-radius:12px;padding:14px;z-index:8;backdrop-filter:blur(6px);box-shadow:0 10px 40px rgba(0,0,0,0.5)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <span style="font-size:13px;font-weight:700;color:#e8eef7">🎨 음영기복 조정</span>
         <button onclick="toggleHsPanel()" style="background:none;border:none;color:#5b7290;cursor:pointer;font-size:15px;padding:0;line-height:1">✕</button>
@@ -857,18 +873,18 @@
       </div>
       <div style="border-top:1px solid #2a3b5c;margin-bottom:10px"></div>
       <!-- 색상 프리셋 -->
-      <div style="font-size:11px;color:#9fb0c8;margin-bottom:7px">색상 프리셋</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
-        <button class="thr on" id="pal_hypso" onclick="setHsPalette('hypso')">🌈 무지개</button>
-        <button class="thr" id="pal_terrain" onclick="setHsPalette('terrain')">🏔️ 자연색</button>
-        <button class="thr" id="pal_shade" onclick="setHsPalette('shade')">⬜ 회색</button>
-        <button class="thr" id="pal_gray-blue" onclick="setHsPalette('gray-blue')">🔵 청회색</button>
-        <button class="thr" id="pal_sepia" onclick="setHsPalette('sepia')">📜 갈색지도</button>
-        <button class="thr" id="pal_forest" onclick="setHsPalette('forest')">🌲 산림</button>
-        <button class="thr" id="pal_autumn" onclick="setHsPalette('autumn')">🍁 단풍</button>
-        <button class="thr" id="pal_pastel" onclick="setHsPalette('pastel')">🎨 파스텔</button>
-        <button class="thr" id="pal_jet" onclick="setHsPalette('jet')">🌈 형광</button>
-        <button class="thr" id="pal_thermal" onclick="setHsPalette('thermal')">🔥 열지도</button>
+      <div style="font-size:11px;color:#9fb0c8;margin-bottom:4px">색상 프리셋</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:9px">
+        <button class="thr palBtn on" id="pal_hypso" onclick="setHsPalette('hypso')">🌈 무지개</button>
+        <button class="thr palBtn" id="pal_terrain" onclick="setHsPalette('terrain')">🏔️ 자연색</button>
+        <button class="thr palBtn" id="pal_shade" onclick="setHsPalette('shade')">⬜ 회색</button>
+        <button class="thr palBtn" id="pal_gray-blue" onclick="setHsPalette('gray-blue')">🔵 청회색</button>
+        <button class="thr palBtn" id="pal_sepia" onclick="setHsPalette('sepia')">📜 갈색지도</button>
+        <button class="thr palBtn" id="pal_forest" onclick="setHsPalette('forest')">🌲 산림</button>
+        <button class="thr palBtn" id="pal_autumn" onclick="setHsPalette('autumn')">🍁 단풍</button>
+        <button class="thr palBtn" id="pal_pastel" onclick="setHsPalette('pastel')">🎨 파스텔</button>
+        <button class="thr palBtn" id="pal_jet" onclick="setHsPalette('jet')">🌈 형광</button>
+        <button class="thr palBtn" id="pal_thermal" onclick="setHsPalette('thermal')">🔥 열지도</button>
       </div>
       <!-- 태양 방향 다이얼 -->
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
@@ -1875,8 +1891,35 @@ cv.addEventListener('click',function(e){
 });
 cv.addEventListener('dblclick',function(e){ e.preventDefault(); if(S.mode==='permit') finishPermit(); });
 cv.addEventListener('contextmenu',function(e){
-  if(S.mode==='permit' && S.permitDraw && S.permitDraw.length){ e.preventDefault(); S.permitDraw.pop(); S.snapClose=false; render(); toast('이전 점 취소'); }
+  e.preventDefault();
+  /* 작업구역/허가지선 그리는 중이면 이전 점 취소 (기존 동작 유지) */
+  if(S.mode==='permit' && S.permitDraw && S.permitDraw.length){ S.permitDraw.pop(); S.snapClose=false; render(); toast('이전 점 취소'); return; }
+  /* 그 외엔 레이어 메뉴 표시 */
+  showLayerCtxMenu(e);
 });
+/* 우클릭 레이어 메뉴: 툴바 버튼과 동일 동작 */
+function showLayerCtxMenu(e){
+  var m=document.getElementById('layerCtxMenu'); if(!m) return;
+  var host=cv.parentElement||document.body, hr=host.getBoundingClientRect();
+  var x=e.clientX-hr.left, y=e.clientY-hr.top;
+  m.style.display='block';
+  /* 화면 밖으로 안 나가게 보정 */
+  var mw=m.offsetWidth||160, mh=m.offsetHeight||300;
+  if(x+mw>host.clientWidth) x=Math.max(4,host.clientWidth-mw-4);
+  if(y+mh>host.clientHeight) y=Math.max(4,host.clientHeight-mh-4);
+  m.style.left=x+'px'; m.style.top=y+'px';
+}
+function hideLayerCtxMenu(){ var m=document.getElementById('layerCtxMenu'); if(m) m.style.display='none'; }
+function layerCtxRun(k){
+  hideLayerCtxMenu();
+  if(k==='map') mapBtnToggle();
+  else if(k==='cad') cadLineBtnToggle();
+  else if(k==='hs') toggleHsPanel();
+  else toggleLayer(k);   // dem/contour/stream/bg/tin/survey
+}
+/* 메뉴 밖 클릭/스크롤/ESC 시 닫기 */
+document.addEventListener('click',function(e){ var m=document.getElementById('layerCtxMenu'); if(m&&m.style.display==='block'&&!m.contains(e.target)) hideLayerCtxMenu(); });
+document.addEventListener('keydown',function(e){ if(e.key==='Escape') hideLayerCtxMenu(); });
 cv.addEventListener('wheel',function(e){
   e.preventDefault();
   var _ep=evPix(e);
@@ -3954,10 +3997,11 @@ function toggle3DRain(on){
 function set3DRainSpeed(v){ _rain3d.speed=Math.max(0.2,Math.min(3,(parseFloat(v)||100)/100)); var e=document.getElementById('c3d_rainSpVal'); if(e)e.textContent='×'+_rain3d.speed.toFixed(1); }
 function set3DRainAmt(v){ _rain3d.amount=Math.max(0.2,Math.min(3,(parseFloat(v)||100)/100)); var e=document.getElementById('c3d_rainAmtVal'); if(e)e.textContent='×'+_rain3d.amount.toFixed(1); if(_rain3d.on) _rain3dInit(); }
 function set3DRainSize(v){ _rain3d.size=Math.max(0.5,Math.min(10,(parseFloat(v)||100)/22)); var e=document.getElementById('c3d_rainSizeVal'); if(e)e.textContent=_rain3d.size.toFixed(1); if(_rain3d.on&&_rain3d.pts){ _rain3d.pts.material.size=_rain3d.size; _rain3d.pts.material.needsUpdate=true; } }
-function set3DRainColor(hex){ _rain3d.color=parseInt(hex.replace('#',''),16); document.querySelectorAll('.rainColBtn3d').forEach(function(b){ b.style.outline=(b.dataset.col===hex)?'2px solid #fff':'none'; }); if(_rain3d.on&&_rain3d.pts){ _rain3d.pts.material.color.setHex(_rain3d.color); _rain3d.pts.material.needsUpdate=true; } }
+function set3DRainColor(hex){ _rain3d.color=parseInt(hex.replace('#',''),16); document.querySelectorAll('.rainColBtn3d').forEach(function(b){ b.style.outline=(b.dataset.col===hex)?'2px solid #fff':'none'; }); if(_rain3d.on&&_rain3d.pts){ _rain3d.pts.material.color.setHex(_rain3d.color); _rain3d.pts.material.needsUpdate=true; if(_rain3d.tail){ _rain3d.tail.material.color.setHex(_rain3d.color); _rain3d.tail.material.needsUpdate=true; } } }
 function _rain3dClear(){
   if(_rain3d.pts && _three){ _three.scene.remove(_rain3d.pts); if(_rain3d.pts.geometry)_rain3d.pts.geometry.dispose(); if(_rain3d.pts.material)_rain3d.pts.material.dispose(); }
-  _rain3d.pts=null; _rain3d.data=[];
+  if(_rain3d.tail && _three){ _three.scene.remove(_rain3d.tail); if(_rain3d.tail.geometry)_rain3d.tail.geometry.dispose(); if(_rain3d.tail.material)_rain3d.tail.material.dispose(); }
+  _rain3d.pts=null; _rain3d.tail=null; _rain3d.data=[];
 }
 function _rain3dSpawn(af){
   for(var t=0;t<30;t++){ var c=(Math.random()*af.cols)|0, r=(Math.random()*af.rows)|0; if(af.fdir[r*af.cols+c]>0) return {c:c+Math.random(), r:r+Math.random(), life:120+Math.random()*220}; }
@@ -3982,6 +4026,13 @@ function _rain3dInit(){
   });
   _rain3d.pts=new THREE.Points(geo,mat); _rain3d.hp=hp;
   _three.scene.add(_rain3d.pts);
+  /* 꼬리(흐르는 느낌): 각 물방울 현재→직전 위치 선분 */
+  var tailPos=new Float32Array(N*2*3);
+  var tgeo=new THREE.BufferGeometry();
+  tgeo.setAttribute('position', new THREE.BufferAttribute(tailPos,3));
+  var tmat=new THREE.LineBasicMaterial({color:new THREE.Color(_rain3d.color||0x7ce0ff), transparent:true, opacity:0.45, depthTest:true});
+  _rain3d.tail=new THREE.LineSegments(tgeo, tmat);
+  _three.scene.add(_rain3d.tail);
   _rain3dStep();
 }
 /* 원형(물방울) 스프라이트 텍스처 캐시 생성 */
@@ -4003,18 +4054,28 @@ function _rain3dStep(){
   var af=S.flow; if(!af){ return; }
   var dem=_three.dem, hp=_rain3d.hp||demPositions(dem,_three.exag), exag=_three.exag;
   var pos=_rain3d.pts.geometry.attributes.position.array;
+  var tpos=(_rain3d.tail&&_rain3d.tail.geometry)?_rain3d.tail.geometry.attributes.position.array:null;
   for(var i=0;i<_rain3d.data.length;i++){
     var dp=_rain3d.data[i];
     var ci=Math.max(0,Math.min(af.cols-1,dp.c|0)), ri=Math.max(0,Math.min(af.rows-1,dp.r|0));
     var code=af.fdir[ri*af.cols+ci]; var d=code>0?_step(code):null;
-    if(!d || (dp.life--)<=0){ _rain3d.data[i]=_rain3dSpawn(af); dp=_rain3d.data[i]; }
+    var respawned=false;
+    if(!d || (dp.life--)<=0){ _rain3d.data[i]=_rain3dSpawn(af); dp=_rain3d.data[i]; respawned=true; }
     else { var sp=(0.22+Math.random()*0.12)*_rain3d.speed; dp.c+=d[0]*sp; dp.r+=d[1]*sp;
-      if(dp.c<0||dp.c>=af.cols||dp.r<0||dp.r>=af.rows) _rain3d.data[i]=_rain3dSpawn(af); dp=_rain3d.data[i]; }
+      if(dp.c<0||dp.c>=af.cols||dp.r<0||dp.r>=af.rows){ _rain3d.data[i]=_rain3dSpawn(af); dp=_rain3d.data[i]; respawned=true; } }
     var wx=af.minX+dp.c*af.cell, wy=af.minY+dp.r*af.cell;
     var p3=tmTo3DPt(wx,wy,dem,hp,exag); p3.y+=3;
     pos[i*3]=p3.x; pos[i*3+1]=p3.y; pos[i*3+2]=p3.z;
+    /* 꼬리: 현재점 → 직전점 (리스폰 시 접힘 방지로 꼬리=머리) */
+    if(tpos){
+      var qx=(respawned||dp._px==null)?p3.x:dp._px, qy=(respawned||dp._py==null)?p3.y:dp._py, qz=(respawned||dp._pz==null)?p3.z:dp._pz;
+      tpos[i*6]  =p3.x; tpos[i*6+1]=p3.y; tpos[i*6+2]=p3.z;
+      tpos[i*6+3]=qx;   tpos[i*6+4]=qy;   tpos[i*6+5]=qz;
+      dp._px=p3.x; dp._py=p3.y; dp._pz=p3.z;
+    }
   }
   _rain3d.pts.geometry.attributes.position.needsUpdate=true;
+  if(tpos) _rain3d.tail.geometry.attributes.position.needsUpdate=true;
 }
 
 /* ══ 버퍼선 색상 ══ */
