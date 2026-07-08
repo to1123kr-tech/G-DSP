@@ -5083,16 +5083,29 @@ function _moamToScore(rock){
 }
 
 function geoOverlayLoad(){
-  if(!S.bounds){ _dmsg('geoMsg','먼저 지형도를 올리고 DEM까지 만드세요','err'); return; }
-  /* 지형 5186 bbox → WGS84 (네 모서리 변환해 경위도 min/max) */
+  /* 중심 = 검색한 작업위치(우선) > 지형 중심. 크기 = 지형 범위(있으면) > 기본 800m */
+  var loc=_d8GetLoc();
   var b=S.bounds;
-  var corners=[[b.minX,b.minY],[b.maxX,b.minY],[b.minX,b.maxY],[b.maxX,b.maxY]];
+  var cx, cy, halfW, halfH;
+  if(b){ halfW=(b.maxX-b.minX)/2; halfH=(b.maxY-b.minY)/2; }
+  else { halfW=400; halfH=300; }   // 지형 없으면 기본 반경(가로800·세로600m)
+  if(loc && loc.lng){
+    var c5=wgs84toTm5186(loc.lng, loc.lat);
+    if(!c5){ _dmsg('geoMsg','좌표변환 실패 (proj4)','err'); return; }
+    cx=c5[0]; cy=c5[1];   // 검색 위치를 중심으로
+  } else if(b){
+    cx=(b.minX+b.maxX)/2; cy=(b.minY+b.maxY)/2;
+  } else {
+    _dmsg('geoMsg','먼저 「작업 위치」를 검색하거나 지형도를 올리세요','err'); return;
+  }
+  /* 검색 위치 중심의 5186 bbox */
+  var minX=cx-halfW, maxX=cx+halfW, minY=cy-halfH, maxY=cy+halfH;
+  var corners=[[minX,minY],[maxX,minY],[minX,maxY],[maxX,maxY]];
   var lngs=[], lats=[];
   for(var i=0;i<corners.length;i++){ var w=tm5186toWgs84(corners[i][0],corners[i][1]); if(!w){ _dmsg('geoMsg','좌표변환 실패 (proj4)','err'); return; } lngs.push(w[0]); lats.push(w[1]); }
   var minLng=Math.min.apply(null,lngs), maxLng=Math.max.apply(null,lngs);
   var minLat=Math.min.apply(null,lats), maxLat=Math.max.apply(null,lats);
   var bbox=minLng+','+minLat+','+maxLng+','+maxLat;
-  /* 이미지 비율을 지형 bbox에 맞춤 (가로세로 왜곡 방지) */
   var wRatio=(maxLng-minLng), hRatio=(maxLat-minLat);
   var W=900, H=Math.max(100, Math.min(1400, Math.round(W*(hRatio/wRatio))));
   _dmsg('geoMsg','⏳ 지질도 이미지 불러오는 중…','');
@@ -5100,10 +5113,10 @@ function geoOverlayLoad(){
   var im=new Image();
   im.onload=function(){
     DATA8.overlays.geo_map={ kind:'geomap', img:im, ready:true, visible:true,
-      tm:{x0:b.minX, y0:b.minY, x1:b.maxX, y1:b.maxY}, bbox:bbox };
+      tm:{x0:minX, y0:minY, x1:maxX, y1:maxY}, bbox:bbox };
     if(DATA8.forestAlpha===undefined) DATA8.forestAlpha=0.5;
     _geoOverlayCtl();
-    _dmsg('geoMsg','✅ 지질도 겹침 완료','ok');
+    _dmsg('geoMsg','✅ 지질도 겹침 완료'+(loc&&loc.label?' ('+loc.label+' 중심)':''),'ok');
     if(typeof render==='function') render();
   };
   im.onerror=function(){ _dmsg('geoMsg','지질도 이미지 로드 실패 — 좌표 범위 밖이거나 서버 오류','err'); };
