@@ -2242,7 +2242,7 @@ function render(){
             ctx.moveTo(q2.x,q2.y); ctx.lineTo(q2.x-hl2*Math.cos(ang2+0.42),q2.y-hl2*Math.sin(ang2+0.42));
             ctx.stroke();
           }
-          if(showNum){ ctx.fillStyle='rgba(232,240,250,0.92)'; ctx.fillText(String(Math.round(acc)), (q1.x+q2.x)/2, (q1.y+q2.y)/2 - cellPx*0.30); }
+          if(showNum){ ctx.fillStyle='rgba(232,240,250,0.92)'; ctx.fillText(String(Math.max(0,Math.round(acc)-1)), (q1.x+q2.x)/2, (q1.y+q2.y)/2 - cellPx*0.30); }
         }
         ctx.textAlign='left'; ctx.textBaseline='alphabetic';
       }
@@ -3178,6 +3178,8 @@ function computeFlow(dem){
   }
   // 흐름누적 (위상정렬=Kahn → 평지에도 상류먼저 보장, 물 보존)
   var acc=new Float64Array(N), indeg=new Int32Array(N), down=new Int32Array(N);
+  /* ★ 흐름누적: 각 셀 가중치 1로 계산(매뉴얼 표준). 계산은 반드시 1부터
+     (0으로 시작하면 0+0=0으로 전부 0 됨). 표시할 때 -1 해서 "흘러든 셀 수"=산등성이0 로 보여줌 */
   for(var i=0;i<N;i++){ down[i]=-1; if(filled[i]===filled[i]) acc[i]=1; }
   for(var i=0;i<N;i++){
     if(filled[i]!==filled[i]) continue;
@@ -3699,7 +3701,7 @@ function _add3DFlow(scene, dem, hp, exag){
   // 누적 숫자 (스프라이트) — 화살표와 같은 개수(gm 간격)이므로 상한 넉넉히
   if(S.show3DFlowNum!==false && numPts.length<=8000){
     numPts.forEach(function(n){
-      var sp=_makeNumSprite(Math.round(n.acc));
+      var sp=_makeNumSprite(Math.max(0,Math.round(n.acc)-1));
       if(!sp) return;
       var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(3, effM*0.15);  // 지형 위로 넉넉히 띄움
       sp.position.set(p.x,p.y,p.z);
