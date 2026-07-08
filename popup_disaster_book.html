@@ -3567,6 +3567,7 @@ function ensureThree(cb){
 }
 function open3D(){
   if(!S.dem){ toast('먼저 DEM을 생성하세요','err'); return; }
+  if(!S.flow){ toast('6번 수계·단면에서 흐름(하천)분석을 먼저 실행하세요 — 분석 후 3D 사용 가능','err'); return; }
   /* ★ WMS 지도 패널 임시 숨김 (3D 위에 겹치는 문제 방지) */
   var wmsP=document.getElementById('wmsPanel');
   if(wmsP){ wmsP._wasOpen=wmsP.classList.contains('open'); wmsP.classList.remove('open'); }
@@ -3802,9 +3803,10 @@ function _add3DFlow(scene, dem, hp, exag){
   // 격자선 (draped)
   var gridPts=[];
   var c0=af.minX, c1=af.minX+af.cols*af.cell, r0=af.minY, r1=af.minY+af.rows*af.cell;
-  for(var gc=0; gc<=af.cols; gc+=gm){ var gx=af.minX+gc*af.cell;
+  // ★ 격자선을 화살표와 동일한 effM 간격으로 (화살표 중심은 칸 중앙 minX+effM/2, 격자선은 칸 경계 minX+n*effM)
+  for(var gx=c0; gx<=c1+0.001; gx+=effM){
     for(var yy=r0; yy<r1; yy+=af.cell*2){ var ga=tmTo3DPt(gx,yy,dem,hp,exag), gb=tmTo3DPt(gx,Math.min(yy+af.cell*2,r1),dem,hp,exag); ga.y+=0.3; gb.y+=0.3; gridPts.push(ga,gb); } }
-  for(var gr=0; gr<=af.rows; gr+=gm){ var gy=af.minY+gr*af.cell;
+  for(var gy=r0; gy<=r1+0.001; gy+=effM){
     for(var xx=c0; xx<c1; xx+=af.cell*2){ var gc2=tmTo3DPt(xx,gy,dem,hp,exag), gd2=tmTo3DPt(Math.min(xx+af.cell*2,c1),gy,dem,hp,exag); gc2.y+=0.3; gd2.y+=0.3; gridPts.push(gc2,gd2); } }
   if(gridPts.length){
     var gg=new THREE.BufferGeometry().setFromPoints(gridPts);
