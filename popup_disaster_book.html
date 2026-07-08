@@ -52,6 +52,9 @@
   .palBtn{padding:4.5px 4px !important;font-size:10.5px !important;line-height:1.2}
   .lctx{padding:7px 12px;font-size:12px;color:#cdd8ea;cursor:pointer;border-radius:6px;white-space:nowrap;user-select:none}
   .lctx:hover{background:rgba(56,189,248,0.18);color:#e8f4ff}
+  /* 농도 슬라이더: 평소 숨김, 버튼 hover 시 슬라이드로 나옴 (레이어 ON일 때만) */
+  .alphaSl{width:0;opacity:0;margin:0;padding:0;pointer-events:none;transition:width .22s ease,opacity .22s ease,margin .22s ease;vertical-align:middle}
+  .alphaWrap.armed:hover .alphaSl{width:64px;opacity:1;margin-left:2px;pointer-events:auto}
   .thr2{padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--tx3);font-size:10.5px;cursor:pointer}
   .thr2.on{color:#06121f;background:linear-gradient(135deg,#38bdf8,#0ea5e9);border-color:transparent;font-weight:600}
   .thr3{flex:1;padding:5px 0;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--tx3);font-size:10.5px;cursor:pointer;transition:.12s}
@@ -823,16 +826,16 @@
       <div class="lctx" onclick="layerCtxRun('hs')">🎨 음영조절</div>
     </div>
     <div id="layerBar" style="display:none;position:absolute;left:12px;top:12px;gap:4px;z-index:6;flex-wrap:nowrap;align-items:center;overflow-x:auto;max-width:calc(100% - 120px);white-space:nowrap;scrollbar-width:thin;padding-bottom:2px">
-      <span style="display:inline-flex;align-items:center;gap:3px;flex-shrink:0">
+      <span class="alphaWrap" style="display:inline-flex;align-items:center;gap:3px;flex-shrink:0">
         <button class="lyrBtn" id="lyrMap" onclick="mapBtnToggle()" title="배경지도(위성/일반+지적) 표시/숨김">🗺 배경지도</button>
-        <input type="range" id="mapAlphaSl" min="20" max="100" step="5" value="100" oninput="setCadBgAlpha(this.value)" title="배경지도 농도" style="width:52px;display:none">
+        <input type="range" id="mapAlphaSl" class="alphaSl" min="20" max="100" step="5" value="100" oninput="setCadBgAlpha(this.value)" title="배경지도 농도">
       </span>
       <button class="lyrBtn on" id="lyrDem" onclick="toggleLayer('dem')" title="음영기복 표시/숨김" style="flex-shrink:0">음영기복</button>
       <button class="lyrBtn on" id="lyrContour" onclick="toggleLayer('contour')" title="등고선 표시/숨김" style="flex-shrink:0">등고선</button>
       <button class="lyrBtn on" id="lyrStream" onclick="toggleLayer('stream')" title="하천망 표시/숨김" style="flex-shrink:0">하천망</button>
-      <span style="display:inline-flex;align-items:center;gap:3px;flex-shrink:0">
+      <span class="alphaWrap" style="display:inline-flex;align-items:center;gap:3px;flex-shrink:0">
         <button class="lyrBtn" id="lyrBg" onclick="toggleLayer('bg')" title="지형도 배경(도로·하천·시설 등) 표시/숨김">지형도</button>
-        <input type="range" id="bgAlphaSl" min="10" max="100" step="5" value="45" oninput="setBgAlpha(this.value)" title="지형도 배경 농도" style="width:52px;display:none">
+        <input type="range" id="bgAlphaSl" class="alphaSl" min="10" max="100" step="5" value="45" oninput="setBgAlpha(this.value)" title="지형도 배경 농도">
       </span>
       <button class="lyrBtn" id="lyrCad" onclick="cadLineBtnToggle()" title="지적선+지번 표시/숨김" style="flex-shrink:0">📐 지적선</button>
       <button class="lyrBtn on" id="lyrTin" onclick="toggleLayer('tin')" title="삼각망(TIN) 표시/숨김 · 느리면 끄기" style="flex-shrink:0">삼각망</button>
@@ -1044,7 +1047,7 @@
       <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
         <span style="font-size:10px;color:#9fb0c8">모양</span>
         <button class="thr3 on" id="c3d_fs_line" onclick="set3DFlowStyle('line')" title="선 화살표">→ 선</button>
-        <button class="thr3" id="c3d_fs_tri" onclick="set3DFlowStyle('tri')" title="삼각형">▲ 삼각</button>
+        <button class="thr3" id="c3d_fs_chev" onclick="set3DFlowStyle('chev')" title="쌍갈매기 (방향 잘 보임)">》 쌍갈매기</button>
       </div>
       <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px">
         <span style="font-size:10px;color:#9fb0c8">색</span>
@@ -1843,8 +1846,10 @@ window.addEventListener('mousemove',function(e){
     render(); return;
   }
   if(!S.isDown) return;
-  /* ★ 클릭/드래그 구분: 10px 넘게 움직여야 패닝 시작 (살짝 흔들려도 클릭으로 인정) */
-  if(!S.dragStarted && (Math.abs(e.clientX-S.dnX)+Math.abs(e.clientY-S.dnY))<10) return;
+  /* ★ 클릭/드래그 구분: 기본 10px 넘게 움직여야 패닝 시작.
+     단, 작업구역(crop)·단면(section) 그리기 중엔 임계값을 크게(30px) — 살짝 움직여도 점 찍기로 인정 (지도 이동은 가운데버튼) */
+  var _dragTh=(S.mode==='crop'||S.mode==='section')?30:10;
+  if(!S.dragStarted && (Math.abs(e.clientX-S.dnX)+Math.abs(e.clientY-S.dnY))<_dragTh) return;
   S.dragStarted=true;
   S.ox+=e.clientX-S.lastM.x; S.oy-=e.clientY-S.lastM.y;
   S.lastM={x:e.clientX,y:e.clientY}; render();
@@ -2905,7 +2910,7 @@ function toggleLayer(which){
   if(which==='bg'){
     S.showBg=!S.showBg;
     var bb=document.getElementById('lyrBg'); if(bb) bb.className='lyrBtn'+(S.showBg?' on':'');
-    var sl=document.getElementById('bgAlphaSl'); if(sl) sl.style.display=S.showBg?'':'none';
+    var sl=document.getElementById('bgAlphaSl'); if(sl){ var wr=sl.closest('.alphaWrap'); if(wr) wr.classList.toggle('armed', !!S.showBg); }
     if(S.showBg && (!S.bgLines||!S.bgLines.length) && (!S.bgTexts||!S.bgTexts.length))
       toast('이 도면엔 배경 요소(도로·하천 등 잡선)가 없어요','err');
     render(); return;
@@ -3740,10 +3745,8 @@ function _add3DFlow(scene, dem, hp, exag){
       var t2=tmTo3DPt(cx+d[0]*Lw, cy+d[1]*Lw, dem, hp, exag);
       var mid=tmTo3DPt(cx, cy, dem, hp, exag);      // 중앙점(면 삼각형 기준)
       t1.y+=0.3; t2.y+=0.3; mid.y+=0.3;
-      if(_fstyle==='tri'){
-        // ★ 모양 유지 + 각도만 지형(음영) 따라감: 평평한 삼각형을 지형 법선에 맞춰 통째 회전.
-        //   (세 점을 지형에 각각 붙이면 급경사에서 위아래로 늘어나 찌그러짐)
-        var ts=Lw*1.05, wd=Lw*0.52;
+      if(_fstyle==='chev'){
+        // ★ 쌍갈매기(》 방향 잘 보임): 지형 법선에 맞춰 눕힘 (모양 유지)
         var eps=Math.max(af.cell, effM*0.25);
         var pC=tmTo3DPt(cx, cy, dem, hp, exag);
         var pX=tmTo3DPt(cx+eps, cy, dem, hp, exag);
@@ -3752,18 +3755,24 @@ function _add3DFlow(scene, dem, hp, exag){
         var vx=pZ.x-pC.x, vy=pZ.y-pC.y, vz=pZ.z-pC.z;
         var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;   // 법선 N=u×v
         var nl=Math.hypot(nx,ny,nz)||1; nx/=nl; ny/=nl; nz/=nl;
-        if(ny<0){ nx=-nx; ny=-ny; nz=-nz; }                   // 위 향하게
+        if(ny<0){ nx=-nx; ny=-ny; nz=-nz; }
         var dn2=Math.hypot(d[0],d[1])||1;
         var fx=d[0]/dn2, fy=0, fz=d[1]/dn2;                    // 진행방향(수평)
-        var fdotN=fx*nx+fy*ny+fz*nz;                           // 접평면 투영
+        var fdotN=fx*nx+fy*ny+fz*nz;
         fx-=fdotN*nx; fy-=fdotN*ny; fz-=fdotN*nz;
         var fl=Math.hypot(fx,fy,fz)||1; fx/=fl; fy/=fl; fz/=fl;
         var rx=ny*fz-nz*fy, ry=nz*fx-nx*fz, rz=nx*fy-ny*fx;    // 폭방향 R=N×F
-        var bx=pC.x+nx*0.4, by=pC.y+ny*0.4, bz=pC.z+nz*0.4;    // 표면 위 살짝
-        var tip=new THREE.Vector3(bx+fx*ts*(2/3),       by+fy*ts*(2/3),       bz+fz*ts*(2/3));
-        var bl =new THREE.Vector3(bx-fx*ts*(1/3)+rx*wd, by-fy*ts*(1/3)+ry*wd, bz-fz*ts*(1/3)+rz*wd);
-        var br =new THREE.Vector3(bx-fx*ts*(1/3)-rx*wd, by-fy*ts*(1/3)-ry*wd, bz-fz*ts*(1/3)-rz*wd);
-        pushTri(tip,bl,br,rgb);
+        var chLen=Lw*0.62, chW=Lw*0.5, gap=Lw*0.5;            // 팔길이·반폭·앞뒤 간격
+        var bx=pC.x+nx*0.4, by=pC.y+ny*0.4, bz=pC.z+nz*0.4;
+        // 갈매기 2개 (앞·뒤). 각 갈매기: 꼭짓점(앞) + 뒤로 벌어진 두 팔
+        for(var g=0; g<2; g++){
+          var off=(g===0)? gap*0.5 : -gap*0.5;               // 앞 갈매기 / 뒤 갈매기
+          var vx0=bx+fx*off,           vy0=by+fy*off,           vz0=bz+fz*off;             // 꼭짓점
+          var a1x=vx0-fx*chLen+rx*chW, a1y=vy0-fy*chLen+ry*chW, a1z=vz0-fz*chLen+rz*chW;   // 팔1(뒤+좌)
+          var a2x=vx0-fx*chLen-rx*chW, a2y=vy0-fy*chLen-ry*chW, a2z=vz0-fz*chLen-rz*chW;   // 팔2(뒤+우)
+          push2(new THREE.Vector3(a1x,a1y,a1z), new THREE.Vector3(vx0,vy0,vz0), rgb);
+          push2(new THREE.Vector3(vx0,vy0,vz0), new THREE.Vector3(a2x,a2y,a2z), rgb);
+        }
       } else {
         // 선 화살표: 몸통 + V자 촉 (촉도 지형 표면 따름 — 끝점 t2에서 뒤로 두 선, y는 t2와 동일)
         push2(t1,t2,rgb);
@@ -3839,8 +3848,8 @@ function set3DFlow(on){ S.show3DFlow=!!on; if(_three) _rebuild3D(); }
 function set3DStream(on){ S.show3DStream=!!on; if(_three) _rebuild3D(); }
 function set3DFlowNum(on){ S.show3DFlowNum=!!on; if(_three && S.show3DFlow) _rebuild3D(); }
 function set3DFlowStyle(s){ S.flow3dStyle=s; if(_three){ _three.flowStyle=s;
-    var l=document.getElementById('c3d_fs_line'), t=document.getElementById('c3d_fs_tri');
-    if(l)l.className='thr3'+(s==='line'?' on':''); if(t)t.className='thr3'+(s==='tri'?' on':'');
+    var l=document.getElementById('c3d_fs_line'), t=document.getElementById('c3d_fs_chev');
+    if(l)l.className='thr3'+(s==='line'?' on':''); if(t)t.className='thr3'+(s==='chev'?' on':'');
     if(S.show3DFlow) _rebuild3D(); } }
 function set3DFlowColorFixed(fx){ S.flow3dColorFixed=!!fx; if(_three){ _three.flowColorFixed=!!fx;
     var a=document.getElementById('c3d_fc_acc'), f=document.getElementById('c3d_fc_fix');
@@ -6099,7 +6108,7 @@ function cadLineBtnToggle(){
 function _cadMapBtnsSync(){
   var m=document.getElementById('lyrMap'); if(m) m.className='lyrBtn'+((cadBg.on&&cadBg.showBase)?' on':'');
   var c=document.getElementById('lyrCad'); if(c) c.className='lyrBtn'+((cadBg.on&&cadBg.showCad)?' on':'');
-  var sl=document.getElementById('mapAlphaSl'); if(sl) sl.style.display=(cadBg.on&&cadBg.showBase)?'':'none';
+  var sl=document.getElementById('mapAlphaSl'); if(sl){ var wr=sl.closest('.alphaWrap'); if(wr) wr.classList.toggle('armed', !!(cadBg.on&&cadBg.showBase)); }
 }
 
 /* 실행하면 바로 지도 (지형도 없어도) */
