@@ -811,17 +811,17 @@
         <button class="lyrBtn" id="lyrMap" onclick="mapBtnToggle()" title="배경지도(위성/일반+지적) 표시/숨김">🗺 배경지도</button>
         <input type="range" id="mapAlphaSl" min="20" max="100" step="5" value="100" oninput="setCadBgAlpha(this.value)" title="배경지도 농도" style="width:52px;display:none">
       </span>
-      <button class="lyrBtn" id="lyrCad" onclick="cadLineBtnToggle()" title="지적선+지번 표시/숨김" style="flex-shrink:0">📐 지적선</button>
+      <button class="lyrBtn on" id="lyrDem" onclick="toggleLayer('dem')" title="음영기복 표시/숨김" style="flex-shrink:0">음영기복</button>
+      <button class="lyrBtn on" id="lyrContour" onclick="toggleLayer('contour')" title="등고선 표시/숨김" style="flex-shrink:0">등고선</button>
+      <button class="lyrBtn on" id="lyrStream" onclick="toggleLayer('stream')" title="하천망 표시/숨김" style="flex-shrink:0">하천망</button>
       <span style="display:inline-flex;align-items:center;gap:3px;flex-shrink:0">
         <button class="lyrBtn" id="lyrBg" onclick="toggleLayer('bg')" title="지형도 배경(도로·하천·시설 등) 표시/숨김">지형도</button>
         <input type="range" id="bgAlphaSl" min="10" max="100" step="5" value="45" oninput="setBgAlpha(this.value)" title="지형도 배경 농도" style="width:52px;display:none">
       </span>
-      <button class="lyrBtn on" id="lyrContour" onclick="toggleLayer('contour')" title="등고선 표시/숨김" style="flex-shrink:0">등고선</button>
-      <button class="lyrBtn on" id="lyrDem" onclick="toggleLayer('dem')" title="음영기복 표시/숨김" style="flex-shrink:0">음영기복</button>
-      <button class="lyrBtn" id="lyrHsAdjust" onclick="toggleHsPanel()" title="음영기복 조정 패널 열기/닫기 (색상·태양·입체)" style="padding:6px 8px;flex-shrink:0">🎨</button>
-      <button class="lyrBtn on" id="lyrStream" onclick="toggleLayer('stream')" title="하천망 표시/숨김" style="flex-shrink:0">하천망</button>
-      <button class="lyrBtn on" id="lyrSurvey" onclick="toggleLayer('survey')" title="표고점 표시/숨김" style="flex-shrink:0">표고점</button>
+      <button class="lyrBtn" id="lyrCad" onclick="cadLineBtnToggle()" title="지적선+지번 표시/숨김" style="flex-shrink:0">📐 지적선</button>
       <button class="lyrBtn on" id="lyrTin" onclick="toggleLayer('tin')" title="삼각망(TIN) 표시/숨김 · 느리면 끄기" style="flex-shrink:0">삼각망</button>
+      <button class="lyrBtn on" id="lyrSurvey" onclick="toggleLayer('survey')" title="표고점 표시/숨김" style="flex-shrink:0">표고점</button>
+      <button class="lyrBtn" id="lyrHsAdjust" onclick="toggleHsPanel()" title="음영기복 조정 패널 열기/닫기 (색상·태양·입체)" style="padding:6px 8px;flex-shrink:0">🎨 음영조절</button>
     </div>
     <div class="tools" id="tools" style="display:none">
       <button class="tbtn" title="화면 맞춤" onclick="fitView()">⤢</button>
@@ -936,6 +936,19 @@
           <span>빗물량</span><span id="rainAmtVal" style="color:#7cc5ff;font-weight:600">×1.0</span>
         </div>
         <input type="range" min="20" max="300" value="100" step="10" oninput="setRainAmount(this.value)" style="width:100%;margin-top:3px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8;margin-top:6px">
+          <span>빗물 크기</span><span id="rainSizeVal" style="color:#7cc5ff;font-weight:600">2.2px</span>
+        </div>
+        <input type="range" min="40" max="360" value="100" step="10" oninput="setRainSize(this.value)" style="width:100%;margin-top:3px">
+        <div style="font-size:10px;color:#9fb0c8;margin-top:8px;margin-bottom:4px">빗물 색상</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="rainColBtn" data-col="#7ce0ff" onclick="setRainColor('#7ce0ff')" title="하늘" style="width:24px;height:24px;border-radius:6px;border:1px solid #2a3a52;background:#7ce0ff;cursor:pointer;outline:2px solid #fff"></button>
+          <button class="rainColBtn" data-col="#2b6fff" onclick="setRainColor('#2b6fff')" title="파랑" style="width:24px;height:24px;border-radius:6px;border:1px solid #2a3a52;background:#2b6fff;cursor:pointer"></button>
+          <button class="rainColBtn" data-col="#00e5cc" onclick="setRainColor('#00e5cc')" title="시안" style="width:24px;height:24px;border-radius:6px;border:1px solid #2a3a52;background:#00e5cc;cursor:pointer"></button>
+          <button class="rainColBtn" data-col="#ffd23c" onclick="setRainColor('#ffd23c')" title="노랑" style="width:24px;height:24px;border-radius:6px;border:1px solid #2a3a52;background:#ffd23c;cursor:pointer"></button>
+          <button class="rainColBtn" data-col="#ff5a5a" onclick="setRainColor('#ff5a5a')" title="빨강" style="width:24px;height:24px;border-radius:6px;border:1px solid #2a3a52;background:#ff5a5a;cursor:pointer"></button>
+          <button class="rainColBtn" data-col="#ffffff" onclick="setRainColor('#ffffff')" title="흰색" style="width:24px;height:24px;border-radius:6px;border:1px solid #2a3a52;background:#ffffff;cursor:pointer"></button>
+        </div>
       </div>
     </div>
 
@@ -1003,9 +1016,6 @@
       <input type="checkbox" id="c3d_stream" checked onchange="set3DStream(this.checked)"> 🌊 하천선 (시안)
     </label>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
-      <input type="checkbox" id="c3d_surv" checked onchange="set3DSurv(this.checked)"> ⛰ 표고점 (주황점·숫자)
-    </label>
-    <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
       <input type="checkbox" id="c3d_wire" onchange="set3DWire(this.checked)"> 골격(와이어프레임)
     </label>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
@@ -1064,6 +1074,17 @@
       <input type="range" min="20" max="300" value="100" step="10" oninput="set3DRainSpeed(this.value)" style="width:100%">
       <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8;margin-top:3px"><span>빗물량</span><span id="c3d_rainAmtVal" style="color:#7cc5ff;font-weight:600">×1.0</span></div>
       <input type="range" min="20" max="300" value="100" step="10" oninput="set3DRainAmt(this.value)" style="width:100%">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#9fb0c8;margin-top:3px"><span>빗물 크기</span><span id="c3d_rainSizeVal" style="color:#7cc5ff;font-weight:600">기본</span></div>
+      <input type="range" min="20" max="220" value="100" step="10" oninput="set3DRainSize(this.value)" style="width:100%">
+      <div style="font-size:10px;color:#9fb0c8;margin-top:6px;margin-bottom:4px">빗물 색상</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="rainColBtn3d" data-col="#7ce0ff" onclick="set3DRainColor('#7ce0ff')" title="하늘" style="width:22px;height:22px;border-radius:6px;border:1px solid #2a3a52;background:#7ce0ff;cursor:pointer;outline:2px solid #fff"></button>
+        <button class="rainColBtn3d" data-col="#2b6fff" onclick="set3DRainColor('#2b6fff')" title="파랑" style="width:22px;height:22px;border-radius:6px;border:1px solid #2a3a52;background:#2b6fff;cursor:pointer"></button>
+        <button class="rainColBtn3d" data-col="#00e5cc" onclick="set3DRainColor('#00e5cc')" title="시안" style="width:22px;height:22px;border-radius:6px;border:1px solid #2a3a52;background:#00e5cc;cursor:pointer"></button>
+        <button class="rainColBtn3d" data-col="#ffd23c" onclick="set3DRainColor('#ffd23c')" title="노랑" style="width:22px;height:22px;border-radius:6px;border:1px solid #2a3a52;background:#ffd23c;cursor:pointer"></button>
+        <button class="rainColBtn3d" data-col="#ff5a5a" onclick="set3DRainColor('#ff5a5a')" title="빨강" style="width:22px;height:22px;border-radius:6px;border:1px solid #2a3a52;background:#ff5a5a;cursor:pointer"></button>
+        <button class="rainColBtn3d" data-col="#ffffff" onclick="set3DRainColor('#ffffff')" title="흰색" style="width:22px;height:22px;border-radius:6px;border:1px solid #2a3a52;background:#ffffff;cursor:pointer"></button>
+      </div>
     </div>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:#9fb0c8;margin-top:11px">
       <span>높이 강조</span><span id="c3d_exagVal" style="color:#4ade80;font-weight:700">×2.2</span>
@@ -1605,7 +1626,8 @@ function applyParsed(r){
   document.getElementById('hint').style.display='';
   document.getElementById('tools').style.display='';
   document.getElementById('sbar').style.display='';
-  document.getElementById('floatLegend').style.display='';
+  /* 범례 숨김(2025-07 사용안함): 나중에 다시 켜려면 아래 주석 해제
+  document.getElementById('floatLegend').style.display=''; */
   document.getElementById('layerBar').style.display='flex';
 
   // TIN 초기화 + 버튼 활성 + 파이프 리셋
@@ -2866,9 +2888,12 @@ function _syncTinLyrBtn(){ var b=document.getElementById('lyrTin'); if(b) b.clas
 function setArrowGrid(v){ S.arrowMeters=Math.max(1,parseFloat(v)||10); var e=document.getElementById('arrowStepVal'); if(e)e.textContent=S.arrowMeters+'m'; if(!S.showArrows){var t=document.getElementById('arrowToggle'); if(t&&!t.checked){t.checked=true; S.showArrows=true;}} if(!S.flow){ toast('흐름누적도는 7번 「흐름·하천 분석(D8)」을 먼저 실행해야 나와요','err'); } render(); }
 
 /* ══ 🌧️ 비 내리기 — D8 흐름 따라 물방울이 흘러내리는 애니메이션 (꾸미기존·결과 무관) ══ */
-var _rain={on:false, drops:[], raf:null, layer:null, speed:1.0, amount:1.0};
+var _rain={on:false, drops:[], raf:null, layer:null, speed:1.0, amount:1.0, color:'#7ce0ff', size:2.2};
 function setRainSpeed(v){ _rain.speed=Math.max(0.2,Math.min(3,(parseFloat(v)||100)/100)); var e=document.getElementById('rainSpeedVal'); if(e)e.textContent='×'+_rain.speed.toFixed(1); }
 function setRainAmount(v){ _rain.amount=Math.max(0.2,Math.min(3,(parseFloat(v)||100)/100)); var e=document.getElementById('rainAmtVal'); if(e)e.textContent='×'+_rain.amount.toFixed(1); if(_rain.on) _rainRefill(); }
+function setRainSize(v){ _rain.size=Math.max(0.8,Math.min(8,(parseFloat(v)||100)/45)); var e=document.getElementById('rainSizeVal'); if(e)e.textContent=_rain.size.toFixed(1)+'px'; }
+function setRainColor(hex){ _rain.color=hex; document.querySelectorAll('.rainColBtn').forEach(function(b){ b.style.outline=(b.dataset.col===hex)?'2px solid #fff':'none'; });
+  var e3=document.getElementById('c3d_rainColBtns'); /* 3D도 같은 색으로 동기화 표시는 각자 */ }
 function _rainRefill(){
   if(!S.flow) return;
   var af=S.flow, N=Math.round(Math.min(700, Math.max(200, af.cols*af.rows/6)) * _rain.amount);
@@ -2926,21 +2951,26 @@ function _rainLoop(){
 function _rainDraw(){
   var cv=document.getElementById('cv'); if(!cv) return;
   var ctx=cv.getContext('2d'); var af=S.flow;
+  var col=_rain.color||'#7ce0ff', rad=_rain.size||2.2;
+  var rgb=_hexToRgb(col);
+  var fillC='rgba('+rgb.r+','+rgb.g+','+rgb.b+',0.95)';
+  var tailC='rgba('+rgb.r+','+rgb.g+','+rgb.b+',0.4)';
   ctx.save();
   for(var i=0;i<_rain.drops.length;i++){
     var dp=_rain.drops[i];
     var p=w2s({x:af.minX+dp.c*af.cell, y:af.minY+dp.r*af.cell});
     if(p.x<-5||p.x>cv.width+5||p.y<-5||p.y>cv.height+5) continue;
-    ctx.fillStyle='rgba(120,200,255,0.9)';
-    ctx.beginPath(); ctx.arc(p.x,p.y, 1.6, 0, 6.283); ctx.fill();
+    ctx.fillStyle=fillC;
+    ctx.beginPath(); ctx.arc(p.x,p.y, rad, 0, 6.283); ctx.fill();
     /* 꼬리 */
-    ctx.strokeStyle='rgba(120,200,255,0.35)'; ctx.lineWidth=1;
+    ctx.strokeStyle=tailC; ctx.lineWidth=Math.max(1,rad*0.6);
     var ci=Math.max(0,Math.min(af.cols-1,dp.c|0)), ri=Math.max(0,Math.min(af.rows-1,dp.r|0));
     var code=af.fdir[ri*af.cols+ci]; var d=code>0?_step(code):null;
     if(d){ ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-d[0]*5*(S.scale*af.cell/10||1), p.y+d[1]*5*(S.scale*af.cell/10||1)); ctx.stroke(); }
   }
   ctx.restore();
 }
+function _hexToRgb(h){ h=(h||'').replace('#',''); if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2]; var n=parseInt(h,16); return {r:(n>>16)&255,g:(n>>8)&255,b:n&255}; }
 
 
 function setArrowStyle(s){ S.arrowStyle=s; ['line','solid','tri','chevron','dot'].forEach(function(k){ var b=document.getElementById('arrSty_'+k); if(b)b.className='thr'+(k===s?' on':''); }); if(!S.showArrows){var t=document.getElementById('arrowToggle'); if(t){t.checked=true; S.showArrows=true;}} render(); }
@@ -3621,46 +3651,8 @@ function _rebuild3D(){
     }
   }
   /* 우수 흐름 (화살표·격자·누적숫자) — 토글 */
-  if(S.show3DSurv!==false && S.surveys && S.surveys.length){ _add3DSurv(scene, dem, hp, exag); }
   if(S.show3DFlow && S.flow){ _add3DFlow(scene, dem, hp, exag); }
 }
-
-/* 3D 표고점: 주황 점 + 표고값 스프라이트(항상 정면, depthTest off로 지형에 안 묻힘) */
-function _add3DSurv(scene, dem, hp, exag){
-  var list=S.surveys.filter(function(s){ return s.val!=null || (s.z&&s.z>0); });
-  if(!list.length) list=S.surveys;
-  if(list.length>3000){ toast('표고점 '+list.length+'개 — 3D 라벨은 3000개까지만','err'); list=list.slice(0,3000); }
-  var land=Math.max(hp.w, hp.h);
-  var sc=Math.max(land*0.03, 10);
-  list.forEach(function(s){
-    var sp=_makeSurvSprite(s.val!=null?s.val:s.z);
-    if(!sp) return;
-    var p=tmTo3DPt(s.x, s.y, dem, hp, exag);
-    p.y+=Math.max(0.8, sc*0.08);
-    sp.position.set(p.x, p.y, p.z);
-    sp.scale.set(sc, sc*0.375, 1);
-    sp.renderOrder=20;
-    scene.add(sp); _three.objs.push(sp);
-  });
-}
-function _makeSurvSprite(val){
-  try{
-    var n=parseFloat(val), txt=isFinite(n)?String(Math.round(n*10)/10):'';
-    var cv=document.createElement('canvas'); cv.width=128; cv.height=48;
-    var c=cv.getContext('2d'); c.clearRect(0,0,128,48);
-    c.beginPath(); c.arc(14,24,7,0,Math.PI*2); c.fillStyle='#f59e0b'; c.fill();
-    c.lineWidth=2; c.strokeStyle='rgba(0,0,0,0.7)'; c.stroke();
-    if(txt){
-      c.font='bold 23px sans-serif'; c.textAlign='left'; c.textBaseline='middle';
-      c.lineWidth=5; c.strokeStyle='rgba(0,0,0,0.85)'; c.strokeText(txt,28,25);
-      c.fillStyle='#ffd27a'; c.fillText(txt,28,25);
-    }
-    var tex=new THREE.CanvasTexture(cv);
-    var mat=new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false, depthWrite:false});
-    return new THREE.Sprite(mat);
-  }catch(e){ return null; }
-}
-function set3DSurv(on){ S.show3DSurv=!!on; if(_three) _rebuild3D(); }
 
 /* 3D 우수 흐름: 화살표(누적색) + 격자 + 누적숫자(스프라이트) — 표면 드레이프 */
 function _add3DFlow(scene, dem, hp, exag){
@@ -3704,30 +3696,15 @@ function _add3DFlow(scene, dem, hp, exag){
       var t1=tmTo3DPt(cx-d[0]*Lw, cy-d[1]*Lw, dem, hp, exag);
       var t2=tmTo3DPt(cx+d[0]*Lw, cy+d[1]*Lw, dem, hp, exag);
       var mid=tmTo3DPt(cx, cy, dem, hp, exag);      // 중앙점(면 삼각형 기준)
-      t1.y+=0.3; t2.y+=0.3; mid.y+=0.3;
+      t1.y+=1.4; t2.y+=1.4; mid.y+=1.4;
       if(_fstyle==='tri'){
-        // ★ 모양 유지 + 각도만 지형 따라감: 평평한 삼각형을 지형 법선에 맞춰 통째 회전.
-        //   (세 점을 지형에 각각 붙이면 급경사에서 위아래로 늘어나 찌그러짐)
+        // 큰 삼각형(면): 무게중심이 격자중앙(mid)에 오도록 앞:뒤=2:1 (안 쏠림)
+        var dx=t2.x-t1.x, dz=t2.z-t1.z, ln=Math.hypot(dx,dz)||1; dx/=ln; dz/=ln;
+        var px=-dz, pz=dx;                           // 진행방향 수직(폭 방향)
         var ts=Lw*1.05, wd=Lw*0.52;
-        var eps=Math.max(af.cell, effM*0.25);
-        var pC=tmTo3DPt(cx, cy, dem, hp, exag);
-        var pX=tmTo3DPt(cx+eps, cy, dem, hp, exag);
-        var pZ=tmTo3DPt(cx, cy+eps, dem, hp, exag);
-        var ux=pX.x-pC.x, uy=pX.y-pC.y, uz=pX.z-pC.z;
-        var vx=pZ.x-pC.x, vy=pZ.y-pC.y, vz=pZ.z-pC.z;
-        var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;   // 법선 N=u×v
-        var nl=Math.hypot(nx,ny,nz)||1; nx/=nl; ny/=nl; nz/=nl;
-        if(ny<0){ nx=-nx; ny=-ny; nz=-nz; }                   // 위 향하게
-        var dn2=Math.hypot(d[0],d[1])||1;
-        var fx=d[0]/dn2, fy=0, fz=d[1]/dn2;                    // 진행방향(수평)
-        var fdotN=fx*nx+fy*ny+fz*nz;                           // 접평면에 투영
-        fx-=fdotN*nx; fy-=fdotN*ny; fz-=fdotN*nz;
-        var fl=Math.hypot(fx,fy,fz)||1; fx/=fl; fy/=fl; fz/=fl;
-        var rx=ny*fz-nz*fy, ry=nz*fx-nx*fz, rz=nx*fy-ny*fx;    // 폭방향 R=N×F
-        var bx=pC.x+nx*0.4, by=pC.y+ny*0.4, bz=pC.z+nz*0.4;    // 표면 위 살짝
-        var tip=new THREE.Vector3(bx+fx*ts*(2/3),           by+fy*ts*(2/3),           bz+fz*ts*(2/3));
-        var bl =new THREE.Vector3(bx-fx*ts*(1/3)+rx*wd,     by-fy*ts*(1/3)+ry*wd,     bz-fz*ts*(1/3)+rz*wd);
-        var br =new THREE.Vector3(bx-fx*ts*(1/3)-rx*wd,     by-fy*ts*(1/3)-ry*wd,     bz-fz*ts*(1/3)-rz*wd);
+        var tip=new THREE.Vector3(mid.x+dx*ts*(2/3), mid.y+0.6, mid.z+dz*ts*(2/3));   // 앞 2/3
+        var bl =new THREE.Vector3(mid.x-dx*ts*(1/3)+px*wd, mid.y+0.6, mid.z-dz*ts*(1/3)+pz*wd);  // 뒤 1/3
+        var br =new THREE.Vector3(mid.x-dx*ts*(1/3)-px*wd, mid.y+0.6, mid.z-dz*ts*(1/3)-pz*wd);
         pushTri(tip,bl,br,rgb);
       } else {
         // 선 화살표: 몸통 + V자 촉 (촉도 지형 표면 따름 — 끝점 t2에서 뒤로 두 선, y는 t2와 동일)
@@ -3759,9 +3736,9 @@ function _add3DFlow(scene, dem, hp, exag){
   var gridPts=[];
   var c0=af.minX, c1=af.minX+af.cols*af.cell, r0=af.minY, r1=af.minY+af.rows*af.cell;
   for(var gc=0; gc<=af.cols; gc+=gm){ var gx=af.minX+gc*af.cell;
-    for(var yy=r0; yy<r1; yy+=af.cell*2){ var ga=tmTo3DPt(gx,yy,dem,hp,exag), gb=tmTo3DPt(gx,Math.min(yy+af.cell*2,r1),dem,hp,exag); ga.y+=0.3; gb.y+=0.3; gridPts.push(ga,gb); } }
+    for(var yy=r0; yy<r1; yy+=af.cell*2){ var ga=tmTo3DPt(gx,yy,dem,hp,exag), gb=tmTo3DPt(gx,Math.min(yy+af.cell*2,r1),dem,hp,exag); ga.y+=1.5; gb.y+=1.5; gridPts.push(ga,gb); } }
   for(var gr=0; gr<=af.rows; gr+=gm){ var gy=af.minY+gr*af.cell;
-    for(var xx=c0; xx<c1; xx+=af.cell*2){ var gc2=tmTo3DPt(xx,gy,dem,hp,exag), gd2=tmTo3DPt(Math.min(xx+af.cell*2,c1),gy,dem,hp,exag); gc2.y+=0.3; gd2.y+=0.3; gridPts.push(gc2,gd2); } }
+    for(var xx=c0; xx<c1; xx+=af.cell*2){ var gc2=tmTo3DPt(xx,gy,dem,hp,exag), gd2=tmTo3DPt(Math.min(xx+af.cell*2,c1),gy,dem,hp,exag); gc2.y+=1.5; gd2.y+=1.5; gridPts.push(gc2,gd2); } }
   if(gridPts.length){
     var gg=new THREE.BufferGeometry().setFromPoints(gridPts);
     var gLines=new THREE.LineSegments(gg, new THREE.LineBasicMaterial({color:0x9cacc8, transparent:true, opacity:0.22}));
@@ -3773,7 +3750,7 @@ function _add3DFlow(scene, dem, hp, exag){
       var val=Math.max(0,Math.round(n.acc)-1);
       var sp=_makeNumSprite(val);
       if(!sp) return;
-      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(0.8, effM*0.05);  // 지형 위로 최소만 띄움
+      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(3, effM*0.15);  // 지형 위로 넉넉히 띄움
       sp.position.set(p.x,p.y,p.z);
       /* 겹침 방지: 격자 간격의 0.6배로 축소. 세로는 더 작게(0.28). 자릿수 많으면 가로만 약간 확보 */
       var digits=String(val).length;
@@ -3951,7 +3928,7 @@ function init3DScene(){
     if(!drag)return;
     theta-=dx*0.006; phi=Math.max(0.15,Math.min(Math.PI-0.15,phi-dy*0.006)); lx=e.clientX; ly=e.clientY; cam();
   };
-  canvas.onwheel=function(e){ e.preventDefault(); rad*=(e.deltaY>0?1.1:0.9); rad=Math.max(ext*0.05,Math.min(ext*4,rad)); cam(); };
+  canvas.onwheel=function(e){ e.preventDefault(); rad*=(e.deltaY>0?1.1:0.9); rad=Math.max(ext*0.2,Math.min(ext*4,rad)); cam(); };
   var onUp=function(){ drag=false; panning=false; };
   var onResize=function(){ var w=lay.clientWidth,h=lay.clientHeight; camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h,false); };
   window.addEventListener('mouseup',onUp);
@@ -3964,7 +3941,7 @@ function init3DScene(){
 }
 
 /* ══ 🌧️ 3D 비 내리기 — 지형 표면 위 물방울이 D8 따라 흘러내림 ══ */
-var _rain3d={on:false, pts:null, data:[], speed:1.0, amount:1.0};
+var _rain3d={on:false, pts:null, data:[], speed:1.0, amount:1.0, color:0x7ce0ff, size:null};
 function toggle3DRain(on){
   _rain3d.on=(on!==undefined)?!!on:!_rain3d.on;
   var b=document.getElementById('c3d_rain'); if(b)b.checked=_rain3d.on;
@@ -3976,6 +3953,8 @@ function toggle3DRain(on){
 }
 function set3DRainSpeed(v){ _rain3d.speed=Math.max(0.2,Math.min(3,(parseFloat(v)||100)/100)); var e=document.getElementById('c3d_rainSpVal'); if(e)e.textContent='×'+_rain3d.speed.toFixed(1); }
 function set3DRainAmt(v){ _rain3d.amount=Math.max(0.2,Math.min(3,(parseFloat(v)||100)/100)); var e=document.getElementById('c3d_rainAmtVal'); if(e)e.textContent='×'+_rain3d.amount.toFixed(1); if(_rain3d.on) _rain3dInit(); }
+function set3DRainSize(v){ _rain3d.size=Math.max(0.5,Math.min(10,(parseFloat(v)||100)/22)); var e=document.getElementById('c3d_rainSizeVal'); if(e)e.textContent=_rain3d.size.toFixed(1); if(_rain3d.on&&_rain3d.pts){ _rain3d.pts.material.size=_rain3d.size; _rain3d.pts.material.needsUpdate=true; } }
+function set3DRainColor(hex){ _rain3d.color=parseInt(hex.replace('#',''),16); document.querySelectorAll('.rainColBtn3d').forEach(function(b){ b.style.outline=(b.dataset.col===hex)?'2px solid #fff':'none'; }); if(_rain3d.on&&_rain3d.pts){ _rain3d.pts.material.color.setHex(_rain3d.color); _rain3d.pts.material.needsUpdate=true; } }
 function _rain3dClear(){
   if(_rain3d.pts && _three){ _three.scene.remove(_rain3d.pts); if(_rain3d.pts.geometry)_rain3d.pts.geometry.dispose(); if(_rain3d.pts.material)_rain3d.pts.material.dispose(); }
   _rain3d.pts=null; _rain3d.data=[];
@@ -3994,9 +3973,10 @@ function _rain3dInit(){
   var geo=new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
   /* 동그란 물방울 텍스처 (기본 PointsMaterial은 네모라서 원형 스프라이트 필요) */
+  var _rsize=(_rain3d.size!=null)?_rain3d.size:Math.max(1.5, Math.min(6, dem.cell*0.45));
   var mat=new THREE.PointsMaterial({
-    color:0x9be0ff,
-    size:Math.max(1.5, Math.min(6, dem.cell*0.45)),   // 훨씬 작게 (기존 cell*1.3 → cell*0.45, 상한 6)
+    color:_rain3d.color||0x7ce0ff,
+    size:_rsize,
     map:_rainDropTex(), alphaTest:0.35,
     transparent:true, opacity:0.9, depthTest:true, sizeAttenuation:true
   });
