@@ -3669,11 +3669,16 @@ function _rebuild3D(){
   var mesh=new THREE.Mesh(geo,material); scene.add(mesh); _three.objs.push(mesh);
   /* 허가지선 (분홍) — 표면 드레이프. WebGL LineBasicMaterial은 두께 조절이 안 되므로
      설정한 두께를 튜브 반경에 반영해 실제로 굵게 보이게 */
-  if(S.permit&&S.permit.length>=3){
-    var pPts=densify3DLine(S.permit, dem, hp, exag, 1.5);
-    var _pw=(S.lineStyle&&S.lineStyle.permit&&S.lineStyle.permit.width)||2.5;
-    var _pr=Math.max(0.4, _pw*0.55);   // 두께 → 튜브 반경 (2.5→1.4, 크게 하면 굵어짐)
-    var _pcol=parseInt((lineColor('permit')||'#f472b6').replace('#',''),16);
+  /* ★복수 필지: permitParcels 순회(2D 2390줄과 동일). 단일이면 S.permit 하나 */
+  var _permRings3d = (S.permitParcels&&S.permitParcels.length)
+    ? S.permitParcels.map(function(p){return p.ring;})
+    : ((S.permit&&S.permit.length>=3)?[S.permit]:[]);
+  var _pw=(S.lineStyle&&S.lineStyle.permit&&S.lineStyle.permit.width)||2.5;
+  var _pr=Math.max(0.4, _pw*0.55);   // 두께 → 튜브 반경 (2.5→1.4, 크게 하면 굵어짐)
+  var _pcol=parseInt((lineColor('permit')||'#f472b6').replace('#',''),16);
+  _permRings3d.forEach(function(_pring){
+    if(!_pring||_pring.length<3) return;
+    var pPts=densify3DLine(_pring, dem, hp, exag, 1.5);
     try{
       var _pcurve=new THREE.CatmullRomCurve3(pPts, true, 'catmullrom', 0.02);
       var _ptube=new THREE.TubeGeometry(_pcurve, Math.min(400, pPts.length*2), _pr, 6, true);
@@ -3684,7 +3689,7 @@ function _rebuild3D(){
       var pLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pPts), new THREE.LineBasicMaterial({color:_pcol}));
       scene.add(pLine); _three.objs.push(pLine);
     }
-  }
+  });
   /* 버퍼선 — 표면 드레이프 */
   if(S.permit&&S.permit.length>=3&&S.bufferDist>0){
     var bPoly=offsetPolygon(S.permit,S.bufferDist);
