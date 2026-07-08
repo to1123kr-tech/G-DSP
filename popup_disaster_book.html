@@ -3739,15 +3739,30 @@ function _add3DFlow(scene, dem, hp, exag){
       var t1=tmTo3DPt(cx-d[0]*Lw, cy-d[1]*Lw, dem, hp, exag);
       var t2=tmTo3DPt(cx+d[0]*Lw, cy+d[1]*Lw, dem, hp, exag);
       var mid=tmTo3DPt(cx, cy, dem, hp, exag);      // 중앙점(면 삼각형 기준)
-      t1.y+=1.4; t2.y+=1.4; mid.y+=1.4;
+      t1.y+=0.3; t2.y+=0.3; mid.y+=0.3;
       if(_fstyle==='tri'){
-        // 큰 삼각형(면): 무게중심이 격자중앙(mid)에 오도록 앞:뒤=2:1 (안 쏠림)
-        var dx=t2.x-t1.x, dz=t2.z-t1.z, ln=Math.hypot(dx,dz)||1; dx/=ln; dz/=ln;
-        var px=-dz, pz=dx;                           // 진행방향 수직(폭 방향)
+        // ★ 모양 유지 + 각도만 지형(음영) 따라감: 평평한 삼각형을 지형 법선에 맞춰 통째 회전.
+        //   (세 점을 지형에 각각 붙이면 급경사에서 위아래로 늘어나 찌그러짐)
         var ts=Lw*1.05, wd=Lw*0.52;
-        var tip=new THREE.Vector3(mid.x+dx*ts*(2/3), mid.y+0.6, mid.z+dz*ts*(2/3));   // 앞 2/3
-        var bl =new THREE.Vector3(mid.x-dx*ts*(1/3)+px*wd, mid.y+0.6, mid.z-dz*ts*(1/3)+pz*wd);  // 뒤 1/3
-        var br =new THREE.Vector3(mid.x-dx*ts*(1/3)-px*wd, mid.y+0.6, mid.z-dz*ts*(1/3)-pz*wd);
+        var eps=Math.max(af.cell, effM*0.25);
+        var pC=tmTo3DPt(cx, cy, dem, hp, exag);
+        var pX=tmTo3DPt(cx+eps, cy, dem, hp, exag);
+        var pZ=tmTo3DPt(cx, cy+eps, dem, hp, exag);
+        var ux=pX.x-pC.x, uy=pX.y-pC.y, uz=pX.z-pC.z;
+        var vx=pZ.x-pC.x, vy=pZ.y-pC.y, vz=pZ.z-pC.z;
+        var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;   // 법선 N=u×v
+        var nl=Math.hypot(nx,ny,nz)||1; nx/=nl; ny/=nl; nz/=nl;
+        if(ny<0){ nx=-nx; ny=-ny; nz=-nz; }                   // 위 향하게
+        var dn2=Math.hypot(d[0],d[1])||1;
+        var fx=d[0]/dn2, fy=0, fz=d[1]/dn2;                    // 진행방향(수평)
+        var fdotN=fx*nx+fy*ny+fz*nz;                           // 접평면 투영
+        fx-=fdotN*nx; fy-=fdotN*ny; fz-=fdotN*nz;
+        var fl=Math.hypot(fx,fy,fz)||1; fx/=fl; fy/=fl; fz/=fl;
+        var rx=ny*fz-nz*fy, ry=nz*fx-nx*fz, rz=nx*fy-ny*fx;    // 폭방향 R=N×F
+        var bx=pC.x+nx*0.4, by=pC.y+ny*0.4, bz=pC.z+nz*0.4;    // 표면 위 살짝
+        var tip=new THREE.Vector3(bx+fx*ts*(2/3),       by+fy*ts*(2/3),       bz+fz*ts*(2/3));
+        var bl =new THREE.Vector3(bx-fx*ts*(1/3)+rx*wd, by-fy*ts*(1/3)+ry*wd, bz-fz*ts*(1/3)+rz*wd);
+        var br =new THREE.Vector3(bx-fx*ts*(1/3)-rx*wd, by-fy*ts*(1/3)-ry*wd, bz-fz*ts*(1/3)-rz*wd);
         pushTri(tip,bl,br,rgb);
       } else {
         // 선 화살표: 몸통 + V자 촉 (촉도 지형 표면 따름 — 끝점 t2에서 뒤로 두 선, y는 t2와 동일)
@@ -3779,9 +3794,9 @@ function _add3DFlow(scene, dem, hp, exag){
   var gridPts=[];
   var c0=af.minX, c1=af.minX+af.cols*af.cell, r0=af.minY, r1=af.minY+af.rows*af.cell;
   for(var gc=0; gc<=af.cols; gc+=gm){ var gx=af.minX+gc*af.cell;
-    for(var yy=r0; yy<r1; yy+=af.cell*2){ var ga=tmTo3DPt(gx,yy,dem,hp,exag), gb=tmTo3DPt(gx,Math.min(yy+af.cell*2,r1),dem,hp,exag); ga.y+=1.5; gb.y+=1.5; gridPts.push(ga,gb); } }
+    for(var yy=r0; yy<r1; yy+=af.cell*2){ var ga=tmTo3DPt(gx,yy,dem,hp,exag), gb=tmTo3DPt(gx,Math.min(yy+af.cell*2,r1),dem,hp,exag); ga.y+=0.3; gb.y+=0.3; gridPts.push(ga,gb); } }
   for(var gr=0; gr<=af.rows; gr+=gm){ var gy=af.minY+gr*af.cell;
-    for(var xx=c0; xx<c1; xx+=af.cell*2){ var gc2=tmTo3DPt(xx,gy,dem,hp,exag), gd2=tmTo3DPt(Math.min(xx+af.cell*2,c1),gy,dem,hp,exag); gc2.y+=1.5; gd2.y+=1.5; gridPts.push(gc2,gd2); } }
+    for(var xx=c0; xx<c1; xx+=af.cell*2){ var gc2=tmTo3DPt(xx,gy,dem,hp,exag), gd2=tmTo3DPt(Math.min(xx+af.cell*2,c1),gy,dem,hp,exag); gc2.y+=0.3; gd2.y+=0.3; gridPts.push(gc2,gd2); } }
   if(gridPts.length){
     var gg=new THREE.BufferGeometry().setFromPoints(gridPts);
     var gLines=new THREE.LineSegments(gg, new THREE.LineBasicMaterial({color:0x9cacc8, transparent:true, opacity:0.22}));
@@ -3793,7 +3808,7 @@ function _add3DFlow(scene, dem, hp, exag){
       var val=Math.max(0,Math.round(n.acc)-1);
       var sp=_makeNumSprite(val);
       if(!sp) return;
-      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(3, effM*0.15);  // 지형 위로 넉넉히 띄움
+      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(0.8, effM*0.05);  // 지형 위로 최소만
       sp.position.set(p.x,p.y,p.z);
       /* 겹침 방지: 격자 간격의 0.6배로 축소. 세로는 더 작게(0.28). 자릿수 많으면 가로만 약간 확보 */
       var digits=String(val).length;
