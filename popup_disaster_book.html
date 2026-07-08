@@ -52,6 +52,8 @@
   .palBtn{padding:4.5px 4px !important;font-size:10.5px !important;line-height:1.2}
   .lctx{padding:7px 12px;font-size:12px;color:#cdd8ea;cursor:pointer;border-radius:6px;white-space:nowrap;user-select:none}
   .lctx:hover{background:rgba(56,189,248,0.18);color:#e8f4ff}
+  .lctx.lctxon{color:#38bdf8;font-weight:700}
+  .lctx.lctxon::before{content:"● ";font-size:9px;color:#38bdf8}
   /* 농도 슬라이더: 평소 숨김, 버튼 hover 시 슬라이드로 나옴 (레이어 ON일 때만) */
   .alphaSl{width:0;opacity:0;margin:0;padding:0;pointer-events:none;transition:width .22s ease,opacity .22s ease,margin .22s ease;vertical-align:middle}
   .alphaWrap.armed:hover .alphaSl{width:64px;opacity:1;margin-left:2px;pointer-events:auto}
@@ -814,14 +816,14 @@
     <!-- 레이어 토글 바 (좌측 상단) — 한 줄 유지 -->
     <!-- 우클릭 레이어 컨텍스트 메뉴 (툴바와 동일 항목) -->
     <div id="layerCtxMenu" style="display:none;position:absolute;z-index:50;background:rgba(14,22,38,0.98);border:1px solid #2a3b5c;border-radius:10px;padding:5px;min-width:150px;box-shadow:0 10px 40px rgba(0,0,0,0.6);backdrop-filter:blur(6px)">
-      <div class="lctx" onclick="layerCtxRun('map')">🗺 배경지도</div>
-      <div class="lctx" onclick="layerCtxRun('dem')">음영기복</div>
-      <div class="lctx" onclick="layerCtxRun('contour')">등고선</div>
-      <div class="lctx" onclick="layerCtxRun('stream')">하천망</div>
-      <div class="lctx" onclick="layerCtxRun('bg')">지형도</div>
-      <div class="lctx" onclick="layerCtxRun('cad')">📐 지적선</div>
-      <div class="lctx" onclick="layerCtxRun('tin')">삼각망</div>
-      <div class="lctx" onclick="layerCtxRun('survey')">표고점</div>
+      <div class="lctx" data-lyr="lyrMap" onclick="layerCtxRun('map')">🗺 배경지도</div>
+      <div class="lctx" data-lyr="lyrDem" onclick="layerCtxRun('dem')">음영기복</div>
+      <div class="lctx" data-lyr="lyrContour" onclick="layerCtxRun('contour')">등고선</div>
+      <div class="lctx" data-lyr="lyrStream" onclick="layerCtxRun('stream')">하천망</div>
+      <div class="lctx" data-lyr="lyrBg" onclick="layerCtxRun('bg')">지형도</div>
+      <div class="lctx" data-lyr="lyrCad" onclick="layerCtxRun('cad')">📐 지적선</div>
+      <div class="lctx" data-lyr="lyrTin" onclick="layerCtxRun('tin')">삼각망</div>
+      <div class="lctx" data-lyr="lyrSurvey" onclick="layerCtxRun('survey')">표고점</div>
       <div style="height:1px;background:#2a3b5c;margin:4px 2px"></div>
       <div class="lctx" onclick="layerCtxRun('hs')">🎨 음영조절</div>
     </div>
@@ -1905,6 +1907,11 @@ cv.addEventListener('contextmenu',function(e){
 /* 우클릭 레이어 메뉴: 툴바 버튼과 동일 동작 */
 function showLayerCtxMenu(e){
   var m=document.getElementById('layerCtxMenu'); if(!m) return;
+  /* 현재 켜진 레이어에 불 켜기(툴바 버튼 .on 상태 반영) */
+  m.querySelectorAll('.lctx[data-lyr]').forEach(function(it){
+    var btn=document.getElementById(it.getAttribute('data-lyr'));
+    it.classList.toggle('lctxon', !!(btn && btn.classList.contains('on')));
+  });
   var host=cv.parentElement||document.body, hr=host.getBoundingClientRect();
   var x=e.clientX-hr.left, y=e.clientY-hr.top;
   m.style.display='block';
@@ -3764,7 +3771,9 @@ function _add3DFlow(scene, dem, hp, exag){
         var fl=Math.hypot(fx,fy,fz)||1; fx/=fl; fy/=fl; fz/=fl;
         var rx=ny*fz-nz*fy, ry=nz*fx-nx*fz, rz=nx*fy-ny*fx;    // 폭방향 R=N×F
         var chLen=Lw*0.62, chW=Lw*0.5, gap=Lw*0.5;            // 팔길이·반폭·앞뒤 간격
-        var bx=pC.x+nx*0.4, by=pC.y+ny*0.4, bz=pC.z+nz*0.4;
+        // ★ 갈매기 전체(꼭짓점~뒤팔끝) 기하중심이 격자중앙에 오도록 진행방향으로 당김
+        var cShift=chLen*0.5;
+        var bx=pC.x+nx*0.4+fx*cShift, by=pC.y+ny*0.4+fy*cShift, bz=pC.z+nz*0.4+fz*cShift;
         // 갈매기 2개 (앞·뒤). 각 갈매기: 꼭짓점(앞) + 뒤로 벌어진 두 팔
         for(var g=0; g<2; g++){
           var off=(g===0)? gap*0.5 : -gap*0.5;               // 앞 갈매기 / 뒤 갈매기
@@ -3819,7 +3828,9 @@ function _add3DFlow(scene, dem, hp, exag){
       var val=Math.max(0,Math.round(n.acc)-1);
       var sp=_makeNumSprite(val);
       if(!sp) return;
-      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(0.8, effM*0.05);  // 지형 위로 최소만
+      /* ★ 갈매기와 안 겹치게: 격자 중앙에서 칸 안쪽으로 약간(+X,+Z) 이동 */
+      var noff=effM*0.28;
+      var p=tmTo3DPt(n.x+noff, n.y+noff, dem, hp, exag); p.y+=Math.max(0.8, effM*0.05);
       sp.position.set(p.x,p.y,p.z);
       /* 겹침 방지: 격자 간격의 0.6배로 축소. 세로는 더 작게(0.28). 자릿수 많으면 가로만 약간 확보 */
       var digits=String(val).length;
