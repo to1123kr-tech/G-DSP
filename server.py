@@ -58,6 +58,53 @@ def kigam_wms_proxy():
         logger.error(f"[kigam-wms] {e}")
         return b'', 404
 
+@app.route('/api/geo-map')
+@cache.cached(timeout=3600, query_string=True)
+def geo_map_proxy():
+    """KIGAM 지질도 이미지 GetMap 프록시 (지형도 위에 겹치기용)
+    엔드포인트: data.kigam.re.kr/mgeo/geoserver/wms (geoserver 본체, key 불필요)
+    통과조건: User-Agent(Chrome) + Referer(data.kigam.re.kr/map/) + 레이어명 geoOpen: 네임스페이스
+    params:
+        bbox   — 'minLng,minLat,maxLng,maxLat' (EPSG:4326 WGS84). 지형도 5186은 프론트에서 변환해 전달
+        w, h   — 이미지 픽셀 크기 (기본 800x600)
+        scale  — '50k'(기본) | '250k'  → 레이어 선택
+    returns: PNG (RGBA, 투명)
+    """
+    try:
+        bbox = request.args.get('bbox', '')
+        if not bbox or len(bbox.split(',')) != 4:
+            return b'', 400
+        w = request.args.get('w', '800')
+        h = request.args.get('h', '600')
+        layer = 'geoOpen:L_250K_Geology_Map' if request.args.get('scale') == '250k' else 'geoOpen:L_50K_Geology_Map'
+        params = {
+            'service': 'WMS', 'version': '1.1.1', 'request': 'GetMap',
+            'layers': layer, 'srs': 'EPSG:4326', 'bbox': bbox,
+            'width': w, 'height': h, 'format': 'image/png', 'transparent': 'true',
+        }
+        r = req.get(
+            'https://data.kigam.re.kr/mgeo/geoserver/wms',
+            params=params,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+                "Referer": "https://data.kigam.re.kr/map/",
+            },
+            timeout=20
+        )
+        ct = r.headers.get('Content-Type', '')
+        # 이미지가 아니면(에러 XML 등) 실패로 처리
+        if 'image' not in ct or len(r.content) < 500:
+            logger.warning(f"[geo-map] not image: {r.status_code} {ct} {len(r.content)}bytes")
+            return b'', 502
+        resp = make_response(r.content)
+        resp.headers['Content-Type'] = 'image/png'
+        resp.headers['Access-Control-Allow-Origin'] = '*'
+        logger.info(f"[geo-map] {r.status_code} {len(r.content)}bytes {layer}")
+        return resp
+    except Exception as e:
+        logger.error(f"[geo-map] {e}")
+        return b'', 404
+
 @app.route('/api/kigam-info')
 def kigam_featureinfo_proxy():
     """KIGAM GetFeatureInfo — 허가지선 centroid의 지질 정보 조회
