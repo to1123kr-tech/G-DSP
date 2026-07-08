@@ -1003,6 +1003,9 @@
       <input type="checkbox" id="c3d_stream" checked onchange="set3DStream(this.checked)"> 🌊 하천선 (시안)
     </label>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
+      <input type="checkbox" id="c3d_surv" checked onchange="set3DSurv(this.checked)"> ⛰ 표고점 (주황점·숫자)
+    </label>
+    <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
       <input type="checkbox" id="c3d_wire" onchange="set3DWire(this.checked)"> 골격(와이어프레임)
     </label>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:8px;cursor:pointer">
@@ -3617,9 +3620,51 @@ function _rebuild3D(){
       scene.add(_wLines); _three.objs.push(_wLines);
     }
   }
+  /* 표고점 라벨 (주황 점 + 표고값) — 지형 위에 띄우고 depthTest 꺼서 안 묻히게 */
+  if(S.show3DSurv!==false && S.surveys && S.surveys.length){ _add3DSurv(scene, dem, hp, exag); }
   /* 우수 흐름 (화살표·격자·누적숫자) — 토글 */
   if(S.show3DFlow && S.flow){ _add3DFlow(scene, dem, hp, exag); }
 }
+
+/* 3D 표고점: 주황 점 + 표고값 스프라이트.
+   ★ 항상 카메라를 향하고(스프라이트), depthTest:false + renderOrder로 지형에 절대 안 묻힘.
+   ★ 위치는 지형 표면 보간높이(tmTo3DPt) + 오프셋 → 높이강조(exag) 바꿔도 따라감 */
+function _add3DSurv(scene, dem, hp, exag){
+  var list=S.surveys.filter(function(s){ return s.val!=null || (s.z&&s.z>0); });
+  if(!list.length) list=S.surveys;                       // 값 없어도 위치(점)라도 표시
+  if(list.length>3000){ toast('표고점 '+list.length+'개 — 3D 라벨은 3000개까지만 표시','err'); list=list.slice(0,3000); }
+  var land=Math.max(hp.w, hp.h);
+  var sc=Math.max(land*0.03, 10);                        // 라벨 크기: 땅 크기의 3% (최소 10)
+  list.forEach(function(s){
+    var sp=_makeSurvSprite(s.val!=null?s.val:s.z);
+    if(!sp) return;
+    var p=tmTo3DPt(s.x, s.y, dem, hp, exag);
+    p.y+=Math.max(0.8, sc*0.08);                         // 지형 위로 최소만 띄움
+    sp.position.set(p.x, p.y, p.z);
+    sp.scale.set(sc, sc*0.375, 1);                       // 캔버스 128×48 비율 유지
+    sp.renderOrder=20;                                   // 지형·선들 위에 그림
+    scene.add(sp); _three.objs.push(sp);
+  });
+}
+/* 표고점 스프라이트: 주황 점 + 표고값(외곽선 흰숫자) */
+function _makeSurvSprite(val){
+  try{
+    var n=parseFloat(val), txt=isFinite(n)?String(Math.round(n*10)/10):'';
+    var cv=document.createElement('canvas'); cv.width=128; cv.height=48;
+    var c=cv.getContext('2d'); c.clearRect(0,0,128,48);
+    c.beginPath(); c.arc(14,24,7,0,Math.PI*2); c.fillStyle='#f59e0b'; c.fill();
+    c.lineWidth=2; c.strokeStyle='rgba(0,0,0,0.7)'; c.stroke();
+    if(txt){
+      c.font='bold 23px sans-serif'; c.textAlign='left'; c.textBaseline='middle';
+      c.lineWidth=5; c.strokeStyle='rgba(0,0,0,0.85)'; c.strokeText(txt,28,25);
+      c.fillStyle='#ffd27a'; c.fillText(txt,28,25);
+    }
+    var tex=new THREE.CanvasTexture(cv);
+    var mat=new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false, depthWrite:false});
+    return new THREE.Sprite(mat);
+  }catch(e){ return null; }
+}
+function set3DSurv(on){ S.show3DSurv=!!on; if(_three) _rebuild3D(); }
 
 /* 3D 우수 흐름: 화살표(누적색) + 격자 + 누적숫자(스프라이트) — 표면 드레이프 */
 function _add3DFlow(scene, dem, hp, exag){
@@ -3663,15 +3708,21 @@ function _add3DFlow(scene, dem, hp, exag){
       var t1=tmTo3DPt(cx-d[0]*Lw, cy-d[1]*Lw, dem, hp, exag);
       var t2=tmTo3DPt(cx+d[0]*Lw, cy+d[1]*Lw, dem, hp, exag);
       var mid=tmTo3DPt(cx, cy, dem, hp, exag);      // 중앙점(면 삼각형 기준)
-      t1.y+=1.4; t2.y+=1.4; mid.y+=1.4;
+      t1.y+=0.3; t2.y+=0.3; mid.y+=0.3;
       if(_fstyle==='tri'){
-        // 큰 삼각형(면): 무게중심이 격자중앙(mid)에 오도록 앞:뒤=2:1 (안 쏠림)
-        var dx=t2.x-t1.x, dz=t2.z-t1.z, ln=Math.hypot(dx,dz)||1; dx/=ln; dz/=ln;
-        var px=-dz, pz=dx;                           // 진행방향 수직(폭 방향)
+        // 큰 삼각형(면): 무게중심이 격자중앙(cx,cy)에 오도록 앞:뒤=2:1.
+        // ★ 세 꼭짓점을 TM좌표에서 만들어 각각 지형 표면높이를 샘플 → 경사면에 눕음(수평 안 뜸)
         var ts=Lw*1.05, wd=Lw*0.52;
-        var tip=new THREE.Vector3(mid.x+dx*ts*(2/3), mid.y+0.6, mid.z+dz*ts*(2/3));   // 앞 2/3
-        var bl =new THREE.Vector3(mid.x-dx*ts*(1/3)+px*wd, mid.y+0.6, mid.z-dz*ts*(1/3)+pz*wd);  // 뒤 1/3
-        var br =new THREE.Vector3(mid.x-dx*ts*(1/3)-px*wd, mid.y+0.6, mid.z-dz*ts*(1/3)-pz*wd);
+        var pdx=-d[1], pdy=d[0], pn=Math.hypot(pdx,pdy)||1; pdx/=pn; pdy/=pn;  // 진행방향 수직(TM평면)
+        var dn=Math.hypot(d[0],d[1])||1, ddx=d[0]/dn, ddy=d[1]/dn;             // 진행방향 단위(TM평면)
+        // TM좌표상의 세 꼭짓점
+        var tipTM=[cx+ddx*ts*(2/3),        cy+ddy*ts*(2/3)];                    // 앞 2/3
+        var blTM =[cx-ddx*ts*(1/3)+pdx*wd, cy-ddy*ts*(1/3)+pdy*wd];             // 뒤 1/3 좌
+        var brTM =[cx-ddx*ts*(1/3)-pdx*wd, cy-ddy*ts*(1/3)-pdy*wd];             // 뒤 1/3 우
+        var tip=tmTo3DPt(tipTM[0],tipTM[1],dem,hp,exag);
+        var bl =tmTo3DPt(blTM[0], blTM[1], dem,hp,exag);
+        var br =tmTo3DPt(brTM[0], brTM[1], dem,hp,exag);
+        tip.y+=0.5; bl.y+=0.5; br.y+=0.5;                                       // 표면 위로 살짝만
         pushTri(tip,bl,br,rgb);
       } else {
         // 선 화살표: 몸통 + V자 촉 (촉도 지형 표면 따름 — 끝점 t2에서 뒤로 두 선, y는 t2와 동일)
@@ -3703,9 +3754,9 @@ function _add3DFlow(scene, dem, hp, exag){
   var gridPts=[];
   var c0=af.minX, c1=af.minX+af.cols*af.cell, r0=af.minY, r1=af.minY+af.rows*af.cell;
   for(var gc=0; gc<=af.cols; gc+=gm){ var gx=af.minX+gc*af.cell;
-    for(var yy=r0; yy<r1; yy+=af.cell*2){ var ga=tmTo3DPt(gx,yy,dem,hp,exag), gb=tmTo3DPt(gx,Math.min(yy+af.cell*2,r1),dem,hp,exag); ga.y+=1.5; gb.y+=1.5; gridPts.push(ga,gb); } }
+    for(var yy=r0; yy<r1; yy+=af.cell*2){ var ga=tmTo3DPt(gx,yy,dem,hp,exag), gb=tmTo3DPt(gx,Math.min(yy+af.cell*2,r1),dem,hp,exag); ga.y+=0.3; gb.y+=0.3; gridPts.push(ga,gb); } }
   for(var gr=0; gr<=af.rows; gr+=gm){ var gy=af.minY+gr*af.cell;
-    for(var xx=c0; xx<c1; xx+=af.cell*2){ var gc2=tmTo3DPt(xx,gy,dem,hp,exag), gd2=tmTo3DPt(Math.min(xx+af.cell*2,c1),gy,dem,hp,exag); gc2.y+=1.5; gd2.y+=1.5; gridPts.push(gc2,gd2); } }
+    for(var xx=c0; xx<c1; xx+=af.cell*2){ var gc2=tmTo3DPt(xx,gy,dem,hp,exag), gd2=tmTo3DPt(Math.min(xx+af.cell*2,c1),gy,dem,hp,exag); gc2.y+=0.3; gd2.y+=0.3; gridPts.push(gc2,gd2); } }
   if(gridPts.length){
     var gg=new THREE.BufferGeometry().setFromPoints(gridPts);
     var gLines=new THREE.LineSegments(gg, new THREE.LineBasicMaterial({color:0x9cacc8, transparent:true, opacity:0.22}));
@@ -3717,7 +3768,7 @@ function _add3DFlow(scene, dem, hp, exag){
       var val=Math.max(0,Math.round(n.acc)-1);
       var sp=_makeNumSprite(val);
       if(!sp) return;
-      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(3, effM*0.15);  // 지형 위로 넉넉히 띄움
+      var p=tmTo3DPt(n.x,n.y,dem,hp,exag); p.y+=Math.max(0.8, effM*0.05);  // 지형 위로 최소만 띄움(격자·화살표에 안 겹칠 정도)
       sp.position.set(p.x,p.y,p.z);
       /* 겹침 방지: 격자 간격의 0.6배로 축소. 세로는 더 작게(0.28). 자릿수 많으면 가로만 약간 확보 */
       var digits=String(val).length;
