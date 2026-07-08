@@ -160,7 +160,18 @@ def soil_depth_proxy():
         if len(pnu) != 19 or not pnu.isdigit():
             return jsonify({'ok': False, 'error': f'PNU 19자리 아님: {pnu}'}), 400
         url = 'http://apis.data.go.kr/1390802/SoilEnviron/SoilCharac/V3/getSoilCharacter'
-        r = req.get(url, params={'serviceKey': SOIL_KEY, 'PNU_CD': pnu}, timeout=15)
+        # 흙토람 API가 가끔 느림 → 타임아웃 30초 + 재시도 2회
+        r = None; last_err = None
+        for _try in range(3):
+            try:
+                r = req.get(url, params={'serviceKey': SOIL_KEY, 'PNU_CD': pnu}, timeout=30)
+                break
+            except Exception as te:
+                last_err = te
+                logger.warning(f"[soil-depth] try{_try+1} timeout/err pnu={pnu}: {te}")
+                r = None
+        if r is None:
+            return jsonify({'ok': False, 'error': f'흙토람 응답 지연(재시도 실패): {last_err}', 'pnu': pnu})
         body = r.text or ''
         if r.status_code != 200 or '<item>' not in body:
             logger.warning(f"[soil-depth] {r.status_code} no item pnu={pnu} body={body[:120]}")
