@@ -206,6 +206,10 @@
     background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:3px 9px}
   /* ===== 8번 자료 겹치기 카드 ===== */
   .dcard{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:12px 13px;margin-bottom:10px;transition:.15s}
+  /* 드래그로 파일을 이 카드 위에 올렸을 때 — 이 카드만 강조(글씨 안 봐도 어느 카드인지 보임) */
+  .dcard.drag-hi{border-color:#38bdf8;border-width:2px;background:rgba(56,189,248,0.12);box-shadow:0 0 0 3px rgba(56,189,248,0.18),0 6px 20px rgba(56,189,248,0.25);transform:translateY(-1px)}
+  .dcard.drag-hi .dcard-hd{color:#7dd3fc}
+  .dcard.drag-hi .ddrop{border-color:#38bdf8;background:rgba(56,189,248,0.10)}
   .dcard.on{border-color:#2a6ea8;background:rgba(56,189,248,.05)}
   .dcard-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
   .dcard-hd .chk{width:17px;height:17px;cursor:pointer;flex-shrink:0;accent-color:#38bdf8}
@@ -1306,11 +1310,22 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
   function hasFile(e){ return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types||[],'Files')>=0; }
   /* 8번 카드 드롭존 정의: id → {handler, accept, 오버레이문구} */
   var CARD_DROPS=[
-    {id:'forestDrop', ic:'🌲', t:'산림청 zip을 놓으세요', s:'산사태·임상·토양 (여러 개 가능)'},
-    {id:'geoDrop',    ic:'🪨', t:'지질도 캡처를 놓으세요', s:'KIGAM 화면 캡처 이미지'},
-    {id:'rainDrop',   ic:'🌧️', t:'확률강우량 엑셀을 놓으세요', s:'WAMIS에서 받은 .xlsx'},
-    {id:'groundDrop', ic:'⛏️', t:'시추 기록 캡처를 놓으세요', s:'국토지반정보 화면 캡처'}
+    {id:'forestDrop', card:'dc_forest', ic:'🌲', t:'산림청 zip을 놓으세요', s:'산사태·임상·토양 (여러 개 가능)'},
+    {id:'geoDrop',    card:'dc_geo',    ic:'🪨', t:'지질도 캡처를 놓으세요', s:'KIGAM 화면 캡처 이미지'},
+    {id:'rainDrop',   card:'dc_rain',   ic:'🌧️', t:'확률강우량 엑셀을 놓으세요', s:'WAMIS에서 받은 .xlsx'},
+    {id:'groundDrop', card:'dc_ground', ic:'⛏️', t:'시추 기록 캡처를 놓으세요', s:'국토지반정보 화면 캡처'}
   ];
+  /* 현재 하이라이트된 카드 해제 + 지정 카드만 강조 */
+  function _hiCard(cd){
+    /* 이전 하이라이트 전부 해제 */
+    var prev=document.querySelectorAll('.dcard.drag-hi');
+    for(var i=0;i<prev.length;i++) prev[i].classList.remove('drag-hi');
+    /* 새 카드 강조 */
+    if(cd && cd.card){
+      var el=document.getElementById(cd.card);
+      if(el) el.classList.add('drag-hi');
+    }
+  }
   /* 드래그가 어느 카드 드롭존 위인지 (없으면 null) */
   function _whichCardDrop(e){
     var t=e.target;
@@ -1341,22 +1356,20 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
   window.addEventListener('dragenter',function(e){
     if(!hasFile(e))return;
     var cd=_whichCardDrop(e);
-    if(cd){ e.preventDefault(); depth++; _setLayText(cd); lay.classList.add('on'); lay._card=cd; return; }
-    if(_overForestDrop(e)) return;   // 8번 페이지 나머지 = DXF 안 받음
-    e.preventDefault(); depth++; _setLayText(null); lay._card=null; lay.classList.add('on');
+    if(cd){ e.preventDefault(); _hiCard(cd); lay._card=cd; return; }   // 카드별 하이라이트 (전체 오버레이 X)
+    if(_overForestDrop(e)){ _hiCard(null); return; }  // 8번 페이지 나머지 = 아무 것도 안 함
+    e.preventDefault(); depth++; _setLayText(null); lay._card=null; lay.classList.add('on');  // 다른 페이지 = DXF 전체 오버레이
   });
   window.addEventListener('dragover', function(e){
     if(!hasFile(e))return;
     var cd=_whichCardDrop(e);
     if(cd){
       e.preventDefault();
-      /* 카드 위면 오버레이 계속 유지 (자식 경계로 dragleave 나도 여기서 되살림) */
-      if(!lay.classList.contains('on')){ _setLayText(cd); lay.classList.add('on'); }
-      else if(lay._card!==cd){ _setLayText(cd); lay._card=cd; }  // 다른 카드로 이동 시 문구 교체
-      lay._card=cd;
+      /* 카드 바뀌면 하이라이트 이동 (자식 경계로 leave 나도 여기서 되살림) */
+      if(lay._card!==cd){ _hiCard(cd); lay._card=cd; }
       return;
     }
-    if(_overForestDrop(e)){ return; }
+    if(_overForestDrop(e)){ _hiCard(null); lay._card=null; return; }  // 8번서 카드 밖 = 하이라이트 해제
     e.preventDefault();
     if(!lay.classList.contains('on')){ _setLayText(null); lay.classList.add('on'); }
   });
@@ -1365,15 +1378,15 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
     /* relatedTarget = 커서가 이동해 들어간 요소. null이면 창(문서) 밖으로 나간 것 = 진짜 종료 */
     var to = e.relatedTarget;
     if(to===null || to===undefined){
-      depth=0; lay.classList.remove('on'); lay._card=null;
+      depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);  // 카드 하이라이트도 해제
       return;
     }
-    /* 문서 안에서 요소 간 이동은 무시 (오버레이 유지) — depth 방식 폐기 */
+    /* 문서 안에서 요소 간 이동은 무시 (하이라이트/오버레이 유지) */
   });
   window.addEventListener('drop',     function(e){
     var cd=_whichCardDrop(e);
     if(cd){
-      e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null;
+      e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);  // 하이라이트 해제
       var files=e.dataTransfer&&e.dataTransfer.files;
       if(files&&files.length){
         if(cd.id==='forestDrop') forestUpload(files);
@@ -1384,8 +1397,8 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
       return;
     }
     /* 8번 페이지 나머지 = DXF 안 받음 */
-    if(_overForestDrop(e)){ e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; return; }
-    e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null;
+    if(_overForestDrop(e)){ e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null); return; }
+    e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);
     var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) loadDXFFile(f); });
   /* 드래그 지점이 산림청 zip 드롭존(또는 그 안)인지, 또는 8번 페이지 활성 중인지 */
   function _overForestDrop(e){
