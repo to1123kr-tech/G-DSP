@@ -2277,6 +2277,8 @@ def _fgis_parse_tif(tif_bytes, tfw_text):
     import numpy as np
     v=[float(x) for x in tfw_text.split()]
     pxW,_,_,pxH,x0,y0=v
+    # tfw C/F(x0,y0)=좌상단 픽셀 "중심" → 이미지 모서리로 반픽셀 보정(산사태 정합 오차 수정)
+    x0 -= pxW/2.0; y0 -= pxH/2.0
     img=Image.open(io.BytesIO(tif_bytes)); arr=np.array(img)
     if arr.ndim==3: arr=arr[:,:,0]
     H,W=arr.shape
