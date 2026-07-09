@@ -6666,7 +6666,7 @@ function airMake(ov){
   var center=(ov&&ov.center)||((typeof _d8GetLoc==='function')?_d8GetLoc():null);
   if(!center||!center.lng){ _airSetStatus('<span style="color:#f87171">먼저 8번에서 작업위치를 검색하거나 허가지선을 잡아주세요 (또는 지도 화면 위치로)</span>'); return; }
   var zoom=(ov&&ov.zoom)||AIR.zoom;
-  var btn=document.getElementById('airMakeBtn'), aBtn=document.getElementById('airAreaGenBtn'), n=AIR.cols, picks=AIR.picks.slice(0,n), size=512;
+  var btn=document.getElementById('airMakeBtn'), aBtn=document.getElementById('airAreaGenBtn'), n=AIR.cols, picks=AIR.picks.slice(0,n), size=400;
   var rb=document.getElementById('airResult'); if(rb && !AIR.areaMode) rb.innerHTML='';
   var total=picks.length+1, doneN=0;   // 사진 n장 + 지적 1
   function paint(){
@@ -6710,8 +6710,6 @@ var AREA_FRAC=0.9;
 function airAreaStart(){
   if(!S.bounds || !(S.scale>0) || typeof s2w!=='function'){ toast('먼저 지도를 보이게 하세요 (2번/8번에서 배경지도 켜기)','err'); return; }
   AIR.areaMode=true;
-  var p=document.getElementById('airAChkPermit'), c=document.getElementById('airAChkCad'), j=document.getElementById('airAChkJibun');
-  if(p) p.checked=AIR.drawPermit; if(c) c.checked=AIR.drawCad; if(j) j.checked=AIR.drawJibun;
   var st=document.getElementById('airAreaStatus'); if(st) st.innerHTML='';
   var ov=document.getElementById('airAreaOverlay'), mn=document.getElementById('airAreaMenu');
   if(ov) ov.style.display='block'; if(mn) mn.style.display='block';
@@ -6735,15 +6733,27 @@ function airAreaEnd(){
   window.removeEventListener('resize', _airAreaLayout);
 }
 function airAreaGenerate(){
-  if(!S.bounds || !(S.scale>0) || typeof s2w!=='function'){ toast('지도가 필요해요','err'); return; }
-  var p=document.getElementById('airAChkPermit'), c=document.getElementById('airAChkCad'), j=document.getElementById('airAChkJibun');
-  AIR.drawPermit=p?p.checked:true; AIR.drawCad=c?c.checked:true; AIR.drawJibun=j?j.checked:true;
-  var wc=s2w(cv.width/2, cv.height/2);
-  var ll=(typeof tm5186toWgs84==='function')?tm5186toWgs84(wc.x, wc.y):null;
-  if(!ll){ toast('좌표 변환 실패 — 서버에서 열어주세요','err'); return; }
-  var boxMeters=(Math.min(cv.width, cv.height)*AREA_FRAC)/S.scale, resT=boxMeters/512;
-  var z=15,bd=1e18; for(var zz=13; zz<=18; zz++){ var d=Math.abs(_AIR_RES[zz]-resT); if(d<bd){ bd=d; z=zz; } }
-  airMake({center:{lng:ll[0], lat:ll[1]}, zoom:z});
+  var st=document.getElementById('airAreaStatus');
+  if(st) st.innerHTML='<span style="color:#93c5fd">준비 중…</span>';
+  var center=null, zoom=AIR.zoom;
+  try{
+    if(S.bounds && S.scale>0 && typeof s2w==='function' && typeof cv!=='undefined' && cv.width>0){
+      var wc=s2w(cv.width/2, cv.height/2);
+      var ll=(typeof tm5186toWgs84==='function')?tm5186toWgs84(wc.x, wc.y):null;
+      if(ll && ll[0]){
+        center={lng:ll[0], lat:ll[1]};
+        var boxMeters=(Math.min(cv.width, cv.height)*AREA_FRAC)/S.scale, resT=boxMeters/400, bd=1e18;
+        for(var zz=13; zz<=18; zz++){ var d=Math.abs(_AIR_RES[zz]-resT); if(d<bd){ bd=d; zoom=zz; } }
+      }
+    }
+  }catch(e){}
+  if(!center){   // 지도 중심 못 읽으면 허가지선/작업위치로 폴백(이 경로는 검증됨)
+    if(st) st.innerHTML='<span style="color:#fbbf24">지도 위치를 못 읽어 허가지선/작업위치 기준으로 만들어요…</span>';
+    center=(typeof _d8GetLoc==='function')?_d8GetLoc():null;
+    if(!center||!center.lng){ if(st) st.innerHTML='<span style="color:#f87171">위치가 없어요 — 8번에서 작업위치를 잡거나 배경지도를 켜세요</span>'; return; }
+    zoom=AIR.zoom;
+  }
+  airMake({center:center, zoom:zoom});
 }
 /* 저장된 사진(로드 완료)로 즉시 합성 — opts로 지적선/허가지선 표시 토글 (다시 안 받음) */
 function _airComposite(canvas, opts){
@@ -7000,18 +7010,23 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
 <div id="airModal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(6,10,18,0.95);flex-direction:column">
   <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0d1626;border-bottom:1px solid #2a3a52;flex-wrap:wrap">
     <b style="color:#fff;font-size:13px;margin-right:4px">🛰 과거항공 시계열</b>
-    <label style="color:#cbd5e1;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="airMChkCad" onchange="airModalRedraw()"> 지적선</label>
-    <label style="color:#cbd5e1;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="airMChkJibun" onchange="airModalRedraw()"> 지번</label>
-    <label style="color:#cbd5e1;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="airMChkPermit" onchange="airModalRedraw()"> 허가지선</label>
+    <span style="color:#94a3b8;font-size:11px">→ 우측 메뉴에서 켜고 끄고 저장</span>
     <span style="flex:1"></span>
     <button onclick="airModalZoom(0.8)" title="축소" style="width:34px;height:30px;font-size:17px;background:#1e2a3f;color:#fff;border:1px solid #33475f;border-radius:6px;cursor:pointer">−</button>
     <button onclick="airModalZoom(1.25)" title="확대" style="width:34px;height:30px;font-size:17px;background:#1e2a3f;color:#fff;border:1px solid #33475f;border-radius:6px;cursor:pointer">＋</button>
     <button onclick="airModalFit()" title="화면맞춤" style="height:30px;padding:0 10px;font-size:12px;background:#1e2a3f;color:#fff;border:1px solid #33475f;border-radius:6px;cursor:pointer">맞춤</button>
-    <button onclick="airModalDownload()" style="height:30px;padding:0 12px;font-size:12px;background:#2b6cff;color:#fff;border:none;border-radius:6px;cursor:pointer">⬇ 저장</button>
     <button onclick="airCloseModal()" style="height:30px;padding:0 12px;font-size:12px;background:#374151;color:#fff;border:none;border-radius:6px;cursor:pointer">✕ 닫기</button>
   </div>
   <div id="airModalBody" onwheel="event.preventDefault(); airModalZoom(event.deltaY<0?1.1:0.9);" style="flex:1;overflow:auto;padding:14px;text-align:center;cursor:grab;-webkit-overflow-scrolling:touch">
     <canvas id="airModalCanvas" style="max-width:none;box-shadow:0 6px 30px rgba(0,0,0,0.6);border-radius:6px;vertical-align:top"></canvas>
+  </div>
+  <!-- 우측 플로팅 메뉴: 표시 토글 + 저장 한 곳에 -->
+  <div id="airModalPanel" style="position:fixed;right:16px;top:62px;z-index:100000;background:#0d1626;border:1px solid #33475f;border-radius:12px;padding:13px;width:172px;box-shadow:0 10px 40px rgba(0,0,0,0.6)">
+    <div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:11px">🗺 표시</div>
+    <label style="color:#e5e7eb;font-size:13px;display:flex;align-items:center;gap:9px;cursor:pointer;margin-bottom:10px"><input type="checkbox" id="airMChkPermit" onchange="airModalRedraw()" style="width:16px;height:16px;cursor:pointer"> 허가지선</label>
+    <label style="color:#e5e7eb;font-size:13px;display:flex;align-items:center;gap:9px;cursor:pointer;margin-bottom:10px"><input type="checkbox" id="airMChkCad" onchange="airModalRedraw()" style="width:16px;height:16px;cursor:pointer"> 지적선</label>
+    <label style="color:#e5e7eb;font-size:13px;display:flex;align-items:center;gap:9px;cursor:pointer;margin-bottom:14px"><input type="checkbox" id="airMChkJibun" onchange="airModalRedraw()" style="width:16px;height:16px;cursor:pointer"> 지번</label>
+    <button onclick="airModalDownload()" style="width:100%;padding:10px;font-size:13px;font-weight:700;background:#2b6cff;color:#fff;border:none;border-radius:8px;cursor:pointer">⬇ 이미지 저장</button>
   </div>
 </div>
 
@@ -7021,13 +7036,11 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
   <div style="position:absolute;top:8px;left:0;right:0;text-align:center;color:#fff;font-size:12px;font-weight:600;text-shadow:0 1px 4px #000">▭ 이 사각형 안이 사진에 담겨요 · 지도를 옮기고/확대해서 맞추세요</div>
 </div>
 <div id="airAreaMenu" style="display:none;position:fixed;z-index:99991;background:#0d1626;border:1px solid #2a3a52;border-radius:10px;padding:12px;width:196px;box-shadow:0 8px 34px rgba(0,0,0,0.55)">
-  <div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:9px">▭ 영역선택</div>
-  <label style="color:#cbd5e1;font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="airAChkPermit" checked> 허가지선</label>
-  <label style="color:#cbd5e1;font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="airAChkCad" checked> 지적선</label>
-  <label style="color:#cbd5e1;font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:10px"><input type="checkbox" id="airAChkJibun" checked> 지번</label>
-  <button id="airAreaGenBtn" onclick="airAreaGenerate()" style="width:100%;padding:9px;font-size:13px;font-weight:700;background:#2b6cff;color:#fff;border:none;border-radius:7px;cursor:pointer">🖼 만들기</button>
-  <div id="airAreaStatus" style="font-size:11px;margin-top:8px;min-height:14px;line-height:1.4"></div>
-  <button onclick="airAreaEnd()" style="width:100%;padding:7px;margin-top:6px;font-size:12px;background:#374151;color:#fff;border:none;border-radius:7px;cursor:pointer">✕ 취소</button>
+  <div style="color:#fff;font-size:12.5px;font-weight:700;margin-bottom:8px">▭ 영역선택</div>
+  <div style="font-size:10.5px;color:#94a3b8;margin-bottom:11px;line-height:1.5">틀 안에 원하는 범위를 맞추고 완료를 누르세요. 표시(허가지선·지적선·지번)는 결과 화면에서 켜고 끕니다.</div>
+  <button id="airAreaGenBtn" onclick="airAreaGenerate()" style="width:100%;padding:10px;font-size:13px;font-weight:700;background:#2b6cff;color:#fff;border:none;border-radius:8px;cursor:pointer">✅ 영역선택 완료 · 만들기</button>
+  <div id="airAreaStatus" style="font-size:11px;margin-top:9px;min-height:14px;line-height:1.4"></div>
+  <button onclick="airAreaEnd()" style="width:100%;padding:7px;margin-top:7px;font-size:12px;background:#374151;color:#fff;border:none;border-radius:7px;cursor:pointer">✕ 취소</button>
 </div>
 
 </body>
