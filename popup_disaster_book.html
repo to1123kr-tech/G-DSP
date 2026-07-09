@@ -309,25 +309,8 @@
         <div id="srchDrop" class="srchDrop" style="display:none"></div>
       </div>
       <div id="jibunMsg" style="display:none;font-size:10.5px;margin-top:5px;line-height:1.5"></div>
-
-      <!-- ② 점선 드롭박스 (클릭 = 파일 선택) -->
-      <div class="dropzone" id="dropzone" onclick="document.getElementById('file').click()">
-        <div class="dz-ic">📁</div>
-        <div class="dz-t">DXF를 <b>끌어다 놓거나</b><br>클릭해서 선택</div>
-      </div>
-      <input type="file" id="file" accept=".dxf" style="display:none">
-
-      <!-- ③ 열기 버튼 (유지) -->
-      <button class="btn btn-primary" onclick="document.getElementById('file').click()" style="margin-top:9px">
-        ⬆ 수치지형도 DXF 열기
-      </button>
-
-      <!-- ④ 안내 정리 -->
-      <div style="font-size:10.5px;color:var(--tx3);margin-top:8px;line-height:1.55">
-        변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식
-      </div>
       <!-- 🗺 지적(VWorld) — 서버에서 열 때만 동작 -->
-      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:11px">
+      <div style="border:1px solid var(--line);border-radius:10px;margin-top:10px;padding:11px">
         <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:3px">🗺 지적도 <span style="font-size:9.5px;color:var(--tx3);font-weight:400">(EPSG:5186 · 서버 전용)</span></div>
         <div style="font-size:10px;color:var(--tx3);line-height:1.5;margin-bottom:8px">지형도가 실좌표(5186)면 지적이 제자리에 얹혀요. <b style="color:var(--tx2)">필지 클릭 → 선택 완료 → 허가지선/DXF</b></div>
         <button class="btn btn-ghost" id="cadBgBtn" onclick="toggleCadBg()">🗺 지도·지적 배경</button>
@@ -363,6 +346,23 @@
           </div>
           <div style="font-size:9px;color:var(--tx3);margin-top:8px;line-height:1.5">🎯 허가지선: 이 도구에서 바로 분석<br>📐 DXF: CAD로 빼서 편집(좌표 깨진 도면 대비)</div>
         </div>
+      </div>
+
+      <!-- ② 점선 드롭박스 (클릭 = 파일 선택) -->
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('file').click()">
+        <div class="dz-ic">📁</div>
+        <div class="dz-t">DXF를 <b>끌어다 놓거나</b><br>클릭해서 선택</div>
+      </div>
+      <input type="file" id="file" accept=".dxf" style="display:none">
+
+      <!-- ③ 열기 버튼 (유지) -->
+      <button class="btn btn-primary" onclick="document.getElementById('file').click()" style="margin-top:9px">
+        ⬆ 수치지형도 DXF 열기
+      </button>
+
+      <!-- ④ 안내 정리 -->
+      <div style="font-size:10.5px;color:var(--tx3);margin-top:8px;line-height:1.55">
+        변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식
       </div>
     </div>
 
