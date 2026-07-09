@@ -6658,26 +6658,35 @@ function airMake(){
   var center=(typeof _d8GetLoc==='function')?_d8GetLoc():null;
   if(!center||!center.lng){ airStatus('<span style="color:#f87171">먼저 8번에서 작업위치를 검색하거나 허가지선을 잡아주세요</span>'); return; }
   var btn=document.getElementById('airMakeBtn'), n=AIR.cols, picks=AIR.picks.slice(0,n), size=512;
-  airStatus('<span>⏳ '+n+'개 연도 항공사진 받는 중… '+(AIR.drawCad?'(지적선 포함) ':'')+'(조금 걸려요)</span>');
+  airStatus('<span>⏳ '+n+'개 연도 항공사진 + 지적 받는 중… (조금 걸려요)</span>');
   if(btn) btn.disabled=true; var rb=document.getElementById('airResult'); if(rb) rb.innerHTML='';
-  var cadJob = AIR.drawCad ? _airFetchCadastral(center, AIR.zoom, size) : Promise.resolve(null);
+  var cadJob=_airFetchCadastral(center, AIR.zoom, size).catch(function(){return null;});
   var photoJobs=picks.map(function(year){
     var url='/api/air-photo?lng='+center.lng+'&lat='+center.lat+'&year='+year+'&z='+AIR.zoom+'&size='+size;
-    return fetch(url).then(function(r){ if(!r.ok) return {year:year,img:null}; return r.blob().then(function(b){ return {year:year, img:URL.createObjectURL(b)}; }); }).catch(function(){ return {year:year,img:null}; });
+    return fetch(url).then(function(r){ if(!r.ok) return null; return r.blob(); }).then(function(b){
+      if(!b) return {year:year,img:null};
+      return new Promise(function(res){ var im=new Image(); im.onload=function(){res({year:year,img:im});}; im.onerror=function(){res({year:year,img:null});}; im.src=URL.createObjectURL(b); });
+    }).catch(function(){ return {year:year,img:null}; });
   });
   Promise.all([cadJob].concat(photoJobs)).then(function(all){
-    var cadParcels=all[0], items=all.slice(1);
-    airCompose(items, size, center, cadParcels); if(btn) btn.disabled=false;
+    AIR._res={imgs:all.slice(1), cad:all[0], center:center, size:size};
+    if(btn) btn.disabled=false;
+    var ok=AIR._res.imgs.filter(function(x){return x&&x.img;}).length;
+    airStatus('<span style="color:#4ade80">✅ 완료 ('+ok+'/'+AIR._res.imgs.length+'장)'+(all[0]?'':' · 지적 없음')+'</span>');
+    if(rb) rb.innerHTML='<button class="air-dl" onclick="airOpenModal()">🔍 결과 크게 보기</button> <button class="air-dl" onclick="airModalDownload()">⬇ 저장</button>';
+    airOpenModal();
   });
 }
-function airCompose(items, size, center, cadParcels){
+/* 저장된 사진(로드 완료)로 즉시 합성 — opts로 지적선/허가지선 표시 토글 (다시 안 받음) */
+function _airComposite(canvas, opts){
+  var R=AIR._res; if(!R||!canvas) return;
+  var items=R.imgs, size=R.size, center=R.center, cadParcels=(opts.drawCad?R.cad:null);
   var n=items.length, cols=n<=2?n:2, rows=Math.ceil(n/cols);
   var pad=8, labelH=26, gap=6, cellW=size, cellH=size+labelH;
   var W=pad*2+cols*cellW+(cols-1)*gap, H=pad*2+rows*cellH+(rows-1)*gap;
-  var cv=document.createElement('canvas'); cv.width=W; cv.height=H;
-  var ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
-  var permitRings=_airPermitPx(center, AIR.zoom, size);
-  /* 지적선 픽셀 미리계산 (중심·화각·크기 동일하므로 1회) */
+  canvas.width=W; canvas.height=H;
+  var ctx=canvas.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+  var permitRings=opts.drawPermit?_airPermitPx(center, AIR.zoom, size):null;
   var cadPx=null, _res=_AIR_RES[AIR.zoom], _cc=_wgs84to5179(center.lng, center.lat);
   if(cadParcels && cadParcels.length && _res && _cc){
     cadPx=[];
@@ -6689,7 +6698,6 @@ function airCompose(items, size, center, cadParcels){
       cadPx.push({ring:ring, lx:sx/ring.length, ly:sy/ring.length, jibun:pc.jibun});
     }
   }
-  var loaded=0, fail=0;
   function drawCadAt(x,y){
     if(!cadPx||!cadPx.length) return;
     ctx.save(); ctx.beginPath(); ctx.rect(x,y,cellW,size); ctx.clip();
@@ -6710,32 +6718,56 @@ function airCompose(items, size, center, cadParcels){
       ctx.beginPath();
       for(var k=0;k<ring.length;k++){ var p=ring[k]; if(k===0)ctx.moveTo(x+p.px,y+p.py); else ctx.lineTo(x+p.px,y+p.py); }
       ctx.closePath();
-      ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.stroke();
-      ctx.lineWidth=2; ctx.strokeStyle='#ff2d55'; ctx.stroke();
+      ctx.lineWidth=4; ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.stroke();
+      ctx.lineWidth=2.5; ctx.strokeStyle='#ff2d55'; ctx.stroke();
       ctx.fillStyle='rgba(255,45,85,0.12)'; ctx.fill();
     });
     ctx.restore();
-  }
-  function done(){ if(loaded+fail<n) return;
-    var dataUrl=cv.toDataURL('image/png');
-    var box=document.getElementById('airResult');
-    if(box) box.innerHTML='<img src="'+dataUrl+'" alt="과거항공 시계열" style="width:100%;border-radius:8px">'+'<a class="air-dl" download="과거항공_시계열.png" href="'+dataUrl+'">⬇ 이미지 저장</a>';
-    airStatus('<span style="color:#4ade80">✅ 완료'+(fail?' (일부 연도 사진없음 '+fail+'개)':'')+'</span>');
   }
   items.forEach(function(it, idx){
     var cIdx=idx%cols, rIdx=Math.floor(idx/cols);
     var x=pad+cIdx*(cellW+gap), y=pad+rIdx*(cellH+gap);
     ctx.fillStyle='#1a2233'; ctx.fillRect(x,y,cellW,labelH);
     ctx.fillStyle='#fff'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('정사영상 ('+it.year+'년)', x+cellW/2, y+labelH/2);
-    if(it.img){
-      var im=new Image();
-      im.onload=function(){ ctx.drawImage(im, x, y+labelH, cellW, size); drawCadAt(x, y+labelH); drawPermitAt(x, y+labelH); loaded++; done(); };
-      im.onerror=function(){ fail++; ctx.fillStyle='#eee'; ctx.fillRect(x,y+labelH,cellW,size); ctx.fillStyle='#999'; ctx.fillText('사진 없음', x+cellW/2, y+labelH+size/2); done(); };
-      im.src=it.img;
-    } else { fail++; ctx.fillStyle='#eee'; ctx.fillRect(x,y+labelH,cellW,size); ctx.fillStyle='#999'; ctx.font='13px sans-serif'; ctx.fillText(it.year+'년 사진 없음', x+cellW/2, y+labelH+size/2); done(); }
+    ctx.fillText('정사영상 ('+((it&&it.year)||'')+'년)', x+cellW/2, y+labelH/2);
+    if(it&&it.img){ ctx.drawImage(it.img, x, y+labelH, cellW, size); drawCadAt(x, y+labelH); drawPermitAt(x, y+labelH); }
+    else { ctx.fillStyle='#eee'; ctx.fillRect(x,y+labelH,cellW,size); ctx.fillStyle='#999'; ctx.font='13px sans-serif'; ctx.fillText(((it&&it.year)||'')+'년 사진 없음', x+cellW/2, y+labelH+size/2); }
   });
 }
+/* ── 결과 큰 화면(모달): 확대/축소 + 지적선/허가지선 토글 + 저장 ── */
+var _airZoom=1;
+function airOpenModal(){
+  if(!AIR._res) return;
+  var m=document.getElementById('airModal'); if(!m) return;
+  var cc=document.getElementById('airMChkCad'), cp=document.getElementById('airMChkPermit');
+  if(cc) cc.checked=AIR.drawCad; if(cp) cp.checked=AIR.drawPermit;
+  m.style.display='flex'; _airZoom=1; airModalRedraw();
+}
+function airCloseModal(){ var m=document.getElementById('airModal'); if(m) m.style.display='none'; }
+function airModalRedraw(){
+  var cv=document.getElementById('airModalCanvas'); if(!cv) return;
+  var cc=document.getElementById('airMChkCad'), cp=document.getElementById('airMChkPermit');
+  _airComposite(cv, {drawCad:cc?cc.checked:false, drawPermit:cp?cp.checked:false});
+  cv.setAttribute('data-natw', cv.width); _airApplyZoom();
+}
+function _airApplyZoom(){ var cv=document.getElementById('airModalCanvas'); if(!cv) return; var w=+cv.getAttribute('data-natw')||cv.width; cv.style.width=Math.round(w*_airZoom)+'px'; }
+function airModalZoom(f){ _airZoom=Math.max(0.3, Math.min(6, _airZoom*f)); _airApplyZoom(); }
+function airModalFit(){ _airZoom=1; var cv=document.getElementById('airModalCanvas'), b=document.getElementById('airModalBody'); if(cv&&b){ var w=+cv.getAttribute('data-natw')||cv.width; _airZoom=Math.min(1,(b.clientWidth-28)/(w||1)); } _airApplyZoom(); }
+function airModalDownload(){
+  if(!AIR._res) return;
+  var tmp=document.createElement('canvas');
+  var cc=document.getElementById('airMChkCad'), cp=document.getElementById('airMChkPermit');
+  _airComposite(tmp, {drawCad:cc?cc.checked:AIR.drawCad, drawPermit:cp?cp.checked:AIR.drawPermit});
+  var a=document.createElement('a'); a.download='과거항공_시계열.png'; a.href=tmp.toDataURL('image/png'); a.click();
+}
+/* 모달에서 드래그로 이동(팬) */
+(function(){ document.addEventListener('DOMContentLoaded',function(){
+  var b=document.getElementById('airModalBody'); if(!b) return;
+  var down=false,sx,sy,sl,st;
+  b.addEventListener('pointerdown',function(e){ if(e.target&&e.target.id==='airModalCanvas'){ down=true; sx=e.clientX; sy=e.clientY; sl=b.scrollLeft; st=b.scrollTop; b.style.cursor='grabbing'; } });
+  window.addEventListener('pointermove',function(e){ if(!down) return; b.scrollLeft=sl-(e.clientX-sx); b.scrollTop=st-(e.clientY-sy); });
+  window.addEventListener('pointerup',function(){ down=false; if(b) b.style.cursor='grab'; });
+}); })();
 (function(){ function init(){ if(document.getElementById('airYearPicks')) airLoadYears(); } if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded', init); })();
 
 /* 책 1페이지로 시작 */
@@ -6891,6 +6923,24 @@ function _rstep(num, title, body){
 function closeRainGuide(){ document.getElementById('rainGuideModal').style.display='none'; }
 document.addEventListener('click',function(e){ if(e.target && e.target.id==='rainGuideModal') closeRainGuide(); });
 </script>
+
+<!-- 과거항공 시계열 결과 큰 화면 -->
+<div id="airModal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(6,10,18,0.95);flex-direction:column">
+  <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:#0d1626;border-bottom:1px solid #2a3a52;flex-wrap:wrap">
+    <b style="color:#fff;font-size:13px;margin-right:4px">🛰 과거항공 시계열</b>
+    <label style="color:#cbd5e1;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="airMChkCad" onchange="airModalRedraw()"> 지적선·지번</label>
+    <label style="color:#cbd5e1;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="airMChkPermit" onchange="airModalRedraw()"> 허가지선</label>
+    <span style="flex:1"></span>
+    <button onclick="airModalZoom(0.8)" title="축소" style="width:34px;height:30px;font-size:17px;background:#1e2a3f;color:#fff;border:1px solid #33475f;border-radius:6px;cursor:pointer">−</button>
+    <button onclick="airModalZoom(1.25)" title="확대" style="width:34px;height:30px;font-size:17px;background:#1e2a3f;color:#fff;border:1px solid #33475f;border-radius:6px;cursor:pointer">＋</button>
+    <button onclick="airModalFit()" title="화면맞춤" style="height:30px;padding:0 10px;font-size:12px;background:#1e2a3f;color:#fff;border:1px solid #33475f;border-radius:6px;cursor:pointer">맞춤</button>
+    <button onclick="airModalDownload()" style="height:30px;padding:0 12px;font-size:12px;background:#2b6cff;color:#fff;border:none;border-radius:6px;cursor:pointer">⬇ 저장</button>
+    <button onclick="airCloseModal()" style="height:30px;padding:0 12px;font-size:12px;background:#374151;color:#fff;border:none;border-radius:6px;cursor:pointer">✕ 닫기</button>
+  </div>
+  <div id="airModalBody" onwheel="event.preventDefault(); airModalZoom(event.deltaY<0?1.1:0.9);" style="flex:1;overflow:auto;padding:14px;text-align:center;cursor:grab;-webkit-overflow-scrolling:touch">
+    <canvas id="airModalCanvas" style="max-width:none;box-shadow:0 6px 30px rgba(0,0,0,0.6);border-radius:6px;vertical-align:top"></canvas>
+  </div>
+</div>
 
 </body>
 </html>
