@@ -311,20 +311,9 @@
       <div id="jibunMsg" style="display:none;font-size:10.5px;margin-top:5px;line-height:1.5"></div>
       <!-- 🗺 지적(VWorld) — 서버에서 열 때만 동작 -->
       <div style="border:1px solid var(--line);border-radius:10px;margin-top:10px;padding:11px">
-        <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:3px">🗺 지적도 <span style="font-size:9.5px;color:var(--tx3);font-weight:400">(EPSG:5186 · 서버 전용)</span></div>
-        <div style="font-size:10px;color:var(--tx3);line-height:1.5;margin-bottom:8px">지형도가 실좌표(5186)면 지적이 제자리에 얹혀요. <b style="color:var(--tx2)">필지 클릭 → 선택 완료 → 허가지선/DXF</b></div>
-        <button class="btn btn-ghost" id="cadBgBtn" onclick="toggleCadBg()">🗺 지도·지적 배경</button>
-        <div id="cadBgCtrl" style="display:none;margin-top:7px">
-          <div style="display:flex;gap:5px;margin-bottom:6px">
-            <button class="thr on" id="cadBgL_sat" onclick="setCadBgLayers('sat')">위성+지적</button>
-            <button class="thr" id="cadBgL_base" onclick="setCadBgLayers('base')">일반지도+지적</button>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:10px;color:var(--tx3);white-space:nowrap">농도</span>
-            <input type="range" min="20" max="100" value="85" step="5" oninput="setCadBgAlpha(this.value)" style="flex:1">
-          </div>
-        </div>
-        <button class="btn btn-ghost" id="cadSelBtn" onclick="toggleCadSelect()" style="margin-top:8px">📍 지적 선택</button>
+        <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:3px">🗺 지적 선택 <span style="font-size:9.5px;color:var(--tx3);font-weight:400">(서버 전용)</span></div>
+        <div style="font-size:10px;color:var(--tx3);line-height:1.5;margin-bottom:9px"><b style="color:var(--tx2)">「지적 선택」</b> 누르면 지도가 자동으로 뜨고, 필지 클릭 → 선택 완료 → 허가지선/DXF. 지형도(실좌표 5186)가 있으면 제자리에 얹혀요.</div>
+        <button class="btn btn-primary" id="cadSelBtn" onclick="toggleCadSelect()">📍 지적 선택</button>
 
         <!-- 1단계: 선택 중 (필지 클릭) -->
         <div id="cadSelBar" style="display:none;margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px">
@@ -6120,10 +6109,6 @@ function _cadKakaoReady(cb, _tries){
 /* 지적 선택 모드 토글 */
 function toggleCadSelect(){
   if(!_cadInitProj()){ toast('좌표 변환(proj4) 로드 실패 — 서버에서 열어주세요','err'); return; }
-  if(!S.bounds){
-    if(!_cadEnsureView()){ toast('지도 준비 실패 — 서버에서 열어주세요','err'); return; }
-    if(typeof cadBg!=='undefined' && !cadBg.on && typeof cadBgAutoOn==='function'){ cadBgAutoOn(); }
-  }
   CAD.selMode=!CAD.selMode;
   var b=document.getElementById('cadSelBtn');
   if(b){ b.classList.toggle('active',CAD.selMode); b.textContent=CAD.selMode?'✓ 지적 선택 중 (필지 클릭)':'📍 지적 선택'; }
@@ -6131,6 +6116,9 @@ function toggleCadSelect(){
   var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display=CAD.selMode?'':'none';
   var db=document.getElementById('cadDoneBar'); if(db) db.style.display='none';
   if(CAD.selMode){
+    /* ★ 지적 선택 = 지도(위성+지적) 자동 켜기 — 필지를 봐야 하니까 (DXF 있어도) */
+    if(typeof cadBg!=='undefined' && !cadBg.on && typeof cadBgAutoOn==='function'){ cadBgAutoOn(); }
+    else if(!S.bounds){ if(!_cadEnsureView()){ toast('지도 준비 실패 — 서버에서 열어주세요','err'); } }
     _cadKakaoReady(function(ok){ if(!ok) toast('카카오 지도 API 로드 실패 — 서버에서 열어야 해요','err'); });
     toast('필지를 클릭하세요 (여러 개 가능, 다시 클릭=해제)','ok');
     _cadUpdateBar(); render();
