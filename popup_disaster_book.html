@@ -837,6 +837,8 @@
         <label class="air-chk"><input type="checkbox" id="airCadChk" checked onchange="airToggleCad(this.checked)"> 지적선·지번 얹기 <small style="color:var(--tx3)">(느리면 끄기)</small></label>
         <div id="airYearPicks" class="air-picks"></div>
         <button class="air-make" id="airMakeBtn" onclick="airMake()">🖼 시계열 만들기</button>
+        <button class="air-make" onclick="airMakeFromMap()" style="background:#0e7490;margin-top:6px">📍 지금 지도 화면 위치로</button>
+        <div style="font-size:10px;color:var(--tx3);margin-top:5px;line-height:1.45">위 버튼 = 허가지선·8번 작업위치 기준 · 아래 버튼 = <b>지금 보이는 지도 화면 그대로</b> (지도를 원하는 곳으로 옮겨놓고 누르세요)</div>
         <div id="airStatus" class="air-status"></div>
         <div id="airResult" class="air-result"></div>
       </div>
@@ -6657,9 +6659,10 @@ function _airPermitPx(center, zoom, size){
   }
   return out.length?out:null;
 }
-function airMake(){
-  var center=(typeof _d8GetLoc==='function')?_d8GetLoc():null;
-  if(!center||!center.lng){ airStatus('<span style="color:#f87171">먼저 8번에서 작업위치를 검색하거나 허가지선을 잡아주세요</span>'); return; }
+function airMake(ov){
+  var center=(ov&&ov.center)||((typeof _d8GetLoc==='function')?_d8GetLoc():null);
+  if(!center||!center.lng){ airStatus('<span style="color:#f87171">먼저 8번에서 작업위치를 검색하거나 허가지선을 잡아주세요 (또는 지도 화면 위치로)</span>'); return; }
+  var zoom=(ov&&ov.zoom)||AIR.zoom;
   var btn=document.getElementById('airMakeBtn'), n=AIR.cols, picks=AIR.picks.slice(0,n), size=512;
   var rb=document.getElementById('airResult'); if(rb) rb.innerHTML='';
   var total=picks.length+1, doneN=0;   // 사진 n장 + 지적 1
@@ -6671,22 +6674,37 @@ function airMake(){
   function tick(){ doneN++; paint(); }
   paint();
   if(btn){ btn.disabled=true; btn.textContent='⏳ 만드는 중…'; }
-  var cadJob=_airFetchCadastral(center, AIR.zoom, size).then(function(r){ tick(); return r; }).catch(function(){ tick(); return null; });
+  var cadJob=_airFetchCadastral(center, zoom, size).then(function(r){ tick(); return r; }).catch(function(){ tick(); return null; });
   var photoJobs=picks.map(function(year){
-    var url='/api/air-photo?lng='+center.lng+'&lat='+center.lat+'&year='+year+'&z='+AIR.zoom+'&size='+size;
+    var url='/api/air-photo?lng='+center.lng+'&lat='+center.lat+'&year='+year+'&z='+zoom+'&size='+size;
     return fetch(url).then(function(r){ if(!r.ok) return null; return r.blob(); }).then(function(b){
       if(!b) return {year:year,img:null};
       return new Promise(function(res){ var im=new Image(); im.onload=function(){res({year:year,img:im});}; im.onerror=function(){res({year:year,img:null});}; im.src=URL.createObjectURL(b); });
     }).catch(function(){ return {year:year,img:null}; }).then(function(res){ tick(); return res; });
   });
   Promise.all([cadJob].concat(photoJobs)).then(function(all){
-    AIR._res={imgs:all.slice(1), cad:all[0], center:center, size:size};
+    AIR._res={imgs:all.slice(1), cad:all[0], center:center, size:size, zoom:zoom};
     if(btn){ btn.disabled=false; btn.textContent='🖼 시계열 만들기'; }
     var ok=AIR._res.imgs.filter(function(x){return x&&x.img;}).length;
     airStatus('<span style="color:#4ade80">✅ 완료 ('+ok+'/'+AIR._res.imgs.length+'장)'+(all[0]?'':' · 지적 없음')+'</span>');
     if(rb) rb.innerHTML='<button class="air-dl" onclick="airOpenModal()">🔍 결과 크게 보기</button> <button class="air-dl" onclick="airModalDownload()">⬇ 저장</button>';
     airOpenModal();
   });
+}
+/* 화면 배율(S.scale, 5186 m당 px) → 가장 가까운 NGIS_AIR 줌레벨 */
+function _airZoomFromScale(){
+  if(!(S.scale>0)) return AIR.zoom;
+  var target=1/S.scale, best=15, bd=1e18;
+  for(var z=13; z<=18; z++){ var d=Math.abs(_AIR_RES[z]-target); if(d<bd){ bd=d; best=z; } }
+  return best;
+}
+/* 지금 지도 화면(중심+줌) 그대로 시계열 만들기 */
+function airMakeFromMap(){
+  if(!S.bounds || !(S.scale>0) || typeof s2w!=='function'){ toast('먼저 지도를 보이게 하세요 (배경지도 켜기)','err'); return; }
+  var wc=s2w(cv.width/2, cv.height/2);
+  var ll=(typeof tm5186toWgs84==='function')?tm5186toWgs84(wc.x, wc.y):null;
+  if(!ll){ toast('좌표 변환 실패 — 서버에서 열어주세요','err'); return; }
+  airMake({center:{lng:ll[0], lat:ll[1]}, zoom:_airZoomFromScale()});
 }
 /* 저장된 사진(로드 완료)로 즉시 합성 — opts로 지적선/허가지선 표시 토글 (다시 안 받음) */
 function _airComposite(canvas, opts){
@@ -6697,8 +6715,8 @@ function _airComposite(canvas, opts){
   var W=pad*2+cols*cellW+(cols-1)*gap, H=pad*2+rows*cellH+(rows-1)*gap;
   canvas.width=W; canvas.height=H;
   var ctx=canvas.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
-  var permitRings=opts.drawPermit?_airPermitPx(center, AIR.zoom, size):null;
-  var cadPx=null, _res=_AIR_RES[AIR.zoom], _cc=_wgs84to5179(center.lng, center.lat);
+  var permitRings=opts.drawPermit?_airPermitPx(center, (R.zoom||AIR.zoom), size):null;
+  var cadPx=null, _res=_AIR_RES[(R.zoom||AIR.zoom)], _cc=_wgs84to5179(center.lng, center.lat);
   if(cadParcels && cadParcels.length && _res && _cc){
     cadPx=[];
     for(var ci=0;ci<cadParcels.length;ci++){
