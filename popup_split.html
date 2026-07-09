@@ -417,6 +417,17 @@
       <button class="btn btn-ghost" id="spBtnEdge" onclick="splitStartEdge()" style="margin-bottom:6px">📏 B. 거리 분할 (오프셋·도로폭)</button>
       <button class="btn btn-ghost" id="spBtnTarget" onclick="splitStartTarget()" style="margin-bottom:6px">🎯 C. 면적 분할 (목표면적 자동맞춤)</button>
       <button class="btn btn-ghost" id="spBtnCorner" onclick="splitStartCorner()" style="margin-bottom:6px">📐 가각 주기 (모서리 절취)</button>
+      <button class="btn btn-ghost" id="spBtnText" onclick="splitStartText()" style="margin-bottom:6px">🔤 글자 쓰기 (도로 표기 등)</button>
+
+      <!-- 표시 옵션 -->
+      <div style="display:flex;gap:10px;align-items:center;margin:8px 0 2px;flex-wrap:wrap">
+        <label style="font-size:11px;color:var(--tx2);display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="spShowLbl" checked onchange="SPLIT.showLabels=this.checked;render()"> 조각 색칠·면적 라벨
+        </label>
+        <span style="font-size:11px;color:var(--tx2);display:flex;align-items:center;gap:5px">
+          선 굵기 <input type="number" id="spLineW" value="2.2" min="0.5" max="8" step="0.5" style="width:52px" onchange="SPLIT.lineWidth=parseFloat(this.value)||2.2;render()">
+        </span>
+      </div>
 
       <!-- B: 오프셋 패널 -->
       <div id="spEdgePanel" style="display:none;margin:4px 0 10px;padding:9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px">
@@ -462,7 +473,8 @@
           <button onclick="splitResetAll(true)" style="background:none;border:1px solid var(--line);color:var(--tx3);font-size:10px;border-radius:6px;padding:3px 8px;cursor:pointer">전체 초기화</button>
         </div>
         <div id="spLineList" style="font-size:11px;color:var(--tx3)">아직 분할선이 없어요</div>
-        <div style="font-size:10px;color:var(--tx3);margin-top:5px;line-height:1.5">선 클릭=선택 · <b>드래그=이동(면적 실시간)</b> · Delete=삭제<br>그리기 중: 클릭=점 · 우클릭=점취소 · 더블클릭=완료</div>
+        <div id="spTextList" style="font-size:11px;color:var(--tx3);margin-top:4px"></div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:5px;line-height:1.5">선 클릭=선택 · <b>드래그=이동(면적 실시간)</b> · Delete=삭제 · <b>Ctrl+Z=실행취소</b><br>그리기 중: 클릭=점 · <b>Shift=수직/수평/45°</b> · 우클릭=점취소 · 더블클릭=완료<br>글자도 드래그로 이동 가능</div>
       </div>
 
       <!-- 결과 표 -->
@@ -5908,6 +5920,7 @@ function _forestCopyToast(){
 document.addEventListener('click',function(e){ if(e.target && e.target.id==='forestGuideModal') closeForestGuide(); });
 </script>
 
+
 <script>
 /* ══════════════════════════════════════════════════════════════
    ✂️ 분할 도구 모듈 (SPLIT) — 기존 엔진 무수정 원칙
@@ -5930,7 +5943,12 @@ var SPLIT = {
   edgeHover: null,
   targetPt: null,   // 면적분할 기준점(월드)
   cornerPick: null, // {P, da, db, click}
-  pieces: []        // [{ring,parcelIdx,jibun,areaCad,areaCorr,no}]
+  pieces: [],       // [{ring,parcelIdx,jibun,areaCad,areaCorr,no}]
+  texts: [],        // {x,y,str,size(월드m),color} 글자 쓰기
+  dragText: null,   // {idx, start, orig:{x,y}, moved, snapshot}
+  showLabels: true, // 조각 색칠·면적 라벨 표시
+  lineWidth: 2.2,   // 분할선 기본 굵기
+  undo: []          // 실행취소 스택 (JSON 스냅샷, 최대 30)
 };
 var SPLIT_COLORS = ['#f59e0b','#38bdf8','#a78bfa','#34d399','#fb7185','#facc15','#f472b6','#60a5fa'];
 var SPLIT_CIRC = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩','⑪','⑫','⑬','⑭','⑮'];
@@ -6069,6 +6087,14 @@ function _spExtendEnds(pts, len){
   p[n-1]={x:e.x+(e.x-c.x)/L2*len, y:e.y+(e.y-c.y)/L2*len};
   return p;
 }
+/* 직교 스냅: 기준점 a에서 커서 w를 수평/수직/45도로 (Shift) */
+function _spOrtho(a,w){
+  var dx=w.x-a.x, dy=w.y-a.y, adx=Math.abs(dx), ady=Math.abs(dy);
+  if(adx>ady*2.414) return {x:w.x, y:a.y};        /* 수평 (±22.5°) */
+  if(ady>adx*2.414) return {x:a.x, y:w.y};        /* 수직 */
+  var d=(adx+ady)/2;                               /* 45도 */
+  return {x:a.x+(dx<0?-d:d), y:a.y+(dy<0?-d:d)};
+}
 /* 선택 엣지들을 끝점 공유 기준으로 연속 체인으로 묶기 */
 function _spChains(sels){
   var EPS=0.02;
@@ -6125,6 +6151,23 @@ function _spExtentDiag(){
   return Math.hypot(mxx-mnx,mxy-mny)||200;
 }
 
+/* ── 실행취소 (Ctrl+Z, 최대 30단계) ── */
+function _spSnapState(){
+  return JSON.stringify({l:SPLIT.lines, c:SPLIT.corners, t:SPLIT.texts});
+}
+function _spUndoPush(snap){
+  SPLIT.undo.push(snap||_spSnapState());
+  if(SPLIT.undo.length>30) SPLIT.undo.shift();
+}
+function splitUndo(){
+  if(!SPLIT.undo.length){ toast('되돌릴 작업이 없어요','err'); return; }
+  var s=JSON.parse(SPLIT.undo.pop());
+  SPLIT.lines=s.l||[]; SPLIT.corners=s.c||[]; SPLIT.texts=s.t||[];
+  SPLIT.sel=-1; SPLIT.drag=null; SPLIT.dragText=null;
+  splitRecompute(); render();
+  toast('↩ 실행취소','ok');
+}
+
 /* ── 재계산: 모든 필지 × 모든 분할선 → 조각 목록 ── */
 function splitRecompute(skipTable){
   var parcels=_spParcels();
@@ -6179,13 +6222,21 @@ function splitRenderTable(){
     +'<td style="text-align:right;padding:4px 2px;border-top:1px solid var(--line);color:#4ade80;font-weight:700">'+_spN(sumCorr)+'</td>'
     +'<td style="text-align:right;padding:4px 2px;border-top:1px solid var(--line);color:var(--tx2)">'+_spPy(sumCorr)+'</td></tr>';
   SPLIT.corners.forEach(function(c,i){
-    h+='<tr><td style="padding:3px 2px;color:#34d399">가각'+(i+1)+' ('+c.d1+'×'+c.d2+'m)</td>'
+    h+='<tr><td style="padding:3px 2px;color:#34d399">가각'+(i+1)+' ('+c.d1+'×'+c.d2+'m) <span onclick="splitDeleteCorner('+i+')" style="cursor:pointer;color:var(--tx3)">🗑</span></td>'
       +'<td style="text-align:right;padding:3px 2px;color:var(--tx3)">'+_spN(c.areaCad)+'</td>'
       +'<td style="text-align:right;padding:3px 2px;color:#34d399">'+_spN(c.areaCorr)+'</td>'
       +'<td style="text-align:right;padding:3px 2px;color:var(--tx2)">'+_spPy(c.areaCorr)+'</td></tr>';
   });
   tb.innerHTML=h;
   _spRenderLineList();
+  _spRenderTextList();
+}
+function splitDeleteCorner(i){
+  if(i<0||i>=SPLIT.corners.length) return;
+  _spUndoPush();
+  SPLIT.corners.splice(i,1);
+  splitRenderTable(); render();
+  toast('가각 삭제됨 (Ctrl+Z로 되살리기)','ok');
 }
 function _spRenderLineList(){
   var el=document.getElementById('spLineList'); if(!el) return;
@@ -6194,27 +6245,55 @@ function _spRenderLineList(){
   SPLIT.lines.forEach(function(ln,i){
     var on=(i===SPLIT.sel);
     h+='<div onclick="splitSelectLine('+i+')" style="display:flex;align-items:center;gap:6px;padding:4px 6px;margin-bottom:3px;border-radius:6px;cursor:pointer;border:1px solid '+(on?ln.color:'var(--line)')+';'+(on?'background:rgba(255,255,255,0.05)':'')+'">'
-      +'<span style="display:inline-block;width:14px;height:3px;background:'+ln.color+';border-radius:2px"></span>'
+      +'<input type="color" value="'+ln.color+'" onclick="event.stopPropagation()" oninput="splitLineColor('+i+',this.value)" style="width:20px;height:16px;padding:0;border:none;background:none;cursor:pointer" title="선 색 변경">'
       +'<span style="flex:1;color:var(--tx2)">'+ln.name+'</span>'
       +'<span onclick="event.stopPropagation();splitDeleteLine('+i+')" style="color:var(--tx3);cursor:pointer;padding:0 3px">🗑</span>'
       +'</div>';
   });
   el.innerHTML=h;
 }
+function splitLineColor(i,c){
+  if(SPLIT.lines[i]){ SPLIT.lines[i].color=c; render(); }
+}
+function _spRenderTextList(){
+  var el=document.getElementById('spTextList'); if(!el) return;
+  if(!SPLIT.texts.length){ el.innerHTML=''; return; }
+  var h='';
+  SPLIT.texts.forEach(function(t,i){
+    h+='<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;margin-bottom:3px;border-radius:6px;border:1px solid var(--line)">'
+      +'<input type="color" value="'+t.color+'" oninput="splitTextColor('+i+',this.value)" style="width:20px;height:16px;padding:0;border:none;background:none;cursor:pointer" title="글자 색 변경">'
+      +'<span style="flex:1;color:var(--tx2)">🔤 '+t.str+'</span>'
+      +'<span onclick="splitDeleteText('+i+')" style="color:var(--tx3);cursor:pointer;padding:0 3px">🗑</span>'
+      +'</div>';
+  });
+  el.innerHTML=h;
+}
+function splitTextColor(i,c){
+  if(SPLIT.texts[i]){ SPLIT.texts[i].color=c; render(); }
+}
+function splitDeleteText(i){
+  if(i<0||i>=SPLIT.texts.length) return;
+  _spUndoPush();
+  SPLIT.texts.splice(i,1);
+  _spRenderTextList(); render();
+  toast('글자 삭제됨','ok');
+}
 function splitSelectLine(i){ SPLIT.sel=(SPLIT.sel===i?-1:i); _spRenderLineList(); render(); }
 function splitDeleteLine(i){
   if(i<0||i>=SPLIT.lines.length) return;
+  _spUndoPush();
   SPLIT.lines.splice(i,1);
   if(SPLIT.sel===i) SPLIT.sel=-1; else if(SPLIT.sel>i) SPLIT.sel--;
   splitRecompute(); render();
   toast('분할선 삭제됨','ok');
 }
 function splitResetAll(ask){
-  if(ask && (SPLIT.lines.length||SPLIT.corners.length)){
-    if(!confirm('분할선·가각을 모두 지울까요?')) return;
+  if(ask && (SPLIT.lines.length||SPLIT.corners.length||SPLIT.texts.length)){
+    if(!confirm('분할선·가각·글자를 모두 지울까요? (Ctrl+Z로 되살릴 수 있어요)')) return;
   }
-  SPLIT.lines=[]; SPLIT.corners=[]; SPLIT.sel=-1; SPLIT.hover=-1;
-  SPLIT.drag=null; SPLIT.targetPt=null; SPLIT.cornerPick=null;
+  if(SPLIT.lines.length||SPLIT.corners.length||SPLIT.texts.length) _spUndoPush();
+  SPLIT.lines=[]; SPLIT.corners=[]; SPLIT.texts=[]; SPLIT.sel=-1; SPLIT.hover=-1;
+  SPLIT.drag=null; SPLIT.dragText=null; SPLIT.targetPt=null; SPLIT.cornerPick=null;
   splitCancelMode(true);
   splitRecompute(); render();
 }
@@ -6262,6 +6341,7 @@ function splitStartDraw(){
 }
 function _spFinishDraw(){
   if(!SPLIT.draw || SPLIT.draw.length<2){ toast('점을 2개 이상 찍어주세요','err'); return; }
+  _spUndoPush();
   var pts=SPLIT.draw.map(function(p){return {x:p.x,y:p.y};});
   var ln={pts:pts, color:SPLIT_COLORS[SPLIT.lines.length%SPLIT_COLORS.length], kind:'draw', name:'선 '+(SPLIT.lines.length+1)};
   SPLIT.lines.push(ln);
@@ -6296,6 +6376,7 @@ function splitEdgeApply(){
   _spHint('👆 오프셋할 방향(선의 어느 쪽인지)을 지도에서 클릭하세요');
 }
 function _spEdgeDirClick(w){
+  _spUndoPush();
   var d=parseFloat(document.getElementById('spDist').value)||4;
   var chains=_spChains(SPLIT.edgeSel);
   var ext=_spExtentDiag()*0.6;
@@ -6371,6 +6452,7 @@ function splitFitArea(){
   var vx=p1.x-p0.x, vy=p1.y-p0.y, L=Math.hypot(vx,vy)||1;
   var nx=-vy/L, ny=vx/L;
   var orig=ln.pts.map(function(p){return {x:p.x,y:p.y};});
+  var preSnap=_spSnapState();   /* 이동 전 상태 — 성공 시에만 undo에 push */
   function areaAt(t){
     ln.pts=orig.map(function(p){return {x:p.x+nx*t, y:p.y+ny*t};});
     splitRecompute(true);
@@ -6407,6 +6489,7 @@ function splitFitArea(){
     toast('그 목표로는 못 맞춰요 — 선 이동 범위를 벗어남 (목표/선 위치 확인)','err');
     return;
   }
+  _spUndoPush(preSnap);
   splitRecompute(); render();
   splitCancelMode(true);
   toast('🎯 면적 맞춤 완료: '+_spN(fa)+'㎡ (목표 '+_spN(goal)+'㎡ · 오차 '+_spN(Math.abs(fa-goal))+'㎡)','ok');
@@ -6467,6 +6550,7 @@ function splitCornerApply(){
     var dot=mx*(cp.click.x-cp.P.x)+my*(cp.click.y-cp.P.y);
     if(dot>bestDot){ bestDot=dot; bestQ={Q1:Q1,Q2:Q2}; }
   });});
+  _spUndoPush();
   var areaCad=Math.abs((bestQ.Q1.x-cp.P.x)*(bestQ.Q2.y-cp.P.y)-(bestQ.Q2.x-cp.P.x)*(bestQ.Q1.y-cp.P.y))/2;
   var parcels=_spParcels(), coef=1;
   for(var i=0;i<parcels.length;i++){
@@ -6477,6 +6561,38 @@ function splitCornerApply(){
   splitCancelMode(true);
   toast('가각 '+d1+'×'+d2+'m 적용 — '+_spN(areaCad*coef)+'㎡ (보정, 표에 별도 표기)','ok');
   render();
+}
+
+/* 글자 쓰기 */
+function splitStartText(){
+  if(SPLIT.mode==='text'){ splitCancelMode(); return; }
+  if(!_spNeedParcels()) return;
+  splitCancelMode(true);
+  SPLIT.mode='text';
+  _spBtnActive('spBtnText');
+  _spHint('🔤 글자를 넣을 위치를 지도에서 클릭하세요 (넣은 뒤 드래그로 이동 가능)');
+  cv.style.cursor='text';
+  render();
+}
+function _spTextClick(w){
+  var str=prompt('표시할 글자를 입력하세요 (예: 도로)','도로');
+  if(str===null){ splitCancelMode(); return; }
+  str=(str||'').trim();
+  if(!str){ splitCancelMode(); return; }
+  _spUndoPush();
+  SPLIT.texts.push({x:w.x, y:w.y, str:str, size:Math.max(1, 18/S.scale), color:'#ffffff'});
+  _spRenderTextList();
+  splitCancelMode(true);
+  toast('글자 추가 — 드래그로 이동할 수 있어요','ok');
+  render();
+}
+function _spHitText(w){
+  for(var i=SPLIT.texts.length-1;i>=0;i--){
+    var t=SPLIT.texts[i];
+    var hw=t.str.length*t.size*0.6/2+t.size*0.3, hh=t.size*0.75;
+    if(Math.abs(w.x-t.x)<=hw && Math.abs(w.y-t.y)<=hh) return i;
+  }
+  return -1;
 }
 
 /* ── 히트테스트 & 스냅 ── */
@@ -6528,7 +6644,7 @@ function _spActive(){ return (typeof BOOK!=='undefined' && BOOK.page===3) && !CA
 /* ── 오버레이 그리기 (render 래핑에서 호출) ── */
 function drawSplitOverlay(){
   if(!S.bounds) return;
-  var showPieces = SPLIT.lines.length>0 && SPLIT.pieces.length>0;
+  var showPieces = SPLIT.showLabels && SPLIT.lines.length>0 && SPLIT.pieces.length>0;
   if(showPieces){
     SPLIT.pieces.forEach(function(pc,i){
       var col=SPLIT_COLORS[i%SPLIT_COLORS.length];
@@ -6560,7 +6676,7 @@ function drawSplitOverlay(){
   SPLIT.lines.forEach(function(ln,i){
     ctx.save();
     ctx.strokeStyle=ln.color;
-    ctx.lineWidth=(i===SPLIT.sel)?3.5:2.2;
+    ctx.lineWidth=(i===SPLIT.sel)?(SPLIT.lineWidth+1.3):SPLIT.lineWidth;
     if(i===SPLIT.sel){ ctx.shadowColor=ln.color; ctx.shadowBlur=8; }
     ctx.lineJoin='round';
     ctx.beginPath();
@@ -6580,11 +6696,28 @@ function drawSplitOverlay(){
     SPLIT.draw.forEach(function(p){ var s=w2s(p); ctx.beginPath(); ctx.arc(s.x,s.y,3.5,0,6.283); ctx.fill(); });
     if(SPLIT.ghost){
       var gs=w2s(SPLIT.ghost);
-      ctx.strokeStyle=(SPLIT.snapKind==='v')?'#4ade80':(SPLIT.snapKind==='e')?'#38bdf8':'#f59e0b';
+      ctx.strokeStyle=(SPLIT.snapKind==='v')?'#4ade80':(SPLIT.snapKind==='e')?'#38bdf8':(SPLIT.snapKind==='o')?'#facc15':'#f59e0b';
       ctx.lineWidth=2; ctx.beginPath(); ctx.arc(gs.x,gs.y,6,0,6.283); ctx.stroke();
+      if(SPLIT.snapKind==='o'){
+        ctx.font='10px sans-serif'; ctx.fillStyle='#facc15'; ctx.textAlign='left';
+        ctx.fillText('직교', gs.x+9, gs.y-9);
+      }
     }
     ctx.restore();
   }
+  /* 글자 (맨 위 레이어) */
+  SPLIT.texts.forEach(function(t){
+    var s=w2s({x:t.x,y:t.y});
+    var px=Math.max(8, t.size*S.scale);
+    ctx.save();
+    ctx.font='bold '+px+'px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=Math.max(2, px*0.16);
+    ctx.strokeText(t.str, s.x, s.y);
+    ctx.fillStyle=t.color;
+    ctx.fillText(t.str, s.x, s.y);
+    ctx.restore();
+  });
   /* 오프셋 엣지 선택 하이라이트 */
   if(SPLIT.mode==='edge' || SPLIT.mode==='edgeDir'){
     ctx.save();
@@ -6643,10 +6776,16 @@ cv.addEventListener('mousedown', function(e){
   if(e.button!==0 || !_spActive()) return;
   if(SPLIT.mode) return;   /* 모드 중엔 드래그 시작 안 함 */
   var w=evWorld(e);
+  var ti=_spHitText(w);
+  if(ti>=0){
+    SPLIT.dragText={idx:ti, start:w, orig:{x:SPLIT.texts[ti].x, y:SPLIT.texts[ti].y}, moved:false, snapshot:_spSnapState()};
+    cv.style.cursor='move';
+    return;
+  }
   var hit=_spHitLine(w);
   if(hit>=0){
     SPLIT.sel=hit;
-    SPLIT.drag={idx:hit, start:w, orig:SPLIT.lines[hit].pts.map(function(p){return {x:p.x,y:p.y};}), moved:false};
+    SPLIT.drag={idx:hit, start:w, orig:SPLIT.lines[hit].pts.map(function(p){return {x:p.x,y:p.y};}), moved:false, snapshot:_spSnapState()};
     _spRenderLineList();
     cv.style.cursor='move';
     render();
@@ -6655,6 +6794,16 @@ cv.addEventListener('mousedown', function(e){
 window.addEventListener('mousemove', function(e){
   if(!_spActive()){ return; }
   if(S.midPan) return;   /* 가운데 버튼 팬은 기존 로직 */
+  if(SPLIT.dragText){
+    var wt=evWorld(e);
+    var tdx=wt.x-SPLIT.dragText.start.x, tdy=wt.y-SPLIT.dragText.start.y;
+    if(Math.abs(tdx)+Math.abs(tdy)>0.001) SPLIT.dragText.moved=true;
+    var to=SPLIT.texts[SPLIT.dragText.idx];
+    to.x=SPLIT.dragText.orig.x+tdx; to.y=SPLIT.dragText.orig.y+tdy;
+    render();
+    e.stopImmediatePropagation();
+    return;
+  }
   if(SPLIT.drag){
     var w=evWorld(e);
     var dx=w.x-SPLIT.drag.start.x, dy=w.y-SPLIT.drag.start.y;
@@ -6667,9 +6816,15 @@ window.addEventListener('mousemove', function(e){
   }
   if(SPLIT.mode==='draw'){
     var w2=evWorld(e);
-    var sn=_spSnap(w2);
-    SPLIT.ghost=sn?{x:sn.x,y:sn.y}:w2;
-    SPLIT.snapKind=sn?sn.kind:null;
+    var last=SPLIT.draw.length?SPLIT.draw[SPLIT.draw.length-1]:null;
+    if(e.shiftKey && last){
+      var o=_spOrtho(last,w2);
+      SPLIT.ghost={x:o.x,y:o.y}; SPLIT.snapKind='o';
+    }else{
+      var sn=_spSnap(w2);
+      SPLIT.ghost=sn?{x:sn.x,y:sn.y}:w2;
+      SPLIT.snapKind=sn?sn.kind:null;
+    }
     render();
     return;   /* 팬 허용(기존 로직 계속) */
   }
@@ -6684,7 +6839,7 @@ window.addEventListener('mousemove', function(e){
   }
   if(!SPLIT.mode && !S.isDown){
     var w4=evWorld(e);
-    var h=_spHitLine(w4);
+    var h=(_spHitText(w4)>=0)?999:_spHitLine(w4);
     if(h!==SPLIT.hover){
       SPLIT.hover=h;
       cv.style.cursor=(h>=0)?'move':'grab';
@@ -6692,8 +6847,19 @@ window.addEventListener('mousemove', function(e){
   }
 }, true);
 window.addEventListener('mouseup', function(e){
+  if(SPLIT.dragText){
+    if(SPLIT.dragText.moved){
+      _spUndoPush(SPLIT.dragText.snapshot);
+      SPLIT.dragEnded=true;
+    }
+    SPLIT.dragText=null;
+    cv.style.cursor='grab';
+    render();
+    return;
+  }
   if(SPLIT.drag){
     var wasMoved=SPLIT.drag.moved;
+    if(wasMoved) _spUndoPush(SPLIT.drag.snapshot);
     SPLIT.drag=null;
     SPLIT.dragEnded=wasMoved;
     cv.style.cursor='move';
@@ -6708,11 +6874,18 @@ cv.addEventListener('click', function(e){
   if(SPLIT.dragEnded){ SPLIT.dragEnded=false; return; }
   var w=evWorld(e);
   if(SPLIT.mode==='draw'){
-    var sn=_spSnap(w);
-    SPLIT.draw.push(sn?{x:sn.x,y:sn.y}:{x:w.x,y:w.y});
+    var last=SPLIT.draw.length?SPLIT.draw[SPLIT.draw.length-1]:null;
+    if(e.shiftKey && last){
+      var o=_spOrtho(last,w);
+      SPLIT.draw.push({x:o.x,y:o.y});
+    }else{
+      var sn=_spSnap(w);
+      SPLIT.draw.push(sn?{x:sn.x,y:sn.y}:{x:w.x,y:w.y});
+    }
     render();
     return;
   }
+  if(SPLIT.mode==='text'){ _spTextClick(w); return; }
   if(SPLIT.mode==='edge'){
     var hit=_spHitEdge(w);
     if(!hit) return;
@@ -6747,7 +6920,22 @@ cv.addEventListener('contextmenu', function(e){
 });
 window.addEventListener('keydown', function(e){
   if(!_spActive()) return;
+  if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z')){
+    var tg=(document.activeElement&&document.activeElement.tagName)||'';
+    if(tg==='INPUT'||tg==='TEXTAREA') return;
+    splitUndo();
+    e.preventDefault(); e.stopImmediatePropagation();
+    return;
+  }
   if(e.key==='Escape'){
+    if(SPLIT.dragText){
+      var t0=SPLIT.texts[SPLIT.dragText.idx];
+      t0.x=SPLIT.dragText.orig.x; t0.y=SPLIT.dragText.orig.y;
+      SPLIT.dragText=null;
+      render();
+      e.preventDefault(); e.stopImmediatePropagation();
+      return;
+    }
     if(SPLIT.drag){
       SPLIT.lines[SPLIT.drag.idx].pts=SPLIT.drag.orig;
       SPLIT.drag=null;
@@ -6777,8 +6965,8 @@ window.addEventListener('keydown', function(e){
     var _c=cadUseAsPermit;
     cadUseAsPermit=function(){
       _c();
-      SPLIT.lines=[]; SPLIT.corners=[]; SPLIT.sel=-1;
-      SPLIT.drag=null; SPLIT.targetPt=null; SPLIT.cornerPick=null;
+      SPLIT.lines=[]; SPLIT.corners=[]; SPLIT.texts=[]; SPLIT.undo=[]; SPLIT.sel=-1;
+      SPLIT.drag=null; SPLIT.dragText=null; SPLIT.targetPt=null; SPLIT.cornerPick=null;
       splitCancelMode(true);
       splitRecompute();
     };
@@ -6818,6 +7006,9 @@ function splitExportDxf(){
   SPLIT.corners.forEach(function(c,i){
     var ct=_spCentroid([c.P,c.Q1,c.Q2]);
     text(ct,'AREA_TEXT',3,1.2,'CUT'+(i+1)+' '+c.areaCorr.toFixed(2)+'m2');
+  });
+  SPLIT.texts.forEach(function(t){
+    text({x:t.x,y:t.y},'LABEL_TEXT',7,Math.max(0.5,t.size),t.str);
   });
   push(0,'ENDSEC',0,'EOF');
   var blob=new Blob([L.join('\r\n')],{type:'application/dxf'});
