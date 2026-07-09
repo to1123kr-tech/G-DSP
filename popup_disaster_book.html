@@ -257,26 +257,11 @@
   .air-make{width:100%;padding:10px;margin-top:4px;font-size:13px;font-weight:700;background:#2b6cff;color:#fff;border:none;border-radius:8px;cursor:pointer}
   .air-make:disabled{opacity:.5;cursor:default}
   .air-status{font-size:11px;margin-top:8px;min-height:16px;line-height:1.4}
+  .air-prog{height:9px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .air-prog-bar{height:100%;width:0;background-color:#2b6cff;background-image:linear-gradient(45deg,rgba(255,255,255,.28) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.28) 50%,rgba(255,255,255,.28) 75%,transparent 75%,transparent);background-size:24px 24px;transition:width .35s ease;animation:airStripes .6s linear infinite}
+  @keyframes airStripes{from{background-position:0 0}to{background-position:24px 0}}
   .air-result{margin-top:10px}
   .air-dl{display:inline-block;margin-top:8px;padding:7px 12px;font-size:12px;background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:6px;text-decoration:none}
-  .air-live-btn{width:100%;padding:10px;margin-top:6px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#34d399,#0ea5e9);color:#06121f;border:none;border-radius:8px;cursor:pointer}
-  .air-live-btn:hover{filter:brightness(1.06)}
-  .air-mini-note{font-size:9.8px;color:#64748b;line-height:1.5;margin-top:6px}
-  .air-live-top{display:flex;align-items:center;gap:7px;padding:8px 10px;background:#0d1626;border-bottom:1px solid #2a3a52;flex-wrap:wrap}
-  .air-live-top b{color:#fff;font-size:13px;margin-right:4px;white-space:nowrap}
-  .air-live-selects{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
-  .air-live-selects select,.air-live-top select{height:28px;background:#172238;color:#e8eef7;border:1px solid #33475f;border-radius:6px;font-size:11px;padding:0 6px;outline:none}
-  .air-live-top label{color:#cbd5e1;font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
-  .air-live-btn2{height:28px;padding:0 9px;font-size:12px;background:#1e2a3f;color:#fff;border:1px solid #33475f;border-radius:6px;cursor:pointer;white-space:nowrap}
-  .air-live-btn2:hover{border-color:#38bdf8;color:#7dd3fc}
-  .air-live-btn2.pri{background:#2b6cff;border-color:#2b6cff;color:#fff;font-weight:700}
-  .air-live-btn2.ok{background:#22c55e;border-color:#22c55e;color:#06121f;font-weight:800}
-  .air-live-btn2.dark{background:#374151;color:#fff}
-  .air-live-stat{font-size:11px;color:#94a3b8;min-width:190px;white-space:nowrap}
-  .air-live-pad{display:grid;grid-template-columns:28px 28px 28px;grid-template-rows:24px 24px 24px;gap:2px;margin-left:2px}
-  .air-live-pad button{background:#172238;color:#cbd5e1;border:1px solid #33475f;border-radius:5px;font-size:12px;cursor:pointer}
-  .air-live-pad button:hover{border-color:#38bdf8;color:#7dd3fc}
-  .air-live-help{position:absolute;left:14px;bottom:12px;z-index:2;background:rgba(6,10,18,.78);border:1px solid #33475f;color:#cbd5e1;border-radius:8px;padding:7px 10px;font-size:11px;line-height:1.45;pointer-events:none}
 </style>
 <!-- 지적 기능용: proj4(좌표변환) + 카카오(주소↔좌표). 서버에서 열 때만 동작 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
@@ -849,11 +834,9 @@
           <button data-z="14" onclick="airSetZoom(14)">넓게</button>
         </div></div>
         <label class="air-chk"><input type="checkbox" id="airPermitChk" checked onchange="airToggleDraw(this.checked)"> 허가지선 얹기</label>
-        <label class="air-chk"><input type="checkbox" id="airCadChk" checked onchange="airToggleCad(this.checked)"> 지적선 얹기 <small style="color:var(--tx3)">(지번은 실시간 창에서 따로 조절)</small></label>
+        <label class="air-chk"><input type="checkbox" id="airCadChk" checked onchange="airToggleCad(this.checked)"> 지적선·지번 얹기 <small style="color:var(--tx3)">(느리면 끄기)</small></label>
         <div id="airYearPicks" class="air-picks"></div>
-        <button class="air-make" id="airMakeBtn" onclick="airMake()">🖼 자동 시계열 만들기</button>
-        <button class="air-live-btn" id="airLiveBtn" onclick="airLiveOpen()">🧭 4분할 실시간 조정 열기</button>
-        <div class="air-mini-note">드래그/휠로 화각을 직접 맞춘 뒤 <b style="color:#9fe8ff">현재화면 결과에 붙이기</b>를 누르면 보고서용 이미지로 남겨요.</div>
+        <button class="air-make" id="airMakeBtn" onclick="airMake()">🖼 시계열 만들기</button>
         <div id="airStatus" class="air-status"></div>
         <div id="airResult" class="air-result"></div>
       </div>
@@ -6678,19 +6661,27 @@ function airMake(){
   var center=(typeof _d8GetLoc==='function')?_d8GetLoc():null;
   if(!center||!center.lng){ airStatus('<span style="color:#f87171">먼저 8번에서 작업위치를 검색하거나 허가지선을 잡아주세요</span>'); return; }
   var btn=document.getElementById('airMakeBtn'), n=AIR.cols, picks=AIR.picks.slice(0,n), size=512;
-  airStatus('<span>⏳ '+n+'개 연도 항공사진 + 지적 받는 중… (조금 걸려요)</span>');
-  if(btn) btn.disabled=true; var rb=document.getElementById('airResult'); if(rb) rb.innerHTML='';
-  var cadJob=_airFetchCadastral(center, AIR.zoom, size).catch(function(){return null;});
+  var rb=document.getElementById('airResult'); if(rb) rb.innerHTML='';
+  var total=picks.length+1, doneN=0;   // 사진 n장 + 지적 1
+  function paint(){
+    var pct=Math.round(doneN/total*100);
+    airStatus('<div class="air-prog"><div class="air-prog-bar" style="width:'+pct+'%"></div></div>'
+      +'<div style="margin-top:5px;font-size:11px;color:var(--tx2)">🛰 받는 중… <b>'+Math.min(doneN,total)+' / '+total+'</b>'+(doneN>=total?' · 합치는 중…':'')+'</div>');
+  }
+  function tick(){ doneN++; paint(); }
+  paint();
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 만드는 중…'; }
+  var cadJob=_airFetchCadastral(center, AIR.zoom, size).then(function(r){ tick(); return r; }).catch(function(){ tick(); return null; });
   var photoJobs=picks.map(function(year){
     var url='/api/air-photo?lng='+center.lng+'&lat='+center.lat+'&year='+year+'&z='+AIR.zoom+'&size='+size;
     return fetch(url).then(function(r){ if(!r.ok) return null; return r.blob(); }).then(function(b){
       if(!b) return {year:year,img:null};
       return new Promise(function(res){ var im=new Image(); im.onload=function(){res({year:year,img:im});}; im.onerror=function(){res({year:year,img:null});}; im.src=URL.createObjectURL(b); });
-    }).catch(function(){ return {year:year,img:null}; });
+    }).catch(function(){ return {year:year,img:null}; }).then(function(res){ tick(); return res; });
   });
   Promise.all([cadJob].concat(photoJobs)).then(function(all){
     AIR._res={imgs:all.slice(1), cad:all[0], center:center, size:size};
-    if(btn) btn.disabled=false;
+    if(btn){ btn.disabled=false; btn.textContent='🖼 시계열 만들기'; }
     var ok=AIR._res.imgs.filter(function(x){return x&&x.img;}).length;
     airStatus('<span style="color:#4ade80">✅ 완료 ('+ok+'/'+AIR._res.imgs.length+'장)'+(all[0]?'':' · 지적 없음')+'</span>');
     if(rb) rb.innerHTML='<button class="air-dl" onclick="airOpenModal()">🔍 결과 크게 보기</button> <button class="air-dl" onclick="airModalDownload()">⬇ 저장</button>';
@@ -6779,170 +6770,6 @@ function airModalDownload(){
   var cc=document.getElementById('airMChkCad'), cp=document.getElementById('airMChkPermit');
   _airComposite(tmp, {drawCad:cc?cc.checked:AIR.drawCad, drawPermit:cp?cp.checked:AIR.drawPermit});
   var a=document.createElement('a'); a.download='과거항공_시계열.png'; a.href=tmp.toDataURL('image/png'); a.click();
-}
-
-/* ── 4분할 실시간 조정: 자동 생성 전 단계에서 직접 화각을 맞추는 모드 ── */
-var AIRLIVE={open:false,center:null,zoom:15,size:512,picks:[],imgs:[],cad:null,drawCad:true,drawPermit:true,labelMode:'none',token:0,timer:null,loading:false,_bound:false};
-function _airClamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
-function _airDefaultPicks(n){
-  var ys=(AIR.years&&AIR.years.length)?AIR.years.slice():[];
-  if(!ys.length){ for(var y=2011;y<=2024;y++) ys.push(y); }
-  var out=[];
-  for(var i=0;i<n;i++){ var idx=Math.round(i*(ys.length-1)/(n-1||1)); out.push(ys[idx]); }
-  return out;
-}
-function _airGetPermitPolys(){
-  if(S.permitParcels&&S.permitParcels.length) return S.permitParcels.map(function(p){return {jibun:p.jibun||'', ring:p.ring};});
-  if(S.permit&&S.permit.length>=3) return [{jibun:'', ring:S.permit}];
-  return [];
-}
-function _airSelectedJibuns(){
-  var m={}; _airGetPermitPolys().forEach(function(p){ if(p.jibun) m[p.jibun]=true; }); return m;
-}
-function _airLiveFitByPermit(){
-  var polys=_airGetPermitPolys(), pts=[];
-  polys.forEach(function(pp){ (pp.ring||[]).forEach(function(p){ var ll=tm5186toWgs84(p.x,p.y); if(!ll) return; var xy=_wgs84to5179(ll[0],ll[1]); if(xy) pts.push(xy); }); });
-  if(pts.length<3) return false;
-  var minX=pts[0][0],maxX=pts[0][0],minY=pts[0][1],maxY=pts[0][1];
-  pts.forEach(function(p){ minX=Math.min(minX,p[0]); maxX=Math.max(maxX,p[0]); minY=Math.min(minY,p[1]); maxY=Math.max(maxY,p[1]); });
-  var cx=(minX+maxX)/2, cy=(minY+maxY)/2, ll=_5179toWgs84(cx,cy); if(!ll) return false;
-  var w=Math.max(30,(maxX-minX)*1.55), h=Math.max(30,(maxY-minY)*1.55), best=14;
-  for(var z=18; z>=11; z--){ var r=_AIR_RES[z]; if(r && w/r<=AIRLIVE.size*0.72 && h/r<=AIRLIVE.size*0.72){ best=z; break; } }
-  AIRLIVE.center={lng:ll[0],lat:ll[1]}; AIRLIVE.zoom=best; return true;
-}
-function _airLiveSyncZoomButtons(){
-  AIR.zoom=AIRLIVE.zoom;
-  document.querySelectorAll('#airZoom button').forEach(function(b){ b.classList.toggle('on',+b.dataset.z===AIR.zoom); });
-  var el=document.getElementById('airLiveZoomTxt'); if(el) el.textContent='Z '+AIRLIVE.zoom;
-}
-function airLiveOpen(){
-  var center=(typeof _d8GetLoc==='function')?_d8GetLoc():null;
-  if(!center||!center.lng){ airStatus('<span style="color:#f87171">먼저 1번/8번에서 작업위치를 검색하거나 허가지선을 잡아주세요</span>'); return; }
-  AIRLIVE.open=true; AIRLIVE.center={lng:+center.lng,lat:+center.lat}; AIRLIVE.zoom=AIR.zoom||15; AIRLIVE.drawCad=AIR.drawCad; AIRLIVE.drawPermit=AIR.drawPermit; AIRLIVE.labelMode='none';
-  AIRLIVE.picks=(AIR.picks&&AIR.picks.length>=4)?AIR.picks.slice(0,4):_airDefaultPicks(4);
-  var m=document.getElementById('airLiveModal'); if(m) m.style.display='flex';
-  _airLiveBuildControls(); _airLiveBind(); _airLiveSyncChecks(); _airLiveSyncZoomButtons();
-  if(_airLiveFitByPermit()) _airLiveSyncZoomButtons();
-  airLiveScheduleLoad(0);
-}
-function airLiveClose(){ AIRLIVE.open=false; var m=document.getElementById('airLiveModal'); if(m) m.style.display='none'; }
-function _airLiveBuildControls(){
-  var box=document.getElementById('airLiveYears'); if(!box) return;
-  var ys=(AIR.years&&AIR.years.length)?AIR.years.slice():_airDefaultPicks(14);
-  var html='';
-  for(var i=0;i<4;i++){
-    var pick=AIRLIVE.picks[i]||ys[Math.min(i,ys.length-1)];
-    html+='<span style="font-size:11px;color:#94a3b8">'+(i+1)+'</span><select data-i="'+i+'" onchange="airLivePick(this)">';
-    for(var j=0;j<ys.length;j++){ var y=ys[j]; html+='<option value="'+y+'"'+(+y===+pick?' selected':'')+'>'+y+'년</option>'; }
-    html+='</select>';
-  }
-  box.innerHTML=html;
-}
-function _airLiveSyncChecks(){
-  var c=document.getElementById('airLiveCadChk'), p=document.getElementById('airLivePermitChk'), lm=document.getElementById('airLiveLabelMode');
-  if(c) c.checked=AIRLIVE.drawCad; if(p) p.checked=AIRLIVE.drawPermit; if(lm) lm.value=AIRLIVE.labelMode;
-}
-function airLivePick(sel){ var i=+sel.dataset.i; AIRLIVE.picks[i]=+sel.value; AIR.picks=AIRLIVE.picks.slice(); airLiveScheduleLoad(120); }
-function airLiveToggleCad(on){ AIRLIVE.drawCad=!!on; AIR.drawCad=AIRLIVE.drawCad; if(on && !AIRLIVE.cad) airLiveScheduleLoad(120); else airLiveRedraw(); }
-function airLiveTogglePermit(on){ AIRLIVE.drawPermit=!!on; AIR.drawPermit=AIRLIVE.drawPermit; airLiveRedraw(); }
-function airLiveSetLabelMode(v){ AIRLIVE.labelMode=v||'none'; airLiveRedraw(); }
-function airLiveAutoFit(){ if(!_airLiveFitByPermit()){ var c=(typeof _d8GetLoc==='function')?_d8GetLoc():null; if(c&&c.lng) AIRLIVE.center={lng:+c.lng,lat:+c.lat}; } _airLiveSyncZoomButtons(); airLiveScheduleLoad(80); }
-function airLiveZoom(d){ AIRLIVE.zoom=_airClamp((AIRLIVE.zoom||15)+d, 11, 18); _airLiveSyncZoomButtons(); airLiveScheduleLoad(80); }
-function airLivePan(dx,dy){
-  var c=_wgs84to5179(AIRLIVE.center.lng,AIRLIVE.center.lat), r=_AIR_RES[AIRLIVE.zoom]; if(!c||!r) return;
-  var ll=_5179toWgs84(c[0]+dx*r, c[1]-dy*r); if(!ll) return;
-  AIRLIVE.center={lng:ll[0],lat:ll[1]}; airLiveScheduleLoad(80);
-}
-function airLiveScheduleLoad(ms){
-  if(!AIRLIVE.open) return; clearTimeout(AIRLIVE.timer);
-  var st=document.getElementById('airLiveStatus'); if(st) st.textContent='준비중…';
-  AIRLIVE.timer=setTimeout(airLiveLoad, ms==null?250:ms);
-}
-function _airLiveFetchImg(year,center,zoom,size){
-  var url='/api/air-photo?lng='+center.lng+'&lat='+center.lat+'&year='+year+'&z='+zoom+'&size='+size;
-  return fetch(url).then(function(r){ if(!r.ok) return null; return r.blob(); }).then(function(b){
-    if(!b) return {year:year,img:null};
-    return new Promise(function(res){ var im=new Image(); im.onload=function(){res({year:year,img:im});}; im.onerror=function(){res({year:year,img:null});}; im.src=URL.createObjectURL(b); });
-  }).catch(function(){ return {year:year,img:null}; });
-}
-function airLiveLoad(){
-  if(!AIRLIVE.open) return;
-  var token=++AIRLIVE.token, center={lng:AIRLIVE.center.lng,lat:AIRLIVE.center.lat}, zoom=AIRLIVE.zoom, size=AIRLIVE.size, picks=AIRLIVE.picks.slice(0,4);
-  var st=document.getElementById('airLiveStatus'); if(st) st.textContent='항공사진 받는 중…';
-  var cadJob=AIRLIVE.drawCad?_airFetchCadastral(center,zoom,size).catch(function(){return null;}):Promise.resolve(AIRLIVE.cad);
-  var jobs=picks.map(function(y){ return _airLiveFetchImg(y,center,zoom,size); });
-  Promise.all([cadJob].concat(jobs)).then(function(all){
-    if(token!==AIRLIVE.token) return;
-    AIRLIVE.cad=all[0]||null; AIRLIVE.imgs=all.slice(1); AIRLIVE.center=center; AIRLIVE.zoom=zoom;
-    var ok=AIRLIVE.imgs.filter(function(x){return x&&x.img;}).length;
-    if(st) st.textContent='완료 '+ok+'/4 · 중심 '+center.lng.toFixed(6)+', '+center.lat.toFixed(6)+' · Z '+zoom;
-    airLiveRedraw();
-  });
-}
-function _airLivePermitPx(center,zoom,size){
-  if(!AIRLIVE.drawPermit) return null;
-  var polys=_airGetPermitPolys(); if(!polys.length) return null;
-  var res=_AIR_RES[zoom], c=_wgs84to5179(center.lng, center.lat); if(!res||!c) return null;
-  var out=[];
-  polys.forEach(function(pp){ var ring=[]; (pp.ring||[]).forEach(function(p){ var ll=tm5186toWgs84(p.x,p.y); if(!ll) return; var XY=_wgs84to5179(ll[0],ll[1]); if(!XY) return; ring.push({px:size/2+(XY[0]-c[0])/res, py:size/2+(c[1]-XY[1])/res}); }); if(ring.length>=3) out.push(ring); });
-  return out.length?out:null;
-}
-function _airLiveCadPx(center,zoom,size){
-  var cad=AIRLIVE.drawCad?AIRLIVE.cad:null; if(!cad||!cad.length) return null;
-  var res=_AIR_RES[zoom], c=_wgs84to5179(center.lng, center.lat); if(!res||!c) return null;
-  var out=[];
-  cad.forEach(function(pc){ var ring=[], ok=true; (pc.ll||[]).forEach(function(ll){ var XY=_wgs84to5179(ll[0],ll[1]); if(!XY){ok=false;return;} ring.push({px:size/2+(XY[0]-c[0])/res, py:size/2+(c[1]-XY[1])/res}); }); if(!ok||ring.length<3) return; var sx=0,sy=0; ring.forEach(function(p){sx+=p.px;sy+=p.py;}); out.push({ring:ring,lx:sx/ring.length,ly:sy/ring.length,jibun:pc.jibun||''}); });
-  return out.length?out:null;
-}
-function _airLiveComposite(canvas){
-  if(!canvas) return;
-  var items=AIRLIVE.imgs||[], size=AIRLIVE.size, center=AIRLIVE.center, zoom=AIRLIVE.zoom;
-  if(!center){ return; }
-  var cols=2, rows=2, pad=8, gap=6, labelH=26, cellW=size, cellH=size+labelH;
-  var W=pad*2+cols*cellW+gap, H=pad*2+rows*cellH+gap;
-  canvas.width=W; canvas.height=H;
-  var ctx=canvas.getContext('2d'); ctx.fillStyle='#f8fafc'; ctx.fillRect(0,0,W,H);
-  var cadPx=_airLiveCadPx(center,zoom,size), permitPx=_airLivePermitPx(center,zoom,size), selected=_airSelectedJibuns();
-  function drawCad(x,y){
-    if(!cadPx) return;
-    ctx.save(); ctx.beginPath(); ctx.rect(x,y,cellW,size); ctx.clip();
-    ctx.lineWidth=1.25; ctx.strokeStyle='rgba(255,50,50,0.92)'; ctx.beginPath();
-    cadPx.forEach(function(pc){ var r=pc.ring; ctx.moveTo(x+r[0].px,y+r[0].py); for(var i=1;i<r.length;i++) ctx.lineTo(x+r[i].px,y+r[i].py); ctx.closePath(); }); ctx.stroke();
-    if(AIRLIVE.labelMode!=='none'){
-      ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      cadPx.forEach(function(pc){ if(!pc.jibun) return; if(AIRLIVE.labelMode==='selected' && !selected[pc.jibun]) return; if(pc.lx<4||pc.lx>cellW-4||pc.ly<4||pc.ly>size-4) return; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,.82)'; ctx.strokeText(pc.jibun,x+pc.lx,y+pc.ly); ctx.fillStyle='#fff'; ctx.fillText(pc.jibun,x+pc.lx,y+pc.ly); });
-    }
-    ctx.restore();
-  }
-  function drawPermit(x,y){
-    if(!permitPx) return; ctx.save(); ctx.beginPath(); ctx.rect(x,y,cellW,size); ctx.clip();
-    permitPx.forEach(function(ring){ ctx.beginPath(); ring.forEach(function(p,i){ if(i===0)ctx.moveTo(x+p.px,y+p.py); else ctx.lineTo(x+p.px,y+p.py); }); ctx.closePath(); ctx.lineJoin='round'; ctx.lineWidth=5; ctx.strokeStyle='rgba(0,0,0,.62)'; ctx.stroke(); ctx.lineWidth=2.8; ctx.strokeStyle='#ff2d55'; ctx.stroke(); ctx.fillStyle='rgba(255,45,85,.12)'; ctx.fill(); });
-    ctx.restore();
-  }
-  for(var idx=0; idx<4; idx++){
-    var it=items[idx]||{year:AIRLIVE.picks[idx],img:null}, cidx=idx%2, ridx=Math.floor(idx/2), x=pad+cidx*(cellW+gap), y=pad+ridx*(cellH+gap);
-    ctx.fillStyle='#182133'; ctx.fillRect(x,y,cellW,labelH);
-    ctx.fillStyle='#fff'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('정사영상 ('+((it&&it.year)||AIRLIVE.picks[idx]||'')+'년)',x+cellW/2,y+labelH/2);
-    if(it&&it.img){ ctx.drawImage(it.img,x,y+labelH,cellW,size); drawCad(x,y+labelH); drawPermit(x,y+labelH); }
-    else { ctx.fillStyle='#e5e7eb'; ctx.fillRect(x,y+labelH,cellW,size); ctx.fillStyle='#6b7280'; ctx.font='13px sans-serif'; ctx.fillText('사진 불러오는 중 / 없음',x+cellW/2,y+labelH+size/2); }
-  }
-}
-function airLiveRedraw(){ var cv=document.getElementById('airLiveCanvas'); _airLiveComposite(cv); }
-function airLiveDownload(){ var cv=document.getElementById('airLiveCanvas'); if(!cv) return; var a=document.createElement('a'); a.download='과거항공_4분할_수동조정.png'; a.href=cv.toDataURL('image/png'); a.click(); }
-function airLiveAttach(){
-  var cv=document.getElementById('airLiveCanvas'), rb=document.getElementById('airResult'); if(!cv||!rb) return;
-  var url=cv.toDataURL('image/png');
-  rb.innerHTML='<div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:8px"><div style="font-size:11px;color:#4ade80;margin-bottom:6px">✓ 현재 4분할 화면을 결과물로 붙였어요</div><img src="'+url+'" style="width:100%;border-radius:6px;border:1px solid var(--line);display:block"><a class="air-dl" download="과거항공_4분할_수동조정.png" href="'+url+'">⬇ 이 이미지 저장</a></div>';
-  airStatus('<span style="color:#4ade80">✅ 현재 4분할 화면을 결과물에 붙였습니다</span>');
-}
-function _airLiveBind(){
-  if(AIRLIVE._bound) return; AIRLIVE._bound=true;
-  var cv=document.getElementById('airLiveCanvas'); if(!cv) return;
-  var down=false,sx=0,sy=0,start=null;
-  cv.addEventListener('pointerdown',function(e){ if(!AIRLIVE.center) return; down=true; sx=e.clientX; sy=e.clientY; start={lng:AIRLIVE.center.lng,lat:AIRLIVE.center.lat}; cv.setPointerCapture&&cv.setPointerCapture(e.pointerId); cv.style.cursor='grabbing'; });
-  cv.addEventListener('pointermove',function(e){ if(!down) return; var st=document.getElementById('airLiveStatus'); if(st) st.textContent='이동 중… 손을 떼면 사진을 다시 불러와요'; });
-  window.addEventListener('pointerup',function(e){ if(!down) return; down=false; cv.style.cursor='grab'; var dx=e.clientX-sx, dy=e.clientY-sy; if(Math.abs(dx)+Math.abs(dy)<4) return; var c=_wgs84to5179(start.lng,start.lat), r=_AIR_RES[AIRLIVE.zoom]; if(!c||!r) return; var ll=_5179toWgs84(c[0]-dx*r,c[1]+dy*r); if(!ll) return; AIRLIVE.center={lng:ll[0],lat:ll[1]}; airLiveScheduleLoad(80); });
-  cv.addEventListener('wheel',function(e){ e.preventDefault(); airLiveZoom(e.deltaY<0?1:-1); },{passive:false});
 }
 /* 모달에서 드래그로 이동(팬) */
 (function(){ document.addEventListener('DOMContentLoaded',function(){
@@ -7123,40 +6950,6 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
   </div>
   <div id="airModalBody" onwheel="event.preventDefault(); airModalZoom(event.deltaY<0?1.1:0.9);" style="flex:1;overflow:auto;padding:14px;text-align:center;cursor:grab;-webkit-overflow-scrolling:touch">
     <canvas id="airModalCanvas" style="max-width:none;box-shadow:0 6px 30px rgba(0,0,0,0.6);border-radius:6px;vertical-align:top"></canvas>
-  </div>
-</div>
-
-<!-- 과거항공 4분할 실시간 조정 화면 -->
-<div id="airLiveModal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(6,10,18,0.96);flex-direction:column">
-  <div class="air-live-top">
-    <b>🧭 과거항공 4분할 실시간 조정</b>
-    <div id="airLiveYears" class="air-live-selects"></div>
-    <label><input type="checkbox" id="airLiveCadChk" onchange="airLiveToggleCad(this.checked)"> 지적선</label>
-    <label><input type="checkbox" id="airLivePermitChk" onchange="airLiveTogglePermit(this.checked)"> 허가지선</label>
-    <span style="font-size:11px;color:#94a3b8">지번</span>
-    <select id="airLiveLabelMode" onchange="airLiveSetLabelMode(this.value)">
-      <option value="none">없음</option>
-      <option value="selected">선택필지만</option>
-      <option value="all">전체</option>
-    </select>
-    <button class="air-live-btn2" onclick="airLiveAutoFit()">자동맞춤</button>
-    <button class="air-live-btn2" onclick="airLiveZoom(-1)">−</button>
-    <span id="airLiveZoomTxt" style="color:#9fe8ff;font-size:11px;min-width:32px;text-align:center">Z 15</span>
-    <button class="air-live-btn2" onclick="airLiveZoom(1)">＋</button>
-    <div class="air-live-pad" title="조금씩 이동">
-      <span></span><button onclick="airLivePan(0,-96)">▲</button><span></span>
-      <button onclick="airLivePan(-96,0)">◀</button><button onclick="airLiveAutoFit()">◎</button><button onclick="airLivePan(96,0)">▶</button>
-      <span></span><button onclick="airLivePan(0,96)">▼</button><span></span>
-    </div>
-    <span id="airLiveStatus" class="air-live-stat">대기중</span>
-    <span style="flex:1"></span>
-    <button class="air-live-btn2 ok" onclick="airLiveAttach()">현재화면 결과에 붙이기</button>
-    <button class="air-live-btn2 pri" onclick="airLiveDownload()">⬇ 저장</button>
-    <button class="air-live-btn2 dark" onclick="airLiveClose()">✕ 닫기</button>
-  </div>
-  <div style="flex:1;overflow:auto;text-align:center;padding:14px;position:relative;background:#050914">
-    <canvas id="airLiveCanvas" style="box-shadow:0 6px 30px rgba(0,0,0,.65);border-radius:6px;vertical-align:top;cursor:grab;background:#111827"></canvas>
-    <div class="air-live-help">드래그: 위치 이동 · 마우스휠: 확대/축소<br>연도/지번 옵션을 바꾼 뒤 현재화면을 결과에 붙이세요.</div>
   </div>
 </div>
 
