@@ -694,20 +694,19 @@
       <!-- ★ 공용 작업위치 — 여기서 한 번 정하면 지질도·강우가 함께 사용 -->
       <div style="position:relative;background:var(--panel2);border:1px solid #2a6ea8;border-radius:10px;padding:11px 12px;margin-bottom:12px">
         <div style="font-size:10.5px;color:#38bdf8;font-weight:700;margin-bottom:6px">📍 작업 위치 (지질도·강우 공용)</div>
-        <div style="position:relative">
-          <div style="display:flex;gap:5px">
-            <input type="text" class="dinp" id="d8Addr" placeholder="지번·도로명 (예: 남양읍 남양리 100)" style="flex:1"
-              onkeydown="if(event.key==='Enter')d8Search()">
-            <button class="dbtn pri" onclick="d8Search()" style="white-space:nowrap">🔍 검색</button>
-          </div>
-          <div id="d8SearchMask" style="display:none;position:absolute;inset:0;border-radius:8px;overflow:hidden;cursor:pointer;z-index:8" onclick="_d8RevealSearch()" title="탭하면 검색창 열림">
-            <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,#17293f,#17293f 5px,#20344e 5px,#20344e 10px);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)"></div>
-            <div id="d8MaskTxt" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:5px;font-size:10.5px;color:#bfe0ff;font-weight:700;text-shadow:0 1px 2px #000">🔒 허가지선 있음 · 검색 불필요 <span style="opacity:.65;font-weight:400">(탭하면 검색)</span></div>
-          </div>
+        <div style="display:flex;gap:5px">
+          <input type="text" class="dinp" id="d8Addr" placeholder="지번·도로명 (예: 남양읍 남양리 100)" style="flex:1"
+            onkeydown="if(event.key==='Enter')d8Search()">
+          <button class="dbtn pri" onclick="d8Search()" style="white-space:nowrap">🔍 검색</button>
         </div>
         <div id="d8Drop" class="srchDrop" style="display:none"></div>
         <div id="d8Loc" style="font-size:10.5px;margin-top:6px;color:var(--tx3)">
           허가지선이 있으면 그 위치를 자동으로 씁니다 · 다른 곳은 위에서 검색
+        </div>
+        <!-- ★ 카드 전체 모자이크 덮개 (복권) — 탭하면 벗겨짐 -->
+        <div id="d8SearchMask" style="display:none;position:absolute;inset:0;border-radius:10px;overflow:hidden;cursor:pointer;z-index:8" onclick="_d8RevealSearch()" title="탭하면 열림">
+          <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,#16273c,#16273c 6px,#20344e 6px,#20344e 12px);backdrop-filter:blur(2.5px);-webkit-backdrop-filter:blur(2.5px)"></div>
+          <div id="d8MaskTxt" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;padding:0 10px"><span style="font-size:13px;font-weight:800;color:#ff6b6b;text-shadow:0 1px 3px #000">🔍 허가지선 없을 경우 검색하세요</span><span style="font-size:10px;color:#cfe3ff;opacity:.85;font-weight:600">탭하면 열려요</span></div>
         </div>
       </div>
 
@@ -5829,9 +5828,9 @@ function _d8UpdateSearchMask(){
   var has=(S.permit && S.permit.length>=3);
   var t=document.getElementById('d8MaskTxt');
   if(t) t.innerHTML = has
-    ? '🔒 허가지선 있음 · 검색 불필요 <span style="opacity:.65;font-weight:400">(탭하면 검색)</span>'
-    : '🔍 지번·도로명 위치 검색 <span style="opacity:.65;font-weight:400">(탭하면 열기)</span>';
-  m.style.display='block';   // 8번이면 항상 덮개(복권) — 탭하면 벗겨짐
+    ? '<span style="font-size:13px;font-weight:800;color:#7fe0a0;text-shadow:0 1px 3px #000">🔒 허가지선 있음 · 검색 불필요</span><span style="font-size:10px;color:#cfe3ff;opacity:.85;font-weight:600">필요하면 탭</span>'
+    : '<span style="font-size:13px;font-weight:800;color:#ff6b6b;text-shadow:0 1px 3px #000">🔍 허가지선 없을 경우 검색하세요</span><span style="font-size:10px;color:#cfe3ff;opacity:.85;font-weight:600">탭하면 열려요</span>';
+  m.style.display='block';   // 8번이면 카드 전체 덮개(복권) — 탭하면 벗겨짐
 }
 
 function _ovToggle(key, on){ if(DATA8.overlays[key]){ DATA8.overlays[key].visible=on; if(typeof render==='function') render(); if(typeof _syncOverlayPanel==='function') _syncOverlayPanel(); } }
