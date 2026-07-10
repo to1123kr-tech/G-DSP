@@ -2301,7 +2301,7 @@ function render(){
           ctx.fillRect(hs0.x, hs0.y, hs1.x-hs0.x, hs1.y-hs0.y);
         }
       }
-      if(S.showArrows){
+      if(S.showArrows && (typeof BOOK==="undefined"||BOOK.page<=7)){
       /* 격자선 (옅은 회청) */
       if(cellPx>=7){
         ctx.save(); ctx.strokeStyle='rgba(150,172,200,0.20)'; ctx.lineWidth=1; ctx.beginPath();
@@ -2519,7 +2519,7 @@ function render(){
 
   // ★ 누적 단면선들 (번호 표시) + 삭제 X 뱃지
   _secDelHits=[];
-  if(typeof _sections!=='undefined' && _sections.length){
+  if(typeof _sections!=='undefined' && _sections.length && (typeof BOOK==="undefined"||BOOK.page<=7)){
     _sections.forEach(function(sec,idx){
       var active=(idx===_activeSection);
       var sp1=w2s(sec.p1), sp2=w2s(sec.p2);

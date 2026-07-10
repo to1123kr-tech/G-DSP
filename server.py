@@ -2301,22 +2301,43 @@ def _fgis_parse_shp(shp_path):
     sf=shapefile.Reader(shp_path, encoding='cp949')
     fns=[f[0] for f in sf.fields[1:]]
     kind=_fgis_classify(fns)
-    # ★ .prj로 실제 좌표계 판별 → WGS84 변환기 (없거나 실패 시 5179 기본).
-    #   FGIS 임상/토양 shp이 5186 등 다른 CRS면 5179 하드코딩 시 폴리곤이 화면 밖으로 감.
-    T=_FGIS_T_5179; crs_used='5179(기본)'
+    shapes=list(sf.iterShapeRecords())
+    # 첫 도형의 좌표 1개 (CRS 판별 샘플)
+    def _firstpt(c):
+        while isinstance(c,(list,tuple)) and c and isinstance(c[0],(list,tuple)): c=c[0]
+        return c
+    sample=None
+    for sr in shapes:
+        fp=_firstpt(sr.shape.__geo_interface__.get('coordinates'))
+        if fp and len(fp)>=2: sample=(fp[0],fp[1]); break
+    def _in_korea(lng,lat): return 124.0<=lng<=132.0 and 33.0<=lat<=43.5
+    T=None; crs_used=''
+    # 1) .prj 읽어 판별 → 결과가 한국 범위면 채택
     try:
         prj=shp_path[:-4]+'.prj' if shp_path.lower().endswith('.shp') else shp_path+'.prj'
         if os.path.exists(prj):
             from pyproj import CRS
             wkt=open(prj, encoding='utf-8', errors='ignore').read().strip()
             if wkt:
-                c=CRS.from_wkt(wkt)
-                T=Transformer.from_crs(c, "EPSG:4326", always_xy=True)
-                crs_used=('EPSG:%s'%c.to_epsg()) if c.to_epsg() else 'prj'
-    except Exception as e:
-        T=_FGIS_T_5179; crs_used='5179(prj실패)'
+                c=CRS.from_wkt(wkt); T2=Transformer.from_crs(c, "EPSG:4326", always_xy=True)
+                if sample:
+                    ll=T2.transform(sample[0], sample[1])
+                    if _in_korea(ll[0], ll[1]): T=T2; crs_used=('EPSG:%s'%c.to_epsg()) if c.to_epsg() else 'prj'
+                else: T=T2; crs_used='prj'
+    except Exception:
+        T=None
+    # 2) .prj 없음/실패/한국밖 → 후보 좌표계 자동판별 (샘플이 한국에 들어오는 것)
+    if T is None and sample:
+        for epsg in (5186,5174,5179,5187,5185,5182,4326):
+            try:
+                tt=Transformer.from_crs("EPSG:%d"%epsg, "EPSG:4326", always_xy=True)
+                ll=tt.transform(sample[0], sample[1])
+                if _in_korea(ll[0], ll[1]): T=tt; crs_used='EPSG:%d(auto)'%epsg; break
+            except Exception:
+                pass
+    if T is None: T=_FGIS_T_5179; crs_used='5179(fallback)'
     feats=[]
-    for sr in sf.iterShapeRecords():
+    for sr in shapes:
         geom=_fgis_reproj(sr.shape.__geo_interface__, T)
         props={k:_fgis_safe(val) for k,val in zip(fns, list(sr.record))}
         feats.append({'type':'Feature','geometry':geom,'properties':props})
