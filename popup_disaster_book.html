@@ -694,10 +694,16 @@
       <!-- ★ 공용 작업위치 — 여기서 한 번 정하면 지질도·강우가 함께 사용 -->
       <div style="position:relative;background:var(--panel2);border:1px solid #2a6ea8;border-radius:10px;padding:11px 12px;margin-bottom:12px">
         <div style="font-size:10.5px;color:#38bdf8;font-weight:700;margin-bottom:6px">📍 작업 위치 (지질도·강우 공용)</div>
-        <div style="display:flex;gap:5px">
-          <input type="text" class="dinp" id="d8Addr" placeholder="지번·도로명 (예: 남양읍 남양리 100)" style="flex:1"
-            onkeydown="if(event.key==='Enter')d8Search()">
-          <button class="dbtn pri" onclick="d8Search()" style="white-space:nowrap">🔍 검색</button>
+        <div style="position:relative">
+          <div style="display:flex;gap:5px">
+            <input type="text" class="dinp" id="d8Addr" placeholder="지번·도로명 (예: 남양읍 남양리 100)" style="flex:1"
+              onkeydown="if(event.key==='Enter')d8Search()">
+            <button class="dbtn pri" onclick="d8Search()" style="white-space:nowrap">🔍 검색</button>
+          </div>
+          <div id="d8SearchMask" style="display:none;position:absolute;inset:0;border-radius:8px;overflow:hidden;cursor:pointer" onclick="_d8RevealSearch()" title="탭하면 검색창 열림">
+            <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,#17293f,#17293f 5px,#20344e 5px,#20344e 10px);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)"></div>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:5px;font-size:10.5px;color:#bfe0ff;font-weight:700;text-shadow:0 1px 2px #000">🔒 허가지선 있음 · 검색 불필요 <span style="opacity:.65;font-weight:400">(탭하면 검색)</span></div>
+          </div>
         </div>
         <div id="d8Drop" class="srchDrop" style="display:none"></div>
         <div id="d8Loc" style="font-size:10.5px;margin-top:6px;color:var(--tx3)">
@@ -3627,6 +3633,7 @@ function clearPermit(){
   S.permit=null; S.permitParcels=null; S.permitDraw=null; S.ghostXY=null; S.pickHover=null;
   S.permitBuild=[]; S._permitBk=null;
   S._permitPnus=null; S._permitMergedRings=null; S._permitMergeKey=null; S.permitMerge=false;
+  if(typeof _d8UpdateSearchMask==='function') _d8UpdateSearchMask();
   var _pdm=document.getElementById('permitDaejangMsg'); if(_pdm)_pdm.innerHTML=''; var _pdl=document.getElementById('permitDaejangList'); if(_pdl)_pdl.style.display='none';
   var _pd=document.getElementById('btnPermitDone'); if(_pd) _pd.style.display='none';
   S.daejangArea=null;
@@ -4314,6 +4321,7 @@ function isStandardMapLayer(L){
 }
 /* 허가지선 확정되면 폐합선 후보 레이어 모두 끄기 (화면 정리) */
 function _afterPermitSet(){
+  if(typeof _d8UpdateSearchMask==='function') _d8UpdateSearchMask();
   if(S.polyLayersOn) Object.keys(S.polyLayersOn).forEach(function(L){ S.polyLayersOn[L]=false; });
   var box=document.getElementById('polyLayerPicker');
   if(box){ var cbs=box.querySelectorAll('input[type=checkbox]'); for(var i=0;i<cbs.length;i++) cbs[i].checked=false; }
@@ -5808,11 +5816,29 @@ function setForestField(kind, field){
   if(!ov) return;
   ov.field=field;
   _forestRenderLayerUI();   // 범례도 갱신
+  var _sk='forest_'+kind, _sub=document.getElementById('olpSub_'+_sk); if(_sub && _sub.style.display!=='none' && typeof _olpFillSub==='function') _olpFillSub(_sk);
   if(typeof render==='function') render();
 }
 
 /* 겹침 레이어 표시 토글 */
+/* 지번검색 모자이크: 허가지선 있으면 검색칸을 덮어 "검색 불필요" 안내 · 탭하면 벗겨짐 */
+function _d8RevealSearch(){ var m=document.getElementById('d8SearchMask'); if(m) m.style.display='none'; var i=document.getElementById('d8Addr'); if(i){ try{ i.focus(); }catch(e){} } }
+function _d8UpdateSearchMask(){ var m=document.getElementById('d8SearchMask'); if(!m) return; m.style.display=(S.permit && S.permit.length>=3)?'block':'none'; }
+
 function _ovToggle(key, on){ if(DATA8.overlays[key]){ DATA8.overlays[key].visible=on; if(typeof render==='function') render(); if(typeof _syncOverlayPanel==='function') _syncOverlayPanel(); } }
+/* 패널 임상/토양 세부(색 기준 + 범례) 열기/닫기 — 카드의 _forestFieldSelect·_forestPolyLegend 재사용 */
+function _olpFillSub(key){
+  var sub=document.getElementById('olpSub_'+key), o=DATA8.overlays[key]; if(!sub||!o) return;
+  var kind=key.replace('forest_','');
+  var html=(typeof _forestFieldSelect==='function')?_forestFieldSelect(kind, o):'';
+  html+=(typeof _forestPolyLegend==='function')?_forestPolyLegend(o):'';
+  sub.innerHTML=html || '<span style="font-size:10px;color:#7f96b3">세부 항목 없음</span>';
+}
+function _olpToggleSub(key){
+  var sub=document.getElementById('olpSub_'+key); if(!sub) return;
+  if(sub.style.display==='none'||!sub.style.display){ _olpFillSub(key); sub.style.display='block'; }
+  else sub.style.display='none';
+}
 /* 좌측 겹친자료 토글 패널: 8번에서만, 로드된 오버레이만 큼직한 체크로 */
 function _syncOverlayPanel(){
   var panel=document.getElementById('overlayLeftPanel'); if(!panel) return;
@@ -5822,7 +5848,9 @@ function _syncOverlayPanel(){
   keys.forEach(function(key){
     var row=document.getElementById('olpRow_'+key); if(!row) return;
     var o=DATA8.overlays[key];
-    if(o){ row.style.display='flex'; var cb=row.querySelector('input'); if(cb) cb.checked=!!o.visible; any=true; }
+    if(o){ row.style.display='block'; var cb=row.querySelector('input'); if(cb) cb.checked=!!o.visible; any=true;
+      var sub=document.getElementById('olpSub_'+key); if(sub && sub.style.display!=='none') _olpFillSub(key);   // 열린 세부 갱신
+    }
     else row.style.display='none';
   });
   if(onP8 && any){
@@ -6175,6 +6203,7 @@ function goToPage(n){
   updateNav();
   if(typeof render==='function') render();   // 겹친 자료 표시/숨김 즉시 반영
   if(typeof _syncOverlayPanel==='function') _syncOverlayPanel();
+  if(typeof _d8UpdateSearchMask==='function') _d8UpdateSearchMask();
 }
 
 /* 목차 체크표시 갱신 (S.* 상태 읽어 ○ 안함 / ◐ 진행중 / ✓ 완료) */
@@ -7179,10 +7208,26 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
     <span style="color:#4b607a;font-size:9px">드래그</span>
   </div>
   <div style="padding:2px 12px 12px">
-    <label id="olpRow_forest_sansatae" style="display:none;align-items:center;gap:10px;font-size:13.5px;color:#e5e7eb;cursor:pointer;padding:7px 4px;border-radius:7px"><input type="checkbox" onchange="_ovToggle('forest_sansatae',this.checked)" style="width:17px;height:17px;cursor:pointer;flex-shrink:0"> 🔴 산사태</label>
-    <label id="olpRow_forest_imsang" style="display:none;align-items:center;gap:10px;font-size:13.5px;color:#e5e7eb;cursor:pointer;padding:7px 4px;border-radius:7px"><input type="checkbox" onchange="_ovToggle('forest_imsang',this.checked)" style="width:17px;height:17px;cursor:pointer;flex-shrink:0"> 🌳 임상도</label>
-    <label id="olpRow_forest_toyang" style="display:none;align-items:center;gap:10px;font-size:13.5px;color:#e5e7eb;cursor:pointer;padding:7px 4px;border-radius:7px"><input type="checkbox" onchange="_ovToggle('forest_toyang',this.checked)" style="width:17px;height:17px;cursor:pointer;flex-shrink:0"> 🟫 토양도</label>
-    <label id="olpRow_geo_map" style="display:none;align-items:center;gap:10px;font-size:13.5px;color:#e5e7eb;cursor:pointer;padding:7px 4px;border-radius:7px"><input type="checkbox" onchange="_ovToggle('geo_map',this.checked)" style="width:17px;height:17px;cursor:pointer;flex-shrink:0"> 🪨 지질도</label>
+    <div id="olpRow_forest_sansatae" style="display:none;padding:5px 3px;border-radius:7px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#e5e7eb"><input type="checkbox" onchange="_ovToggle('forest_sansatae',this.checked)" style="width:17px;height:17px;flex-shrink:0"> 🔴 산사태</label>
+    </div>
+    <div id="olpRow_forest_imsang" style="display:none;padding:5px 3px;border-radius:7px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#e5e7eb;flex:1"><input type="checkbox" onchange="_ovToggle('forest_imsang',this.checked)" style="width:17px;height:17px;flex-shrink:0"> 🌳 임상도</label>
+        <button onclick="_olpToggleSub('forest_imsang')" title="색 기준 열기" style="background:#1e2a3f;border:1px solid #33475f;color:#9fb3cc;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:5px">⚙</button>
+      </div>
+      <div id="olpSub_forest_imsang" style="display:none;margin-top:5px;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:6px"></div>
+    </div>
+    <div id="olpRow_forest_toyang" style="display:none;padding:5px 3px;border-radius:7px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#e5e7eb;flex:1"><input type="checkbox" onchange="_ovToggle('forest_toyang',this.checked)" style="width:17px;height:17px;flex-shrink:0"> 🟫 토양도</label>
+        <button onclick="_olpToggleSub('forest_toyang')" title="색 기준 열기" style="background:#1e2a3f;border:1px solid #33475f;color:#9fb3cc;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:5px">⚙</button>
+      </div>
+      <div id="olpSub_forest_toyang" style="display:none;margin-top:5px;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:6px"></div>
+    </div>
+    <div id="olpRow_geo_map" style="display:none;padding:5px 3px;border-radius:7px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#e5e7eb"><input type="checkbox" onchange="_ovToggle('geo_map',this.checked)" style="width:17px;height:17px;flex-shrink:0"> 🪨 지질도</label>
+    </div>
   </div>
 </div>
 <script>
