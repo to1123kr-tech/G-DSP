@@ -377,6 +377,13 @@
             <div style="font-size:9.5px;color:var(--tx3);margin-top:2px">보정면적 (공부)</div>
           </div>
         </div>
+        <div id="permitMergeRow" style="display:none;margin-top:9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 9px">
+          <div style="font-size:10.5px;color:var(--tx2);font-weight:700;margin-bottom:5px">복수 필지 외곽선</div>
+          <div style="display:flex;gap:5px">
+            <button class="thr on" id="pmIndiv" onclick="setPermitMerge(false)">개별 표시</button>
+            <button class="thr" id="pmMerge" onclick="setPermitMerge(true)">외곽 하나로</button>
+          </div>
+        </div>
         <!-- 대장면적 입력 (보정) -->
         <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
           <span style="font-size:11px;color:var(--tx2);white-space:nowrap">대장면적</span>
@@ -726,7 +733,7 @@
         <div class="dcard-bd" id="dcb_geo">
           <button class="dbtn pri" onclick="geoAutoMoam()" style="width:100%;margin-bottom:6px">🪨 작업위치 모암 자동조회</button>
           <div id="geoMoamResult" style="display:none;margin-bottom:7px"></div>
-          <button class="dbtn pri" onclick="geoOverlayLoad()" style="width:100%;margin-bottom:6px">🗺️ 지질도 지형 위에 겹치기</button>
+          <button class="dbtn pri" onclick="geoOverlayLoad()" style="width:100%;margin-bottom:6px;background:linear-gradient(135deg,#8b5cf6,#6d28d9)">🗺️ 지질도 지형 위에 겹치기</button>
           <div id="geoOverlayCtl" style="display:none;margin-bottom:7px"></div>
           <details style="margin-bottom:6px">
             <summary style="font-size:10px;color:var(--tx3);cursor:pointer">＋ 지도 이미지도 첨부 (선택)</summary>
@@ -762,20 +769,20 @@
       </div>
 
       <!-- 카드 3: 강우강도 -->
-      <div class="dcard" id="dc_rain">
+      <div class="dcard on" id="dc_rain">
         <div class="dcard-hd">
-          <input type="checkbox" class="chk" onchange="dcardToggle('rain',this.checked)">
+          <input type="checkbox" class="chk" checked onchange="dcardToggle('rain',this.checked)">
           <span class="ic">🌧️</span>
           <span class="tt">강우강도</span>
           <span class="st">WAMIS 확률강우량</span>
         </div>
-        <div class="dcard-bd off" id="dcb_rain">
-          <button class="dbtn pri" onclick="rainOpenWamis()" style="width:100%;margin-bottom:6px">🔗 확률강우량 다운로드 (WAMIS)</button>
+        <div class="dcard-bd" id="dcb_rain">
           <div class="ddrop" id="rainDrop" onclick="document.getElementById('rainXlsx').click()">
             📂 받은 엑셀을 여기 놓거나 클릭<br><span style="font-size:9.5px">확률강우량_지역빈도해석_.xlsx</span>
           </div>
           <input type="file" id="rainXlsx" accept=".xlsx,.xls" style="display:none" onchange="rainUpload(this.files)">
-          <a href="#" onclick="openRainGuide();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-top:6px;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법 (뭘 받을지 모르면)</a>
+          <button class="dbtn pri" onclick="rainOpenWamis()" style="width:100%;margin-top:6px;margin-bottom:6px">🔗 확률강우량 다운로드</button>
+          <a href="#" onclick="openRainGuide();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법</a>
           <div id="rainStation" style="font-size:10.5px;color:var(--tx2);margin-top:8px;display:none"></div>
           <div id="rainResult" style="display:none;margin-top:6px"></div>
           <div id="rainMsg" style="font-size:10px;margin-top:6px"></div>
@@ -2079,7 +2086,7 @@ function render(){
   }
 
   // 유역 채움 (반투명 하늘색)
-  if(S.watershed && S.showWS && S.wsCanvas){
+  if(S.watershed && S.showWS && S.wsCanvas && (typeof BOOK==="undefined"||BOOK.page<=7)){
     var w=S.watershed;
     var wx0=w.minX, wx1=w.minX+(w.cols-1)*w.cell, wy0=w.minY, wy1=w.minY+(w.rows-1)*w.cell;
     var wtl=w2s({x:wx0,y:wy1}), wbr=w2s({x:wx1,y:wy0});
@@ -2152,7 +2159,7 @@ function render(){
   }
 
   // 하천망 — 차수별 굵기 유지, 색·선종류·기준두께는 lineStyle.stream
-  if(S.flow && S.showStreams && S.streamMask){
+  if(S.flow && S.showStreams && S.streamMask && (typeof BOOK==="undefined"||BOOK.page<=7)){
     var fl=S.flow, sm=S.streamMask.mask, fa=fl.acc, thr=S.streamMask.thr||1;
     var _sts=S.lineStyle.stream||{color:'#3b82f6',width:2.2,dash:'solid'};
     var _swf=_sts.width/2.2, _sdash=_dashArr(_sts.dash,_sts.width);
@@ -2385,7 +2392,7 @@ function render(){
   }
 
   // 능선선 (유역 경계 · 초록)
-  if(S.watershed && S.showWS && S.wsSegs){
+  if(S.watershed && S.showWS && S.wsSegs && (typeof BOOK==="undefined"||BOOK.page<=7)){
     var _rs=applyLineStyle(ctx,'ridge'); ctx.lineJoin='round';
     ctx.beginPath();
     for(var gi=0;gi<S.wsSegs.length;gi++){
@@ -2407,9 +2414,14 @@ function render(){
     ctx.fillStyle=_pfill; ctx.strokeStyle=_pc;
     ctx.lineWidth=Math.max(1, _ps.width); ctx.setLineDash(_dashArr(_ps.dash,_ps.width)); ctx.lineJoin='round';
     /* 복수 필지 = 각 필지 개별 폴리곤 그림. 단일이면 S.permit 하나 */
-    var _permPolys = (S.permitParcels && S.permitParcels.length)
-      ? S.permitParcels.map(function(p){return p.ring;})
-      : [S.permit];
+    var _permPolys;
+    if(S.permitMerge && S.permitParcels && S.permitParcels.length>1){
+      _permPolys = ensurePermitMerged() || S.permitParcels.map(function(p){return p.ring;});
+    } else {
+      _permPolys = (S.permitParcels && S.permitParcels.length)
+        ? S.permitParcels.map(function(p){return p.ring;})
+        : [S.permit];
+    }
     _permPolys.forEach(function(poly){
       if(!poly||poly.length<3) return;
       ctx.beginPath();
@@ -3792,9 +3804,14 @@ function _rebuild3D(){
   /* 허가지선 (분홍) — 표면 드레이프. WebGL LineBasicMaterial은 두께 조절이 안 되므로
      설정한 두께를 튜브 반경에 반영해 실제로 굵게 보이게 */
   /* ★복수 필지: permitParcels 순회(2D 2390줄과 동일). 단일이면 S.permit 하나 */
-  var _permRings3d = (S.permitParcels&&S.permitParcels.length)
-    ? S.permitParcels.map(function(p){return p.ring;})
-    : ((S.permit&&S.permit.length>=3)?[S.permit]:[]);
+  var _permRings3d;
+  if(S.permitMerge && S.permitParcels && S.permitParcels.length>1){
+    _permRings3d = ensurePermitMerged() || S.permitParcels.map(function(p){return p.ring;});
+  } else {
+    _permRings3d = (S.permitParcels&&S.permitParcels.length)
+      ? S.permitParcels.map(function(p){return p.ring;})
+      : ((S.permit&&S.permit.length>=3)?[S.permit]:[]);
+  }
   var _pw=(S.lineStyle&&S.lineStyle.permit&&S.lineStyle.permit.width)||2.5;
   var _pr=Math.max(0.4, _pw*0.55);   // 두께 → 튜브 반경 (2.5→1.4, 크게 하면 굵어짐)
   var _pcol=parseInt((lineColor('permit')||'#f472b6').replace('#',''),16);
@@ -4385,6 +4402,11 @@ function updatePermitAreaDisplay(){
   var areaEl=document.getElementById('permitArea');
   var nP=(S.permitParcels&&S.permitParcels.length)?S.permitParcels.length:1;
   areaEl.innerHTML=fmtArea(cad)+(nP>1?(' <span style="font-size:9px;color:var(--tx3);font-weight:400">('+nP+'필지 합산)</span>'):'');
+  var mr=document.getElementById('permitMergeRow');
+  if(mr){ mr.style.display=(nP>1)?'':'none';
+    if(nP>1){ var _pa=document.getElementById('pmIndiv'), _pb=document.getElementById('pmMerge');
+      if(_pa) _pa.className='thr'+(S.permitMerge?'':' on'); if(_pb) _pb.className='thr'+(S.permitMerge?' on':''); }
+  }
   var corrEl=document.getElementById('permitAreaCorr');
   var ci=document.getElementById('corrInfo');
   if(S.daejangArea&&S.daejangArea>0){
@@ -4597,6 +4619,66 @@ function bufferRings(polys, d){
 }
 /* 버퍼 링 캐시 — 신청지/이격거리 바뀔 때만 재계산(격자 계산이 무거우므로 매 프레임 X).
    폴리곤=복수필지면 전부(union), 아니면 대표필지 하나. 키=이격거리+필지수+각 링 좌표체크섬. */
+/* ══ 허가지선 복수 필지 외곽 병합 (개별 vs 외곽 하나로) ══ */
+function _ringSelfInt(r){
+  var n=r.length,c=0;
+  function o(p,q,s){return(q.y-p.y)*(s.x-q.x)-(q.x-p.x)*(s.y-q.y);}
+  for(var i=0;i<n;i++){ var a=r[i],b=r[(i+1)%n];
+    for(var k=i+2;k<n;k++){ if(i===0&&k===n-1)continue;
+      var c1=r[k],c2=r[(k+1)%n];
+      var d1=o(c1,c2,a),d2=o(c1,c2,b),d3=o(a,b,c1),d4=o(a,b,c2);
+      if(((d1>0)!==(d2>0))&&((d3>0)!==(d4>0)))c++;
+    }
+  }
+  return c;
+}
+function _mergeByEdges(polys){   // 공유변(짝수 등장) 제거 → 바깥 테두리만 스티칭. 정확·점 적음
+  var R=100; function key(p){ return Math.round(p.x*R)+'_'+Math.round(p.y*R); }
+  var coord={},ec={},ee={};
+  polys.forEach(function(ring){ var n=ring.length;
+    for(var i=0;i<n;i++){ var a=ring[i],b=ring[(i+1)%n]; var ka=key(a),kb=key(b); if(ka===kb)continue;
+      coord[ka]=a; coord[kb]=b; var ek=(ka<kb)?(ka+'|'+kb):(kb+'|'+ka); ec[ek]=(ec[ek]||0)+1; ee[ek]=[ka,kb]; }
+  });
+  var adj={},any=false;
+  for(var ek in ec){ if(ec[ek]%2===1){ var e=ee[ek]; (adj[e[0]]||(adj[e[0]]=[])).push(e[1]); (adj[e[1]]||(adj[e[1]]=[])).push(e[0]); any=true; } }
+  if(!any) return null;
+  var vis={},rings=[];
+  for(var sk in adj){ if(vis[sk]||!adj[sk].length)continue;
+    var ring=[],cur=sk,prev=null,gd=0;
+    while(cur&&!vis[cur]&&gd++<200000){ vis[cur]=1; ring.push(coord[cur]);
+      var nb=adj[cur],nx=null; for(var t=0;t<nb.length;t++){ if(nb[t]!==prev&&!vis[nb[t]]){nx=nb[t];break;} } prev=cur; cur=nx; }
+    if(ring.length>=3) rings.push(ring);
+  }
+  return rings.length?rings:null;
+}
+function mergePermitOutline(polys){
+  if(!polys||!polys.length) return null;
+  var ec=_mergeByEdges(polys);   // 1) 정확
+  if(ec && ec.every(function(r){ return _ringSelfInt(r)===0; })) return ec;
+  if(typeof bufferRings==='function'){ try{ var bf=bufferRings(polys,0); if(bf&&bf.length) return bf; }catch(e){} }   // 2) 견고 폴백(거리장 union)
+  return ec;
+}
+function _permitParcelsKey(){
+  if(!(S.permitParcels&&S.permitParcels.length)) return '';
+  var k=S.permitParcels.length+':';
+  for(var i=0;i<S.permitParcels.length;i++){ var r=S.permitParcels[i].ring; k+=(r?r.length:0)+','+(r&&r[0]?Math.round(r[0].x)+'_'+Math.round(r[0].y):'')+';'; }
+  return k;
+}
+function ensurePermitMerged(){
+  if(!(S.permitParcels&&S.permitParcels.length>1)){ S._permitMergedRings=null; return null; }
+  var key=_permitParcelsKey();
+  if(S._permitMergeKey===key && S._permitMergedRings) return S._permitMergedRings;
+  S._permitMergedRings=mergePermitOutline(S.permitParcels.map(function(p){return p.ring;}));
+  S._permitMergeKey=key;
+  return S._permitMergedRings;
+}
+function setPermitMerge(on){
+  S.permitMerge=!!on;
+  var a=document.getElementById('pmIndiv'), b=document.getElementById('pmMerge');
+  if(a) a.className='thr'+(on?'':' on'); if(b) b.className='thr'+(on?' on':'');
+  if(typeof render==='function') render();
+}
+
 function ensureBufferRings(){
   var polys=(S.permitParcels&&S.permitParcels.length)
     ? S.permitParcels.map(function(p){return p.ring;})
