@@ -231,9 +231,9 @@
   .dbtn:hover{border-color:#2a6ea8;color:var(--tx)}
   .dbtn.pri{background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#06121f;font-weight:700;border-color:transparent}
   .dbtn.pri:hover{opacity:.9}
-  .ddrop{border:1.5px dashed #2b4a6b;border-radius:9px;padding:7px 14px;text-align:center;font-size:11px;color:var(--tx3);
-    cursor:pointer;transition:.12s;background:rgba(56,189,248,.02);line-height:1.35}
-  .ddrop:hover,.ddrop.drag{border-color:#38bdf8;background:rgba(56,189,248,.08);color:var(--tx2)}
+  .ddrop{border:1.5px dashed #3a5f86;border-radius:9px;padding:9px 14px;text-align:center;font-size:11.5px;color:#c3d2e2;font-weight:600;
+    cursor:pointer;transition:.12s;background:rgba(56,189,248,.04);line-height:1.4}
+  .ddrop:hover,.ddrop.drag{border-color:#38bdf8;background:rgba(56,189,248,.1);color:#fff}
   .dhint{font-size:9.5px;color:#5b7290;line-height:1.5;margin-top:5px}
   .dinp{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:11px;color:var(--tx);width:100%}
   .dinp:focus{border-color:#38bdf8;outline:none}
@@ -708,10 +708,8 @@
             📂 산림청 zip을 여기 놓거나 클릭<br><span style="font-size:9.5px">산사태·임상·토양 zip 한 번에 (여러 개 가능)</span>
           </div>
           <input type="file" id="forestFile" accept=".zip" multiple style="display:none" onchange="forestUpload(this.files)">
-          <div class="dhint" style="display:flex;align-items:stretch;gap:6px">
-            <a href="https://map.forest.go.kr" target="_blank" style="flex:1;text-align:center;background:#1e3a5f;color:#8ecbff;font-weight:700;padding:7px 6px;border-radius:6px;white-space:nowrap;font-size:11px;text-decoration:none;border:1px solid #2f4d70">🔗 산림공간정보서비스</a>
-            <a href="#" onclick="openForestGuide();return false;" style="flex:1;text-align:center;background:#1e3a5f;color:#8ecbff;font-weight:700;padding:7px 6px;border-radius:6px;white-space:nowrap;font-size:11px;text-decoration:none;border:1px solid #2f4d70">📖 다운로드 방법</a>
-          </div>
+          <a href="https://map.forest.go.kr" target="_blank" class="dbtn pri" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;text-decoration:none">🔗 산림공간정보서비스</a>
+          <a href="#" onclick="openForestGuide();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법</a>
           <div id="forestLayers" style="margin-top:8px;display:none"></div>
           <div id="forestMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
@@ -726,9 +724,9 @@
           <span class="st">자동조회 · KIGAM</span>
         </div>
         <div class="dcard-bd" id="dcb_geo">
-          <button class="dbtn pri" onclick="geoAutoMoam()" style="width:100%;margin-bottom:6px;background:linear-gradient(135deg,#0ea5e9,#0284c7)">🪨 작업위치 모암 자동조회</button>
+          <button class="dbtn pri" onclick="geoAutoMoam()" style="width:100%;margin-bottom:6px">🪨 작업위치 모암 자동조회</button>
           <div id="geoMoamResult" style="display:none;margin-bottom:7px"></div>
-          <button class="dbtn pri" onclick="geoOverlayLoad()" style="width:100%;margin-bottom:6px;background:linear-gradient(135deg,#8b5cf6,#6d28d9)">🗺️ 지질도 지형 위에 겹치기</button>
+          <button class="dbtn pri" onclick="geoOverlayLoad()" style="width:100%;margin-bottom:6px">🗺️ 지질도 지형 위에 겹치기</button>
           <div id="geoOverlayCtl" style="display:none;margin-bottom:7px"></div>
           <details style="margin-bottom:6px">
             <summary style="font-size:10px;color:var(--tx3);cursor:pointer">＋ 지도 이미지도 첨부 (선택)</summary>
@@ -772,15 +770,12 @@
           <span class="st">WAMIS 확률강우량</span>
         </div>
         <div class="dcard-bd off" id="dcb_rain">
-          <button class="dbtn pri" onclick="rainOpenWamis()" style="width:100%;margin-bottom:6px">🔗 WAMIS 열기 (확률강우량 다운로드)</button>
+          <button class="dbtn pri" onclick="rainOpenWamis()" style="width:100%;margin-bottom:6px">🔗 확률강우량 다운로드 (WAMIS)</button>
           <div class="ddrop" id="rainDrop" onclick="document.getElementById('rainXlsx').click()">
             📂 받은 엑셀을 여기 놓거나 클릭<br><span style="font-size:9.5px">확률강우량_지역빈도해석_.xlsx</span>
           </div>
           <input type="file" id="rainXlsx" accept=".xlsx,.xls" style="display:none" onchange="rainUpload(this.files)">
-          <div class="dhint" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px">
-            <a href="#" onclick="openRainGuide();return false;" style="background:#fbbf24;color:#1a1400;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;font-size:10px">📖 다운로드 방법</a>
-            <span style="font-size:9.5px;color:#5b7290">뭘 받아야 할지 모르면 클릭</span>
-          </div>
+          <a href="#" onclick="openRainGuide();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-top:6px;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법 (뭘 받을지 모르면)</a>
           <div id="rainStation" style="font-size:10.5px;color:var(--tx2);margin-top:8px;display:none"></div>
           <div id="rainResult" style="display:none;margin-top:6px"></div>
           <div id="rainMsg" style="font-size:10px;margin-top:6px"></div>
