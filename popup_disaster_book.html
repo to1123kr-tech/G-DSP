@@ -706,7 +706,7 @@
         <!-- ★ 카드 전체 모자이크 덮개 (복권) — 탭하면 벗겨짐 -->
         <div id="d8SearchMask" style="display:none;position:absolute;inset:0;border-radius:10px;overflow:hidden;cursor:pointer;z-index:8" onclick="_d8RevealSearch()" title="탭하면 열림">
           <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(90,110,142,.62),rgba(90,110,142,.62) 9px,rgba(132,155,190,.62) 9px,rgba(132,155,190,.62) 18px);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)"></div>
-          <div id="d8MaskTxt" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;padding:0 10px"><span style="font-size:13px;font-weight:800;color:#ff6b6b;text-shadow:0 1px 3px #000">🔍 허가지선 없을 경우 검색하세요</span><span style="font-size:10px;color:#cfe3ff;opacity:.85;font-weight:600">탭하면 열려요</span></div>
+          <div id="d8MaskTxt" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;padding:0 6px"><span style="font-size:11.5px;font-weight:800;color:#fde047;background:rgba(6,13,24,0.92);padding:5px 11px;border-radius:7px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.55)">🔍 허가지선 없으면 검색하세요</span><span style="font-size:10px;font-weight:700;color:#dbe9ff;background:rgba(6,13,24,0.82);padding:2px 8px;border-radius:5px">탭하면 열려요</span></div>
         </div>
       </div>
 
@@ -5828,8 +5828,8 @@ function _d8UpdateSearchMask(){
   var has=(S.permit && S.permit.length>=3);
   var t=document.getElementById('d8MaskTxt');
   if(t) t.innerHTML = has
-    ? '<span style="font-size:13px;font-weight:800;color:#7fe0a0;text-shadow:0 1px 3px #000">🔒 허가지선 있음 · 검색 불필요</span><span style="font-size:10px;color:#cfe3ff;opacity:.85;font-weight:600">필요하면 탭</span>'
-    : '<span style="font-size:13px;font-weight:800;color:#ff6b6b;text-shadow:0 1px 3px #000">🔍 허가지선 없을 경우 검색하세요</span><span style="font-size:10px;color:#cfe3ff;opacity:.85;font-weight:600">탭하면 열려요</span>';
+    ? '<span style="font-size:11.5px;font-weight:800;color:#86efac;background:rgba(6,13,24,0.92);padding:5px 11px;border-radius:7px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.55)">🔒 허가지선 있음 · 검색 불필요</span><span style="font-size:10px;font-weight:700;color:#dbe9ff;background:rgba(6,13,24,0.82);padding:2px 8px;border-radius:5px">필요하면 탭</span>'
+    : '<span style="font-size:11.5px;font-weight:800;color:#fde047;background:rgba(6,13,24,0.92);padding:5px 11px;border-radius:7px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.55)">🔍 허가지선 없으면 검색하세요</span><span style="font-size:10px;font-weight:700;color:#dbe9ff;background:rgba(6,13,24,0.82);padding:2px 8px;border-radius:5px">탭하면 열려요</span>';
   m.style.display='block';   // 8번이면 카드 전체 덮개(복권) — 탭하면 벗겨짐
 }
 
