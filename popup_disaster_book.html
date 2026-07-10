@@ -290,7 +290,7 @@
     <button class="navitem" data-go="5" onclick="goToPage(5)"><span class="bn-no">5</span><span class="bn-nm">음영기복 (DEM)</span><span class="bn-st"></span></button>
     <button class="navitem" data-go="6" onclick="goToPage(6)"><span class="bn-no">6</span><span class="bn-nm">수계·단면</span><span class="bn-st"></span></button>
     <button class="navitem" data-go="7" onclick="openSlopeWin()"><span class="bn-no">7</span><span class="bn-nm">경사도 <small style="color:var(--tx3);font-weight:400;font-size:9.5px">↗ 창</small></span><span class="bn-st"></span></button>
-    <button class="navitem" data-go="8" onclick="goToPage(8)"><span class="bn-no">8</span><span class="bn-nm">자료 겹치기</span><span class="bn-st"></span></button>
+    <button class="navitem" data-go="8" onclick="goToPage(8)"><span class="bn-no">8</span><span class="bn-nm">자료 업로드</span><span class="bn-st"></span></button>
     <button class="navitem soon" data-go="9" onclick="goToPage(9)"><span class="bn-no">9</span><span class="bn-nm">과거항공 <small>수정중</small></span><span class="bn-st"></span></button>
     <button class="navitem soon" data-go="10" onclick="goToPage(10)"><span class="bn-no">10</span><span class="bn-nm">결과 보고서 <small>대기중</small></span><span class="bn-st"></span></button>
   </nav>
@@ -676,7 +676,7 @@
 
     <!-- 자료 겹치기 (page 8) -->
     <div class="sec pgsec" data-page="8">
-      <h3>📚 자료 겹치기</h3>
+      <h3>📚 자료 업로드</h3>
       <div style="font-size:10.5px;color:var(--tx3);margin-bottom:10px;line-height:1.5">
         각 자료를 체크하면 첨부됩니다. 없으면 체크 해제(스킵). 좌표가 박힌 자료는 지형도 위에 자동으로 얹힙니다.
       </div>
@@ -708,9 +708,9 @@
             📂 산림청 zip을 여기 놓거나 클릭<br><span style="font-size:9.5px">산사태·임상·토양 zip 한 번에 (여러 개 가능)</span>
           </div>
           <input type="file" id="forestFile" accept=".zip" multiple style="display:none" onchange="forestUpload(this.files)">
-          <div class="dhint" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <a href="https://map.forest.go.kr" target="_blank" style="background:#1e3a5f;color:#38bdf8;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;font-size:10px">🔗 산림공간정보서비스</a>
-            <a href="#" onclick="openForestGuide();return false;" style="background:#fbbf24;color:#1a1400;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;font-size:10px">📖 다운로드 방법</a>
+          <div class="dhint" style="display:flex;align-items:stretch;gap:6px">
+            <a href="https://map.forest.go.kr" target="_blank" style="flex:1;text-align:center;background:#1e3a5f;color:#8ecbff;font-weight:700;padding:7px 6px;border-radius:6px;white-space:nowrap;font-size:11px;text-decoration:none;border:1px solid #2f4d70">🔗 산림공간정보서비스</a>
+            <a href="#" onclick="openForestGuide();return false;" style="flex:1;text-align:center;background:#1e3a5f;color:#8ecbff;font-weight:700;padding:7px 6px;border-radius:6px;white-space:nowrap;font-size:11px;text-decoration:none;border:1px solid #2f4d70">📖 다운로드 방법</a>
           </div>
           <div id="forestLayers" style="margin-top:8px;display:none"></div>
           <div id="forestMsg" style="font-size:10px;margin-top:6px"></div>
@@ -5791,6 +5791,7 @@ function _forestColor(val, field){
 
 /* ★ 산림청 겹침 레이어 렌더 (render에서 호출) — 지형도 위에 얹기 */
 function drawForestOverlays(){
+  if(typeof BOOK!=='undefined' && BOOK.page!==8) return;   // ★ 겹친 자료(지질·산림청)는 8페이지에서만 표시 (넘어가면 자동 숨김, 돌아오면 복원)
   var ov=DATA8.overlays;
   var alpha=(DATA8.forestAlpha!==undefined)?DATA8.forestAlpha:0.5;
   /* 지질도(이미지) — 맨 아래 (산림청 자료보다 먼저) */
@@ -6038,6 +6039,7 @@ function goToPage(n){
   /* 패널 맨 위로 */
   var asd=document.querySelector('aside'); if(asd) asd.scrollTop=0;
   updateNav();
+  if(typeof render==='function') render();   // 겹친 자료 표시/숨김 즉시 반영
 }
 
 /* 목차 체크표시 갱신 (S.* 상태 읽어 ○ 안함 / ◐ 진행중 / ✓ 완료) */
