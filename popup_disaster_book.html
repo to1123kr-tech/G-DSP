@@ -5816,7 +5816,7 @@ function setForestField(kind, field){
   if(!ov) return;
   ov.field=field;
   _forestRenderLayerUI();   // 범례도 갱신
-  var _sk='forest_'+kind, _sub=document.getElementById('olpSub_'+_sk); if(_sub && _sub.style.display!=='none' && typeof _olpFillSub==='function') _olpFillSub(_sk);
+  if(typeof _syncOverlayPanel==='function') _syncOverlayPanel();   // 패널 색 기준 버튼 재하이라이트
   if(typeof render==='function') render();
 }
 
@@ -5826,18 +5826,22 @@ function _d8RevealSearch(){ var m=document.getElementById('d8SearchMask'); if(m)
 function _d8UpdateSearchMask(){ var m=document.getElementById('d8SearchMask'); if(!m) return; m.style.display=(S.permit && S.permit.length>=3)?'block':'none'; }
 
 function _ovToggle(key, on){ if(DATA8.overlays[key]){ DATA8.overlays[key].visible=on; if(typeof render==='function') render(); if(typeof _syncOverlayPanel==='function') _syncOverlayPanel(); } }
-/* 패널 임상/토양 세부(색 기준 + 범례) 열기/닫기 — 카드의 _forestFieldSelect·_forestPolyLegend 재사용 */
-function _olpFillSub(key){
-  var sub=document.getElementById('olpSub_'+key), o=DATA8.overlays[key]; if(!sub||!o) return;
+/* 패널 임상/토양 색 기준 = 버튼 다 펼침. 찍으면 그 기준으로 즉시 표시 */
+function _olpFieldButtons(key){
+  var o=DATA8.overlays[key]; if(!o) return '';
   var kind=key.replace('forest_','');
-  var html=(typeof _forestFieldSelect==='function')?_forestFieldSelect(kind, o):'';
-  html+=(typeof _forestPolyLegend==='function')?_forestPolyLegend(o):'';
-  sub.innerHTML=html || '<span style="font-size:10px;color:#7f96b3">세부 항목 없음</span>';
+  var list=((typeof FOREST_FIELDS!=='undefined'&&FOREST_FIELDS[kind])||[]).filter(function(x){ return o.fields && o.fields.indexOf(x.f)>=0; });
+  if(!list.length) return '';
+  return list.map(function(x){
+    var on=(x.f===o.field);
+    return '<button onclick="_olpPickField(\''+kind+'\',\''+x.f+'\')" style="font-size:11px;padding:4px 9px;border-radius:6px;cursor:pointer;font-weight:'+(on?'700':'400')+';border:1px solid '+(on?'#8b5cf6':'#33475f')+';background:'+(on?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'#1a2536')+';color:'+(on?'#fff':'#9fb3cc')+'">'+x.n+'</button>';
+  }).join('');
 }
-function _olpToggleSub(key){
-  var sub=document.getElementById('olpSub_'+key); if(!sub) return;
-  if(sub.style.display==='none'||!sub.style.display){ _olpFillSub(key); sub.style.display='block'; }
-  else sub.style.display='none';
+function _olpPickField(kind, field){
+  var key='forest_'+kind;
+  if(DATA8.overlays[key]) DATA8.overlays[key].visible=true;   // 찍으면 바로 보이게
+  if(typeof setForestField==='function') setForestField(kind, field);
+  if(typeof _syncOverlayPanel==='function') _syncOverlayPanel();
 }
 /* 좌측 겹친자료 토글 패널: 8번에서만, 로드된 오버레이만 큼직한 체크로 */
 function _syncOverlayPanel(){
@@ -5849,7 +5853,7 @@ function _syncOverlayPanel(){
     var row=document.getElementById('olpRow_'+key); if(!row) return;
     var o=DATA8.overlays[key];
     if(o){ row.style.display='block'; var cb=row.querySelector('input'); if(cb) cb.checked=!!o.visible; any=true;
-      var sub=document.getElementById('olpSub_'+key); if(sub && sub.style.display!=='none') _olpFillSub(key);   // 열린 세부 갱신
+      var fc=document.getElementById('olpFields_'+key); if(fc && typeof _olpFieldButtons==='function') fc.innerHTML=_olpFieldButtons(key);   // 색 기준 버튼 채움
     }
     else row.style.display='none';
   });
@@ -7211,19 +7215,13 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
     <div id="olpRow_forest_sansatae" style="display:none;padding:5px 3px;border-radius:7px">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#e5e7eb"><input type="checkbox" onchange="_ovToggle('forest_sansatae',this.checked)" style="width:17px;height:17px;flex-shrink:0"> 🔴 산사태</label>
     </div>
-    <div id="olpRow_forest_imsang" style="display:none;padding:5px 3px;border-radius:7px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#e5e7eb;flex:1"><input type="checkbox" onchange="_ovToggle('forest_imsang',this.checked)" style="width:17px;height:17px;flex-shrink:0"> 🌳 임상도</label>
-        <button onclick="_olpToggleSub('forest_imsang')" title="색 기준 열기" style="background:#1e2a3f;border:1px solid #33475f;color:#9fb3cc;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:5px">⚙</button>
-      </div>
-      <div id="olpSub_forest_imsang" style="display:none;margin-top:5px;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:6px"></div>
+    <div id="olpRow_forest_imsang" style="display:none;padding:5px 3px 7px;border-radius:7px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#e5e7eb"><input type="checkbox" onchange="_ovToggle('forest_imsang',this.checked)" style="width:17px;height:17px;flex-shrink:0"> 🌳 임상도</label>
+      <div id="olpFields_forest_imsang" style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 0 26px"></div>
     </div>
-    <div id="olpRow_forest_toyang" style="display:none;padding:5px 3px;border-radius:7px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#e5e7eb;flex:1"><input type="checkbox" onchange="_ovToggle('forest_toyang',this.checked)" style="width:17px;height:17px;flex-shrink:0"> 🟫 토양도</label>
-        <button onclick="_olpToggleSub('forest_toyang')" title="색 기준 열기" style="background:#1e2a3f;border:1px solid #33475f;color:#9fb3cc;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:5px">⚙</button>
-      </div>
-      <div id="olpSub_forest_toyang" style="display:none;margin-top:5px;padding:6px 8px;background:rgba(255,255,255,.04);border-radius:6px"></div>
+    <div id="olpRow_forest_toyang" style="display:none;padding:5px 3px 7px;border-radius:7px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#e5e7eb"><input type="checkbox" onchange="_ovToggle('forest_toyang',this.checked)" style="width:17px;height:17px;flex-shrink:0"> 🟫 토양도</label>
+      <div id="olpFields_forest_toyang" style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 0 26px"></div>
     </div>
     <div id="olpRow_geo_map" style="display:none;padding:5px 3px;border-radius:7px">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:#e5e7eb"><input type="checkbox" onchange="_ovToggle('geo_map',this.checked)" style="width:17px;height:17px;flex-shrink:0"> 🪨 지질도</label>
