@@ -5456,6 +5456,7 @@ function geoOverlayLoad(){
   im.onload=function(){
     DATA8.overlays.geo_map={ kind:'geomap', img:im, ready:true, visible:true,
       tm:{x0:minX, y0:minY, x1:maxX, y1:maxY}, bbox:bbox };
+    if(typeof _syncOverlayPanel==='function') _syncOverlayPanel();
     if(DATA8.forestAlpha===undefined) DATA8.forestAlpha=0.5;
     /* 지질도 중심으로 화면 자동 이동 (센터링) */
     S.ox=cv.width/2 - cx*S.scale;
@@ -5482,7 +5483,7 @@ function _geoOverlayCtl(){
     '<button class="dbtn" onclick="geoLegendToggle()" style="width:100%;margin-top:6px;font-size:11px">📋 지질 범례 보기 (암종 색·이름)</button>'+
     '<div id="geoLegendBox" style="display:none;margin-top:6px;max-height:280px;overflow-y:auto;background:#0e1626;border:1px solid #2a3b5c;border-radius:8px;padding:6px;text-align:center"></div>';
 }
-function _geoOvToggle(on){ if(DATA8.overlays.geo_map){ DATA8.overlays.geo_map.visible=on; if(typeof render==='function') render(); } }
+function _geoOvToggle(on){ if(DATA8.overlays.geo_map){ DATA8.overlays.geo_map.visible=on; if(typeof render==='function') render(); if(typeof _syncOverlayPanel==='function') _syncOverlayPanel(); } }
 /* 지질 범례 이미지 접기/펼치기 (KIGAM GetLegendGraphic) */
 function geoLegendToggle(){
   var box=document.getElementById('geoLegendBox'); if(!box) return;
@@ -5708,6 +5709,7 @@ function forestApply(results, errors){
     }
   });
   _forestRenderLayerUI();
+  if(typeof _syncOverlayPanel==='function') _syncOverlayPanel();
   _dmsg('forestMsg','✅ '+msg.join(' · ')+(errors&&errors.length?' · ⚠️'+errors.join('/'):''),'ok');
   if(typeof render==='function') render();
 }
@@ -5810,7 +5812,24 @@ function setForestField(kind, field){
 }
 
 /* 겹침 레이어 표시 토글 */
-function _ovToggle(key, on){ if(DATA8.overlays[key]){ DATA8.overlays[key].visible=on; if(typeof render==='function') render(); } }
+function _ovToggle(key, on){ if(DATA8.overlays[key]){ DATA8.overlays[key].visible=on; if(typeof render==='function') render(); if(typeof _syncOverlayPanel==='function') _syncOverlayPanel(); } }
+/* 좌측 겹친자료 토글 패널: 8번에서만, 로드된 오버레이만 큼직한 체크로 */
+function _syncOverlayPanel(){
+  var panel=document.getElementById('overlayLeftPanel'); if(!panel) return;
+  var onP8=(typeof BOOK==='undefined'||BOOK.page===8);
+  var keys=['forest_sansatae','forest_imsang','forest_toyang','geo_map'];
+  var any=false;
+  keys.forEach(function(key){
+    var row=document.getElementById('olpRow_'+key); if(!row) return;
+    var o=DATA8.overlays[key];
+    if(o){ row.style.display='flex'; var cb=row.querySelector('input'); if(cb) cb.checked=!!o.visible; any=true; }
+    else row.style.display='none';
+  });
+  if(onP8 && any){
+    panel.style.display='block';
+    if(!panel._moved && typeof cv!=='undefined' && cv.getBoundingClientRect){ var r=cv.getBoundingClientRect(); if(r.width>0){ var pw=panel.offsetWidth||156; panel.style.left=Math.round(r.right - pw - 16)+'px'; panel.style.top=Math.round(r.top+14)+'px'; } }
+  } else panel.style.display='none';
+}
 
 /* 산사태 PNG → Image 로드 + bounds를 5186으로 변환 (지도에 얹기 준비) */
 function _forestSansataeToCanvas(r){
@@ -6155,6 +6174,7 @@ function goToPage(n){
   var asd=document.querySelector('aside'); if(asd) asd.scrollTop=0;
   updateNav();
   if(typeof render==='function') render();   // 겹친 자료 표시/숨김 즉시 반영
+  if(typeof _syncOverlayPanel==='function') _syncOverlayPanel();
 }
 
 /* 목차 체크표시 갱신 (S.* 상태 읽어 ○ 안함 / ◐ 진행중 / ✓ 완료) */
@@ -7149,6 +7169,31 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
   <div id="airAreaStatus" style="font-size:11px;margin-top:9px;min-height:14px;line-height:1.4"></div>
   <button onclick="airAreaEnd()" style="width:100%;padding:7px;margin-top:7px;font-size:12px;background:#374151;color:#fff;border:none;border-radius:7px;cursor:pointer">✕ 취소</button>
 </div>
+
+<!-- 겹친자료 토글 패널 (8번에서만 · 드래그로 이동) -->
+<div id="overlayLeftPanel" style="display:none;position:fixed;left:auto;right:20px;top:90px;z-index:850;background:#0d1626;border:1px solid #2a3a52;border-radius:12px;width:158px;box-shadow:0 10px 34px rgba(0,0,0,0.55)">
+  <div id="olpHead" style="cursor:move;padding:11px 13px 8px;display:flex;align-items:center;gap:7px;user-select:none;-webkit-user-select:none">
+    <span style="color:#4b607a;font-size:13px;letter-spacing:-2px">⣿</span>
+    <span style="color:#fff;font-size:12px;font-weight:700">겹친 자료</span>
+    <span style="flex:1"></span>
+    <span style="color:#4b607a;font-size:9px">드래그</span>
+  </div>
+  <div style="padding:2px 12px 12px">
+    <label id="olpRow_forest_sansatae" style="display:none;align-items:center;gap:10px;font-size:13.5px;color:#e5e7eb;cursor:pointer;padding:7px 4px;border-radius:7px"><input type="checkbox" onchange="_ovToggle('forest_sansatae',this.checked)" style="width:17px;height:17px;cursor:pointer;flex-shrink:0"> 🔴 산사태</label>
+    <label id="olpRow_forest_imsang" style="display:none;align-items:center;gap:10px;font-size:13.5px;color:#e5e7eb;cursor:pointer;padding:7px 4px;border-radius:7px"><input type="checkbox" onchange="_ovToggle('forest_imsang',this.checked)" style="width:17px;height:17px;cursor:pointer;flex-shrink:0"> 🌳 임상도</label>
+    <label id="olpRow_forest_toyang" style="display:none;align-items:center;gap:10px;font-size:13.5px;color:#e5e7eb;cursor:pointer;padding:7px 4px;border-radius:7px"><input type="checkbox" onchange="_ovToggle('forest_toyang',this.checked)" style="width:17px;height:17px;cursor:pointer;flex-shrink:0"> 🟫 토양도</label>
+    <label id="olpRow_geo_map" style="display:none;align-items:center;gap:10px;font-size:13.5px;color:#e5e7eb;cursor:pointer;padding:7px 4px;border-radius:7px"><input type="checkbox" onchange="_ovToggle('geo_map',this.checked)" style="width:17px;height:17px;cursor:pointer;flex-shrink:0"> 🪨 지질도</label>
+  </div>
+</div>
+<script>
+(function(){ function init(){
+  var panel=document.getElementById('overlayLeftPanel'), head=document.getElementById('olpHead'); if(!panel||!head) return;
+  var down=false,sx,sy,sl,st;
+  head.addEventListener('pointerdown',function(e){ down=true; var r=panel.getBoundingClientRect(); sl=r.left; st=r.top; sx=e.clientX; sy=e.clientY; panel._moved=true; panel.style.right='auto'; e.preventDefault(); });
+  window.addEventListener('pointermove',function(e){ if(!down)return; panel.style.left=Math.max(4,Math.min(window.innerWidth-40,sl+(e.clientX-sx)))+'px'; panel.style.top=Math.max(4,Math.min(window.innerHeight-40,st+(e.clientY-sy)))+'px'; });
+  window.addEventListener('pointerup',function(){ down=false; });
+} if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded', init); })();
+</script>
 
 </body>
 </html>
