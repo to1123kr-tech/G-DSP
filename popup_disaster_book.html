@@ -366,6 +366,14 @@
       </div>
       <button class="btn btn-primary" id="btnPermitDone" onclick="commitPermitBuild()" style="display:none;margin-top:6px">✓ 허가지선 확정</button>
       <div id="permitInfo" style="display:none;margin-top:9px">
+        <div id="permitMergeRow" style="display:none;margin-bottom:9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 9px">
+          <div style="font-size:10.5px;color:var(--tx2);font-weight:700;margin-bottom:5px">복수 필지 외곽선</div>
+          <div style="display:flex;gap:5px">
+            <button class="thr" id="pmIndiv" onclick="setPermitMerge(false)" style="flex:1;height:34px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;font-weight:700">개별 표시</button>
+            <button class="thr" id="pmMerge" onclick="setPermitMerge(true)" style="flex:1;height:34px">외곽 하나로</button>
+          </div>
+        </div>
+        <button onclick="clearPermit()" style="width:100%;height:36px;margin-bottom:9px;font-size:12.5px;font-weight:700;background:#fbbf24;color:#1a1400;border:none;border-radius:8px;cursor:pointer">🗑 지우고 다시 선택</button>
         <!-- 면적 좌우 분할: CAD실측 | 보정(공부) -->
         <div style="display:flex;gap:6px">
           <div style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 8px;text-align:center">
@@ -377,28 +385,20 @@
             <div style="font-size:9.5px;color:var(--tx3);margin-top:2px">보정면적 (공부)</div>
           </div>
         </div>
-        <div id="permitMergeRow" style="display:none;margin-top:9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 9px">
-          <div style="font-size:10.5px;color:var(--tx2);font-weight:700;margin-bottom:5px">복수 필지 외곽선</div>
-          <div style="display:flex;gap:5px">
-            <button class="thr on" id="pmIndiv" onclick="setPermitMerge(false)">개별 표시</button>
-            <button class="thr" id="pmMerge" onclick="setPermitMerge(true)">외곽 하나로</button>
-          </div>
-        </div>
         <!-- 대장면적 입력 (보정) -->
         <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
           <span style="font-size:11px;color:var(--tx2);white-space:nowrap">대장면적</span>
           <input type="number" id="daejangArea" placeholder="공부 면적 입력" min="0" step="0.1"
             oninput="onDaejangInput()"
-            style="flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:5px 7px;font-size:12px">
+            style="flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:7px;font-size:12px">
           <span style="font-size:11px;color:var(--tx3)">㎡</span>
         </div>
         <div id="corrInfo" style="font-size:10px;color:#4ade80;margin-top:5px;display:none"></div>
         <div style="display:flex;gap:5px;margin-top:8px">
-          <button class="thr on" id="uM2" onclick="setUnit('m2')">㎡</button>
-          <button class="thr" id="uA" onclick="setUnit('a')">a</button>
-          <button class="thr" id="uHa" onclick="setUnit('ha')">ha</button>
+          <button class="thr on" id="uM2" onclick="setUnit('m2')" style="flex:1;height:34px">㎡</button>
+          <button class="thr" id="uA" onclick="setUnit('a')" style="flex:1;height:34px">a</button>
+          <button class="thr" id="uHa" onclick="setUnit('ha')" style="flex:1;height:34px">ha</button>
         </div>
-        <button class="btn btn-ghost" onclick="clearPermit()" style="margin-top:8px;font-size:12px;padding:7px">지우고 다시 선택</button>
       </div>
       <div style="font-size:11px;color:var(--tx3);margin-top:8px;line-height:1.6">선택: 폐합선 클릭 / 그리기: 꼭짓점 클릭 후 <b style="color:var(--tx2)">자동 닫기</b><br>우클릭 = 직전 점 취소</div>
     </div>
@@ -4403,10 +4403,7 @@ function updatePermitAreaDisplay(){
   var nP=(S.permitParcels&&S.permitParcels.length)?S.permitParcels.length:1;
   areaEl.innerHTML=fmtArea(cad)+(nP>1?(' <span style="font-size:9px;color:var(--tx3);font-weight:400">('+nP+'필지 합산)</span>'):'');
   var mr=document.getElementById('permitMergeRow');
-  if(mr){ mr.style.display=(nP>1)?'':'none';
-    if(nP>1){ var _pa=document.getElementById('pmIndiv'), _pb=document.getElementById('pmMerge');
-      if(_pa) _pa.className='thr'+(S.permitMerge?'':' on'); if(_pb) _pb.className='thr'+(S.permitMerge?' on':''); }
-  }
+  if(mr){ mr.style.display=(nP>1)?'':'none'; if(nP>1) _syncPmBtns(); }
   var corrEl=document.getElementById('permitAreaCorr');
   var ci=document.getElementById('corrInfo');
   if(S.daejangArea&&S.daejangArea>0){
@@ -4672,11 +4669,12 @@ function ensurePermitMerged(){
   S._permitMergeKey=key;
   return S._permitMergedRings;
 }
-function setPermitMerge(on){
-  S.permitMerge=!!on;
-  var a=document.getElementById('pmIndiv'), b=document.getElementById('pmMerge');
-  if(a) a.className='thr'+(on?'':' on'); if(b) b.className='thr'+(on?' on':'');
-  if(typeof render==='function') render();
+function setPermitMerge(on){ S.permitMerge=!!on; _syncPmBtns(); if(typeof render==='function') render(); }
+function _syncPmBtns(){
+  var a=document.getElementById('pmIndiv'), b=document.getElementById('pmMerge'); if(!a||!b) return;
+  var on=!!S.permitMerge, A='linear-gradient(135deg,#8b5cf6,#6d28d9)', I='var(--panel)';
+  a.style.background=on?I:A; a.style.color=on?'var(--tx2)':'#fff';
+  b.style.background=on?A:I; b.style.color=on?'#fff':'var(--tx2)';
 }
 
 function ensureBufferRings(){
