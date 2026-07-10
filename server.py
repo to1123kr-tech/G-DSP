@@ -2301,13 +2301,27 @@ def _fgis_parse_shp(shp_path):
     sf=shapefile.Reader(shp_path, encoding='cp949')
     fns=[f[0] for f in sf.fields[1:]]
     kind=_fgis_classify(fns)
+    # ★ .prj로 실제 좌표계 판별 → WGS84 변환기 (없거나 실패 시 5179 기본).
+    #   FGIS 임상/토양 shp이 5186 등 다른 CRS면 5179 하드코딩 시 폴리곤이 화면 밖으로 감.
+    T=_FGIS_T_5179; crs_used='5179(기본)'
+    try:
+        prj=shp_path[:-4]+'.prj' if shp_path.lower().endswith('.shp') else shp_path+'.prj'
+        if os.path.exists(prj):
+            from pyproj import CRS
+            wkt=open(prj, encoding='utf-8', errors='ignore').read().strip()
+            if wkt:
+                c=CRS.from_wkt(wkt)
+                T=Transformer.from_crs(c, "EPSG:4326", always_xy=True)
+                crs_used=('EPSG:%s'%c.to_epsg()) if c.to_epsg() else 'prj'
+    except Exception as e:
+        T=_FGIS_T_5179; crs_used='5179(prj실패)'
     feats=[]
     for sr in sf.iterShapeRecords():
-        geom=_fgis_reproj(sr.shape.__geo_interface__, _FGIS_T_5179)
+        geom=_fgis_reproj(sr.shape.__geo_interface__, T)
         props={k:_fgis_safe(val) for k,val in zip(fns, list(sr.record))}
         feats.append({'type':'Feature','geometry':geom,'properties':props})
     return {'kind':kind,'geojson':{'type':'FeatureCollection','features':feats},
-            'count':len(feats),'fields':fns}
+            'count':len(feats),'fields':fns,'crs':crs_used}
 
 @app.route('/api/forest-parse', methods=['POST','OPTIONS'])
 def forest_parse():
