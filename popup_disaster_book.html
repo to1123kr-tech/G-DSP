@@ -393,6 +393,9 @@
             style="flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:7px;font-size:12px">
           <span style="font-size:11px;color:var(--tx3)">㎡</span>
         </div>
+        <button onclick="permitFetchDaejang()" style="width:100%;height:30px;margin-top:6px;font-size:11px;font-weight:700;background:var(--panel);color:#8ecbff;border:1px solid #2f4d70;border-radius:6px;cursor:pointer">🔍 대장면적 자동조회 (지적 필지)</button>
+        <div id="permitDaejangMsg" style="font-size:10px;margin-top:4px;color:var(--tx3);line-height:1.4"></div>
+        <div id="permitDaejangList" style="display:none;margin-top:5px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px"></div>
         <div id="corrInfo" style="font-size:10px;color:#4ade80;margin-top:5px;display:none"></div>
         <div style="display:flex;gap:5px;margin-top:8px">
           <button class="thr on" id="uM2" onclick="setUnit('m2')" style="flex:1;height:34px">㎡</button>
@@ -3602,6 +3605,8 @@ function commitPermitBuild(){
   var parcelsPolys=rings.map(function(r,i){ return {jibun:'허가지'+(i+1), ring:r.slice()}; });
   S.permit=parcelsPolys[0].ring.slice();
   S.permitParcels=(parcelsPolys.length>1)?parcelsPolys:null;
+  S._permitPnus=[];   // 그린 허가지선은 대장면적 자동조회 불가(수동 입력)
+  var _pdm=document.getElementById('permitDaejangMsg'); if(_pdm)_pdm.innerHTML=''; var _pdl=document.getElementById('permitDaejangList'); if(_pdl)_pdl.style.display='none';
   S.daejangArea=null; var dj=document.getElementById('daejangArea'); if(dj) dj.value='';
   /* 세션 정리 */
   S.permitBuild=[]; S.permitDraw=null; S.ghostXY=null; S.snapClose=false; S.pickHover=null; S._permitBk=null;
@@ -3621,6 +3626,8 @@ function commitPermitBuild(){
 function clearPermit(){
   S.permit=null; S.permitParcels=null; S.permitDraw=null; S.ghostXY=null; S.pickHover=null;
   S.permitBuild=[]; S._permitBk=null;
+  S._permitPnus=null; S._permitMergedRings=null; S._permitMergeKey=null; S.permitMerge=false;
+  var _pdm=document.getElementById('permitDaejangMsg'); if(_pdm)_pdm.innerHTML=''; var _pdl=document.getElementById('permitDaejangList'); if(_pdl)_pdl.style.display='none';
   var _pd=document.getElementById('btnPermitDone'); if(_pd) _pd.style.display='none';
   S.daejangArea=null;
   var dj=document.getElementById('daejangArea'); if(dj) dj.value='';
@@ -4415,6 +4422,39 @@ function updatePermitAreaDisplay(){
     corrEl.textContent=fmtArea(cad);  // 입력 없으면 실측=보정
     ci.style.display='none';
   }
+}
+
+/* ══ 대장면적 자동조회: 허가지선 필지 PNU → /api/landinfo(lndpclAr) 합산 → 보정 반영 ══ */
+function _permDMsg(html){ var e=document.getElementById('permitDaejangMsg'); if(e) e.innerHTML=html; }
+function permitFetchDaejang(){
+  var pnus = (S._permitPnus && S._permitPnus.length) ? S._permitPnus.slice() : [];
+  if(!pnus.length){ _permDMsg('<span style="color:#fbbf24">지적 선택으로 잡은 허가지선만 자동조회돼요 (직접 그린 건 수동 입력)</span>'); return; }
+  _permDMsg('⏳ 대장면적 조회 중… ('+pnus.length+'필지)');
+  var jobs=pnus.map(function(pnu){
+    return fetch('/api/landinfo?pnu='+encodeURIComponent(pnu)).then(function(r){return r.json();}).then(function(d){
+      var field=d&&d.landCharacteristicss&&d.landCharacteristicss.field;
+      if(!field||!field.length) return {pnu:pnu, area:null};
+      var p=Array.isArray(field)?field[0]:field;
+      return {pnu:pnu, area:(p.lndpclAr?Number(p.lndpclAr):null), jimok:(p.lndcgrCodeNm||'')};
+    }).catch(function(){ return {pnu:pnu, area:null}; });
+  });
+  Promise.all(jobs).then(function(res){
+    var sum=0, ok=0, list='';
+    res.forEach(function(r,i){
+      if(r.area>0){ sum+=r.area; ok++; }
+      var nm=(S.permitParcels&&S.permitParcels[i]&&S.permitParcels[i].jibun)?S.permitParcels[i].jibun:('필지'+(i+1));
+      list += '<div style="display:flex;justify-content:space-between;font-size:10px;padding:1.5px 0"><span style="color:var(--tx3)">'+nm+(r.jimok?(' <span style="opacity:.55">'+r.jimok+'</span>'):'')+'</span><span style="color:var(--tx2);font-weight:700">'+(r.area>0?r.area.toLocaleString()+'㎡':'-')+'</span></div>';
+    });
+    if(ok){
+      S.daejangArea=sum;
+      var dj=document.getElementById('daejangArea'); if(dj) dj.value=Math.round(sum*100)/100;
+      if(typeof updatePermitAreaDisplay==='function') updatePermitAreaDisplay();
+      _permDMsg('<span style="color:#4ade80">✅ 대장면적 '+sum.toLocaleString()+'㎡'+(pnus.length>1?(' ('+ok+'필지 합산)'):'')+' → 보정 반영</span>');
+    } else {
+      _permDMsg('<span style="color:#f87171">❌ 대장면적 조회 실패 (PNU/서버 확인)</span>');
+    }
+    var le=document.getElementById('permitDaejangList'); if(le){ le.innerHTML=(pnus.length>1)?list:''; le.style.display=(pnus.length>1&&ok)?'':'none'; }
+  });
 }
 
 /* ══ 허가지선 마우스 클릭 선택 ══ */
@@ -6350,17 +6390,19 @@ function cadUseAsPermit(){
   var parcelsPolys=[];   // 각 필지의 외곽 링(첫 링) [{x,y}...]
   CAD.parcels.forEach(function(sp){
     var r0=sp.rings&&sp.rings[0];
-    if(r0&&r0.length>=3) parcelsPolys.push({jibun:sp.jibun||'', ring:r0.map(function(p){return {x:p.x,y:p.y};})});
+    if(r0&&r0.length>=3) parcelsPolys.push({jibun:sp.jibun||'', pnu:sp.pnu||null, ring:r0.map(function(p){return {x:p.x,y:p.y};})});
   });
   if(!parcelsPolys.length){ toast('필지 경계가 유효하지 않아요','err'); return; }
   /* 대표(첫) 필지 = 기존 분석 엔진(경사·유역·버퍼)이 쓰는 S.permit */
   S.permit=parcelsPolys[0].ring.map(function(p){return {x:p.x,y:p.y};});
   /* 복수면 전체 저장(화면 표시·면적 합산). 1개면 null(기존과 동일) */
   S.permitParcels=(parcelsPolys.length>1)?parcelsPolys:null;
+  S._permitPnus=parcelsPolys.map(function(p){return p.pnu;}).filter(function(x){return x&&String(x).length===19;});
   S.daejangArea=null;
   var dj=document.getElementById('daejangArea'); if(dj) dj.value='';
   var pin=document.getElementById('permitInfo'); if(pin) pin.style.display='';
   if(typeof updatePermitAreaDisplay==='function') updatePermitAreaDisplay();
+  if(typeof permitFetchDaejang==='function' && S._permitPnus.length) permitFetchDaejang();   // ★ 대장면적 자동조회
   if(typeof _afterPermitSet==='function') _afterPermitSet();
   CAD.selMode=false;
   /* ★ 허가지선으로 확정됐으니 선택 표시(청록 점선)는 지움.
