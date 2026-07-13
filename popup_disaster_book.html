@@ -488,6 +488,11 @@
           <button class="btn btn-ghost" id="btnSection" onclick="toggleSection()" style="font-size:12px">✂️ 단면선 그리기 (2점 클릭)</button>
           <button class="btn btn-ghost" id="btnReopenProfile" onclick="reopenProfile()" style="font-size:12px;margin-top:6px;display:none">📈 단면도 창 다시 열기</button>
           <button class="btn btn-ghost" id="btnAutoProfile" onclick="autoProfileLine()" style="font-size:12px;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#1a1400;font-weight:700;border:none">🎯 종단선 자동 (사면형 판정)</button>
+          <div style="display:flex;gap:4px;margin-top:5px">
+            <button class="thr on" id="plSty_outline" onclick="setProfileStyle('outline')" style="flex:1;font-size:10px;padding:4px 2px" title="흰 테두리 (어떤 색에도 뚜렷)">흰테두리</button>
+            <button class="thr" id="plSty_arrow" onclick="setProfileStyle('arrow')" style="flex:1;font-size:10px;padding:4px 2px" title="굵은 실선 + 방향 화살표">실선+화살표</button>
+            <button class="thr" id="plSty_neon" onclick="setProfileStyle('neon')" style="flex:1;font-size:10px;padding:4px 2px" title="형광색 (지형색에 안 묻힘)">형광</button>
+          </div>
           <div id="profMsg" style="font-size:10px;color:var(--tx3);margin-top:5px;line-height:1.45"></div>
         </div>
         <!-- 3D -->
@@ -2561,23 +2566,41 @@ function render(){
     ctx.restore();
   }
 
-  // ★ 종단선(자동·사면형 판정용) — 주황 점선 + 상단(높음)/하단(낮음) 마커
+  // ★ 종단선(자동·사면형 판정용) — 스타일 3종 (흰테두리/실선+화살표/형광)
   if(S.profileLine && S.profileLine.pts && (typeof BOOK==="undefined"||BOOK.page<=7)){
-    var _pl=S.profileLine.pts;
-    ctx.save();
-    ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2.5; ctx.setLineDash([9,6]); ctx.lineJoin='round'; ctx.lineCap='round';
-    ctx.beginPath(); var _ps0=w2s(_pl[0]); ctx.moveTo(_ps0.x,_ps0.y);
-    for(var _ppi=1;_ppi<_pl.length;_ppi++){ var _psp=w2s(_pl[_ppi]); ctx.lineTo(_psp.x,_psp.y); }
-    ctx.stroke(); ctx.setLineDash([]);
-    var _ptS=w2s(_pl[0]), _pbS=w2s(_pl[_pl.length-1]);
+    var _pl=S.profileLine.pts, _sty=S.profileLineStyle||'outline';
+    var _pS=_pl.map(function(p){return w2s(p);});
+    var _plPath=function(){ ctx.beginPath(); ctx.moveTo(_pS[0].x,_pS[0].y); for(var _i=1;_i<_pS.length;_i++) ctx.lineTo(_pS[_i].x,_pS[_i].y); };
+    ctx.save(); ctx.lineJoin='round'; ctx.lineCap='round';
+    if(_sty==='outline'){
+      ctx.setLineDash([]); ctx.strokeStyle='#ffffff'; ctx.lineWidth=6; _plPath(); ctx.stroke();
+      ctx.setLineDash([10,6]); ctx.strokeStyle='#f59e0b'; ctx.lineWidth=3; _plPath(); ctx.stroke(); ctx.setLineDash([]);
+    } else if(_sty==='neon'){
+      ctx.setLineDash([]); ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.lineWidth=6; _plPath(); ctx.stroke();
+      ctx.strokeStyle='#39ff14'; ctx.lineWidth=3; _plPath(); ctx.stroke();
+    } else {
+      ctx.setLineDash([]); ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=6.5; _plPath(); ctx.stroke();
+      ctx.strokeStyle='#f59e0b'; ctx.lineWidth=3.5; _plPath(); ctx.stroke();
+      var _nSeg=_pS.length-1, _stp=Math.max(1,Math.floor(_nSeg/4));
+      ctx.strokeStyle='#fde047'; ctx.lineWidth=2.5;
+      for(var _ai=_nSeg; _ai>0; _ai-=_stp){
+        var _a=_pS[_ai], _b=_pS[_ai-1], _dx=_b.x-_a.x, _dy=_b.y-_a.y, _dl=Math.hypot(_dx,_dy)||1; _dx/=_dl; _dy/=_dl;
+        var _mx=(_a.x+_b.x)/2, _my=(_a.y+_b.y)/2, _hl=9, _aa=0.55;
+        ctx.beginPath();
+        ctx.moveTo(_mx,_my); ctx.lineTo(_mx-_hl*(_dx*Math.cos(_aa)-_dy*Math.sin(_aa)), _my-_hl*(_dx*Math.sin(_aa)+_dy*Math.cos(_aa)));
+        ctx.moveTo(_mx,_my); ctx.lineTo(_mx-_hl*(_dx*Math.cos(-_aa)-_dy*Math.sin(-_aa)), _my-_hl*(_dx*Math.sin(-_aa)+_dy*Math.cos(-_aa)));
+        ctx.stroke();
+      }
+    }
+    var _ptS=_pS[0], _pbS=_pS[_pS.length-1];
     var _drawMk=function(sp,txt,col){
       ctx.fillStyle=col; ctx.beginPath(); ctx.arc(sp.x,sp.y,5,0,7); ctx.fill();
       ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      ctx.strokeStyle='rgba(0,0,0,.75)'; ctx.lineWidth=3; ctx.strokeText(txt, sp.x+9, sp.y);
+      ctx.strokeStyle='rgba(0,0,0,.8)'; ctx.lineWidth=3.5; ctx.strokeText(txt, sp.x+9, sp.y);
       ctx.fillStyle='#fff'; ctx.fillText(txt, sp.x+9, sp.y);
     };
-    _drawMk(_ptS, '상단 '+S.profileLine.top.e.toFixed(0)+'m', '#ef4444');
-    _drawMk(_pbS, '하단 '+S.profileLine.bot.e.toFixed(0)+'m', '#3b82f6');
+    _drawMk(_ptS, '상단 '+S.profileLine.top.e.toFixed(1)+'m', '#ef4444');
+    _drawMk(_pbS, '하단 '+S.profileLine.bot.e.toFixed(1)+'m', '#3b82f6');
     ctx.restore();
   }
 
@@ -4866,6 +4889,7 @@ function computeProfileLine(){
   return { pts:p, top:{x:p[0].x,y:p[0].y,e:p[0].e}, bot:{x:p[n-1].x,y:p[n-1].y,e:p[n-1].e}, drop:best.drop, len:len };
 }
 function _profMsg(html){ var e=document.getElementById('profMsg'); if(e) e.innerHTML=html; }
+function setProfileStyle(s){ S.profileLineStyle=s; ['outline','arrow','neon'].forEach(function(k){ var b=document.getElementById('plSty_'+k); if(b)b.className='thr'+(k===s?' on':''); }); render(); }
 function autoProfileLine(){
   if(!S.flow){ toast('먼저 흐름·하천 분석을 하세요 (수계 6번)','err'); return; }
   if(!(S.permit&&S.permit.length>=3)){ toast('허가지선을 먼저 잡으세요','err'); return; }
@@ -4930,7 +4954,7 @@ function _fourTypeSVG(hi){
 function showProfileResult(cls){
   var box=document.getElementById('profResultBox'), body=document.getElementById('profResultBody'); if(!box||!body||!cls) return;
   var col={'상승':'#22c55e','평형':'#94a3b8','하강':'#f59e0b','복합':'#ef4444'}[cls.form];
-  var W=312,H=150,pl=32,pr=12,pt=14,pb=26, iw=W-pl-pr, ih=H-pt-pb;
+  var W=312,H=150,pl=14,pr=14,pt=14,pb=26, iw=W-pl-pr, ih=H-pt-pb;
   var P=cls.P, n=P.length, dR=cls.totLen||1, eR=(cls.eHi-cls.eLo)||1;
   function X(i){ return pl+(cls.dists[i]/dR)*iw; }
   function Y(e){ return pt+ih-((e-cls.eLo)/eR)*ih; }
@@ -4939,13 +4963,12 @@ function showProfileResult(cls){
   var gr=ln+' L'+X(n-1).toFixed(1)+' '+(pt+ih)+' L'+X(0).toFixed(1)+' '+(pt+ih)+' Z';
   var dg='M'+X(0).toFixed(1)+' '+Y(P[0].e).toFixed(1)+' L'+X(n-1).toFixed(1)+' '+Y(P[n-1].e).toFixed(1);
   var svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'">'
-    +'<path d="'+gr+'" fill="'+col+'" fill-opacity="0.2"/>'
-    +'<path d="'+dg+'" fill="none" stroke="#64748b" stroke-width="1" stroke-dasharray="4 3"/>'
-    +'<path d="'+ln+'" fill="none" stroke="'+col+'" stroke-width="2.2"/>'
-    +'<text x="'+X(0).toFixed(0)+'" y="'+(H-8)+'" fill="#93c5fd" font-size="10" text-anchor="middle">하단 '+cls.eLo.toFixed(0)+'m</text>'
-    +'<text x="'+X(n-1).toFixed(0)+'" y="'+(H-8)+'" fill="#f87171" font-size="10" text-anchor="middle">상단 '+cls.eHi.toFixed(0)+'m</text>'
-    +'<text x="'+(pl-5)+'" y="'+(pt+5)+'" fill="#94a3b8" font-size="9" text-anchor="end">'+cls.eHi.toFixed(0)+'m</text>'
-    +'<text x="'+(pl-5)+'" y="'+(pt+ih)+'" fill="#94a3b8" font-size="9" text-anchor="end">'+cls.eLo.toFixed(0)+'m</text>'
+    +'<defs><linearGradient id="pgHyp" gradientUnits="userSpaceOnUse" x1="0" y1="'+pt+'" x2="0" y2="'+(pt+ih)+'"><stop offset="0" stop-color="#a16207"/><stop offset="0.28" stop-color="#ca8a04"/><stop offset="0.55" stop-color="#4d7c0f"/><stop offset="0.8" stop-color="#0d9488"/><stop offset="1" stop-color="#0369a1"/></linearGradient></defs>'
+    +'<path d="'+gr+'" fill="url(#pgHyp)" fill-opacity="0.72"/>'
+    +'<path d="'+dg+'" fill="none" stroke="#f8fafc" stroke-width="1" stroke-dasharray="4 3" stroke-opacity="0.6"/>'
+    +'<path d="'+ln+'" fill="none" stroke="#f8fafc" stroke-width="2.4"/>'
+    +'<text x="'+pl+'" y="'+(H-8)+'" fill="#93c5fd" font-size="10" text-anchor="start">하단 '+cls.eLo.toFixed(1)+'m</text>'
+    +'<text x="'+(W-pr)+'" y="'+(H-8)+'" fill="#f87171" font-size="10" text-anchor="end">상단 '+cls.eHi.toFixed(1)+'m</text>'
     +'</svg>';
   var avgF=computeAvgForm(), avC={'상승':'#22c55e','평형':'#94a3b8','하강':'#f59e0b','복합':'#ef4444'};
   body.innerHTML=svg
