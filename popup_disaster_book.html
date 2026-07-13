@@ -4897,6 +4897,36 @@ function classifyProfile(pts){
   return { form:form, score:score, why:why, P:P, dists:dists, totLen:totLen, eLo:eLo, eHi:eHi };
 }
 /* 종단선 실제 단면(고도 그래프) + 판정 결과 박스 */
+/* 채점표와 동일한 "전체평균 곡률" 사면형 (비교용) */
+function computeAvgForm(){
+  if(!S.dem||!S.dem.z||!(S.permit&&S.permit.length>=3)||typeof ptInPoly!=='function') return null;
+  var d=S.dem, z=d.z, cols=d.cols, rows=d.rows, cell=d.cell, curvs=[];
+  for(var r=1;r<rows-1;r++)for(var c=1;c<cols-1;c++){
+    var px=d.minX+(c+0.5)*cell, py=d.minY+(r+0.5)*cell;
+    if(!ptInPoly({x:px,y:py},S.permit)) continue;
+    var idx=r*cols+c, zc=z[idx]; if(zc!==zc) continue;
+    var zl=z[idx-1],zr2=z[idx+1],zu=z[idx-cols],zd=z[idx+cols];
+    if(zl!==zl||zr2!==zr2||zu!==zu||zd!==zd) continue;
+    curvs.push(zl+zr2+zd+zu-4*zc);
+  }
+  if(curvs.length<3) return null;
+  var a=curvs.reduce(function(x,y){return x+y;},0)/curvs.length;
+  var sp=curvs.reduce(function(x,y){return x+Math.abs(y);},0)/curvs.length;
+  var form=(sp>5*Math.abs(a)&&sp>0.3)?'복합':a<-0.08?'상승':a>0.08?'하강':'평형';
+  return {form:form, score:{'상승':0,'평형':5,'하강':12,'복합':23}[form]};
+}
+/* 4유형 미니 그림 (해당 유형 강조) */
+function _fourTypeSVG(hi){
+  var T=[{k:'상승',d:'M5 50 Q30 18 62 16',c:'#22c55e'},{k:'평형',d:'M5 50 L62 16',c:'#94a3b8'},{k:'하강',d:'M5 50 Q30 48 62 16',c:'#f59e0b'},{k:'복합',d:'M5 50 C18 22 45 46 62 16',c:'#ef4444'}];
+  var W=312,pw=72,gap=(W-pw*4)/5,s='<svg width="100%" viewBox="0 0 '+W+' 78">';
+  for(var i=0;i<4;i++){ var t=T[i], x0=gap+(pw+gap)*i, on=(t.k===hi), col=on?t.c:'#475569';
+    s+='<g transform="translate('+x0.toFixed(1)+',0)">';
+    if(on) s+='<rect x="0" y="0" width="'+pw+'" height="74" rx="6" fill="'+t.c+'" fill-opacity="0.12" stroke="'+t.c+'" stroke-width="1.5"/>';
+    s+='<path d="'+t.d+' L62 58 L5 58 Z" fill="'+col+'" fill-opacity="'+(on?0.28:0.14)+'"/><path d="'+t.d+'" fill="none" stroke="'+col+'" stroke-width="1.6"/>';
+    s+='<text x="36" y="70" fill="'+(on?t.c:'#64748b')+'" font-size="10" font-weight="'+(on?'800':'400')+'" text-anchor="middle">'+t.k+'</text></g>';
+  }
+  return s+'</svg>';
+}
 function showProfileResult(cls){
   var box=document.getElementById('profResultBox'), body=document.getElementById('profResultBody'); if(!box||!body||!cls) return;
   var col={'상승':'#22c55e','평형':'#94a3b8','하강':'#f59e0b','복합':'#ef4444'}[cls.form];
@@ -4917,9 +4947,18 @@ function showProfileResult(cls){
     +'<text x="'+(pl-5)+'" y="'+(pt+5)+'" fill="#94a3b8" font-size="9" text-anchor="end">'+cls.eHi.toFixed(0)+'m</text>'
     +'<text x="'+(pl-5)+'" y="'+(pt+ih)+'" fill="#94a3b8" font-size="9" text-anchor="end">'+cls.eLo.toFixed(0)+'m</text>'
     +'</svg>';
+  var avgF=computeAvgForm(), avC={'상승':'#22c55e','평형':'#94a3b8','하강':'#f59e0b','복합':'#ef4444'};
   body.innerHTML=svg
     +'<div style="margin-top:8px;text-align:center"><span style="display:inline-block;padding:5px 16px;border-radius:8px;background:'+col+';color:#0b1220;font-weight:800;font-size:15px">'+cls.form+'사면 · '+cls.score+'점</span></div>'
-    +'<div style="margin-top:7px;font-size:11px;color:#cbd5e1;text-align:center;line-height:1.5">근거: '+cls.why+'<br><span style="color:#94a3b8">점선=직선 기준 · 실선이 위로 부풀면 오목(상승), 아래로 처지면 볼록(하강)</span></div>';
+    +'<div style="margin-top:7px;font-size:10.5px;color:#cbd5e1;text-align:center;line-height:1.5">근거: '+cls.why+'<br><span style="color:#94a3b8">점선=직선 기준 · 위로 부풀면 오목(상승), 아래로 처지면 볼록(하강)</span></div>'
+    +'<div style="margin-top:10px;border-top:1px solid #24304a;padding-top:8px"><div style="font-size:10px;color:#94a3b8;margin-bottom:4px;text-align:center">4가지 유형 (해당 강조)</div>'+_fourTypeSVG(cls.form)+'</div>'
+    +'<div style="margin-top:9px;border-top:1px solid #24304a;padding-top:8px"><div style="font-size:10px;color:#94a3b8;text-align:center;margin-bottom:5px">📊 두 방식 비교</div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<div style="flex:1;text-align:center;padding:6px 4px;background:rgba(148,163,184,.1);border-radius:6px"><div style="color:#94a3b8;font-size:9px">전체평균 방식</div><div style="font-weight:800;font-size:12px;color:'+(avgF?avC[avgF.form]:'#64748b')+'">'+(avgF?avgF.form+' '+avgF.score+'점':'—')+'</div></div>'
+    +'<div style="flex:1;text-align:center;padding:6px 4px;background:rgba(245,158,11,.12);border-radius:6px;border:1px solid #f59e0b"><div style="color:#fbbf24;font-size:9px">종단선 (정석)</div><div style="font-weight:800;font-size:12px;color:'+col+'">'+cls.form+' '+cls.score+'점</div></div>'
+    +'</div>'
+    +(avgF?(avgF.form!==cls.form?'<div style="margin-top:5px;font-size:10px;color:#fbbf24;text-align:center">⚠️ 결과가 달라요 — 종단선(정석) 권장</div>':'<div style="margin-top:5px;font-size:10px;color:#4ade80;text-align:center">✓ 두 방식 일치</div>'):'')
+    +'</div>';
   box.style.display='block';
 }
 
