@@ -548,7 +548,7 @@
         </div>
         <div style="font-size:9.5px;color:var(--tx3);margin-top:2px;line-height:1.4">격자 간격 m · 클수록 칸이 커지고 누적값 숫자 표시 (음영 격자와 별개)</div>
         <button class="btn btn-ghost" onclick="exportSiteDxf()" style="width:100%;margin-top:9px;font-size:11.5px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;font-weight:700;border:none">📐 현황도 DXF (허가지선+화살표+격자)</button>
-        <div style="font-size:9px;color:var(--tx3);margin-top:3px;line-height:1.4">캐드 편집용 · 레이어 3개(허가지선·화살표·격자)로 색 구분 · 현재 화살표 모양 반영</div>
+        <div style="font-size:9px;color:var(--tx3);margin-top:3px;line-height:1.4">캐드 편집용 · 레이어 3개(허가지선·화살표·격자) 색 구분 · 화살표=선 몸통+촉(꼬랑지)</div>
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx2);margin-top:6px;cursor:pointer">
           <input type="checkbox" id="flowNumToggle" checked onchange="S.showFlowNum=this.checked;render()"> 🔢 누적값 숫자 표시
         </label>
@@ -6589,8 +6589,7 @@ function exportSiteDxf(){
   permRings.forEach(function(r){ if(r&&r.length>=3) poly('허가지선', r.map(function(p){return [p.x,p.y];}), true); });
 
   // 2) 격자 + 화살표
-  var wantM=S.arrowMeters||10, gm=Math.max(1,Math.round(wantM/af.cell)), L=(gm*af.cell)*0.34;
-  var style=S.arrowStyle||'line', lp=_dxfArrowLocal(style);
+  var wantM=S.arrowMeters||10, gm=Math.max(1,Math.round(wantM/af.cell)), L=(gm*af.cell)*0.4;
   for(var gr=0; gr<=af.rows; gr+=gm){ var yy=af.minY+gr*af.cell; line('격자', af.minX, yy, af.minX+af.cols*af.cell, yy); }
   for(var gc=0; gc<=af.cols; gc+=gm){ var xx=af.minX+gc*af.cell; line('격자', xx, af.minY, xx, af.minY+af.rows*af.cell); }
   for(var hr=0; hr<af.rows && nArrow<8000; hr+=gm){
@@ -6600,15 +6599,10 @@ function exportSiteDxf(){
       var st=_step(code); if(!st) continue;
       var dl=Math.hypot(st[0],st[1])||1, dx=st[0]/dl, dy=st[1]/dl;
       var cx=af.minX+(hc+gm*0.5)*af.cell, cy=af.minY+(hr+gm*0.5)*af.cell;   // 격자 칸 정중앙
-      if(lp){
-        var px=-dy, py=dx;
-        poly('화살표', lp.map(function(p){ return [cx+dx*(p[0]*L)+px*(p[1]*L), cy+dy*(p[0]*L)+py*(p[1]*L)]; }), true);
-      } else {
-        var tx=cx+dx*L, ty=cy+dy*L, hl=L*0.5, aa=0.5;
-        line('화살표', cx-dx*L, cy-dy*L, tx, ty);
-        line('화살표', tx, ty, tx-hl*(dx*Math.cos(aa)-dy*Math.sin(aa)), ty-hl*(dx*Math.sin(aa)+dy*Math.cos(aa)));
-        line('화살표', tx, ty, tx-hl*(dx*Math.cos(aa)+dy*Math.sin(aa)), ty-hl*(-dx*Math.sin(aa)+dy*Math.cos(aa)));
-      }
+      var tx=cx+dx*L, ty=cy+dy*L, hl=L*0.45, aa=0.42;                       // 선 몸통(꼬랑지) + V촉 = 화면 선 화살표와 동일
+      line('화살표', cx-dx*L, cy-dy*L, tx, ty);                              // 몸통(꼬랑지)
+      line('화살표', tx, ty, tx-hl*(dx*Math.cos(aa)-dy*Math.sin(aa)), ty-hl*(dx*Math.sin(aa)+dy*Math.cos(aa)));   // 촉 왼
+      line('화살표', tx, ty, tx-hl*(dx*Math.cos(aa)+dy*Math.sin(aa)), ty-hl*(-dx*Math.sin(aa)+dy*Math.cos(aa)));   // 촉 오
       nArrow++;
     }
   }
