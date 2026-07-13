@@ -1074,6 +1074,15 @@
   <div style="font-size:10px;color:#5b7290;margin-top:6px;text-align:center">단면선을 추가로 그리면 탭으로 누적됩니다</div>
 </div>
 
+<!-- 종단형상 판정 결과 (실제 단면 그래프 + 상승/평형/하강/복합) -->
+<div id="profResultBox" style="display:none;position:fixed;top:60px;right:16px;width:340px;background:#0e1626;border:2px solid #f59e0b;border-radius:12px;z-index:76;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,0.55)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span style="font-size:13px;font-weight:800;color:#fbbf24">📐 종단형상 판정 (실제 단면)</span>
+    <button onclick="document.getElementById('profResultBox').style.display='none'" style="background:rgba(30,43,69,.8);border:1px solid #1e2b45;color:#e8eef7;cursor:pointer;border-radius:6px;padding:3px 10px;font-size:13px">✕</button>
+  </div>
+  <div id="profResultBody"></div>
+</div>
+
 <div id="d3dlay" style="display:none;position:fixed;inset:0;z-index:80;background:#06080f">
   <canvas id="d3dcanvas" style="display:block;width:100%;height:100%"></canvas>
   <div id="d3dmsg" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#9fb0c8;font-size:14px"></div>
@@ -4863,8 +4872,55 @@ function autoProfileLine(){
   var r=computeProfileLine();
   if(!r){ _profMsg('<span style="color:#f87171">종단선 계산 실패 — 신청지 안 지형/흐름 확인</span>'); return; }
   S.profileLine=r;
-  _profMsg('<b style="color:#fbbf24">✅ 종단선 자동 생성 (물흐름 D8 방향)</b><br>· <b style="color:#f87171">상단(높음)</b> '+r.top.e.toFixed(1)+'m &nbsp;→&nbsp; <b style="color:#93c5fd">하단(낮음)</b> '+r.bot.e.toFixed(1)+'m<br>· 표고차 <b>'+r.drop.toFixed(1)+'m</b> · 길이 '+Math.round(r.len)+'m');
+  var cls=classifyProfile(r.pts); S.profileClass=cls;
+  var fcol={'상승':'#4ade80','평형':'#94a3b8','하강':'#fbbf24','복합':'#f87171'};
+  _profMsg('<b style="color:#fbbf24">✅ 종단선 자동 (물흐름 D8)</b><br>· <b style="color:#f87171">상단</b> '+r.top.e.toFixed(1)+'m → <b style="color:#93c5fd">하단</b> '+r.bot.e.toFixed(1)+'m · 표고차 <b>'+r.drop.toFixed(1)+'m</b> · '+Math.round(r.len)+'m'
+    + (cls?'<br>· 판정: <b style="color:'+fcol[cls.form]+'">'+cls.form+'사면 '+cls.score+'점</b>':''));
+  if(cls) showProfileResult(cls);
   render();
+}
+/* 종단형상 판정: 정규화 프로파일이 직선(대각선) 대비 위=오목(상승)/아래=볼록(하강)/섞임=복합 */
+function classifyProfile(pts){
+  var n=pts&&pts.length; if(!n||n<4) return null;
+  var P=pts.slice().reverse();   // 하단(낮음) → 상단(높음)
+  var dists=[0]; for(var i=1;i<n;i++) dists.push(dists[i-1]+Math.hypot(P[i].x-P[i-1].x,P[i].y-P[i-1].y));
+  var totLen=dists[n-1]||1, eLo=P[0].e, eHi=P[n-1].e, eRng=(eHi-eLo)||1;
+  var posA=0,negA=0,sumDev=0,cnt=0;
+  for(var i=1;i<n-1;i++){ var dev=((P[i].e-eLo)/eRng)-(dists[i]/totLen); sumDev+=dev; if(dev>0)posA+=dev; else negA+=(-dev); cnt++; }
+  if(cnt<1) return null;
+  var avgDev=sumDev/cnt, posM=posA/cnt, negM=negA/cnt, form, why;
+  if(posM>0.03 && negM>0.03){ form='복합'; why='오목·볼록이 섞여 있음'; }
+  else if(avgDev>0.05){ form='상승'; why='아래 급 · 위 완만 (오목)'; }
+  else if(avgDev<-0.05){ form='하강'; why='아래 완만 · 위 급 (볼록)'; }
+  else { form='평형'; why='경사 거의 일정 (직선)'; }
+  var score={'상승':0,'평형':5,'하강':12,'복합':23}[form];
+  return { form:form, score:score, why:why, P:P, dists:dists, totLen:totLen, eLo:eLo, eHi:eHi };
+}
+/* 종단선 실제 단면(고도 그래프) + 판정 결과 박스 */
+function showProfileResult(cls){
+  var box=document.getElementById('profResultBox'), body=document.getElementById('profResultBody'); if(!box||!body||!cls) return;
+  var col={'상승':'#22c55e','평형':'#94a3b8','하강':'#f59e0b','복합':'#ef4444'}[cls.form];
+  var W=312,H=150,pl=32,pr=12,pt=14,pb=26, iw=W-pl-pr, ih=H-pt-pb;
+  var P=cls.P, n=P.length, dR=cls.totLen||1, eR=(cls.eHi-cls.eLo)||1;
+  function X(i){ return pl+(cls.dists[i]/dR)*iw; }
+  function Y(e){ return pt+ih-((e-cls.eLo)/eR)*ih; }
+  var ln='M'+X(0).toFixed(1)+' '+Y(P[0].e).toFixed(1);
+  for(var i=1;i<n;i++) ln+=' L'+X(i).toFixed(1)+' '+Y(P[i].e).toFixed(1);
+  var gr=ln+' L'+X(n-1).toFixed(1)+' '+(pt+ih)+' L'+X(0).toFixed(1)+' '+(pt+ih)+' Z';
+  var dg='M'+X(0).toFixed(1)+' '+Y(P[0].e).toFixed(1)+' L'+X(n-1).toFixed(1)+' '+Y(P[n-1].e).toFixed(1);
+  var svg='<svg width="100%" viewBox="0 0 '+W+' '+H+'">'
+    +'<path d="'+gr+'" fill="'+col+'" fill-opacity="0.2"/>'
+    +'<path d="'+dg+'" fill="none" stroke="#64748b" stroke-width="1" stroke-dasharray="4 3"/>'
+    +'<path d="'+ln+'" fill="none" stroke="'+col+'" stroke-width="2.2"/>'
+    +'<text x="'+X(0).toFixed(0)+'" y="'+(H-8)+'" fill="#93c5fd" font-size="10" text-anchor="middle">하단 '+cls.eLo.toFixed(0)+'m</text>'
+    +'<text x="'+X(n-1).toFixed(0)+'" y="'+(H-8)+'" fill="#f87171" font-size="10" text-anchor="middle">상단 '+cls.eHi.toFixed(0)+'m</text>'
+    +'<text x="'+(pl-5)+'" y="'+(pt+5)+'" fill="#94a3b8" font-size="9" text-anchor="end">'+cls.eHi.toFixed(0)+'m</text>'
+    +'<text x="'+(pl-5)+'" y="'+(pt+ih)+'" fill="#94a3b8" font-size="9" text-anchor="end">'+cls.eLo.toFixed(0)+'m</text>'
+    +'</svg>';
+  body.innerHTML=svg
+    +'<div style="margin-top:8px;text-align:center"><span style="display:inline-block;padding:5px 16px;border-radius:8px;background:'+col+';color:#0b1220;font-weight:800;font-size:15px">'+cls.form+'사면 · '+cls.score+'점</span></div>'
+    +'<div style="margin-top:7px;font-size:11px;color:#cbd5e1;text-align:center;line-height:1.5">근거: '+cls.why+'<br><span style="color:#94a3b8">점선=직선 기준 · 실선이 위로 부풀면 오목(상승), 아래로 처지면 볼록(하강)</span></div>';
+  box.style.display='block';
 }
 
 function toggleSection(){
