@@ -547,6 +547,8 @@
           <span id="arrowStepVal" style="font-size:11px;color:#60a5fa;font-weight:700;min-width:34px;text-align:right">10m</span>
         </div>
         <div style="font-size:9.5px;color:var(--tx3);margin-top:2px;line-height:1.4">격자 간격 m · 클수록 칸이 커지고 누적값 숫자 표시 (음영 격자와 별개)</div>
+        <button class="btn btn-ghost" onclick="exportSiteDxf()" style="width:100%;margin-top:9px;font-size:11.5px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;font-weight:700;border:none">📐 현황도 DXF (허가지선+화살표+격자)</button>
+        <div style="font-size:9px;color:var(--tx3);margin-top:3px;line-height:1.4">캐드 편집용 · 레이어 3개(허가지선·화살표·격자)로 색 구분 · 현재 화살표 모양 반영</div>
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx2);margin-top:6px;cursor:pointer">
           <input type="checkbox" id="flowNumToggle" checked onchange="S.showFlowNum=this.checked;render()"> 🔢 누적값 숫자 표시
         </label>
@@ -6564,6 +6566,63 @@ function cadDownloadDxf(){
    })
    .catch(function(e){ toast('DXF 생성 실패: '+e.message,'err'); })
    .finally(function(){ if(btn){ btn.disabled=false; btn.textContent='📐 지적 DXF 다운로드'; } });
+}
+
+/* ══ 현황도 DXF: 허가지선 + 흐름 화살표 + 격자 (5186, 레이어 구분, 클라이언트 생성) ══ */
+function _dxfArrowLocal(style){
+  // 로컬 폴리곤 점 [전방fx, 좌우fy] (단위=반길이 L). null=선+V촉
+  if(style==='house'){ var hs=1,wd=0.5,rf=0.75; return [[hs,0],[hs-rf,wd],[-hs*0.75,wd],[-hs*0.75,-wd],[hs-rf,-wd]]; }
+  if(style==='arrow'){ var h=1.1,hw=h*0.9,sw=h*0.3,rb=-h*0.1; return [[h,0],[rb,hw],[rb,sw],[-h,sw],[-h,-sw],[rb,-sw],[rb,-hw]]; }
+  if(style==='tri'){ return [[1,0],[-0.5,0.55],[-0.5,-0.55]]; }
+  if(style==='solid'){ return [[1,0],[0.15,0.42],[0.15,-0.42]]; }
+  return null;
+}
+function exportSiteDxf(){
+  if(!S.flow){ toast('먼저 수계·흐름 분석을 하세요 (4~6번)','err'); return; }
+  var af=S.flow, ents=[], nArrow=0;
+  function poly(layer,pts,closed){ var s='0\nLWPOLYLINE\n8\n'+layer+'\n90\n'+pts.length+'\n70\n'+(closed?1:0)+'\n'; for(var i=0;i<pts.length;i++){ s+='10\n'+pts[i][0].toFixed(3)+'\n20\n'+pts[i][1].toFixed(3)+'\n'; } ents.push(s); }
+  function line(layer,x1,y1,x2,y2){ ents.push('0\nLINE\n8\n'+layer+'\n10\n'+x1.toFixed(3)+'\n20\n'+y1.toFixed(3)+'\n11\n'+x2.toFixed(3)+'\n21\n'+y2.toFixed(3)+'\n'); }
+
+  // 1) 허가지선
+  var permRings=(S.permitParcels&&S.permitParcels.length)?S.permitParcels.map(function(p){return p.ring;}):(S.permit?[S.permit]:[]);
+  if(S.permitMerge && S.permitParcels && S.permitParcels.length>1){ var mg=ensurePermitMerged(); if(mg) permRings=mg; }
+  permRings.forEach(function(r){ if(r&&r.length>=3) poly('허가지선', r.map(function(p){return [p.x,p.y];}), true); });
+
+  // 2) 격자 + 화살표
+  var wantM=S.arrowMeters||10, gm=Math.max(1,Math.round(wantM/af.cell)), L=(gm*af.cell)*0.4;
+  var style=S.arrowStyle||'line', lp=_dxfArrowLocal(style);
+  for(var gr=0; gr<=af.rows; gr+=gm){ var yy=af.minY+gr*af.cell; line('격자', af.minX, yy, af.minX+af.cols*af.cell, yy); }
+  for(var gc=0; gc<=af.cols; gc+=gm){ var xx=af.minX+gc*af.cell; line('격자', xx, af.minY, xx, af.minY+af.rows*af.cell); }
+  for(var hr=0; hr<af.rows && nArrow<8000; hr+=gm){
+    for(var hc=0; hc<af.cols && nArrow<8000; hc+=gm){
+      var hcx=hc+(gm>>1), hcy=hr+(gm>>1); if(hcx>=af.cols||hcy>=af.rows) continue;
+      var ai=hcy*af.cols+hcx, code=af.fdir[ai]; if(code<=0) continue;
+      var st=_step(code); if(!st) continue;
+      var dl=Math.hypot(st[0],st[1])||1, dx=st[0]/dl, dy=st[1]/dl;
+      var cx=af.minX+(hcx+0.5)*af.cell, cy=af.minY+(hcy+0.5)*af.cell;
+      if(lp){
+        var px=-dy, py=dx;
+        poly('화살표', lp.map(function(p){ return [cx+dx*(p[0]*L)+px*(p[1]*L), cy+dy*(p[0]*L)+py*(p[1]*L)]; }), true);
+      } else {
+        var tx=cx+dx*L, ty=cy+dy*L, hl=L*0.5, aa=0.5;
+        line('화살표', cx-dx*L, cy-dy*L, tx, ty);
+        line('화살표', tx, ty, tx-hl*(dx*Math.cos(aa)-dy*Math.sin(aa)), ty-hl*(dx*Math.sin(aa)+dy*Math.cos(aa)));
+        line('화살표', tx, ty, tx-hl*(dx*Math.cos(aa)+dy*Math.sin(aa)), ty-hl*(-dx*Math.sin(aa)+dy*Math.cos(aa)));
+      }
+      nArrow++;
+    }
+  }
+
+  // DXF 조립 (레이어: 허가지선=빨강1 · 화살표=청4 · 격자=회8)
+  var layers=[['허가지선',1],['화살표',4],['격자',8]], layerTbl='';
+  layers.forEach(function(x){ layerTbl+='0\nLAYER\n2\n'+x[0]+'\n70\n0\n62\n'+x[1]+'\n6\nCONTINUOUS\n'; });
+  var dxf='0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n6\n0\nENDSEC\n'
+        +'0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n'+layers.length+'\n'+layerTbl+'0\nENDTAB\n0\nENDSEC\n'
+        +'0\nSECTION\n2\nENTITIES\n'+ents.join('')+'0\nENDSEC\n0\nEOF\n';
+  var url=URL.createObjectURL(new Blob([dxf],{type:'application/dxf'})), a=document.createElement('a');
+  a.href=url; a.download='gdsp_현황도_허가지선_화살표_격자.dxf'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},2000);
+  toast('현황도 DXF 완료 (허가지선·화살표 '+nArrow+'개·격자, 레이어 구분)','ok');
 }
 
 /* 선택 초기화 */
