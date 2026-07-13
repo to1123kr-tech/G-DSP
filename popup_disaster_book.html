@@ -6589,7 +6589,7 @@ function exportSiteDxf(){
   permRings.forEach(function(r){ if(r&&r.length>=3) poly('허가지선', r.map(function(p){return [p.x,p.y];}), true); });
 
   // 2) 격자 + 화살표
-  var wantM=S.arrowMeters||10, gm=Math.max(1,Math.round(wantM/af.cell)), L=(gm*af.cell)*0.4;
+  var wantM=S.arrowMeters||10, gm=Math.max(1,Math.round(wantM/af.cell)), L=(gm*af.cell)*0.36;
   var style=S.arrowStyle||'line', lp=_dxfArrowLocal(style);
   for(var gr=0; gr<=af.rows; gr+=gm){ var yy=af.minY+gr*af.cell; line('격자', af.minX, yy, af.minX+af.cols*af.cell, yy); }
   for(var gc=0; gc<=af.cols; gc+=gm){ var xx=af.minX+gc*af.cell; line('격자', xx, af.minY, xx, af.minY+af.rows*af.cell); }
@@ -6599,7 +6599,7 @@ function exportSiteDxf(){
       var ai=hcy*af.cols+hcx, code=af.fdir[ai]; if(code<=0) continue;
       var st=_step(code); if(!st) continue;
       var dl=Math.hypot(st[0],st[1])||1, dx=st[0]/dl, dy=st[1]/dl;
-      var cx=af.minX+(hcx+0.5)*af.cell, cy=af.minY+(hcy+0.5)*af.cell;
+      var cx=af.minX+(hc+gm*0.5)*af.cell, cy=af.minY+(hr+gm*0.5)*af.cell;   // 격자 칸 정중앙
       if(lp){
         var px=-dy, py=dx;
         poly('화살표', lp.map(function(p){ return [cx+dx*(p[0]*L)+px*(p[1]*L), cy+dy*(p[0]*L)+py*(p[1]*L)]; }), true);
@@ -6622,7 +6622,7 @@ function exportSiteDxf(){
   var url=URL.createObjectURL(new Blob([dxf],{type:'application/dxf'})), a=document.createElement('a');
   a.href=url; a.download='gdsp_현황도_허가지선_화살표_격자.dxf'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(function(){URL.revokeObjectURL(url);},2000);
-  toast('현황도 DXF 완료 (허가지선·화살표 '+nArrow+'개·격자, 레이어 구분)','ok');
+  toast('현황도 DXF 완료 · 허가지선 '+permRings.length+'개 · 화살표 '+nArrow+'개 · 격자'+(permRings.length?'':' (허가지선 없음 — 지적선택/그리기 먼저)'),'ok');
 }
 
 /* 선택 초기화 */
