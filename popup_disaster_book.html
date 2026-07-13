@@ -6573,8 +6573,8 @@ function _dxfArrowLocal(style){
   // 로컬 폴리곤 점 [전방fx, 좌우fy] (단위=반길이 L). null=선+V촉
   if(style==='house'){ var hs=1,wd=0.5,rf=0.75; return [[hs,0],[hs-rf,wd],[-hs*0.75,wd],[-hs*0.75,-wd],[hs-rf,-wd]]; }
   if(style==='arrow'){ var h=1.1,hw=h*0.9,sw=h*0.3,rb=-h*0.1; return [[h,0],[rb,hw],[rb,sw],[-h,sw],[-h,-sw],[rb,-sw],[rb,-hw]]; }
-  if(style==='tri'){ return [[1,0],[-0.5,0.55],[-0.5,-0.55]]; }
-  if(style==='solid'){ return [[1,0],[0.15,0.42],[0.15,-0.42]]; }
+  if(style==='tri'){ return [[0.95,0],[-0.5,0.34],[-0.5,-0.34]]; }   // 화면처럼 날씬한 삼각
+  if(style==='solid'){ return [[0.95,0],[-0.45,0.3],[-0.45,-0.3]]; }
   return null;
 }
 function exportSiteDxf(){
@@ -6589,7 +6589,7 @@ function exportSiteDxf(){
   permRings.forEach(function(r){ if(r&&r.length>=3) poly('허가지선', r.map(function(p){return [p.x,p.y];}), true); });
 
   // 2) 격자 + 화살표
-  var wantM=S.arrowMeters||10, gm=Math.max(1,Math.round(wantM/af.cell)), L=(gm*af.cell)*0.36;
+  var wantM=S.arrowMeters||10, gm=Math.max(1,Math.round(wantM/af.cell)), L=(gm*af.cell)*0.34;
   var style=S.arrowStyle||'line', lp=_dxfArrowLocal(style);
   for(var gr=0; gr<=af.rows; gr+=gm){ var yy=af.minY+gr*af.cell; line('격자', af.minX, yy, af.minX+af.cols*af.cell, yy); }
   for(var gc=0; gc<=af.cols; gc+=gm){ var xx=af.minX+gc*af.cell; line('격자', xx, af.minY, xx, af.minY+af.rows*af.cell); }
