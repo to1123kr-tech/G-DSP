@@ -487,6 +487,8 @@
           <div style="font-size:11px;color:var(--tx3);margin-bottom:6px">📐 단면도 그리기</div>
           <button class="btn btn-ghost" id="btnSection" onclick="toggleSection()" style="font-size:12px">✂️ 단면선 그리기 (2점 클릭)</button>
           <button class="btn btn-ghost" id="btnReopenProfile" onclick="reopenProfile()" style="font-size:12px;margin-top:6px;display:none">📈 단면도 창 다시 열기</button>
+          <button class="btn btn-ghost" id="btnAutoProfile" onclick="autoProfileLine()" style="font-size:12px;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#1a1400;font-weight:700;border:none">🎯 종단선 자동 (사면형 판정)</button>
+          <div id="profMsg" style="font-size:10px;color:var(--tx3);margin-top:5px;line-height:1.45"></div>
         </div>
         <!-- 3D -->
         <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
@@ -2550,6 +2552,26 @@ function render(){
     ctx.restore();
   }
 
+  // ★ 종단선(자동·사면형 판정용) — 주황 점선 + 상단(높음)/하단(낮음) 마커
+  if(S.profileLine && S.profileLine.pts && (typeof BOOK==="undefined"||BOOK.page<=7)){
+    var _pl=S.profileLine.pts;
+    ctx.save();
+    ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2.5; ctx.setLineDash([9,6]); ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath(); var _ps0=w2s(_pl[0]); ctx.moveTo(_ps0.x,_ps0.y);
+    for(var _ppi=1;_ppi<_pl.length;_ppi++){ var _psp=w2s(_pl[_ppi]); ctx.lineTo(_psp.x,_psp.y); }
+    ctx.stroke(); ctx.setLineDash([]);
+    var _ptS=w2s(_pl[0]), _pbS=w2s(_pl[_pl.length-1]);
+    var _drawMk=function(sp,txt,col){
+      ctx.fillStyle=col; ctx.beginPath(); ctx.arc(sp.x,sp.y,5,0,7); ctx.fill();
+      ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.strokeStyle='rgba(0,0,0,.75)'; ctx.lineWidth=3; ctx.strokeText(txt, sp.x+9, sp.y);
+      ctx.fillStyle='#fff'; ctx.fillText(txt, sp.x+9, sp.y);
+    };
+    _drawMk(_ptS, '상단 '+S.profileLine.top.e.toFixed(0)+'m', '#ef4444');
+    _drawMk(_pbS, '하단 '+S.profileLine.bot.e.toFixed(0)+'m', '#3b82f6');
+    ctx.restore();
+  }
+
   // ★ 누적 단면선들 (번호 표시) + 삭제 X 뱃지
   _secDelHits=[];
   if(typeof _sections!=='undefined' && _sections.length && (typeof BOOK==="undefined"||BOOK.page<=7)){
@@ -3659,7 +3681,7 @@ function commitPermitBuild(){
 function clearPermit(){
   S.permit=null; S.permitParcels=null; S.permitDraw=null; S.ghostXY=null; S.pickHover=null;
   S.permitBuild=[]; S._permitBk=null;
-  S._permitPnus=null; S._permitMergedRings=null; S._permitMergeKey=null; S.permitMerge=false;
+  S._permitPnus=null; S._permitMergedRings=null; S._permitMergeKey=null; S.permitMerge=false; S.profileLine=null;
   if(typeof _d8UpdateSearchMask==='function') _d8UpdateSearchMask();
   var _pdm=document.getElementById('permitDaejangMsg'); if(_pdm)_pdm.innerHTML=''; var _pdl=document.getElementById('permitDaejangList'); if(_pdl)_pdl.style.display='none';
   var _pd=document.getElementById('btnPermitDone'); if(_pd) _pd.style.display='none';
@@ -4792,6 +4814,58 @@ function ensureBufferRings(){
 /* 누적 단면 배열: [{p1,p2,profile,minZ,maxZ,len}], 현재 활성 인덱스 */
 var _sections=[], _activeSection=0;
 var _secDelHits=[];   /* 캔버스 단면 삭제 X 클릭영역 [{idx,x,y,r}] */
+
+/* ══ 종단선 자동(사면형 판정용): 신청지 최고점 → 흐름(D8) 따라 하강 → 최대 표고차 경로 ══ */
+function _ringPip(ring, x, y){
+  var inside=false, n=ring.length;
+  for(var i=0,j=n-1;i<n;j=i++){
+    var xi=ring[i].x, yi=ring[i].y, xj=ring[j].x, yj=ring[j].y;
+    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/((yj-yi)||1e-9)+xi)) inside=!inside;
+  }
+  return inside;
+}
+function computeProfileLine(){
+  if(!S.flow||!S.dem||!S.dem.z) return null;
+  var af=S.flow, z=S.dem.z, cols=af.cols, rows=af.rows, cell=af.cell;
+  var polys=(S.permitParcels&&S.permitParcels.length)?S.permitParcels.map(function(p){return p.ring;}):(S.permit&&S.permit.length>=3?[S.permit]:[]);
+  if(!polys.length) return null;
+  function pip(wx,wy){ for(var i=0;i<polys.length;i++) if(_ringPip(polys[i],wx,wy)) return true; return false; }
+  var inMask=new Uint8Array(cols*rows), inCells=[];
+  for(var r=0;r<rows;r++) for(var c=0;c<cols;c++){
+    var wx=af.minX+(c+0.5)*cell, wy=af.minY+(r+0.5)*cell;
+    if(pip(wx,wy)){ var idx=r*cols+c; inMask[idx]=1; var e=z[idx]; if(e===e) inCells.push({r:r,c:c,e:e}); }
+  }
+  if(inCells.length<4) return null;
+  inCells.sort(function(a,b){return b.e-a.e;});
+  var topN=inCells.slice(0, Math.max(1, Math.round(inCells.length*0.2))), best=null;
+  for(var ti=0; ti<topN.length; ti++){
+    var s=topN[ti], path=[], cr=s.r, cc=s.c, guard=0, seen={};
+    while(guard++<5000){
+      var idx=cr*cols+cc; if(seen[idx]||!inMask[idx]) break; seen[idx]=1;
+      var e=z[idx]; if(e!==e) break;
+      path.push({x:af.minX+(cc+0.5)*cell, y:af.minY+(cr+0.5)*cell, e:e});
+      var code=af.fdir[idx]; if(code<=0) break;
+      var st=_step(code); if(!st) break;
+      cc+=st[0]; cr+=st[1];
+      if(cc<0||cr<0||cc>=cols||cr>=rows) break;
+    }
+    if(path.length>=2){ var drop=path[0].e-path[path.length-1].e; if(!best||drop>best.drop) best={path:path, drop:drop}; }
+  }
+  if(!best||best.path.length<2) return null;
+  var p=best.path, n=p.length, len=0;
+  for(var i=1;i<n;i++) len+=Math.hypot(p[i].x-p[i-1].x, p[i].y-p[i-1].y);
+  return { pts:p, top:{x:p[0].x,y:p[0].y,e:p[0].e}, bot:{x:p[n-1].x,y:p[n-1].y,e:p[n-1].e}, drop:best.drop, len:len };
+}
+function _profMsg(html){ var e=document.getElementById('profMsg'); if(e) e.innerHTML=html; }
+function autoProfileLine(){
+  if(!S.flow){ toast('먼저 흐름·하천 분석을 하세요 (수계 6번)','err'); return; }
+  if(!(S.permit&&S.permit.length>=3)){ toast('허가지선을 먼저 잡으세요','err'); return; }
+  var r=computeProfileLine();
+  if(!r){ _profMsg('<span style="color:#f87171">종단선 계산 실패 — 신청지 안 지형/흐름 확인</span>'); return; }
+  S.profileLine=r;
+  _profMsg('<b style="color:#fbbf24">✅ 종단선 자동 생성 (물흐름 D8 방향)</b><br>· <b style="color:#f87171">상단(높음)</b> '+r.top.e.toFixed(1)+'m &nbsp;→&nbsp; <b style="color:#93c5fd">하단(낮음)</b> '+r.bot.e.toFixed(1)+'m<br>· 표고차 <b>'+r.drop.toFixed(1)+'m</b> · 길이 '+Math.round(r.len)+'m');
+  render();
+}
 
 function toggleSection(){
   if(S.mode==='section'){
