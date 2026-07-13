@@ -537,6 +537,7 @@
           <button class="thr" id="arrSty_solid" onclick="setArrowStyle('solid')" title="속찬 화살표(캐드)" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" stroke-width="1.4"/><path d="M11 2 L20 6 L11 10 Z" fill="currentColor"/></svg></button>
           <button class="thr" id="arrSty_tri" onclick="setArrowStyle('tri')" title="삼각형" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><path d="M4 2 L18 6 L4 10 Z" fill="currentColor"/></svg></button>
           <button class="thr" id="arrSty_house" onclick="setArrowStyle('house')" title="집모양(오각형·현황도용)" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><path d="M20 6 L14 2 L4 2 L4 10 L14 10 Z" fill="currentColor"/></svg></button>
+          <button class="thr" id="arrSty_arrow" onclick="setArrowStyle('arrow')" title="화살표(넓은 촉+몸통)" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><path d="M21 6 L12 1 L12 4 L3 4 L3 8 L12 8 L12 11 Z" fill="currentColor"/></svg></button>
           <button class="thr" id="arrSty_chevron" onclick="setArrowStyle('chevron')" title="갈매기" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><path d="M6 2 L12 6 L6 10 M12 2 L18 6 L12 10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
           <button class="thr" id="arrSty_dot" onclick="setArrowStyle('dot')" title="물방울" style="padding:4px 7px"><svg width="22" height="12" viewBox="0 0 22 12"><line x1="2" y1="6" x2="15" y2="6" stroke="currentColor" stroke-width="1.4"/><circle cx="17" cy="6" r="3.2" fill="currentColor"/></svg></button>
         </div>
@@ -1107,6 +1108,8 @@
       <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
         <span style="font-size:10px;color:#9fb0c8">모양</span>
         <button class="thr3 on" id="c3d_fs_line" onclick="set3DFlowStyle('line')" title="선 화살표">→ 선</button>
+        <button class="thr3" id="c3d_fs_house" onclick="set3DFlowStyle('house')" title="집모양(오각형)">⌂ 집</button>
+        <button class="thr3" id="c3d_fs_arrow" onclick="set3DFlowStyle('arrow')" title="화살표(넓은 촉+몸통)">↑ 화살표</button>
         <button class="thr3" id="c3d_fs_chev" onclick="set3DFlowStyle('chev')" title="쌍갈매기 (방향 잘 보임)">》 쌍갈매기</button>
       </div>
       <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:5px">
@@ -2380,6 +2383,17 @@ function render(){
             ctx.beginPath();
             for(var _piH=0;_piH<5;_piH++){ var fxH=_plH[_piH][0], fyH=_plH[_piH][1]; var sxH=mcxH.x+fxH*caH-fyH*saH, syH=mcxH.y+fxH*saH+fyH*caH; if(_piH===0)ctx.moveTo(sxH,syH); else ctx.lineTo(sxH,syH); }
             ctx.closePath(); ctx.fill();
+          } else if(asty==='arrow'){
+            /* 화살표(넓은 촉 + 좁은 몸통) — 격자중앙, 흐름방향, 꼬리 없음 */
+            var gcxA=af.minX+(ac2+gm/2)*af.cell, gcyA=af.minY+(ar2+gm/2)*af.cell;
+            var mcxA=w2s({x:gcxA,y:gcyA});
+            ctx.fillStyle=_fillRmp;
+            var hsA=hl2*2.0, hwA=hsA*0.9, swA=hsA*0.3, rbA=-hsA*0.1;   // 반길이·촉폭·몸통폭·촉밑x
+            var caA=Math.cos(ang2), saA=Math.sin(ang2);
+            var _plA=[[hsA,0],[rbA,hwA],[rbA,swA],[-hsA,swA],[-hsA,-swA],[rbA,-swA],[rbA,-hwA]];  // 로컬 7점
+            ctx.beginPath();
+            for(var _piA=0;_piA<7;_piA++){ var fxA=_plA[_piA][0], fyA=_plA[_piA][1]; var sxA=mcxA.x+fxA*caA-fyA*saA, syA=mcxA.y+fxA*saA+fyA*caA; if(_piA===0)ctx.moveTo(sxA,syA); else ctx.lineTo(sxA,syA); }
+            ctx.closePath(); ctx.fill();
           } else if(asty==='chevron'){
             /* 갈매기(>>) — 몸통 선 + 열린 두 겹 촉 */
             ctx.beginPath(); ctx.moveTo(q1.x,q1.y); ctx.lineTo(q2.x,q2.y); ctx.stroke();
@@ -3117,7 +3131,7 @@ function _rainDraw(){
 function _hexToRgb(h){ h=(h||'').replace('#',''); if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2]; var n=parseInt(h,16); return {r:(n>>16)&255,g:(n>>8)&255,b:n&255}; }
 
 
-function setArrowStyle(s){ S.arrowStyle=s; ['line','solid','tri','house','chevron','dot'].forEach(function(k){ var b=document.getElementById('arrSty_'+k); if(b)b.className='thr'+(k===s?' on':''); }); if(!S.showArrows){var t=document.getElementById('arrowToggle'); if(t){t.checked=true; S.showArrows=true;}} render(); }
+function setArrowStyle(s){ S.arrowStyle=s; ['line','solid','tri','house','arrow','chevron','dot'].forEach(function(k){ var b=document.getElementById('arrSty_'+k); if(b)b.className='thr'+(k===s?' on':''); }); if(!S.showArrows){var t=document.getElementById('arrowToggle'); if(t){t.checked=true; S.showArrows=true;}} render(); }
 function bumpStreamArrow(dir){
   var v=(S.streamArrowSz||1)+dir*0.25; v=Math.max(0.5,Math.min(3,Math.round(v*100)/100)); S.streamArrowSz=v;
   var e=document.getElementById('streamArrowSzVal'); if(e)e.textContent=Math.round(v*100)+'%';
@@ -3973,6 +3987,30 @@ function _add3DFlow(scene, dem, hp, exag){
           push2(new THREE.Vector3(a1x,a1y,a1z), new THREE.Vector3(vx0,vy0,vz0), rgb);
           push2(new THREE.Vector3(vx0,vy0,vz0), new THREE.Vector3(a2x,a2y,a2z), rgb);
         }
+      } else if(_fstyle==='house'||_fstyle==='arrow'){
+        /* 집모양/화살표(면) — 지형 법선에 눕혀 표면 드레이프, 부채꼴 삼각분할 */
+        var _eps=Math.max(af.cell, effM*0.25);
+        var _pC=tmTo3DPt(cx, cy, dem, hp, exag);
+        var _pX=tmTo3DPt(cx+_eps, cy, dem, hp, exag);
+        var _pZ=tmTo3DPt(cx, cy+_eps, dem, hp, exag);
+        var _ux=_pX.x-_pC.x, _uy=_pX.y-_pC.y, _uz=_pX.z-_pC.z;
+        var _vx=_pZ.x-_pC.x, _vy=_pZ.y-_pC.y, _vz=_pZ.z-_pC.z;
+        var _nx=_uy*_vz-_uz*_vy, _ny=_uz*_vx-_ux*_vz, _nz=_ux*_vy-_uy*_vx;
+        var _nl=Math.hypot(_nx,_ny,_nz)||1; _nx/=_nl; _ny/=_nl; _nz/=_nl; if(_ny<0){_nx=-_nx;_ny=-_ny;_nz=-_nz;}
+        var _dn=Math.hypot(d[0],d[1])||1;
+        var _fx=d[0]/_dn, _fy=0, _fz=d[1]/_dn;
+        var _fd=_fx*_nx+_fy*_ny+_fz*_nz; _fx-=_fd*_nx; _fy-=_fd*_ny; _fz-=_fd*_nz;
+        var _fl=Math.hypot(_fx,_fy,_fz)||1; _fx/=_fl; _fy/=_fl; _fz/=_fl;
+        var _rx=_ny*_fz-_nz*_fy, _ry=_nz*_fx-_nx*_fz, _rz=_nx*_fy-_ny*_fx;
+        var _bx=_pC.x+_nx*0.4, _by=_pC.y+_ny*0.4, _bz=_pC.z+_nz*0.4;
+        var _LP;
+        if(_fstyle==='house'){ var _hs=Lw*1.0, _wd=_hs*0.5, _rf=_hs*0.75;
+          _LP=[[_hs,0],[_hs-_rf,_wd],[-_hs*0.75,_wd],[-_hs*0.75,-_wd],[_hs-_rf,-_wd]]; }
+        else { var _hz=Lw*1.1, _hw=_hz*0.9, _sw=_hz*0.3, _rb=-_hz*0.1;
+          _LP=[[_hz,0],[_rb,_hw],[_rb,_sw],[-_hz,_sw],[-_hz,-_sw],[_rb,-_sw],[_rb,-_hw]]; }
+        var _V3=[];
+        for(var _vi=0;_vi<_LP.length;_vi++){ var _pp=_LP[_vi]; _V3.push(new THREE.Vector3(_bx+_fx*_pp[0]+_rx*_pp[1], _by+_fy*_pp[0]+_ry*_pp[1], _bz+_fz*_pp[0]+_rz*_pp[1])); }
+        for(var _tt=1;_tt<_V3.length-1;_tt++){ pushTri(_V3[0], _V3[_tt], _V3[_tt+1], rgb); }
       } else {
         // 선 화살표: 몸통 + V자 촉 (촉도 지형 표면 따름 — 끝점 t2에서 뒤로 두 선, y는 t2와 동일)
         push2(t1,t2,rgb);
@@ -4051,8 +4089,7 @@ function set3DFlow(on){ S.show3DFlow=!!on; if(_three) _rebuild3D(); }
 function set3DStream(on){ S.show3DStream=!!on; if(_three) _rebuild3D(); }
 function set3DFlowNum(on){ S.show3DFlowNum=!!on; if(_three && S.show3DFlow) _rebuild3D(); }
 function set3DFlowStyle(s){ S.flow3dStyle=s; if(_three){ _three.flowStyle=s;
-    var l=document.getElementById('c3d_fs_line'), t=document.getElementById('c3d_fs_chev');
-    if(l)l.className='thr3'+(s==='line'?' on':''); if(t)t.className='thr3'+(s==='chev'?' on':'');
+    ['line','chev','house','arrow'].forEach(function(k){ var b=document.getElementById('c3d_fs_'+k); if(b)b.className='thr3'+(s===k?' on':''); });
     if(S.show3DFlow) _rebuild3D(); } }
 function set3DFlowColorFixed(fx){ S.flow3dColorFixed=!!fx; if(_three){ _three.flowColorFixed=!!fx;
     var a=document.getElementById('c3d_fc_acc'), f=document.getElementById('c3d_fc_fix');
