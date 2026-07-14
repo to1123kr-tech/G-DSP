@@ -2567,7 +2567,7 @@ function render(){
   }
 
   // ★ 종단선(자동·사면형 판정용) — 스타일 3종 (흰테두리/실선+화살표/형광)
-  if(S.profileLine && S.profileLine.pts && (typeof BOOK==="undefined"||BOOK.page<=7)){
+  if(S.profileLine && S.profileLine.pts && (typeof BOOK==="undefined"||BOOK.page===5)){
     var _pl=S.profileLine.pts, _sty=S.profileLineStyle||'outline';
     var _pS=_pl.map(function(p){return w2s(p);});
     var _plPath=function(){ ctx.beginPath(); ctx.moveTo(_pS[0].x,_pS[0].y); for(var _i=1;_i<_pS.length;_i++) ctx.lineTo(_pS[_i].x,_pS[_i].y); };
@@ -2584,7 +2584,7 @@ function render(){
       var _nSeg=_pS.length-1, _stp=Math.max(1,Math.floor(_nSeg/4));
       ctx.strokeStyle='#fde047'; ctx.lineWidth=2.5;
       for(var _ai=_nSeg; _ai>0; _ai-=_stp){
-        var _a=_pS[_ai], _b=_pS[_ai-1], _dx=_b.x-_a.x, _dy=_b.y-_a.y, _dl=Math.hypot(_dx,_dy)||1; _dx/=_dl; _dy/=_dl;
+        var _a=_pS[_ai], _b=_pS[_ai-1], _dx=_a.x-_b.x, _dy=_a.y-_b.y, _dl=Math.hypot(_dx,_dy)||1; _dx/=_dl; _dy/=_dl;
         var _mx=(_a.x+_b.x)/2, _my=(_a.y+_b.y)/2, _hl=9, _aa=0.55;
         ctx.beginPath();
         ctx.moveTo(_mx,_my); ctx.lineTo(_mx-_hl*(_dx*Math.cos(_aa)-_dy*Math.sin(_aa)), _my-_hl*(_dx*Math.sin(_aa)+_dy*Math.cos(_aa)));
@@ -4945,9 +4945,10 @@ function _fourTypeSVG(hi){
   var W=312,pw=72,gap=(W-pw*4)/5,s='<svg width="100%" viewBox="0 0 '+W+' 78">';
   for(var i=0;i<4;i++){ var t=T[i], x0=gap+(pw+gap)*i, on=(t.k===hi), col=on?t.c:'#475569';
     s+='<g transform="translate('+x0.toFixed(1)+',0)">';
-    if(on) s+='<rect x="0" y="0" width="'+pw+'" height="74" rx="6" fill="'+t.c+'" fill-opacity="0.12" stroke="'+t.c+'" stroke-width="1.5"/>';
-    s+='<path d="'+t.d+' L62 58 L5 58 Z" fill="'+col+'" fill-opacity="'+(on?0.28:0.14)+'"/><path d="'+t.d+'" fill="none" stroke="'+col+'" stroke-width="1.6"/>';
-    s+='<text x="36" y="70" fill="'+(on?t.c:'#64748b')+'" font-size="10" font-weight="'+(on?'800':'400')+'" text-anchor="middle">'+t.k+'</text></g>';
+    if(on) s+='<rect x="-1" y="0" width="'+(pw+2)+'" height="76" rx="7" fill="'+t.c+'" fill-opacity="0.22" stroke="'+t.c+'" stroke-width="2.5"/>';
+    else s+='<rect x="1" y="2" width="'+(pw-2)+'" height="70" rx="6" fill="none" stroke="#334155" stroke-width="1"/>';
+    s+='<path d="'+t.d+' L62 58 L5 58 Z" fill="'+col+'" fill-opacity="'+(on?0.4:0.1)+'"/><path d="'+t.d+'" fill="none" stroke="'+col+'" stroke-width="'+(on?2.8:1.4)+'"/>';
+    s+='<text x="36" y="70" fill="'+(on?t.c:'#64748b')+'" font-size="10" font-weight="'+(on?'800':'400')+'" text-anchor="middle">'+t.k+(on?' ✓':'')+'</text></g>';
   }
   return s+'</svg>';
 }
