@@ -8,12 +8,12 @@
   <title>G-DSP - 공간정보 통합 업무 플랫폼</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@8.2.0/ol.css">
   <script src="https://cdn.jsdelivr.net/npm/ol@8.2.0/dist/ol.js"></script>
-  <script>
-  (function(){
-    var k = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';
-    if(k){ document.write('<script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey='+k+'">\x3C/script>'); }
-  })();
-  </script>
+  <!-- [G-DSP1·2026-07] VWorld WebGL SDK(webglMapInit) 자동로드 제거.
+       이 SDK만 "API Key ↔ URI" 검사를 해서 file://로 열면 "[인증실패]" 알림을 띄우고 지도를 막았음.
+       대시보드 지도는 실제로 OpenLayers 래스터(WMTS 위성 + 벡터 지적선)로 그리므로 이 SDK는 불필요
+       (vw 전역객체는 ndVwMap이 생성되지 않아 사용되지 않는 죽은 코드).
+       → map.html과 동일한 래스터 방식만 사용 → 로컬(file://)에서도 지도 정상 표시. -->
+
   <script type="text/javascript"
     src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
   <link
@@ -7866,7 +7866,7 @@
             crossOrigin: 'anonymous', maxZoom: 19
           }), preload: 2
         });
-        // ⭐ 빨간 지적선 + 지번
+        // ⭐ 빨간 지적선 + 지번 (map.html의 _olWfsCadLayer 와 동일 스타일·동일 데이터소스)
         window._ndCadSource = new ol.source.Vector();
         window._ndCadLayer = new ol.layer.Vector({
           source: window._ndCadSource,
@@ -7945,7 +7945,10 @@
       var key = bx0.toFixed(4)+','+by0.toFixed(4)+','+bx1.toFixed(4)+','+by1.toFixed(4);
       if(key===_ndCadKey || _ndCadLoading) return;
       _ndCadLoading=true; _ndCadKey=key;
-      fetch('/api/cad-box?minx='+bx0+'&miny='+by0+'&maxx='+bx1+'&maxy='+by1+'&size=1000')
+      // [G-DSP1·2026-07] map.html(loadWfsCadastral)과 동일하게 PROXY 절대주소 사용.
+      // 기존 상대주소 fetch('/api/cad-box')는 file://로 열면 실패 → 지적선이 안 떴던 원인.
+      var _ndProxy = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+      fetch(_ndProxy+'/api/cad-box?minx='+bx0+'&miny='+by0+'&maxx='+bx1+'&maxy='+by1+'&size=1000')
         .then(function(r){return r.json();})
         .then(function(d){
           _ndCadLoading=false;
