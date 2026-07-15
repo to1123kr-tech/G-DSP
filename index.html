@@ -591,6 +591,17 @@
       color: var(--blue)
     }
 
+    .nav-pct{margin-left:auto;flex:none;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;white-space:nowrap;letter-spacing:-.01em;line-height:1.3;align-self:center}
+    .np-green{color:#0a7c53;background:rgba(16,166,106,.14);border:1px solid rgba(16,166,106,.32)}
+    .np-blue{color:#1f5fce;background:rgba(33,112,236,.12);border:1px solid rgba(33,112,236,.30)}
+    .np-orange{color:#b45309;background:rgba(234,88,12,.13);border:1px solid rgba(234,88,12,.30)}
+    .np-gray{color:#5b6b7f;background:rgba(100,116,139,.13);border:1px solid rgba(100,116,139,.28)}
+    body.dark .np-green{color:#5ff0b4;background:rgba(16,166,106,.18)}
+    body.dark .np-blue{color:#8bbcff;background:rgba(33,112,236,.20)}
+    body.dark .np-orange{color:#ffb166;background:rgba(234,88,12,.20)}
+    body.dark .np-gray{color:#aab8c9;background:rgba(100,116,139,.20)}
+
+
     /* 소분류 */
     .nav-sub {
       display: none;
@@ -3035,7 +3046,7 @@
           <div class="nav-cat-txt">
             <div class="nav-cat-name">대시보드</div>
             <div class="nav-cat-sub">지번검색 · 지도 · 토지정보</div>
-          </div>
+          </div><span class="nav-pct np-green">100% 사용가능</span>
         </div>
       </div>
       <!-- 통합지도 (상세보기용) -->
@@ -3049,7 +3060,7 @@
           <div class="nav-cat-txt">
             <div class="nav-cat-name">통합 지도</div>
             <div class="nav-cat-sub">카카오맵 · 지적도 · 고도</div>
-          </div>
+          </div><span class="nav-pct np-green">100% 사용가능</span>
         </div>
       </div>
       <!-- 대분류 2: 다운로드·발급 -->
@@ -3063,7 +3074,7 @@
           <div class="nav-cat-txt">
             <div class="nav-cat-name">다운로드 · 발급</div>
             <div class="nav-cat-sub">수치지형도 · 대장 · 등기</div>
-          </div>
+          </div><span class="nav-pct np-blue">70% 일부가능</span>
           <span class="nav-cat-arr">↗</span>
         </div>
       </div>
@@ -3079,7 +3090,7 @@
           <div class="nav-cat-txt">
             <div class="nav-cat-name">도면 · 변환</div>
             <div class="nav-cat-sub">DXF 수량 · 공간정보 변환</div>
-          </div>
+          </div><span class="nav-pct np-blue">75% 일부가능</span>
           <span class="nav-cat-arr">↗</span>
         </div>
       </div>
@@ -3094,7 +3105,7 @@
           <div class="nav-cat-txt">
             <div class="nav-cat-name">토지분할 · 면적</div>
             <div class="nav-cat-sub">필지 분할 · 면적 계산</div>
-          </div>
+          </div><span class="nav-pct np-orange">30% 개발중</span>
           <span class="nav-cat-arr">↗</span>
         </div>
       </div>
@@ -3111,7 +3122,7 @@
           <div class="nav-cat-txt">
             <div class="nav-cat-name">사업계획서 작성</div>
             <div class="nav-cat-sub">개발행위 · 공장 · 산지전용</div>
-          </div>
+          </div><span class="nav-pct np-gray">10% 개발중</span>
           <span class="nav-cat-arr">↗</span>
         </div>
       </div>
@@ -3125,7 +3136,7 @@
           <div class="nav-cat-txt">
             <div class="nav-cat-name">업무 관리</div>
             <div class="nav-cat-sub">진행조회 · 연락처 · 이력</div>
-          </div>
+          </div><span class="nav-pct np-green">100% 개발완료</span>
           <span class="nav-cat-arr">↗</span>
         </div>
       </div>
@@ -3139,7 +3150,7 @@
           <div class="nav-cat-txt">
             <div class="nav-cat-name">경사도 분석</div>
             <div class="nav-cat-sub">DXF · TIN · 경사 분석</div>
-          </div>
+          </div><span class="nav-pct np-green">100% 개발완료</span>
           <span class="nav-cat-arr">↗</span>
         </div>
       </div>
@@ -3154,7 +3165,7 @@
           <div class="nav-cat-txt">
             <div class="nav-cat-name">재해 · 우수분석</div>
             <div class="nav-cat-sub">유출계수 · 우수량 산정</div>
-          </div>
+          </div><span class="nav-pct np-green">98% 사용가능</span>
           <span class="nav-cat-arr">↗</span>
         </div>
       </div>
@@ -3166,8 +3177,8 @@
             </svg></div>
           <div class="nav-cat-txt">
             <div class="nav-cat-name">지형계획 분석</div>
-            <div class="nav-cat-sub">계획고 · 절토 · 성토 분석<br><span style="font-size:9px;color:var(--orange);font-weight:700">🚧 개발 중</span></div>
-          </div>
+            <div class="nav-cat-sub">계획고 · 절토 · 성토 분석</div>
+          </div><span class="nav-pct np-gray">0% 개발중</span>
         </div>
       </div>
       <!-- 3D 배치 계획 -->
@@ -3178,8 +3189,8 @@
             </svg></div>
           <div class="nav-cat-txt">
             <div class="nav-cat-name">3D 배치 계획</div>
-            <div class="nav-cat-sub">부지 조감도 · 입체 배치<br><span style="font-size:9px;color:var(--purple);font-weight:700">🚧 개발 중</span></div>
-          </div>
+            <div class="nav-cat-sub">부지 조감도 · 입체 배치</div>
+          </div><span class="nav-pct np-gray">0% 개발중</span>
         </div>
       </div>
       <!-- 대분류 6: 설정 -->
