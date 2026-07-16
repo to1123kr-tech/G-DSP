@@ -201,6 +201,7 @@ function updateScaleBtns(){
             <button onclick="dtmSearch()" style="height:46px;padding:0 22px;border-radius:10px;background:var(--blue);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.18)">검색</button>
           </div>
           <div style="position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:4px">
+            <button id="cadastralBtn" onclick="toggleCadastral()" style="height:30px;padding:0 10px;border-radius:8px;background:var(--blue);border:1px solid var(--line2);font-size:10px;font-weight:700;color:#fff;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">지적선</button>
             <button id="scaleBtn5000" onclick="setGridScale(5000)" style="height:30px;padding:0 10px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:10px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:5,000</button>
             <button id="scaleBtn1000" onclick="setGridScale(1000)" style="height:30px;padding:0 10px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:10px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:1,000</button>
           </div>
@@ -616,6 +617,48 @@ function toggleTheme(){
 /* ===================== 카카오 지도 + 도각격자 (수치지형도 탭) ===================== */
 var _kMap = null, _kMapLoaded = false;
 var _clickMarker = null;
+var _cadastralOn = false; // 지적선(VWorld 필지경계) 상태
+var _dtmCadLines = [];
+var _dtmCadKey = '', _dtmCadLoading = false;
+function _clearDtmCad(){ _dtmCadLines.forEach(function(l){ l.setMap(null); }); _dtmCadLines = []; }
+function _loadDtmCadastral(){
+  if(!_kMap || !_cadastralOn) return;
+  if(_kMap.getLevel() > 4){ _clearDtmCad(); _dtmCadKey=''; return; } // 너무 축소면 생략(필지 과다)
+  var b=_kMap.getBounds(), sw=b.getSouthWest(), ne=b.getNorthEast();
+  var minx=sw.getLng(), miny=sw.getLat(), maxx=ne.getLng(), maxy=ne.getLat();
+  var key=minx.toFixed(4)+','+miny.toFixed(4)+','+maxx.toFixed(4)+','+maxy.toFixed(4);
+  if(key===_dtmCadKey || _dtmCadLoading) return;
+  _dtmCadLoading=true; _dtmCadKey=key;
+  fetch('/api/cad-box?minx='+minx+'&miny='+miny+'&maxx='+maxx+'&maxy='+maxy+'&size=1000')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      _dtmCadLoading=false; _clearDtmCad();
+      var fs=d&&d.features; if(!fs||!fs.length) return;
+      fs.forEach(function(f){
+        try{
+          var g=f.geometry; if(!g) return;
+          var rings;
+          if(g.type==='MultiPolygon') rings=g.coordinates.map(function(p){ return p[0]; });
+          else if(g.type==='Polygon') rings=[g.coordinates[0]];
+          else return;
+          rings.forEach(function(ring){
+            var path=ring.map(function(c){ return new kakao.maps.LatLng(c[1], c[0]); }); // [lng,lat]→(lat,lng)
+            var pl=new kakao.maps.Polyline({ path:path, strokeWeight:1.5, strokeColor:'#dc2626', strokeOpacity:0.9, strokeStyle:'solid' });
+            pl.setMap(_kMap); _dtmCadLines.push(pl);
+          });
+        }catch(e){}
+      });
+    })
+    .catch(function(e){ _dtmCadLoading=false; console.warn('지적선 로드 실패', e); });
+}
+function toggleCadastral(){
+  if(!_kMap) return;
+  _cadastralOn = !_cadastralOn;
+  if(_cadastralOn){ _dtmCadKey=''; _loadDtmCadastral(); }
+  else { _clearDtmCad(); }
+  var b=document.getElementById('cadastralBtn');
+  if(b){ b.style.background = _cadastralOn ? 'var(--blue)' : '#fff'; b.style.color = _cadastralOn ? '#fff' : 'var(--txt2)'; }
+}
 
 function initKakaoMap(){
   if(_kMapLoaded) return;
@@ -632,6 +675,11 @@ function initKakaoMap(){
       mapTypeId: kakao.maps.MapTypeId.HYBRID
     });
     _kMapLoaded = true;
+
+    // 지적선(VWorld 필지경계, 빨간 선) — 확대(레벨≤4) 시 표시
+    _cadastralOn = true;
+    kakao.maps.event.addListener(_kMap, 'idle', _loadDtmCadastral);
+    _loadDtmCadastral();
 
     // 지도 이동/줌 시 격자 갱신
     kakao.maps.event.addListener(_kMap, 'idle', drawGrid);
