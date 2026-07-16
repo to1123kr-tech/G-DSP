@@ -195,16 +195,16 @@ function updateScaleBtns(){
       <div style="flex:55;position:relative;min-width:0;display:flex;flex-direction:column">
         <div style="flex:1;position:relative;min-height:0">
           <div id="kakaoMap" style="width:100%;height:100%"></div>
-          <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px;width:calc(100% - 20px);max-width:340px">
-            <input id="dtmAddr" type="text" placeholder="지번 또는 도로명 검색…" onkeydown="if(event.key==='Enter')dtmSearch()"
-              style="flex:1;height:32px;padding:0 10px;background:#fff;border:1px solid var(--line2);border-radius:8px;font-size:11px;outline:none;box-shadow:0 2px 8px rgba(0,0,0,.15)">
-            <button onclick="dtmSearch()" style="height:32px;padding:0 12px;border-radius:8px;background:var(--blue);color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">검색</button>
+          <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:8px;width:calc(100% - 20px);max-width:440px">
+            <input id="dtmAddr" type="text" placeholder="지번 또는 도로명 검색… (예: 화성시 서신면 광평리 448)" onkeydown="if(event.key==='Enter')dtmSearch()"
+              style="flex:1;height:46px;padding:0 16px;background:#fff;border:1px solid var(--line2);border-radius:10px;font-size:14px;outline:none;box-shadow:0 3px 12px rgba(0,0,0,.18)">
+            <button onclick="dtmSearch()" style="height:46px;padding:0 22px;border-radius:10px;background:var(--blue);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.18)">검색</button>
           </div>
           <div style="position:absolute;top:10px;right:10px;z-index:1000;display:flex;gap:4px">
             <button id="scaleBtn5000" onclick="setGridScale(5000)" style="height:30px;padding:0 10px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:10px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:5,000</button>
             <button id="scaleBtn1000" onclick="setGridScale(1000)" style="height:30px;padding:0 10px;border-radius:8px;background:#fff;border:1px solid var(--line2);font-size:10px;font-weight:700;color:var(--txt2);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)">1:1,000</button>
           </div>
-          <div id="dtmSrchResult" style="position:absolute;top:48px;left:10px;z-index:1001;width:calc(100% - 20px);max-width:340px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);display:none;max-height:160px;overflow-y:auto"></div>
+          <div id="dtmSrchResult" style="position:absolute;top:64px;left:10px;z-index:1001;width:calc(100% - 20px);max-width:440px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.18);display:none;max-height:200px;overflow-y:auto"></div>
           <div id="kakaoMapOverlay" style="position:absolute;inset:0;background:var(--bg2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:500">
             <svg style="width:36px;height:36px;opacity:.2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
             <p style="font-size:11px;color:var(--txt3);text-align:center">카카오 JavaScript 키 필요<br>메인 설정에서 등록</p>
@@ -639,13 +639,12 @@ function initKakaoMap(){
     kakao.maps.event.addListener(_kMap, 'click', function(mouseEvent){
       var lat = mouseEvent.latLng.getLat();
       var lng = mouseEvent.latLng.getLng();
-      var coordEl = document.getElementById('dtmSelCoord');
-      if(coordEl) coordEl.textContent = lat.toFixed(6)+', '+lng.toFixed(6);
-      // calcTiles disabled
-      // 마커
+      // 마커 먼저 표시
       if(_clickMarker) _clickMarker.setMap(null);
       _clickMarker = new kakao.maps.Marker({ position: mouseEvent.latLng });
       _clickMarker.setMap(_kMap);
+      // 클릭 지점의 지번 조회 → 자동 선택
+      dtmPickByCoord(lat, lng);
     });
 
     // 격자는 버튼 눌러야 표시됨 (초기에는 꺼짐)
@@ -954,6 +953,27 @@ function dtmSearch(){
     box.innerHTML = list.map(function(item,i){
       return '<div onclick="dtmSelectAddr('+i+')" style="padding:9px 14px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--line);font-weight:600;color:var(--txt)" onmouseover="this.style.background=\'rgba(37,99,235,.06)\'" onmouseout="this.style.background=\'\'">'+item.addr+'</div>';
     }).join('');
+  });
+}
+
+// 지도 클릭 지점의 지번을 조회해서 자동 선택 (역geocoding)
+function dtmPickByCoord(lat, lng){
+  _kkReady(function(ok){
+    if(!ok){ toast('지도 SDK 로딩 중 — 잠시 후 재시도','err'); return; }
+    var gc = new kakao.maps.services.Geocoder();
+    gc.coord2Address(lng, lat, function(res, st){
+      if(st !== kakao.maps.services.Status.OK || !res.length){ toast('이 위치의 지번을 찾지 못했어요','err'); return; }
+      var addrObj = res[0].address; // 지번 주소
+      var addr = addrObj ? addrObj.address_name : (res[0].road_address ? res[0].road_address.address_name : '');
+      if(!addr){ toast('지번 주소 없음','err'); return; }
+      window._gdspSelAddr = addr;
+      window._gdspSelCoord = {lat:lat, lng:lng};
+      var addrEl = document.getElementById('dtmSelAddr');
+      if(addrEl) addrEl.textContent = addr;
+      var coordEl = document.getElementById('dtmSelCoord');
+      if(coordEl) coordEl.textContent = lat.toFixed(6)+', '+lng.toFixed(6);
+      toast(addr+' 선택됨','ok');
+    });
   });
 }
 
