@@ -619,8 +619,12 @@ var _kMap = null, _kMapLoaded = false;
 var _clickMarker = null;
 var _cadastralOn = false; // 지적선(VWorld 필지경계) 상태
 var _dtmCadLines = [];
+var _dtmCadLabels = [];
 var _dtmCadKey = '', _dtmCadLoading = false;
-function _clearDtmCad(){ _dtmCadLines.forEach(function(l){ l.setMap(null); }); _dtmCadLines = []; }
+function _clearDtmCad(){
+  _dtmCadLines.forEach(function(l){ l.setMap(null); }); _dtmCadLines = [];
+  _dtmCadLabels.forEach(function(o){ o.setMap(null); }); _dtmCadLabels = [];
+}
 function _loadDtmCadastral(){
   if(!_kMap || !_cadastralOn) return;
   if(_kMap.getLevel() > 4){ _clearDtmCad(); _dtmCadKey=''; return; } // 너무 축소면 생략(필지 과다)
@@ -629,6 +633,7 @@ function _loadDtmCadastral(){
   var key=minx.toFixed(4)+','+miny.toFixed(4)+','+maxx.toFixed(4)+','+maxy.toFixed(4);
   if(key===_dtmCadKey || _dtmCadLoading) return;
   _dtmCadLoading=true; _dtmCadKey=key;
+  var showLabel = _kMap.getLevel() <= 2; // 지번은 충분히 확대했을 때만(겹침 방지)
   fetch('/api/cad-box?minx='+minx+'&miny='+miny+'&maxx='+maxx+'&maxy='+maxy+'&size=1000')
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -641,10 +646,22 @@ function _loadDtmCadastral(){
           if(g.type==='MultiPolygon') rings=g.coordinates.map(function(p){ return p[0]; });
           else if(g.type==='Polygon') rings=[g.coordinates[0]];
           else return;
+          var jibun=(f.properties&&f.properties.jibun)||'';
           rings.forEach(function(ring){
             var path=ring.map(function(c){ return new kakao.maps.LatLng(c[1], c[0]); }); // [lng,lat]→(lat,lng)
-            var pl=new kakao.maps.Polyline({ path:path, strokeWeight:1.5, strokeColor:'#dc2626', strokeOpacity:0.9, strokeStyle:'solid' });
+            var pl=new kakao.maps.Polyline({ path:path, strokeWeight:1.5, strokeColor:'#ff2d2d', strokeOpacity:0.9, strokeStyle:'solid' });
             pl.setMap(_kMap); _dtmCadLines.push(pl);
+            // 지번 라벨 (근접 확대 시)
+            if(showLabel && jibun){
+              var sx=0, sy=0; ring.forEach(function(c){ sx+=c[0]; sy+=c[1]; });
+              var cx=sx/ring.length, cy=sy/ring.length;
+              var ov=new kakao.maps.CustomOverlay({
+                position: new kakao.maps.LatLng(cy, cx),
+                yAnchor: 0.5, xAnchor: 0.5,
+                content: '<span style="font-size:10px;color:#c00;font-weight:700;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 2px #fff;white-space:nowrap">'+jibun+'</span>'
+              });
+              ov.setMap(_kMap); _dtmCadLabels.push(ov);
+            }
           });
         }catch(e){}
       });
