@@ -923,31 +923,47 @@ function loadNgiiDlConfig(){
 
 // 확장 설치 감지 (브릿지가 READY 보내면 설치된 것)
 var _gdspExtReady = false;
+function _extSetInstalled(){
+  _gdspExtReady = true;
+  var s = document.getElementById('extStatus'); var g = document.getElementById('extGuide');
+  if(s) s.innerHTML = '🧩 확장 프로그램 <b style="color:#22c55e">설치됨</b> — 다운로드 준비 완료';
+  if(g) g.style.display='none';
+  var btn = document.getElementById('ngiiDlBtn');
+  if(btn){ btn.textContent='⬇ 다운로드'; btn.style.background='var(--blue)'; btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; }
+}
+function _extSetMissing(){
+  if(_gdspExtReady) return;
+  var s = document.getElementById('extStatus'); var g = document.getElementById('extGuide');
+  if(s) s.innerHTML = '⚠️ 확장 프로그램이 <b style="color:#ef4444">설치되어 있지 않습니다</b><br><span style="font-size:10px">아래 안내대로 설치해야 다운로드가 작동합니다.</span>';
+  if(g) g.style.display='block';
+  var box = document.getElementById('extSection');
+  if(box){ box.style.background='rgba(239,68,68,.08)'; box.style.border='1.5px solid rgba(239,68,68,.35)'; }
+  var btn = document.getElementById('ngiiDlBtn');
+  if(btn){ btn.textContent='🧩 확장 설치 필요'; btn.style.background='#ef4444'; btn.style.opacity='0.95'; }
+}
 window.addEventListener('message', function(e){
   if(e.source !== window) return;
   if(e.origin !== 'https://gdsp.kr') return;
   var d = e.data;
   if(!d || d.source !== 'GDSP_EXT') return;
-  if(d.type === 'READY'){
-    _gdspExtReady = true;
-    var s = document.getElementById('extStatus'); var g = document.getElementById('extGuide');
-    if(s) s.innerHTML = '🧩 확장 프로그램 <b style="color:#22c55e">설치됨</b> — 다운로드 준비 완료';
-    if(g) g.style.display='none';
-  } else if(d.type === 'START_ACK'){
+  if(d.type === 'READY'){ _extSetInstalled(); }
+  else if(d.type === 'START_ACK'){
     if(d.ok) toast('국토정보플랫폼에서 다운로드가 시작됩니다 (새 탭 확인)','ok');
     else toast('실행 실패: 확장을 확인하세요','err');
   }
 });
-// 로드 후 잠시 기다려 확장 응답 없으면 "설치 안내" 표시
-setTimeout(function(){
-  if(!_gdspExtReady){
-    var s = document.getElementById('extStatus'); var g = document.getElementById('extGuide');
-    if(s) s.innerHTML = '🧩 확장 프로그램이 <b style="color:#ef4444">설치되지 않음</b>';
-    if(g) g.style.display='block';
-  }
-}, 1500);
+// 로드 후 확장 응답 없으면 "설치 안내" 표시 (여러 번 확인)
+setTimeout(_extSetMissing, 1500);
+setTimeout(function(){ if(!_gdspExtReady) _extSetMissing(); }, 3500);
 
 function startNgiiDownload(){
+  if(!_gdspExtReady){
+    toast('확장 프로그램이 필요합니다 — 아래 안내에서 설치하세요','err');
+    _extSetMissing();
+    var box = document.getElementById('extSection'); if(box) box.scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+
   var addr = window._gdspSelAddr || (document.getElementById('dtmSelAddr')||{}).textContent || '';
   addr = (''+addr).trim();
   if(!addr || addr.indexOf('←') === 0){ toast('먼저 지번을 검색·선택하세요 (지도 위 검색창)','err'); return; }
@@ -958,12 +974,6 @@ function startNgiiDownload(){
   var p1 = document.getElementById('ngiiPurpose1').value;
   var p2 = document.getElementById('ngiiPurpose2').value;
   if(!p1 || !p2){ toast('사용 용도(대/소분류)를 선택하세요','err'); return; }
-
-  if(!_gdspExtReady){
-    toast('확장 프로그램이 필요합니다 — 아래 안내에서 설치하세요','err');
-    var g = document.getElementById('extGuide'); if(g) g.style.display='block';
-    return;
-  }
 
   // 확장(브릿지)으로 전달 → 브릿지가 background로 중계 → 국토정보플랫폼 자동 진행
   window.postMessage({
