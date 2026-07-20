@@ -921,20 +921,23 @@ function loadNgiiDlConfig(){
   if(first==='0'){ var e=document.getElementById('ngiiFirstRun'); if(e) e.checked=false; }
 }
 
-// 확장 설치 감지 (브릿지가 READY 보내면 설치된 것)
+// 확장 설치 감지 (브릿지가 READY 하트비트 보내면 설치된 것)
 var _gdspExtReady = false;
+var _extLastBeat = 0;
 function _extSetInstalled(){
-  _gdspExtReady = true;
+  _gdspExtReady = true; _extLastBeat = Date.now();
   var s = document.getElementById('extStatus'); var g = document.getElementById('extGuide');
   if(s) s.innerHTML = '🧩 확장 프로그램 <b style="color:#22c55e">설치됨</b> — 다운로드 준비 완료';
   if(g) g.style.display='none';
+  var box = document.getElementById('extSection');
+  if(box){ box.style.background='rgba(37,99,235,.05)'; box.style.border='1px solid rgba(37,99,235,.15)'; }
   var btn = document.getElementById('ngiiDlBtn');
-  if(btn){ btn.textContent='⬇ 다운로드'; btn.style.background='var(--blue)'; btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; }
+  if(btn){ btn.textContent='⬇ 다운로드'; btn.style.background='var(--blue)'; btn.style.opacity='1'; }
 }
 function _extSetMissing(){
-  if(_gdspExtReady) return;
+  _gdspExtReady = false;
   var s = document.getElementById('extStatus'); var g = document.getElementById('extGuide');
-  if(s) s.innerHTML = '⚠️ 확장 프로그램이 <b style="color:#ef4444">설치되어 있지 않습니다</b><br><span style="font-size:10px">아래 안내대로 설치해야 다운로드가 작동합니다.</span>';
+  if(s) s.innerHTML = '⚠️ 확장 프로그램이 <b style="color:#ef4444">설치되어 있지 않습니다</b><br><span style="font-size:10px">아래 안내대로 설치해야 다운로드가 작동합니다. (설치했다면 페이지 새로고침 F5)</span>';
   if(g) g.style.display='block';
   var box = document.getElementById('extSection');
   if(box){ box.style.background='rgba(239,68,68,.08)'; box.style.border='1.5px solid rgba(239,68,68,.35)'; }
@@ -947,14 +950,19 @@ window.addEventListener('message', function(e){
   var d = e.data;
   if(!d || d.source !== 'GDSP_EXT') return;
   if(d.type === 'READY'){ _extSetInstalled(); }
+  else if(d.type === 'DEAD'){ _extSetMissing(); }   // 확장 삭제/재로드됨
   else if(d.type === 'START_ACK'){
     if(d.ok) toast('국토정보플랫폼에서 다운로드가 시작됩니다 (새 탭 확인)','ok');
-    else toast('실행 실패: 확장을 확인하세요','err');
+    else { toast('확장이 응답하지 않습니다 — 재설치 또는 F5','err'); _extSetMissing(); }
   }
 });
-// 로드 후 확장 응답 없으면 "설치 안내" 표시 (여러 번 확인)
-setTimeout(_extSetMissing, 1500);
+// 초기: 응답 없으면 "설치 안내" (여러 번 확인)
+setTimeout(function(){ if(!_gdspExtReady) _extSetMissing(); }, 1500);
 setTimeout(function(){ if(!_gdspExtReady) _extSetMissing(); }, 3500);
+// 하트비트 감시: 브릿지 READY가 5초 이상 끊기면 확장 삭제로 간주
+setInterval(function(){
+  if(_gdspExtReady && (Date.now() - _extLastBeat > 5000)){ _extSetMissing(); }
+}, 2000);
 
 function startNgiiDownload(){
   if(!_gdspExtReady){
