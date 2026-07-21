@@ -2099,7 +2099,7 @@ function render(){
   }
 
   // DEM 음영기복 (가장 아래 배경)
-  if(S.dem && S.showDEM && S.hillCanvas){
+  if(S.dem && S.showDEM && S.hillCanvas && BOOK.page<=7){
     var d=S.dem;
     var x0=d.minX, x1=d.minX+(d.cols-1)*d.cell, y0=d.minY, y1=d.minY+(d.rows-1)*d.cell;
     var tl=w2s({x:x0,y:y1}), br=w2s({x:x1,y:y0});
@@ -2126,7 +2126,7 @@ function render(){
   }
 
   // 격자 (DEM 셀 경계) — 셀이 충분히 클 때만
-  if(S.dem && S.showGrid){
+  if(S.dem && S.showGrid && BOOK.page<=7){
     var gd=S.dem, gpx=S.scale*gd.cell;
     if(gpx>=1.5){
       var tlw=s2w(0,0), brw=s2w(cv.width,cv.height);
@@ -2142,7 +2142,7 @@ function render(){
   }
 
   // TIN 삼각망 (등고선 아래 · 한 번에 stroke = 빠름)
-  if(S.showTIN && S.triList.length){
+  if(S.showTIN && S.triList.length && BOOK.page<=7){
     var _tis=S.lineStyle.tin||{color:'#3a4a63',width:1};
     ctx.strokeStyle=_tis.color; ctx.globalAlpha=0.55;
     ctx.lineWidth=Math.max(0.4,_tis.width*0.55);
@@ -2157,7 +2157,7 @@ function render(){
     ctx.stroke(); ctx.globalAlpha=1;
   }
   /* 경사도용 삼각망 (z=0, 경사도 페이지 토글) — 지형용과 구분 위해 살짝 다른 톤 */
-  if(S.showSlopeTin && S.slopeTriList && S.slopeTriList.length){
+  if(S.showSlopeTin && S.slopeTriList && S.slopeTriList.length && BOOK.page<=7){
     ctx.strokeStyle='#5b7fa6'; ctx.globalAlpha=0.5; ctx.lineWidth=0.6; ctx.setLineDash([]);
     ctx.beginPath();
     for(var si=0;si<S.slopeTriList.length;si++){
@@ -2169,7 +2169,7 @@ function render(){
     }
     ctx.stroke(); ctx.globalAlpha=1;
   }
-  if(S.showContours!==false){
+  if(S.showContours!==false && BOOK.page<=7){
   S.contours.forEach(function(c){
     var t=(c.elev-S.zmin)/zr;
     var isIndex=(c.layer||'').toUpperCase()==='F0017114'; // 계곡선
@@ -4941,11 +4941,11 @@ function computeAvgForm(){
 }
 /* 4유형 미니 그림 (해당 유형 강조) */
 function _fourTypeSVG(hi){
-  var T=[{k:'상승',d:'M5 50 Q30 18 62 16',c:'#22c55e'},{k:'평형',d:'M5 50 L62 16',c:'#94a3b8'},{k:'하강',d:'M5 50 Q30 48 62 16',c:'#f59e0b'},{k:'복합',d:'M5 50 C18 22 45 46 62 16',c:'#ef4444'}];
+  var T=[{k:'상승',d:'M5 50 Q30 18 62 16',c:'#22c55e'},{k:'평형',d:'M5 50 L62 16',c:'#60a5fa'},{k:'하강',d:'M5 50 Q30 48 62 16',c:'#f59e0b'},{k:'복합',d:'M5 50 C18 22 45 46 62 16',c:'#ef4444'}];
   var W=312,pw=72,gap=(W-pw*4)/5,s='<svg width="100%" viewBox="0 0 '+W+' 78">';
   for(var i=0;i<4;i++){ var t=T[i], x0=gap+(pw+gap)*i, on=(t.k===hi), col=on?t.c:'#475569';
     s+='<g transform="translate('+x0.toFixed(1)+',0)">';
-    if(on) s+='<rect x="-1" y="0" width="'+(pw+2)+'" height="76" rx="7" fill="'+t.c+'" fill-opacity="0.22" stroke="'+t.c+'" stroke-width="2.5"/>';
+    if(on) s+='<rect x="-1" y="0" width="'+(pw+2)+'" height="76" rx="7" fill="'+t.c+'" fill-opacity="0.28" stroke="'+t.c+'" stroke-width="2.6"/>';
     else s+='<rect x="1" y="2" width="'+(pw-2)+'" height="70" rx="6" fill="none" stroke="#334155" stroke-width="1"/>';
     s+='<path d="'+t.d+' L62 58 L5 58 Z" fill="'+col+'" fill-opacity="'+(on?0.4:0.1)+'"/><path d="'+t.d+'" fill="none" stroke="'+col+'" stroke-width="'+(on?2.8:1.4)+'"/>';
     s+='<text x="36" y="70" fill="'+(on?t.c:'#64748b')+'" font-size="10" font-weight="'+(on?'800':'400')+'" text-anchor="middle">'+t.k+(on?' ✓':'')+'</text></g>';
