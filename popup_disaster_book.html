@@ -752,15 +752,15 @@
 
       <!-- ② 결과 쌓기 안내 -->
       <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
-        <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:4px">② 결과 쌓기</div>
+        <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:4px">② 보고서 만들기</div>
         <div style="font-size:10.5px;color:var(--tx3);margin-bottom:8px;line-height:1.6">
-          어느 페이지에서든 화면을 원하는 대로 만든 뒤 상단의
-          <b style="color:#f59e0b">[📸 결과에 추가]</b>를 누르면 오른쪽 결과함에 쌓입니다.<br>
-          예: 음영만 → 추가 · 음영+화살표 → 추가 · 화살표+누적숫자 → 추가 …<br>
-          필요한 만큼 쌓고, 순서·이름 정리 후 <b>전부 PNG 저장</b>하면 끝.
-          점수·채점은 결과에 포함하지 않습니다(자료까지만 제공).
+          누르면 <b>관내도 → 음영 → 수계 → 종단 → 3D → 경사도 → 자료 → 과거항공</b> 순서로
+          자동으로 열립니다. 단계마다 화면 만지고 <b style="color:#f59e0b">[📸 추가]</b> 몇 번이든 →
+          <b>[다음 ▶]</b>. 결과는 오른쪽에 쌓이고, 순서·이름 정리 후 전부 저장.
+          점수·채점은 결과에 포함하지 않습니다.
         </div>
-        <button class="btn btn-primary" onclick="TRAY.open=true;trayRender()" style="width:100%">📸 결과함 열기</button>
+        <button class="btn btn-primary" onclick="guideStart()" style="width:100%;font-weight:800">▶ 보고서 만들기 시작</button>
+        <button class="btn btn-ghost" onclick="TRAY.open=true;trayRender()" style="width:100%;margin-top:6px;font-size:11.5px">📸 결과함만 열기</button>
       </div>
     </div>
 
@@ -4609,7 +4609,7 @@ function init3DScene(){
   scene.add(new THREE.AmbientLight(0x556070,0.55));
   var hp0=demPositions(dem, exag);
   var camera=new THREE.PerspectiveCamera(45,W/H,1,1e7);
-  var renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});
+  var renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true,preserveDrawingBuffer:true});  /* 캡처(toDataURL) 가능하게 */
   renderer.setPixelRatio(window.devicePixelRatio||1); renderer.setSize(W,H,false);
   var ext=Math.max(hp0.w,hp0.h), rad=ext*1.1, theta=0.7, phi=0.95;
   var tgt=new THREE.Vector3(0,(hp0.zmax-hp0.zmin)*exag*0.3,0);
@@ -5898,6 +5898,231 @@ function _shotAutoName(){
   if(cadBg.on&&cadBg.showCad) t.push('지적');
   if(!t.length && cadBg.on) t.push('위성');
   return t.slice(0,3).join('+')||'화면';
+}
+
+/* ═══ 보고서 가이드 (순서대로 안내) ═══════════════════════════════════
+   [보고서 만들기] → 단계가 순서대로 뜬다. 단계마다 레이어 자동 세팅.
+   구도 = 화면에 고정된 A4 빨간 틀(지도를 옮기고/확대해서 맞춤 — 과거항공 방식).
+   [📸 추가]로 몇 장이든 쌓고 [다음 ▶]으로 진행. 결과는 오른쪽 트레이. */
+var GUIDE={ on:false, i:0 };
+
+/* 고정 A4 틀 — 화면 중앙, 지도를 움직여 맞춘다 */
+function frameOn(){
+  var ov=document.getElementById('rptFrameOv');
+  if(!ov){
+    ov=document.createElement('div'); ov.id='rptFrameOv';
+    ov.style.cssText='display:none;position:fixed;z-index:80;pointer-events:none';
+    ov.innerHTML='<div id="rptFrame" style="position:absolute;box-shadow:0 0 0 9999px rgba(4,8,15,0.62);border:2.5px solid #ff2d55;border-radius:3px"></div>'
+      +'<div style="position:absolute;top:8px;left:0;right:0;text-align:center;color:#fff;font-size:12px;font-weight:600;text-shadow:0 1px 4px #000">▭ 이 사각형 안이 담겨요 · 지도를 옮기고/확대해서 맞추세요</div>';
+    document.body.appendChild(ov);
+    window.addEventListener('resize', frameLayout);
+  }
+  ov.style.display='';
+  frameLayout();
+}
+function frameOff(){ var ov=document.getElementById('rptFrameOv'); if(ov) ov.style.display='none'; }
+function frameLayout(){
+  var ov=document.getElementById('rptFrameOv'), fr=document.getElementById('rptFrame');
+  if(!ov||!fr||ov.style.display==='none') return;
+  var r=cv.getBoundingClientRect();
+  ov.style.left=r.left+'px'; ov.style.top=r.top+'px'; ov.style.width=r.width+'px'; ov.style.height=r.height+'px';
+  /* A4 가로 비율, 화면의 78% */
+  var w=r.width*0.78, h=w/SHOT_RATIO;
+  if(h>r.height*0.82){ h=r.height*0.82; w=h*SHOT_RATIO; }
+  fr.style.width=w+'px'; fr.style.height=h+'px';
+  fr.style.left=((r.width-w)/2)+'px'; fr.style.top=((r.height-h)/2)+'px';
+}
+/* 틀이 화면에서 차지한 영역 → 세계좌표(5186) 사각형 */
+function frameToRect(){
+  var fr=document.getElementById('rptFrame'); if(!fr) return null;
+  var fb=fr.getBoundingClientRect(), cb=cv.getBoundingClientRect();
+  var sx=cv.width/cb.width, sy=cv.height/cb.height;              /* CSS px → 캔버스 px */
+  var x0=(fb.left-cb.left)*sx, y0=(fb.top-cb.top)*sy;
+  var x1=(fb.right-cb.left)*sx, y1=(fb.bottom-cb.top)*sy;
+  var a=s2w(x0,y1), b=s2w(x1,y0);
+  return { minX:Math.min(a.x,b.x), maxX:Math.max(a.x,b.x),
+           minY:Math.min(a.y,b.y), maxY:Math.max(a.y,b.y) };
+}
+/* 틀 기준 캡처 → 트레이 (구도 두 점 안 찍어도 됨) */
+function frameAdd(name){
+  var r=frameToRect();
+  if(!r){ toast('틀이 없습니다','err'); return; }
+  toast('캡처 중…');
+  captureRect(r, 2000, function(c){
+    if(!c) return;
+    try{ trayAdd(name||_shotAutoName(), c.toDataURL('image/png'), c.width, c.height); }
+    catch(e){ toast('캡처 실패: '+e.message,'err'); }
+  });
+}
+
+/* ── 단계 정의 — 레이어 자동 세팅. 순서: 관내도→음영→수계→3D→경사도→자료→과거항공 ── */
+function _gAllOff(){
+  S._noCropClip=false;
+  cadBg.on=true; cadBg.showBase=true; cadBg.showCad=false; cadBg.layers='sat';
+  if(typeof GN!=='undefined') GN.on=false;
+  if(typeof RING!=='undefined') RING.on=false;
+  S.showDEM=false; S.showContours=false; S.showGrid=false; S.showArrows=false;
+  S.showWS=false; S.showTIN=false; S.showSlopeTin=false; S.showStream=false; S.showSurvey=false;
+}
+var GUIDE_STEPS=[
+  { n:'관내도 (위치도)', p:10, frame:true,
+    tip:'거리(1·2·3 / 1·3·5) 고르고, 지도를 옮겨 틀에 맞춘 뒤 [📸 추가].',
+    extra:'<div style="display:flex;gap:5px;margin-top:6px">'
+      +'<button class="btn btn-ghost" onclick="RING.list=[1,2,3];render()" style="flex:1;font-size:11px;padding:5px">1·2·3km</button>'
+      +'<button class="btn btn-ghost" onclick="RING.list=[1,3,5];render()" style="flex:1;font-size:11px;padding:5px">1·3·5km</button>'
+      +'<button class="btn btn-ghost" onclick="RING.list=[0.5,1,2];render()" style="flex:1;font-size:11px;padding:5px">0.5·1·2</button></div>',
+    set:function(){ _gAllOff(); S._noCropClip=true; RING.on=true;
+      if(typeof GN!=='undefined'){ if(GN.img) GN.on=true; else gnToggle(); } } },
+  { n:'현황도', p:2, frame:true,
+    tip:'위성+허가지선+지적선. 신청지가 잘 보이게 맞추고 [📸 추가].',
+    set:function(){ _gAllOff(); cadBg.showCad=true; } },
+  { n:'음영기복', p:5, frame:true,
+    tip:'색·강조는 🎨 음영조절에서. 음영만 추가, 화살표 켜고 또 추가 — 몇 장이든.',
+    set:function(){ _gAllOff(); cadBg.showBase=false; S.showDEM=true; S.showContours=true; } },
+  { n:'수계·우수흐름', p:6, frame:true,
+    tip:'유역·하천·흐름화살표를 조합해가며 필요한 만큼 [📸 추가].',
+    set:function(){ _gAllOff(); cadBg.showBase=false; S.showDEM=true; S.showWS=true; S.showStream=true; S.showArrows=true; } },
+  { n:'종단형상', p:5, frame:true,
+    tip:'종단선이 보이는 상태로 [📸 추가]. 단면 그래프+판정은 [📈 판정 추가]로 따로 담깁니다.',
+    extra:'<button class="btn btn-ghost" onclick="profShotAdd()" style="width:100%;margin-top:6px;font-size:11.5px">📈 단면 그래프+판정 추가</button>',
+    set:function(){ _gAllOff(); cadBg.showBase=false; S.showDEM=true; S.showContours=true; } },
+  { n:'3D 입체', p:6, frame:false,
+    tip:'3D를 열고 각도·색(위성/항공)을 잡은 뒤 [📸 3D 추가]. 몇 장이든.',
+    extra:'<div style="display:flex;gap:5px;margin-top:6px">'
+      +'<button class="btn btn-ghost" onclick="open3D()" style="flex:1;font-size:11.5px">🧊 3D 열기</button>'
+      +'<button class="btn btn-primary" onclick="add3DShot()" style="flex:1;font-size:11.5px">📸 3D 추가</button></div>',
+    set:function(){ _gAllOff(); S.showDEM=true; } },
+  { n:'경사도', p:7, frame:true,
+    tip:'경사도(색·범례)를 확인하고 [📸 추가]. 없으면 3번 「한방에 분석」 먼저.',
+    set:function(){ _gAllOff(); cadBg.showBase=false; S.showSlopeTin=true; } },
+  { n:'자료 (산사태·임상·토양·지질)', p:8, frame:true,
+    tip:'8번에서 자료를 하나 켜고 [📸 추가], 끄고 다음 자료 켜고 [📸 추가] — 반복.',
+    set:function(){ _gAllOff(); } },
+  { n:'과거항공', p:9, frame:false,
+    tip:'9번 기능으로 시계열을 만들면 됩니다(자체 저장). 필요하면 화면을 [📸 추가]로 담아도 됩니다.',
+    set:function(){ _gAllOff(); } }
+];
+
+function guideStart(){
+  if(!S.bounds){ toast('먼저 지형도(1번)를 올리세요','err'); return; }
+  GUIDE.on=true; GUIDE.i=0; TRAY.open=true; trayRender();
+  guideGo();
+}
+function guideGo(){
+  if(!GUIDE.on) return;
+  if(GUIDE.i>=GUIDE_STEPS.length){ guideEnd(true); return; }
+  var st=GUIDE_STEPS[GUIDE.i];
+  try{ st.set(); }catch(e){}
+  if(typeof cadBgRefresh==='function') cadBgRefresh();
+  goToPage(st.p);
+  if(st.frame) frameOn(); else frameOff();
+  render();
+  guideBar();
+}
+function guideBar(){
+  var el=document.getElementById('guideBar');
+  if(!el){
+    el=document.createElement('div'); el.id='guideBar';
+    el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:96;'
+      +'background:#0e1626;border:2px solid #f59e0b;border-radius:12px;padding:10px 14px;'
+      +'box-shadow:0 12px 40px rgba(0,0,0,.55);width:min(620px,94vw);box-sizing:border-box';
+    document.body.appendChild(el);
+  }
+  var st=GUIDE_STEPS[GUIDE.i];
+  el.style.display='';
+  var BS='font-size:12px;padding:8px 10px;white-space:nowrap;border-radius:8px;cursor:pointer;';
+  el.innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+    +'<div style="font-size:12px;color:#9fb0c8">보고서 만들기 <b style="color:#f59e0b">'+(GUIDE.i+1)+' / '+GUIDE_STEPS.length+'</b> · 담긴 <b style="color:#4ade80">'+TRAY.items.length+'장</b></div>'
+    +'<button onclick="guideEnd(false)" style="background:none;border:none;color:#9fb0c8;cursor:pointer;font-size:13px;white-space:nowrap">✕ 중단</button></div>'
+    +'<div style="font-size:14px;font-weight:800;color:#e8eef7;margin:4px 0 2px">'+st.n+'</div>'
+    +'<div style="font-size:11.5px;color:#9fb0c8;line-height:1.5">'+st.tip+'</div>'
+    +(st.extra||'')
+    +'<div style="display:flex;gap:6px;align-items:stretch;margin-top:8px">'
+    +(GUIDE.i>0?'<button class="btn btn-ghost" onclick="guidePrev()" style="'+BS+'">◀</button>':'')
+    +(st.frame?'<button class="btn btn-primary" onclick="frameAdd()" style="flex:1;'+BS+'font-weight:800">📸 추가</button>':'')
+    +'<button class="btn '+(st.frame?'btn-ghost':'btn-primary')+'" onclick="guideNext()" style="flex:1;'+BS+'font-weight:700">다음 ▶</button>'
+    +'</div>';
+}
+function guideNext(){ GUIDE.i++; guideGo(); }
+function guidePrev(){ if(GUIDE.i>0){ GUIDE.i--; guideGo(); } }
+function guideEnd(done){
+  GUIDE.on=false; frameOff();
+  var el=document.getElementById('guideBar'); if(el) el.style.display='none';
+  S._noCropClip=false; render();
+  if(done){ goToPage(10); toast('끝! 결과 '+TRAY.items.length+'장 — 오른쪽에서 정리·저장하세요','ok'); }
+  else toast('중단됨 · 담긴 것은 남아있습니다');
+  TRAY.open=true; trayRender();
+}
+/* 트레이 갱신 시 가이드 막대의 장수도 갱신 */
+var _trayAdd0=trayAdd;
+trayAdd=function(n,u,w,h){ _trayAdd0(n,u,w,h); if(GUIDE.on) guideBar(); };
+
+/* ── 종단형상: 단면 그래프+판정 카드 담기 ── */
+function profShotAdd(){
+  var body=document.getElementById('profResultBody');
+  if(!body || !body.innerHTML.trim()){ toast('먼저 5번에서 종단형상 판정을 실행하세요','err'); return; }
+  /* 판정 박스의 SVG들을 캔버스로 그려 한 장으로 */
+  var svgs=body.querySelectorAll('svg');
+  if(!svgs.length){ toast('판정 그래프가 없습니다','err'); return; }
+  var W=1400, pad=30, y=pad, parts=[];
+  var texts=body.innerText.split('\n').map(function(t){return t.trim();}).filter(Boolean);
+  var cnv=document.createElement('canvas');
+  /* SVG → 이미지 비동기 로드 */
+  var loaded=0, imgs=[];
+  for(var i=0;i<svgs.length;i++){
+    (function(i){
+      var sv=svgs[i];
+      var vb=(sv.getAttribute('viewBox')||'0 0 320 160').split(/\s+/).map(Number);
+      var xml=new XMLSerializer().serializeToString(sv);
+      var im=new Image();
+      im.onload=function(){ imgs[i]={im:im, w:vb[2]||320, h:vb[3]||160}; if(++loaded===svgs.length) drawAll(); };
+      im.onerror=function(){ imgs[i]=null; if(++loaded===svgs.length) drawAll(); };
+      im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(xml);
+    })(i);
+  }
+  function drawAll(){
+    var H=pad;
+    imgs.forEach(function(o){ if(o) H+=Math.round((W-pad*2)*o.h/o.w)+18; });
+    H+=texts.length*0+150+pad;
+    cnv.width=W; cnv.height=H;
+    var g=cnv.getContext('2d');
+    g.fillStyle='#0e1626'; g.fillRect(0,0,W,H);
+    var yy=pad;
+    g.fillStyle='#fbbf24'; g.font='bold 30px sans-serif'; g.textAlign='left';
+    g.fillText('종단형상 판정 (실제 단면)', pad, yy+8); yy+=44;
+    imgs.forEach(function(o){
+      if(!o) return;
+      var hh=Math.round((W-pad*2)*o.h/o.w);
+      g.drawImage(o.im, pad, yy, W-pad*2, hh); yy+=hh+18;
+    });
+    /* 판정 텍스트 (점수 관련 줄은 결과에서 제외) */
+    g.font='24px sans-serif'; g.fillStyle='#e8eef7';
+    var shown=0;
+    texts.forEach(function(t){
+      if(/점$|점수|합계|배점|·\s*\d+점|\d+점\b/.test(t)) return;   /* 점수 제외 */
+      if(shown>=4) return;
+      g.fillText(t, pad, yy+26); yy+=34; shown++;
+    });
+    try{ trayAdd('종단형상 판정', cnv.toDataURL('image/png'), W, H); }
+    catch(e){ toast('담기 실패: '+e.message,'err'); }
+  }
+}
+
+/* ── 3D 화면 캡처 → 트레이 (A4 가로로 가운데 잘라 담기) ── */
+function add3DShot(){
+  var cv3=document.getElementById('d3dcanvas');
+  var lay=document.getElementById('d3dlay');
+  if(!cv3 || !lay || lay.style.display==='none'){ toast('3D를 먼저 열어주세요','err'); return; }
+  try{
+    var w=cv3.width, h=cv3.height, ar=SHOT_RATIO;
+    var cw=w, ch=Math.round(w/ar);
+    if(ch>h){ ch=h; cw=Math.round(h*ar); }
+    var off=document.createElement('canvas'); off.width=2000; off.height=Math.round(2000/ar);
+    var g=off.getContext('2d');
+    g.drawImage(cv3, (w-cw)/2, (h-ch)/2, cw, ch, 0, 0, off.width, off.height);
+    trayAdd('3D 입체', off.toDataURL('image/png'), off.width, off.height);
+  }catch(e){ toast('3D 캡처 실패: '+e.message+' — 다시 시도해보세요','err'); }
 }
 
 function showProfileResult(cls){
