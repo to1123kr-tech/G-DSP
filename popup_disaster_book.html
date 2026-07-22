@@ -7252,15 +7252,12 @@ function _cadBgFetch(){
       cadBg.cache[key]=ent;
       var bimg=new Image();
       bimg.onload=function(){ ent.base=bimg; render(); };
-      bimg.onerror=function(){
-        /* 프록시 실패 시 직접 호출로 폴백 — 지도는 뜨되 그 화면은 캡처 불가 */
-        if(ent._fb) { ent.baseErr=true; return; }
-        ent._fb=true; cadBg.tainted=true;
-        bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
-      };
-      /* ★서버 프록시(같은 출처)로 받아야 캔버스가 오염되지 않아 캡처(PNG/PDF)가 가능함.
-         VWorld를 브라우저가 직접 부르면 보안상 toDataURL이 막힘. */
-      bimg.src='/api/vw-tile/'+baseName+'/'+t.z+'/'+t.x+'/'+t.y+'.'+baseExt;
+      bimg.onerror=function(){ ent.baseErr=true; };
+      /* ★화면 표시는 VWorld 직접 호출(빠름). 프록시를 태우면 서버를 거쳐 느려짐.
+         대신 이 캔버스는 오염(tainted)되어 저장이 막히므로,
+         보고서 캡처는 화면을 찍지 않고 shotRect 범위를 오프스크린에 새로 그린다
+         (프록시 타일 사용 → 오염 없음 + A4 고해상도). captureShot() 참고. */
+      bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
     });
   }
   if(cadBg.showCad) _cadVecFetch();     // 지적선 = 벡터(빠름)
