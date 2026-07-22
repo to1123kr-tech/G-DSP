@@ -750,25 +750,17 @@
         <div id="shotInfo" style="display:none;margin-top:9px;background:var(--panel2);border:1px solid #f59e0b;border-radius:8px;padding:9px 10px;font-size:12px;color:var(--tx2)"></div>
       </div>
 
-      <!-- ③ 보고서 만들기 (마법사) -->
+      <!-- ② 결과 쌓기 안내 -->
       <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
-        <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:4px">③ 보고서 만들기</div>
-        <div style="font-size:10.5px;color:var(--tx3);margin-bottom:8px;line-height:1.55">
-          누르면 <b>위치도 → 현황도 → 음영 → 수계 → 종단 → 경사도 → 자료 → 지질</b> 순서로
-          <b>필요한 것만 자동으로 켜서</b> 보여줍니다. 보고 조정한 뒤 「확정하고 다음」만 누르면 됩니다.
+        <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:4px">② 결과 쌓기</div>
+        <div style="font-size:10.5px;color:var(--tx3);margin-bottom:8px;line-height:1.6">
+          어느 페이지에서든 화면을 원하는 대로 만든 뒤 상단의
+          <b style="color:#f59e0b">[📸 결과에 추가]</b>를 누르면 오른쪽 결과함에 쌓입니다.<br>
+          예: 음영만 → 추가 · 음영+화살표 → 추가 · 화살표+누적숫자 → 추가 …<br>
+          필요한 만큼 쌓고, 순서·이름 정리 후 <b>전부 PNG 저장</b>하면 끝.
+          점수·채점은 결과에 포함하지 않습니다(자료까지만 제공).
         </div>
-        <button class="btn btn-primary" onclick="wizStart()" style="width:100%;font-weight:800">▶ 순서대로 만들기 시작</button>
-        <div id="wizResult" style="display:none;margin-top:10px"></div>
-      </div>
-
-      <!-- ② 캡처 -->
-      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
-        <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:4px">② 캡처</div>
-        <div style="font-size:10.5px;color:var(--tx3);margin-bottom:8px;line-height:1.55">
-          화면을 찍는 게 아니라 <b>구도 범위를 A4 가로로 새로 그려서</b> 저장합니다.
-          화면 크기와 무관하게 <b>2000px 고해상도</b>로 나옵니다.
-        </div>
-        <button class="btn btn-primary" onclick="saveShotPNG()">📸 지금 구도 PNG로 저장</button>
+        <button class="btn btn-primary" onclick="TRAY.open=true;trayRender()" style="width:100%">📸 결과함 열기</button>
       </div>
     </div>
 
@@ -996,6 +988,9 @@
       <button class="lyrBtn on" id="lyrTin" onclick="toggleLayer('tin')" title="삼각망(TIN) 표시/숨김 · 느리면 끄기" style="flex-shrink:0">삼각망</button>
       <button class="lyrBtn on" id="lyrSurvey" onclick="toggleLayer('survey')" title="표고점 표시/숨김" style="flex-shrink:0">표고점</button>
       <button class="lyrBtn" id="lyrHsAdjust" onclick="toggleHsPanel()" title="음영기복 조정 패널 열기/닫기 (색상·태양·입체)" style="padding:6px 8px;flex-shrink:0">🎨 음영조절</button>
+      <span style="width:1px;height:18px;background:#2a3550;flex-shrink:0;margin:0 2px"></span>
+      <button class="lyrBtn" onclick="startShotFrame()" title="보고서 구도(A4 가로) 잡기 — 한 번 잡으면 모든 캡처가 같은 범위" style="padding:6px 8px;flex-shrink:0;border-color:#f59e0b;color:#f59e0b">🖼 구도</button>
+      <button class="lyrBtn" onclick="shotAdd()" title="지금 화면 상태 그대로 A4로 캡처해 오른쪽 결과에 쌓기" style="padding:6px 9px;flex-shrink:0;background:linear-gradient(135deg,#f59e0b,#d97706);color:#0b1220;border:none;font-weight:800">📸 결과에 추가</button>
     </div>
     <div class="tools" id="tools" style="display:none">
       <button class="tbtn" title="화면 맞춤" onclick="fitView()">⤢</button>
@@ -2156,8 +2151,8 @@ function render(){
   if(!S.bounds) return;
   var zr=(S.zmax-S.zmin)||1;
 
-  /* ★ 작업구역 canvas clip */
-  if(S.cropRect){
+  /* ★ 작업구역 canvas clip (위치도처럼 넓게 봐야 할 땐 _noCropClip 으로 해제) */
+  if(S.cropRect && !S._noCropClip){
     var cr=S.cropRect;
     var crtl=w2s({x:cr.minX,y:cr.maxY}), crbr=w2s({x:cr.maxX,y:cr.minY});
     ctx.save();
@@ -2853,7 +2848,7 @@ function render(){
   }
 
   /* ★ 작업구역 clip 해제 후 경계선 다시 그리기 */
-  if(S.cropRect){
+  if(S.cropRect && !S._noCropClip){
     ctx.restore(); // clip 해제
     var cr2=S.cropRect;
     var ctl=w2s({x:cr2.minX,y:cr2.maxY}), cbr=w2s({x:cr2.maxX,y:cr2.minY});
@@ -5789,131 +5784,122 @@ function ringSet(v){
   render();
 }
 function ringMark(on){ RING.mark=!!on; render(); }
-/* ═══ 결과보고서 마법사 ═══════════════════════════════════════════
-   슬롯마다 필요한 레이어를 자동으로 켜고 해당 페이지로 이동 → 사람이 보고 조정 →
-   「확정하고 다음」이면 구도대로 캡처해 담아둔다. */
-var WIZ={ on:false, i:0, shots:[] };
+/* ═══ 결과 트레이 (보고서 자료 쌓기) ═══════════════════════════════
+   철학: 도구는 "자료 만들기"까지만. 순서·선별·점수는 설계자 몫.
+   - 어느 페이지에서든 [📸 결과에 추가] → 지금 화면 상태 그대로 A4 캡처 → 오른쪽 트레이에 쌓임
+   - 구도는 2개: 2D 공용(음영·수계·경사도·자료·과거항공 동일) + 3D 전용
+   - 점수·채점 관련은 결과물에 포함하지 않는다 */
+var TRAY={ open:false, items:[] };
+var _trayBtn='background:#1a2740;border:1px solid #263654;color:#c9d6ea;border-radius:6px;padding:3px 6px;font-size:10px;cursor:pointer;';
 
-function _wzAllOff(){                      /* 공통: 분석선·자료 다 끄고 시작 */
-  cadBg.on=true; cadBg.showBase=true; cadBg.showCad=false; cadBg.layers='sat';
-  GN.on=false; RING.on=false;
-  S.showDEM=false; S.showContours=false; S.showGrid=false; S.showArrows=false;
-  S.showWS=false; S.showTIN=false; S.showSlopeTin=false; S.showStream=false;
-  S.showSurvey=false;
+function trayAdd(name, dataUrl, w, h){
+  TRAY.items.push({n:name||('자료 '+(TRAY.items.length+1)), url:dataUrl, w:w||0, h:h||0});
+  TRAY.open=true; trayRender();
+  toast('추가됨 · '+TRAY.items.length+'장','ok');
 }
-var WIZ_STEPS=[
-  { k:'loc',  n:'위치도',   p:10, tip:'관내도 + 거리원. 구도를 넓게(주변이 보이게) 잡으세요.',
-    set:function(){ _wzAllOff(); RING.on=true; if(GN.img) GN.on=true; } },
-  { k:'site', n:'현황도',   p:2,  tip:'위성 + 허가지선 + 지적선. 신청지가 잘 보이게.',
-    set:function(){ _wzAllOff(); cadBg.showCad=true; } },
-  { k:'hill', n:'음영기복', p:5,  tip:'음영 색·강도는 5번 조정 패널에서 바꿀 수 있어요.',
-    set:function(){ _wzAllOff(); cadBg.showBase=false; S.showDEM=true; S.showContours=true; } },
-  { k:'flow', n:'수계·우수흐름', p:6, tip:'유역·하천·흐름 화살표. 화살표 간격은 6번에서 조정.',
-    set:function(){ _wzAllOff(); S.showDEM=true; S.showWS=true; S.showStream=true; S.showArrows=true; } },
-  { k:'prof', n:'종단형상', p:5,  tip:'종단선과 판정 결과. 판정창은 캡처에 안 찍힙니다.',
-    set:function(){ _wzAllOff(); S.showDEM=true; S.showContours=true; } },
-  { k:'slope',n:'경사도',   p:7,  tip:'경사도 결과. 없으면 3번 「한방에 분석」을 먼저 돌리세요.',
-    set:function(){ _wzAllOff(); S.showSlopeTin=true; } },
-  { k:'data', n:'산림청 자료(산사태·임상·토양)', p:8, tip:'8번에서 볼 자료를 켠 뒤 확정하세요. 자료마다 한 장씩 반복하면 됩니다.',
-    set:function(){ _wzAllOff(); } },
-  { k:'geo',  n:'지질(모암)', p:7, tip:'지질도 겹치기를 켠 뒤 확정하세요.',
-    set:function(){ _wzAllOff(); } }
-];
-
-function wizStart(){
-  if(!S.bounds){ toast('먼저 지형도(1번)를 올리세요','err'); return; }
-  if(!S.shotRect && !confirm('구도를 아직 안 잡았어요.\n지금 화면 범위로 찍힙니다. 계속할까요?\n\n[취소] 누르면 ① 구도 잡기부터')) return;
-  WIZ.on=true; WIZ.i=0; WIZ.shots=[];
-  wizGo();
+function trayRemove(i){ TRAY.items.splice(i,1); trayRender(); }
+function trayRename(i){
+  var cur=TRAY.items[i]; if(!cur) return;
+  var v=prompt('이름', cur.n); if(v!==null && v.trim()){ cur.n=v.trim(); trayRender(); }
 }
-function wizGo(){
-  if(!WIZ.on) return;
-  if(WIZ.i>=WIZ_STEPS.length){ wizFinish(); return; }
-  var st=WIZ_STEPS[WIZ.i];
-  try{ st.set(); }catch(e){}
-  if(typeof cadBgRefresh==='function') cadBgRefresh();
-  goToPage(st.p);
-  render();
-  wizBar();
+function trayMove(i,dir){
+  var j=i+dir; if(j<0||j>=TRAY.items.length) return;
+  var t=TRAY.items[i]; TRAY.items[i]=TRAY.items[j]; TRAY.items[j]=t; trayRender();
 }
-function wizBar(){
-  var el=document.getElementById('wizBar');
+function traySave(i){
+  var s=TRAY.items[i]; if(!s) return;
+  var a=document.createElement('a');
+  a.download=('0'+(i+1)).slice(-2)+'_'+s.n.replace(/[\\/:*?"<>|]/g,'')+'.png';
+  a.href=s.url; a.click();
+}
+function traySaveAll(){
+  if(!TRAY.items.length){ toast('아직 담긴 자료가 없어요','err'); return; }
+  TRAY.items.forEach(function(_,i){ setTimeout(function(){ traySave(i); }, i*450); });
+  toast(TRAY.items.length+'장 저장 중…','ok');
+}
+function trayClear(){
+  if(!TRAY.items.length) return;
+  if(confirm('담긴 '+TRAY.items.length+'장을 모두 비울까요?')){ TRAY.items=[]; trayRender(); }
+}
+function trayToggle(){ TRAY.open=!TRAY.open; trayRender(); }
+function trayView(i){
+  var s=TRAY.items[i]; if(!s) return;
+  var w=window.open('','_blank'); if(!w) return;
+  w.document.write('<body style="margin:0;background:#111"><img src="'+s.url+'" style="max-width:100%;display:block;margin:auto"></body>');
+}
+function trayRender(){
+  var el=document.getElementById('trayPanel');
   if(!el){
-    el=document.createElement('div'); el.id='wizBar';
-    el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:95;'
-      +'background:#0e1626;border:2px solid #f59e0b;border-radius:12px;padding:10px 14px;'
-      +'box-shadow:0 12px 40px rgba(0,0,0,.55);min-width:420px;max-width:92vw';
+    el=document.createElement('div'); el.id='trayPanel';
+    el.style.cssText='position:fixed;top:0;right:0;height:100%;width:238px;z-index:90;'
+      +'background:#0b1322;border-left:2px solid #f59e0b;box-shadow:-8px 0 30px rgba(0,0,0,.5);'
+      +'display:flex;flex-direction:column;transition:transform .18s';
     document.body.appendChild(el);
   }
-  var st=WIZ_STEPS[WIZ.i];
-  el.style.display='';
-  el.innerHTML=
-    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
-    +'<div style="font-size:12px;color:#9fb0c8">보고서 만들기 <b style="color:#f59e0b">'+(WIZ.i+1)+' / '+WIZ_STEPS.length+'</b></div>'
-    +'<button onclick="wizStop()" style="background:none;border:none;color:#9fb0c8;cursor:pointer;font-size:13px">✕ 중단</button></div>'
-    +'<div style="font-size:14px;font-weight:800;color:#e8eef7;margin:4px 0 2px">'+st.n+'</div>'
-    +'<div style="font-size:11.5px;color:#9fb0c8;line-height:1.5;margin-bottom:8px">'+st.tip+'</div>'
-    +'<div style="display:flex;gap:6px">'
-    +(WIZ.i>0?'<button class="btn btn-ghost" onclick="wizPrev()" style="flex:0 0 auto;font-size:12px">◀ 이전</button>':'')
-    +'<button class="btn btn-ghost" onclick="wizSkip()" style="flex:1;font-size:12px">건너뛰기</button>'
-    +'<button class="btn btn-primary" onclick="wizNext()" style="flex:2;font-size:12.5px;font-weight:800">✔ 확정하고 다음 ▶</button>'
-    +'</div>';
-}
-function wizNext(){
-  var st=WIZ_STEPS[WIZ.i];
-  toast('캡처 중…');
-  captureRect(null, 2000, function(c){
-    if(c){ try{ WIZ.shots[WIZ.i]={k:st.k, n:st.n, url:c.toDataURL('image/png')}; }catch(e){ toast('캡처 실패: '+e.message,'err'); return; } }
-    WIZ.i++; wizGo();
-  });
-}
-function wizSkip(){ WIZ.shots[WIZ.i]=null; WIZ.i++; wizGo(); }
-function wizPrev(){ if(WIZ.i>0){ WIZ.i--; wizGo(); } }
-function wizStop(){
-  WIZ.on=false;
-  var el=document.getElementById('wizBar'); if(el) el.style.display='none';
-  toast('중단됨 · 찍은 것은 남아있습니다');
-  wizList();
-}
-function wizFinish(){
-  WIZ.on=false;
-  var el=document.getElementById('wizBar'); if(el) el.style.display='none';
-  goToPage(10); wizList();
-  var n=WIZ.shots.filter(function(s){return s;}).length;
-  toast('완료 · '+n+'장 만들어졌습니다','ok');
-}
-/* 결과 썸네일 목록 — 마음에 안 드는 것만 다시 찍기 */
-function wizList(){
-  var box=document.getElementById('wizResult'); if(!box) return;
-  var got=WIZ.shots.filter(function(s){return s;});
-  if(!got.length){ box.style.display='none'; return; }
-  box.style.display='';
-  var h='<div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:6px">결과 '+got.length+'장</div>'
-       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
-  WIZ.shots.forEach(function(s,i){
-    if(!s) return;
-    h+='<div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px">'
-      +'<img src="'+s.url+'" style="width:100%;border-radius:5px;display:block">'
-      +'<div style="font-size:10.5px;color:var(--tx2);margin:4px 0 3px">'+s.n+'</div>'
-      +'<div style="display:flex;gap:4px">'
-      +'<button class="btn btn-ghost" onclick="wizRetake('+i+')" style="flex:1;font-size:10px;padding:3px">다시</button>'
-      +'<button class="btn btn-ghost" onclick="wizSave('+i+')" style="flex:1;font-size:10px;padding:3px">저장</button>'
+  el.style.transform=TRAY.open?'translateX(0)':'translateX(238px)';
+  var tab=document.getElementById('trayTab');
+  if(!tab){
+    tab=document.createElement('button'); tab.id='trayTab'; tab.onclick=trayToggle;
+    tab.style.cssText='position:fixed;top:50%;right:0;transform:translateY(-50%);z-index:91;'
+      +'background:#f59e0b;color:#0b1220;border:none;border-radius:10px 0 0 10px;'
+      +'padding:14px 7px;font-weight:900;cursor:pointer;font-size:12px;writing-mode:vertical-rl';
+    document.body.appendChild(tab);
+  }
+  tab.textContent='📸 결과 '+TRAY.items.length+'장';
+  tab.style.right=TRAY.open?'238px':'0';
+  var h='<div style="padding:11px 12px;border-bottom:1px solid #1e2b45;display:flex;justify-content:space-between;align-items:center">'
+    +'<b style="color:#f59e0b;font-size:13px">결과 '+TRAY.items.length+'장</b>'
+    +'<span><button onclick="trayClear()" style="background:none;border:none;color:#9fb0c8;cursor:pointer;font-size:11px">비우기</button>'
+    +'<button onclick="trayToggle()" style="background:none;border:none;color:#9fb0c8;cursor:pointer;font-size:13px;margin-left:4px">▶</button></span></div>'
+    +'<div style="flex:1;overflow-y:auto;padding:9px">';
+  if(!TRAY.items.length){
+    h+='<div style="color:#5b6a80;font-size:11.5px;line-height:1.7;padding:14px 6px;text-align:center">'
+      +'아직 비어있어요.<br>각 화면을 만든 뒤<br><b style="color:#f59e0b">[📸 결과에 추가]</b>를 누르면<br>여기에 쌓입니다.</div>';
+  }
+  TRAY.items.forEach(function(s,i){
+    h+='<div style="background:#101a2e;border:1px solid #1e2b45;border-radius:9px;padding:6px;margin-bottom:8px">'
+      +'<img src="'+s.url+'" style="width:100%;border-radius:6px;display:block;cursor:pointer" onclick="trayView('+i+')">'
+      +'<div style="font-size:10.5px;color:#c9d6ea;margin:5px 1px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+s.n+'">'+(i+1)+'. '+s.n+'</div>'
+      +'<div style="display:flex;gap:3px">'
+      +'<button onclick="trayMove('+i+',-1)" title="위로" style="flex:0 0 auto;'+_trayBtn+'">↑</button>'
+      +'<button onclick="trayMove('+i+',1)" title="아래로" style="flex:0 0 auto;'+_trayBtn+'">↓</button>'
+      +'<button onclick="trayRename('+i+')" title="이름" style="flex:1;'+_trayBtn+'">이름</button>'
+      +'<button onclick="traySave('+i+')" title="저장" style="flex:1;'+_trayBtn+'">저장</button>'
+      +'<button onclick="trayRemove('+i+')" title="삭제" style="flex:0 0 auto;'+_trayBtn+'color:#f87171">✕</button>'
       +'</div></div>';
   });
   h+='</div>'
-    +'<button class="btn btn-primary" onclick="wizSaveAll()" style="width:100%;margin-top:8px;font-size:12px">⬇ 전부 PNG로 저장</button>';
-  box.innerHTML=h;
+    +'<div style="padding:10px 12px;border-top:1px solid #1e2b45">'
+    +'<button onclick="traySaveAll()" style="width:100%;background:linear-gradient(135deg,#f59e0b,#d97706);color:#0b1220;border:none;border-radius:9px;padding:10px;font-weight:900;font-size:12.5px;cursor:pointer">⬇ 전부 PNG 저장</button></div>';
+  el.innerHTML=h;
 }
-function wizRetake(i){ WIZ.on=true; WIZ.i=i; wizGo(); }
-function wizSave(i){
-  var s=WIZ.shots[i]; if(!s) return;
-  var a=document.createElement('a'); a.download='보고서_'+(i+1)+'_'+s.n+'.png'; a.href=s.url; a.click();
+
+/* ── [📸 결과에 추가] — 지금 화면 상태 그대로 A4 캡처해 트레이로 ── */
+function shotAdd(name){
+  if(!S.bounds){ toast('먼저 지형도(1번)를 올리세요','err'); return; }
+  if(!S.shotRect){ toast('구도를 먼저 잡아주세요','err'); startShotFrame(); return; }
+  toast('캡처 중…');
+  captureShot(function(c){
+    if(!c) return;
+    try{ trayAdd(name||_shotAutoName(), c.toDataURL('image/png'), c.width, c.height); }
+    catch(e){ toast('캡처 실패: '+e.message,'err'); }
+  });
 }
-function wizSaveAll(){
-  var n=0;
-  WIZ.shots.forEach(function(s,i){ if(s){ setTimeout(function(){ wizSave(i); }, n*400); n++; } });
-  toast(n+'장 저장 중…','ok');
+function _shotAutoName(){
+  var t=[];
+  if(typeof GN!=='undefined'&&GN.on) t.push('관내도');
+  if(typeof RING!=='undefined'&&RING.on) t.push('거리원');
+  if(S.showDEM) t.push('음영');
+  if(S.showContours) t.push('등고선');
+  if(S.showWS) t.push('유역');
+  if(S.showStream) t.push('하천');
+  if(S.showArrows) t.push('흐름화살표');
+  if(S.showSlopeTin) t.push('경사도');
+  if(cadBg.on&&cadBg.showCad) t.push('지적');
+  if(!t.length && cadBg.on) t.push('위성');
+  return t.slice(0,3).join('+')||'화면';
 }
+
 function showProfileResult(cls){
   var box=document.getElementById('profResultBox'), body=document.getElementById('profResultBody'); if(!box||!body||!cls) return;
   var col={'상승':'#22c55e','평형':'#60a5fa','하강':'#f59e0b','복합':'#ef4444'}[cls.form];
