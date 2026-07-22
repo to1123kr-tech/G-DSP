@@ -692,6 +692,29 @@
       </div>
       <div style="font-size:10.5px;color:var(--tx3);margin-top:9px;line-height:1.6">지금은 캔버스 우측 상단 📷(PNG)·📄(PDF) 버튼으로 화면 저장이 가능합니다.</div>
 
+      <!-- 관내도 -->
+      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+        <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:4px">🗺 관내도 (위치도용)</div>
+        <div style="font-size:10.5px;color:var(--tx3);margin-bottom:8px;line-height:1.55">
+          화성시 관내도를 지도 위에 겹칩니다. 좌표가 없는 그림이라 <b>처음 한 번만 눈으로 맞추면</b>
+          그 위치를 기억합니다. (정북 그림이라 회전 없이 이동·확대만 사용)
+        </div>
+        <button class="btn btn-primary" id="btnGwannae" onclick="gnToggle()">🗺 관내도 켜기</button>
+        <div id="gnPanel" style="display:none;margin-top:8px">
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost" id="btnGnAlign" onclick="gnAlignToggle()" style="flex:1;font-size:11.5px">✥ 위치 맞추기</button>
+            <button class="btn btn-ghost" onclick="gnReset()" style="flex:1;font-size:11.5px">↺ 위치 초기화</button>
+          </div>
+          <div style="font-size:11px;color:var(--tx3);margin-top:8px">농도 <span id="gnAlphaVal" style="color:#f59e0b">95%</span></div>
+          <input type="range" min="10" max="100" value="95" oninput="gnSetAlpha(this.value)" style="width:100%">
+          <div style="font-size:11px;color:var(--tx3);margin-top:4px">크기 <span id="gnScaleVal" style="color:#f59e0b">–</span></div>
+          <input type="range" id="gnScale" min="2" max="20" step="0.05" value="8.3" oninput="gnSetScale(this.value)" style="width:100%">
+          <div style="font-size:10px;color:var(--tx3);margin-top:6px;line-height:1.5">
+            「위치 맞추기」를 켜면 <b>끌어서 이동</b>, 크기는 슬라이더로. 다 맞추면 다시 눌러 고정하세요.
+          </div>
+        </div>
+      </div>
+
       <!-- ① 구도 잡기 -->
       <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
         <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:4px">① 구도 잡기</div>
@@ -1898,6 +1921,10 @@ function evPix(e){
 
 /* ---------- 마우스 (팬/줌/좌표) ---------- */
 cv.addEventListener('mousedown',function(e){
+  /* 관내도 위치 맞추는 중이면 왼쪽 드래그 = 관내도 이동 */
+  if(e.button===0 && GN.align && GN.img){
+    if(gnDragStart(evWorld(e))){ e.preventDefault(); return; }
+  }
   /* 가운데 버튼(1) = 어느 모드에서든 항상 지도 이동 전용. 브라우저 자동스크롤 차단 */
   if(e.button===1){
     e.preventDefault();
@@ -1938,6 +1965,7 @@ window.addEventListener('mousemove',function(e){
     if(typeof cadBgRefresh==='function') cadBgRefresh();
     render(); return;
   }
+  if(GN.drag){ gnDragMove(evWorld(e)); return; }          /* 관내도 위치 맞추는 중 */
   if(S.bounds){ var w=evWorld(e); var _sb=document.getElementById('sbXY'); if(_sb)_sb.textContent='X '+w.x.toFixed(1)+'  Y '+w.y.toFixed(1); }
   if(S.mode==='section' && S.sectionPts && S.sectionPts.length===1){
     S.sectionGhost=evWorld(e); render(); return;
@@ -1987,7 +2015,7 @@ window.addEventListener('mousemove',function(e){
   S.ox+=e.clientX-S.lastM.x; S.oy-=e.clientY-S.lastM.y;
   S.lastM={x:e.clientX,y:e.clientY}; render();
 });
-window.addEventListener('mouseup',function(){ var wasDrag=S.dragStarted; S.isDown=false; S.midPan=false; cv.classList.remove('grabbing'); if(typeof cadBgRefresh==='function') cadBgRefresh(); if(wasDrag) render(); });
+window.addEventListener('mouseup',function(){ if(GN.drag) gnDragEnd(); var wasDrag=S.dragStarted; S.isDown=false; S.midPan=false; cv.classList.remove('grabbing'); if(typeof cadBgRefresh==='function') cadBgRefresh(); if(wasDrag) render(); });
 cv.addEventListener('click',function(e){
   if(S.dragStarted) return; // 실제 드래그(패닝)였으면 무시 — 10px 이내 미동은 클릭으로 인정
   /* ★ 지적 선택 모드 — 최우선 */
@@ -2110,6 +2138,21 @@ function render(){
 
   /* ★ 지도·지적 배경 (VWorld) — 최하단. 에러 나도 나머지 렌더 계속 */
   try{ drawCadBg(); }catch(_e){ /* 지도 오류는 무시하고 계속 */ }
+
+  /* 관내도 오버레이 — 배경지도 위, 등고선·허가지선 아래 */
+  if(GN.on && GN.img && GN.wx!=null){
+    try{
+      var _ga=w2s({x:GN.wx, y:GN.wy});
+      var _gw=GN.img.width*GN.mpp*S.scale, _gh=GN.img.height*GN.mpp*S.scale;
+      ctx.save(); ctx.globalAlpha=GN.alpha;
+      ctx.drawImage(GN.img, _ga.x, _ga.y, _gw, _gh);
+      if(GN.align && !S._capturing){          /* 맞추는 중일 때만 테두리 표시 */
+        ctx.globalAlpha=1; ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2; ctx.setLineDash([10,6]);
+        ctx.strokeRect(_ga.x,_ga.y,_gw,_gh); ctx.setLineDash([]);
+      }
+      ctx.restore();
+    }catch(_e){}
+  }
 
   /* ★ 산림청 자료 겹침 (산사태·임상·토양) — 지도 위, 지형선 아래 */
   try{ if(typeof drawForestOverlays==='function') drawForestOverlays(); }catch(_ef){}
@@ -5576,6 +5619,83 @@ function _autoClickSlopeRun(tries){
   if(tries>0) setTimeout(function(){ _autoClickSlopeRun(tries-1); }, 500);
   else { S._slopeAutoClose=false; toast('경사도 창에서 [경사도 분석 실행]을 눌러주세요'); }
 }
+/* ═══ 관내도 오버레이 ═══════════════════════════════════════════
+   화성시 관내도(정북 그림)를 지도 위에 겹친다. 위치도용.
+   ★정합 원칙: 회전 없이 "이동 + 균등확대"만 사용(그림이 정북이라 가능).
+   좌표가 안 박힌 그림이라 처음 한 번 눈으로 맞추고, 그 값을 브라우저에 기억. */
+var GN={ on:false, img:null, loading:false, alpha:0.95,
+         wx:null, wy:null, mpp:8.3,      /* 좌상단 world(5186) + 미터/픽셀 */
+         align:false, drag:null, src:'/gwannae.jpg' };
+
+function gnSaveTf(){
+  try{ localStorage.setItem('gdsp_gwannae', JSON.stringify({wx:GN.wx,wy:GN.wy,mpp:GN.mpp})); }catch(e){}
+}
+function gnLoadTf(){
+  try{
+    var s=localStorage.getItem('gdsp_gwannae');
+    if(s){ var o=JSON.parse(s); if(o&&o.mpp>0){ GN.wx=o.wx; GN.wy=o.wy; GN.mpp=o.mpp; return true; } }
+  }catch(e){}
+  return false;
+}
+/* 처음 켤 때 기본 위치 — 화면 중앙에 화성시 크기(약 43km)로 */
+function gnDefaultPos(){
+  if(!GN.img) return;
+  var c=(typeof currentViewRect==='function')?currentViewRect():null;
+  var cx=c?(c.minX+c.maxX)/2:185293, cy=c?(c.minY+c.maxY)/2:509968;
+  GN.mpp=43000/GN.img.width;
+  GN.wx=cx-GN.img.width*GN.mpp/2;
+  GN.wy=cy+GN.img.height*GN.mpp/2;
+}
+function gnToggle(){
+  if(GN.on){ GN.on=false; GN.align=false; gnSyncUI(); render(); return; }
+  if(GN.img){ GN.on=true; gnSyncUI(); render(); return; }
+  if(GN.loading) return;
+  GN.loading=true; toast('관내도 불러오는 중… (약 5MB)');
+  var im=new Image();
+  im.onload=function(){
+    GN.loading=false; GN.img=im; GN.on=true;
+    if(!gnLoadTf() || GN.wx===null) gnDefaultPos();
+    gnSyncUI(); render();
+    toast('관내도 표시 · 「위치 맞추기」로 정렬하세요','ok');
+  };
+  im.onerror=function(){
+    GN.loading=false;
+    toast('관내도 파일이 없습니다 — 서버 gdsp 폴더에 gwannae.jpg 를 넣어주세요','err');
+  };
+  im.src=GN.src;                    /* 같은 출처 → 캡처(저장) 가능 */
+}
+function gnSetAlpha(v){ GN.alpha=parseFloat(v)/100; var e=document.getElementById('gnAlphaVal'); if(e)e.textContent=Math.round(GN.alpha*100)+'%'; render(); }
+function gnSetScale(v){
+  if(!GN.img) return;
+  var old=GN.mpp, nw=parseFloat(v);
+  /* 중심 고정 확대 — 맞춰놓은 위치가 안 틀어지게 */
+  var cx=GN.wx+GN.img.width*old/2, cy=GN.wy-GN.img.height*old/2;
+  GN.mpp=nw;
+  GN.wx=cx-GN.img.width*nw/2; GN.wy=cy+GN.img.height*nw/2;
+  var e=document.getElementById('gnScaleVal'); if(e)e.textContent=(GN.img.width*nw/1000).toFixed(1)+'km 폭';
+  gnSaveTf(); render();
+}
+function gnAlignToggle(){
+  if(!GN.on){ toast('관내도를 먼저 켜세요','err'); return; }
+  GN.align=!GN.align;
+  cv.style.cursor=GN.align?'move':'grab';
+  gnSyncUI(); render();
+  toast(GN.align?'관내도를 끌어서 옮기세요 (크기는 아래 슬라이더)':'위치 고정됨','ok');
+}
+function gnReset(){ if(!GN.img) return; gnDefaultPos(); gnSaveTf(); gnSyncUI(); render(); toast('관내도 위치 초기화','ok'); }
+function gnSyncUI(){
+  var b=document.getElementById('btnGwannae');
+  if(b){ b.textContent=GN.on?'🗺 관내도 끄기':'🗺 관내도 켜기'; b.classList.toggle('active',GN.on); }
+  var p=document.getElementById('gnPanel'); if(p) p.style.display=GN.on?'':'none';
+  var a=document.getElementById('btnGnAlign');
+  if(a){ a.textContent=GN.align?'✔ 위치 고정':'✥ 위치 맞추기'; a.classList.toggle('active',GN.align); }
+  var s=document.getElementById('gnScale');
+  if(s&&GN.img){ s.value=GN.mpp; var e=document.getElementById('gnScaleVal'); if(e)e.textContent=(GN.img.width*GN.mpp/1000).toFixed(1)+'km 폭'; }
+}
+/* 정렬 모드일 때 캔버스 드래그로 이동 */
+function gnDragStart(w){ if(!GN.align||!GN.img) return false; GN.drag={ox:GN.wx-w.x, oy:GN.wy-w.y}; return true; }
+function gnDragMove(w){ if(!GN.drag) return false; GN.wx=w.x+GN.drag.ox; GN.wy=w.y+GN.drag.oy; render(); return true; }
+function gnDragEnd(){ if(GN.drag){ GN.drag=null; gnSaveTf(); } }
 function showProfileResult(cls){
   var box=document.getElementById('profResultBox'), body=document.getElementById('profResultBody'); if(!box||!body||!cls) return;
   var col={'상승':'#22c55e','평형':'#60a5fa','하강':'#f59e0b','복합':'#ef4444'}[cls.form];

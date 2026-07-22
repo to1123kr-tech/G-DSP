@@ -1796,7 +1796,8 @@ def index():
 
 @app.route('/<path:filename>')
 def serve_html(filename):
-    if filename.endswith('.html') or filename.endswith('.css') or filename.endswith('.js'):
+    # 관내도 등 이미지도 서빙 (같은 출처라 캔버스 오염 없이 캡처 가능)
+    if filename.lower().endswith(('.html', '.css', '.js', '.jpg', '.jpeg', '.png', '.webp', '.svg', '.gif')):
         return send_from_directory('/home/ubuntu/gdsp', filename)
     return jsonify({"error": "not found"}), 404
 
