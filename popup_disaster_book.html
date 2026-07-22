@@ -3926,10 +3926,10 @@ function _texBuild(kind, done){
 
   /* 타일 40장 이하가 되는 가장 선명한 줌 선택 */
   var zTop=(kind==='sat')?19:20, zBot=(kind==='sat')?12:10;
-  var z,x0,x1,y0,y1,span,found=false;
-  for(z=zTop; z>=zBot; z--){
-    span = (kind==='sat') ? (2*_MERC_R/Math.pow(2,z)) : (_TEX_TILE*_AIR_RES[z]);
-    if(!span) continue;
+  function _grid(z){
+    var span=(kind==='sat')?(2*_MERC_R/Math.pow(2,z)):(_TEX_TILE*_AIR_RES[z]);
+    if(!span) return null;
+    var x0,x1,y0,y1;
     if(kind==='sat'){
       x0=Math.floor((bx.mnx+_MERC_R)/span); x1=Math.floor((bx.mxx+_MERC_R)/span);
       y0=Math.floor((_MERC_R-bx.mxy)/span); y1=Math.floor((_MERC_R-bx.mny)/span);
@@ -3937,43 +3937,57 @@ function _texBuild(kind, done){
       x0=Math.floor((bx.mnx-_AIR_ORG_X)/span); x1=Math.floor((bx.mxx-_AIR_ORG_X)/span);
       y0=Math.floor((_AIR_ORG_Y-bx.mxy)/span); y1=Math.floor((_AIR_ORG_Y-bx.mny)/span);
     }
-    if((x1-x0+1)*(y1-y0+1) <= 40 && (x1-x0+1) <= 16 && (y1-y0+1) <= 16){ found=true; break; }
+    var nx=x1-x0+1, ny=y1-y0+1;
+    if(nx*ny>40 || nx>16 || ny>16) return null;
+    return {z:z,span:span,x0:x0,x1:x1,y0:y0,y1:y1,nx:nx,ny:ny};
   }
-  if(!found){ done(null,'범위가 너무 넓습니다'); return; }
+  var zStart=-1;
+  for(var zz=zTop; zz>=zBot; zz--){ if(_grid(zz)){ zStart=zz; break; } }
+  if(zStart<0){ done(null,'범위가 너무 넓습니다'); return; }
 
-  /* 텍스처 사각형 = 타일격자 경계 그대로 (리샘플 없음) */
-  var rect = (kind==='sat')
-    ? { X0:x0*span-_MERC_R, X1:(x1+1)*span-_MERC_R, Ytop:_MERC_R-y0*span, Ybot:_MERC_R-(y1+1)*span }
-    : { X0:_AIR_ORG_X+x0*span, X1:_AIR_ORG_X+(x1+1)*span, Ytop:_AIR_ORG_Y-y0*span, Ybot:_AIR_ORG_Y-(y1+1)*span };
+  /* 해당 줌에 사진이 없으면 한 단계 낮춰 재시도 (최대 3회) */
+  function run(z, tries){
+    var G=_grid(z);
+    if(!G){ done(null,'사진 타일을 받지 못했습니다'); return; }
+    var span=G.span, x0=G.x0, x1=G.x1, y0=G.y0, y1=G.y1;
 
-  var nx=x1-x0+1, ny=y1-y0+1;
-  var cvs=document.createElement('canvas');
-  cvs.width=nx*_TEX_TILE; cvs.height=ny*_TEX_TILE;
-  var g=cvs.getContext('2d');
-  g.fillStyle='#233043'; g.fillRect(0,0,cvs.width,cvs.height);
+    /* 텍스처 사각형 = 타일격자 경계 그대로 (리샘플 없음) */
+    var rect = (kind==='sat')
+      ? { X0:x0*span-_MERC_R, X1:(x1+1)*span-_MERC_R, Ytop:_MERC_R-y0*span, Ybot:_MERC_R-(y1+1)*span }
+      : { X0:_AIR_ORG_X+x0*span, X1:_AIR_ORG_X+(x1+1)*span, Ytop:_AIR_ORG_Y-y0*span, Ybot:_AIR_ORG_Y-(y1+1)*span };
 
-  var total=nx*ny, fin=0, got=0;
-  function finish(){
-    if(!got){ done(null,'사진 타일을 받지 못했습니다'); return; }
-    var tex=new THREE.CanvasTexture(cvs); tex.needsUpdate=true;
-    done({ tex:tex, uv:_texBuildUV(dem,kind,rect), z:z, tiles:total, got:got });
-  }
-  for(var tx=x0; tx<=x1; tx++){
-    for(var ty=y0; ty<=y1; ty++){
-      (function(tx,ty){
-        var img=new Image();
-        img.onload=function(){
-          try{ g.drawImage(img,(tx-x0)*_TEX_TILE,(ty-y0)*_TEX_TILE,_TEX_TILE,_TEX_TILE); got++; }catch(e){}
-          if(++fin===total) finish();
-        };
-        img.onerror=function(){ if(++fin===total) finish(); };
-        /* ★반드시 서버 프록시(같은 출처) — 직접 호출하면 WebGL이 tainted canvas로 막음 */
-        img.src = (kind==='sat')
-          ? '/api/vw-tile/Satellite/'+z+'/'+tx+'/'+ty+'.jpeg'
-          : '/api/ngii-tile/'+_TEX.year+'/'+z+'/'+tx+'/'+ty;
-      })(tx,ty);
+    var cvs=document.createElement('canvas');
+    cvs.width=G.nx*_TEX_TILE; cvs.height=G.ny*_TEX_TILE;
+    var g=cvs.getContext('2d');
+    g.fillStyle='#233043'; g.fillRect(0,0,cvs.width,cvs.height);
+
+    var total=G.nx*G.ny, fin=0, got=0;
+    function finish(){
+      if(!got){
+        if(tries>0 && z-1>=zBot) return run(z-1, tries-1);   /* ★줌 낮춰 재시도 */
+        done(null,'사진 타일을 받지 못했습니다'); return;
+      }
+      var tex=new THREE.CanvasTexture(cvs); tex.needsUpdate=true;
+      done({ tex:tex, uv:_texBuildUV(dem,kind,rect), z:z, tiles:total, got:got });
+    }
+    for(var tx=x0; tx<=x1; tx++){
+      for(var ty=y0; ty<=y1; ty++){
+        (function(tx,ty){
+          var img=new Image();
+          img.onload=function(){
+            try{ g.drawImage(img,(tx-x0)*_TEX_TILE,(ty-y0)*_TEX_TILE,_TEX_TILE,_TEX_TILE); got++; }catch(e){}
+            if(++fin===total) finish();
+          };
+          img.onerror=function(){ if(++fin===total) finish(); };
+          /* ★반드시 서버 프록시(같은 출처) — 직접 호출하면 WebGL이 tainted canvas로 막음 */
+          img.src = (kind==='sat')
+            ? '/api/vw-tile/Satellite/'+z+'/'+tx+'/'+ty+'.jpeg'
+            : '/api/ngii-tile/'+_TEX.year+'/'+z+'/'+tx+'/'+ty;
+        })(tx,ty);
+      }
     }
   }
+  run(zStart, 3);
 }
 /* 버튼: 3D 지형에 위성/항공 사진 입히기 */
 function set3DPhoto(kind){
@@ -5039,7 +5053,7 @@ function autoProfileLine(){
   if(!r){ _profMsg('<span style="color:#f87171">종단선 계산 실패 — 신청지 안 지형/흐름 확인</span>'); return; }
   S.profileLine=r;
   var cls=classifyProfile(r.pts); S.profileClass=cls;
-  var fcol={'상승':'#4ade80','평형':'#94a3b8','하강':'#fbbf24','복합':'#f87171'};
+  var fcol={'상승':'#4ade80','평형':'#60a5fa','하강':'#fbbf24','복합':'#f87171'};
   _profMsg('<b style="color:#fbbf24">✅ 종단선 자동 (물흐름 D8)</b><br>· <b style="color:#f87171">상단</b> '+r.top.e.toFixed(1)+'m → <b style="color:#93c5fd">하단</b> '+r.bot.e.toFixed(1)+'m · 표고차 <b>'+r.drop.toFixed(1)+'m</b> · '+Math.round(r.len)+'m'
     + (cls?'<br>· 판정: <b style="color:'+fcol[cls.form]+'">'+cls.form+'사면 '+cls.score+'점</b>':''));
   if(cls) showProfileResult(cls);
@@ -5085,18 +5099,31 @@ function computeAvgForm(){
 function _fourTypeSVG(hi){
   var T=[{k:'상승',d:'M5 50 Q30 18 62 16',c:'#22c55e'},{k:'평형',d:'M5 50 L62 16',c:'#60a5fa'},{k:'하강',d:'M5 50 Q30 48 62 16',c:'#f59e0b'},{k:'복합',d:'M5 50 C18 22 45 46 62 16',c:'#ef4444'}];
   var W=312,pw=72,gap=(W-pw*4)/5,s='<svg width="100%" viewBox="0 0 '+W+' 78">';
-  for(var i=0;i<4;i++){ var t=T[i], x0=gap+(pw+gap)*i, on=(t.k===hi), col=on?t.c:'#475569';
+  s+='<defs><filter id="ftGlow" x="-40%" y="-40%" width="180%" height="180%">'
+   + '<feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+  for(var i=0;i<4;i++){ var t=T[i], x0=gap+(pw+gap)*i, on=(t.k===hi), col=on?t.c:'#3d4759';
     s+='<g transform="translate('+x0.toFixed(1)+',0)">';
-    if(on) s+='<rect x="-1" y="0" width="'+(pw+2)+'" height="76" rx="7" fill="'+t.c+'" fill-opacity="0.28" stroke="'+t.c+'" stroke-width="2.6"/>';
-    else s+='<rect x="1" y="2" width="'+(pw-2)+'" height="70" rx="6" fill="none" stroke="#334155" stroke-width="1"/>';
-    s+='<path d="'+t.d+' L62 58 L5 58 Z" fill="'+col+'" fill-opacity="'+(on?0.4:0.1)+'"/><path d="'+t.d+'" fill="none" stroke="'+col+'" stroke-width="'+(on?2.8:1.4)+'"/>';
-    s+='<text x="36" y="70" fill="'+(on?t.c:'#64748b')+'" font-size="10" font-weight="'+(on?'800':'400')+'" text-anchor="middle">'+t.k+(on?' ✓':'')+'</text></g>';
+    if(on){
+      s+='<rect x="-1" y="0" width="'+(pw+2)+'" height="76" rx="7" fill="'+t.c+'" fill-opacity="0.30" stroke="'+t.c+'" stroke-width="3"/>';
+    } else {
+      s+='<rect x="1" y="2" width="'+(pw-2)+'" height="70" rx="6" fill="#0e1626" fill-opacity="0.55" stroke="#2a3550" stroke-width="1"/>';
+    }
+    s+='<path d="'+t.d+' L62 58 L5 58 Z" fill="'+col+'" fill-opacity="'+(on?0.45:0.07)+'"/>'
+     + '<path d="'+t.d+'" fill="none" stroke="'+col+'" stroke-width="'+(on?3.4:1.2)+'" stroke-linecap="round"'+(on?' filter="url(#ftGlow)"':'')+'/>';
+    if(on){
+      /* 선택된 유형 = 색칩 라벨(진한 글씨)로 확실히 구분 */
+      s+='<rect x="12" y="60" width="48" height="15" rx="7.5" fill="'+t.c+'"/>'
+       + '<text x="36" y="70.6" fill="#0b1220" font-size="10" font-weight="900" text-anchor="middle">'+t.k+' ✓</text>';
+    } else {
+      s+='<text x="36" y="70" fill="#5b6a80" font-size="10" font-weight="400" text-anchor="middle">'+t.k+'</text>';
+    }
+    s+='</g>';
   }
   return s+'</svg>';
 }
 function showProfileResult(cls){
   var box=document.getElementById('profResultBox'), body=document.getElementById('profResultBody'); if(!box||!body||!cls) return;
-  var col={'상승':'#22c55e','평형':'#94a3b8','하강':'#f59e0b','복합':'#ef4444'}[cls.form];
+  var col={'상승':'#22c55e','평형':'#60a5fa','하강':'#f59e0b','복합':'#ef4444'}[cls.form];
   var W=312,H=150,pl=14,pr=14,pt=14,pb=26, iw=W-pl-pr, ih=H-pt-pb;
   var P=cls.P, n=P.length, dR=cls.totLen||1, eR=(cls.eHi-cls.eLo)||1;
   function X(i){ return pl+(cls.dists[i]/dR)*iw; }
@@ -5113,7 +5140,7 @@ function showProfileResult(cls){
     +'<text x="'+pl+'" y="'+(H-8)+'" fill="#93c5fd" font-size="10" text-anchor="start">하단 '+cls.eLo.toFixed(1)+'m</text>'
     +'<text x="'+(W-pr)+'" y="'+(H-8)+'" fill="#f87171" font-size="10" text-anchor="end">상단 '+cls.eHi.toFixed(1)+'m</text>'
     +'</svg>';
-  var avgF=computeAvgForm(), avC={'상승':'#22c55e','평형':'#94a3b8','하강':'#f59e0b','복합':'#ef4444'};
+  var avgF=computeAvgForm(), avC={'상승':'#22c55e','평형':'#60a5fa','하강':'#f59e0b','복합':'#ef4444'};
   body.innerHTML=svg
     +'<div style="margin-top:8px;text-align:center"><span style="display:inline-block;padding:5px 16px;border-radius:8px;background:'+col+';color:#0b1220;font-weight:800;font-size:15px">'+cls.form+'사면 · '+cls.score+'점</span></div>'
     +'<div style="margin-top:7px;font-size:10.5px;color:#cbd5e1;text-align:center;line-height:1.5">근거: '+cls.why+'<br><span style="color:#94a3b8">점선=직선 기준 · 위로 부풀면 오목(상승), 아래로 처지면 볼록(하강)</span></div>'
