@@ -5540,8 +5540,12 @@ function runAutoAnalysis(){
         var sec=((Date.now()-t0)/1000).toFixed(1);
         render();
         if(S.permit && S.permit.length){
-          _autoFinish('4·5·6번 완료 · '+sec+'초 → 경사도 창을 엽니다', true);
-          setTimeout(function(){ openSlopeWin(); }, 300);
+          _autoFinish('4·5·6번 완료 · '+sec+'초 → 경사도 분석 중…', true);
+          S._slopeAutoClose=true;          /* 결과 오면 창 자동 닫기 */
+          setTimeout(function(){
+            openSlopeWin();
+            _autoClickSlopeRun(12);        /* 창 뜨고 데이터 도착하면 [분석 실행] 자동 클릭 */
+          }, 300);
         } else {
           _autoFinish('4·5·6번 완료 · '+sec+'초 (경사도는 허가지선 필요)', true);
           goToPage(6);
@@ -5549,6 +5553,28 @@ function runAutoAnalysis(){
       });
     });
   });
+}
+/* 경사도 창(iframe) 안의 [분석 실행] 버튼을 대신 눌러줌.
+   같은 서버 파일이라 접근 가능. 데이터가 아직 안 들어왔을 수 있어 몇 번 재시도.
+   못 찾으면 조용히 포기 → 사용자가 직접 누르면 됨(아무것도 망가지지 않음). */
+function _autoClickSlopeRun(tries){
+  var fr=document.getElementById('slopeFrame');
+  try{
+    var d=fr && fr.contentWindow && fr.contentWindow.document;
+    if(d){
+      var bs=d.querySelectorAll('button'), i, t;
+      for(i=0;i<bs.length;i++){
+        t=(bs[i].textContent||'').replace(/\s/g,'');
+        if(t.indexOf('분석실행')>=0 && !bs[i].disabled){
+          bs[i].click();
+          toast('경사도 분석 실행됨','ok');
+          return;
+        }
+      }
+    }
+  }catch(e){ S._slopeAutoClose=false; return; }   /* 접근 불가하면 포기 */
+  if(tries>0) setTimeout(function(){ _autoClickSlopeRun(tries-1); }, 500);
+  else { S._slopeAutoClose=false; toast('경사도 창에서 [경사도 분석 실행]을 눌러주세요'); }
 }
 function showProfileResult(cls){
   var box=document.getElementById('profResultBox'), body=document.getElementById('profResultBody'); if(!box||!body||!cls) return;
@@ -5946,6 +5972,17 @@ function _sendSlopeData(){
 window.addEventListener('message', function(ev){
   var d=ev.data; if(!d||d.type!=='gdsp-slope-result') return;
   S.slopeRes={avgSlope:d.avgSlope, bins:d.bins, totalArea:d.totalArea, nCells:d.nCells};
+  /* ★한방에 분석으로 연 경우엔 결과만 받고 창을 닫는다(결과는 여기 저장돼 안전).
+     7번에서 직접 연 경우엔 그대로 열어둠. */
+  if(S._slopeAutoClose){
+    S._slopeAutoClose=false;
+    setTimeout(function(){
+      if(typeof closeSlopeWin==='function') closeSlopeWin();
+      var av=(d.avgSlope!=null)?(Math.round(d.avgSlope*10)/10+'°'):'-';
+      toast('한방에 분석 완료 · 평균경사 '+av,'ok');
+      if(typeof goToPage==='function') goToPage(7);
+    }, 400);
+  }
   if(typeof updateNav==='function') updateNav();
   var ps=document.getElementById('sl_pageSummary');
   if(ps){ ps.style.display='';
