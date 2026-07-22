@@ -495,10 +495,6 @@
           </div>
           <div id="profMsg" style="font-size:10px;color:var(--tx3);margin-top:5px;line-height:1.45"></div>
         </div>
-        <!-- 3D -->
-        <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
-          <button class="btn btn-ghost" id="btn3D" onclick="open3D()">🧊 3D 입체 보기</button>
-        </div>
       </div>
     </div>
 
@@ -3879,11 +3875,13 @@ function densify3DLine(poly, dem, hp, exag, zLift){
 var _TEX = { mode:null, tex:null, uv:null, key:'', busy:false, year:null };
 var _AIR_ORG_X = -200000.0, _AIR_ORG_Y = 4000000.0, _TEX_TILE = 256;
 
-/* WGS84 → 웹메르카토르(EPSG:3857) */
+/* WGS84 → 웹메르카토르(EPSG:3857)
+   ★주의: y는 "지구반경 6378137"을 쓴다. _MERC_R(=반경×π)을 반경으로 쓰면 π배 틀림 */
 function _llToMerc(lng,lat){
   var s=Math.sin(lat*Math.PI/180);
   if(s>0.9999) s=0.9999; if(s<-0.9999) s=-0.9999;
-  return [ lng/180*_MERC_R, _MERC_R*Math.log((1+s)/(1-s))/2 ];
+  var R=_MERC_R/Math.PI;                      /* = 6378137 */
+  return [ lng/180*_MERC_R, R*Math.log((1+s)/(1-s))/2 ];
 }
 function _texKey(dem,kind,year){
   return kind+'|'+(year||'')+'|'+dem.minX.toFixed(1)+'|'+dem.minY.toFixed(1)+'|'+dem.cols+'x'+dem.rows+'|'+dem.cell;
