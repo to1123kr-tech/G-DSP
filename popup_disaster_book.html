@@ -696,6 +696,16 @@
         </div>
         <div id="shotInfo" style="display:none;margin-top:9px;background:var(--panel2);border:1px solid #f59e0b;border-radius:8px;padding:9px 10px;font-size:12px;color:var(--tx2)"></div>
       </div>
+
+      <!-- ② 캡처 -->
+      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+        <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:4px">② 캡처</div>
+        <div style="font-size:10.5px;color:var(--tx3);margin-bottom:8px;line-height:1.55">
+          화면을 찍는 게 아니라 <b>구도 범위를 A4 가로로 새로 그려서</b> 저장합니다.
+          화면 크기와 무관하게 <b>2000px 고해상도</b>로 나옵니다.
+        </div>
+        <button class="btn btn-primary" onclick="saveShotPNG()">📸 지금 구도 PNG로 저장</button>
+      </div>
     </div>
 
     <!-- 경사도 (page 5) -->
@@ -2555,7 +2565,7 @@ function render(){
 
   /* ★ 작업구역 그리는 중 미리보기 (clip 밖) */
   /* ── 결과보고서 구도 박스 (A4 가로) ────────────────────── */
-  if(S.shotRect){
+  if(S.shotRect && !S._capturing){
     var sr=S.shotRect, stl=w2s({x:sr.minX,y:sr.maxY}), sbr=w2s({x:sr.maxX,y:sr.minY});
     var sx=stl.x, sy=stl.y, sw=sbr.x-stl.x, sh=sbr.y-stl.y;
     ctx.save();
@@ -3814,19 +3824,34 @@ function clearPermit(){
 /* ---------- PNG 내보내기 (현재 화면 캡쳐) ---------- */
 function exportPNG(){
   if(!S.bounds){ toast('먼저 DXF를 여세요','err'); return; }
-  try{
-    var a=document.createElement('a');
-    a.href=cv.toDataURL('image/png');
-    a.download=(S.name?S.name.replace(/\.dxf$/i,''):'수계분석')+'_화면.png';
-    document.body.appendChild(a); a.click(); a.remove();
-    toast('PNG 저장됨','ok');
-  }catch(e){ toast('PNG 저장 실패','err'); }
+  /* ★화면을 그대로 찍으면 지도 타일 때문에 브라우저가 저장을 막음.
+     → 같은 범위를 오프스크린에 새로 그려서 저장 (구도 있으면 A4 구도로). */
+  toast('이미지 만드는 중…');
+  captureRect(null, 2000, function(c){
+    if(!c) return;
+    try{
+      var a=document.createElement('a');
+      a.href=c.toDataURL('image/png');
+      a.download=(S.name?S.name.replace(/\.dxf$/i,''):'수계분석')+(S.shotRect?'_구도':'_화면')+'.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('PNG 저장됨 · '+c.width+'×'+c.height,'ok');
+    }catch(e){ toast('PNG 저장 실패: '+e.message,'err'); }
+  });
 }
 
 /* ---------- PDF 보고서 (도면 + 제원표 → 브라우저 인쇄→PDF) ---------- */
 function exportPDF(){
   if(!S.bounds){ toast('먼저 DXF를 여세요','err'); return; }
-  var img=cv.toDataURL('image/png');
+  toast('보고서 이미지 만드는 중…');
+  captureRect(null, 2000, function(_c){
+    if(!_c){ return; }
+    var img;
+    try{ img=_c.toDataURL('image/png'); }
+    catch(e){ toast('이미지 생성 실패: '+e.message,'err'); return; }
+    _exportPDFWith(img);
+  });
+}
+function _exportPDFWith(img){
   var rows=[];
   rows.push(['도면', S.name||'-']);
   rows.push(['표고 범위', S.zmin.toFixed(1)+' ~ '+S.zmax.toFixed(1)+' m']);
@@ -5323,6 +5348,123 @@ function updateShotInfo(){
     el.style.display='none';
     if(b){ b.classList.remove('active'); b.textContent='🖼 구도 잡기 (A4 가로)'; }
   }
+}
+/* ═══ 보고서 캡처 엔진 ═══════════════════════════════════════════
+   화면을 찍지 않고, 구도 박스(shotRect) 범위를 A4 가로 비율로 "새로" 그린다.
+   ★이유 1: 화면 타일은 VWorld 직접 호출이라 캔버스가 오염돼 저장이 막힘
+            → 캡처용 배경만 서버 프록시로 받아 오염을 피함.
+   ★이유 2: 화면 해상도와 무관하게 인쇄용 고해상도로 뽑을 수 있음. */
+var SHOT_PX = 2000;                    /* 출력 가로 픽셀 (A4 가로 ≈ 170dpi) */
+
+/* 캡처 변환 — 구도 범위를 출력 캔버스에 딱 맞춤(잘림 없이 가운데) */
+function _shotTf(rect, ow, oh){
+  var sc=Math.min(ow/(rect.maxX-rect.minX), oh/(rect.maxY-rect.minY));
+  return { sc:sc,
+    ox:-rect.minX*sc + (ow-(rect.maxX-rect.minX)*sc)/2,
+    oy:-rect.minY*sc + (oh-(rect.maxY-rect.minY)*sc)/2 };
+}
+/* 구도 범위를 덮는 배경 타일을 프록시로 받아 캡처 캔버스에 얹기 */
+function _shotDrawBg(octx, ow, oh, rect, done){
+  if(!cadBg.on || !cadBg.showBase){ done(); return; }
+  if(!_cadInitProj()){ done(); return; }
+  var lls=[[rect.minX,rect.minY],[rect.maxX,rect.minY],[rect.maxX,rect.maxY],[rect.minX,rect.maxY]]
+    .map(function(p){ return tm5186toWgs84(p[0],p[1]); });
+  if(lls.some(function(p){return !p;})){ done(); return; }
+  var mnLng=Math.min.apply(null,lls.map(function(p){return p[0];})),
+      mxLng=Math.max.apply(null,lls.map(function(p){return p[0];})),
+      mnLat=Math.min.apply(null,lls.map(function(p){return p[1];})),
+      mxLat=Math.max.apply(null,lls.map(function(p){return p[1];}));
+  /* 출력 해상도에 맞는 줌 선택 (타일 1장 256px 기준, 최대 80장) */
+  var z, best=15;
+  for(z=19; z>=10; z--){
+    var n=Math.pow(2,z);
+    var x0=Math.floor((mnLng+180)/360*n), x1=Math.floor((mxLng+180)/360*n);
+    var r0=mxLat*Math.PI/180, r1=mnLat*Math.PI/180;
+    var y0=Math.floor((1-Math.log(Math.tan(r0)+1/Math.cos(r0))/Math.PI)/2*n);
+    var y1=Math.floor((1-Math.log(Math.tan(r1)+1/Math.cos(r1))/Math.PI)/2*n);
+    var cnt=(x1-x0+1)*(y1-y0+1);
+    if(cnt<=80 && (x1-x0+1)*256>=ow*0.8){ best=z; break; }
+    if(cnt<=80){ best=z; break; }
+  }
+  z=best;
+  var n2=Math.pow(2,z);
+  var tx0=Math.floor((mnLng+180)/360*n2), tx1=Math.floor((mxLng+180)/360*n2);
+  var ra=mxLat*Math.PI/180, rb=mnLat*Math.PI/180;
+  var ty0=Math.floor((1-Math.log(Math.tan(ra)+1/Math.cos(ra))/Math.PI)/2*n2);
+  var ty1=Math.floor((1-Math.log(Math.tan(rb)+1/Math.cos(rb))/Math.PI)/2*n2);
+  var name=(cadBg.layers==='sat')?'Satellite':'Base', ext=(cadBg.layers==='sat')?'jpeg':'png';
+  var list=[]; for(var a=tx0;a<=tx1;a++) for(var b=ty0;b<=ty1;b++) list.push([a,b]);
+  var left=list.length; if(!left){ done(); return; }
+  var tf=_shotTf(rect, ow, oh);
+  octx.save(); octx.globalAlpha=(cadBg.alpha===undefined?1:cadBg.alpha);
+  list.forEach(function(t){
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var tl=_tileLL(t[0],t[1],z), br=_tileLL(t[0]+1,t[1]+1,z);
+        var p=wgs84toTm5186(tl[0],tl[1]), q=wgs84toTm5186(br[0],br[1]);
+        if(p&&q){
+          var X0=Math.min(p[0],q[0])*tf.sc+tf.ox, X1=Math.max(p[0],q[0])*tf.sc+tf.ox;
+          var Y0=oh-(Math.max(p[1],q[1])*tf.sc+tf.oy), Y1=oh-(Math.min(p[1],q[1])*tf.sc+tf.oy);
+          var xr=Math.floor(X0), yr=Math.floor(Y0);
+          octx.drawImage(img, xr, yr, (Math.floor(X1)-xr)+1, (Math.floor(Y1)-yr)+1);
+        }
+      }catch(e){}
+      if(--left===0){ octx.restore(); done(); }
+    };
+    img.onerror=function(){ if(--left===0){ octx.restore(); done(); } };
+    img.src='/api/vw-tile/'+name+'/'+z+'/'+t[0]+'/'+t[1]+'.'+ext;
+  });
+}
+
+/* 지금 화면에 보이는 범위(5186) — 구도를 안 잡았을 때 캡처 대상 */
+function currentViewRect(){
+  if(!S.scale) return null;
+  var a=s2w(0,cv.height), b=s2w(cv.width,0);
+  return { minX:Math.min(a.x,b.x), maxX:Math.max(a.x,b.x),
+           minY:Math.min(a.y,b.y), maxY:Math.max(a.y,b.y) };
+}
+/* 임의 범위를 지정 픽셀폭으로 캡처 → done(canvas)
+   rect 생략 시 구도 박스, 구도도 없으면 현재 화면 범위 */
+function captureRect(rect, ow, done){
+  var r=rect||S.shotRect||currentViewRect();
+  if(!r){ toast('먼저 도면을 여세요','err'); done(null); return; }
+  var ar=(r.maxX-r.minX)/(r.maxY-r.minY);
+  var oh=Math.max(1,Math.round(ow/ar));
+  var off=document.createElement('canvas'); off.width=ow; off.height=oh;
+  var octx=off.getContext('2d');
+  octx.fillStyle='#0b1220'; octx.fillRect(0,0,ow,oh);
+  _shotDrawBg(octx, ow, oh, r, function(){
+    /* 전역을 캡처 캔버스로 잠깐 바꿔치기 → 기존 render() 그대로 재사용 */
+    var _cv=cv, _ctx=ctx, _sc=S.scale, _ox=S.ox, _oy=S.oy, _bg=cadBg.on;
+    var tf=_shotTf(r, ow, oh);
+    cv=off; ctx=octx;
+    S.scale=tf.sc; S.ox=tf.ox; S.oy=tf.oy;
+    cadBg.on=false;              /* 배경은 위에서 이미 그림 (또 그리면 오염됨) */
+    S._capturing=true;           /* 구도 박스 자체는 그리지 않음 */
+    try{ render(); }catch(e){ console.error('capture render',e); }
+    S._capturing=false;
+    cv=_cv; ctx=_ctx; S.scale=_sc; S.ox=_ox; S.oy=_oy; cadBg.on=_bg;
+    render();                    /* 화면 복구 */
+    done(off);
+  });
+}
+/* 구도 범위를 A4 가로로 캡처 → done(canvas) */
+function captureShot(done, px){
+  if(!S.shotRect){ toast('먼저 ① 구도를 잡아주세요','err'); done(null); return; }
+  captureRect(S.shotRect, px||SHOT_PX, done);
+}
+/* 지금 구도 그대로 PNG 저장 */
+function saveShotPNG(){
+  captureShot(function(c){
+    if(!c) return;
+    try{
+      var a=document.createElement('a');
+      a.download='보고서_'+(new Date().toISOString().slice(0,10))+'.png';
+      a.href=c.toDataURL('image/png'); a.click();
+      toast('PNG 저장 완료 · '+c.width+'×'+c.height,'ok');
+    }catch(e){ toast('저장 실패: '+e.message,'err'); }
+  });
 }
 function showProfileResult(cls){
   var box=document.getElementById('profResultBox'), body=document.getElementById('profResultBody'); if(!box||!body||!cls) return;
@@ -7251,12 +7393,10 @@ function _cadBgFetch(){
       var ent={base:null,tl:_tileLL(t.x,t.y,t.z),br:_tileLL(t.x+1,t.y+1,t.z)};
       cadBg.cache[key]=ent;
       var bimg=new Image();
-      bimg.onload=function(){ ent.base=bimg; render(); };
+      /* ★타일 1장 받을 때마다 render()를 부르면 등고선·DEM까지 매번 다시 그려 느림.
+         → _cadBgRenderSoon()으로 한 프레임에 1번만 그린다. */
+      bimg.onload=function(){ ent.base=bimg; _cadBgRenderSoon(); };
       bimg.onerror=function(){ ent.baseErr=true; };
-      /* ★화면 표시는 VWorld 직접 호출(빠름). 프록시를 태우면 서버를 거쳐 느려짐.
-         대신 이 캔버스는 오염(tainted)되어 저장이 막히므로,
-         보고서 캡처는 화면을 찍지 않고 shotRect 범위를 오프스크린에 새로 그린다
-         (프록시 타일 사용 → 오염 없음 + A4 고해상도). captureShot() 참고. */
       bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
     });
   }
@@ -7304,6 +7444,13 @@ var _cadBgTimer=null;
 function cadBgRefresh(){ if(!cadBg.on) return; clearTimeout(_cadBgTimer); _cadBgTimer=setTimeout(_cadBgFetch,240); }
 
 /* 타일(위성/일반) + 지적 벡터를 5186 캔버스에 그림 */
+/* 타일이 여러 장 도착해도 화면 다시 그리기는 한 프레임에 1번만.
+   (예전엔 타일 30장이면 render()가 30번 = 등고선·DEM까지 30번 다시 그림) */
+var _cadBgRafId=null;
+function _cadBgRenderSoon(){
+  if(_cadBgRafId) return;
+  _cadBgRafId=requestAnimationFrame(function(){ _cadBgRafId=null; render(); });
+}
 function drawCadBg(){
   if(!cadBg.on) return;
   ctx.save();
