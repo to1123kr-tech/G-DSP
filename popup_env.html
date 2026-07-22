@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>🌳 G-DSP 환경등급 분석 · Preview</title>
+<style>
+:root{
+  --bg:#05130d;--line:rgba(255,255,255,.10);--txt:#f2fbf6;--muted:#9fc0b0;
+  --green:#38d39a;--blue:#5aa8ff;--amber:#f6c453;--red:#ff6b6b;
+  --g1:#1a7f3c;--g2:#90c742;--g3:#ffd700;--g4:#ff8c00;--g5:#dc143c;
+  --shadow:0 26px 74px rgba(0,0,0,.44)
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:
+  radial-gradient(1200px 620px at 16% -6%,#0f4d33 0,transparent 45%),
+  radial-gradient(900px 520px at 100% 4%,#0c3a56 0,transparent 42%),
+  linear-gradient(180deg,#05130d,#06180f 55%,#04110b);
+  color:var(--txt);font-family:Pretendard,"Noto Sans KR","Malgun Gothic",sans-serif;overflow-x:hidden}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
+  background-size:34px 34px;mask-image:linear-gradient(to bottom,black,transparent 82%)}
+.prog{position:fixed;top:0;left:0;height:3px;width:0;z-index:60;background:linear-gradient(90deg,#0f7d52,#38d39a,#90c742);box-shadow:0 0 14px rgba(56,211,154,.6);transition:width .1s linear}
+
+.top{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;gap:13px;padding:13px 5vw;background:rgba(5,19,13,.74);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+.brand{font-weight:900;letter-spacing:.3px}.brand b{color:var(--green)}
+.brand em{font-style:normal;font-size:12px;font-weight:800;color:#9ef0c8;background:rgba(56,211,154,.12);border:1px solid rgba(56,211,154,.3);padding:3px 8px;border-radius:999px;margin-left:8px}
+/* [정식화 시 교체 ①] 배지 */
+.badge{font-size:12px;padding:7px 12px;border:1px solid rgba(246,196,83,.4);color:#ffe6a6;background:rgba(246,196,83,.1);border-radius:999px;font-weight:800}
+.top .spacer{flex:1}
+.top button{border:0;border-radius:11px;background:#fff;color:#07130d;font-weight:800;padding:9px 15px;cursor:pointer;transition:.2s}
+.top button:hover{transform:translateY(-1px)}
+
+.hero{position:relative;z-index:1;min-height:100vh;display:grid;place-items:center;padding:120px 6vw 70px;text-align:center}
+.hero-inner{max-width:1000px}
+.eyebrow{color:#7fe3b5;font-weight:800;letter-spacing:.2em;font-size:12px}
+.hero h1{font-size:clamp(34px,6vw,70px);line-height:1.07;margin:16px 0 20px;letter-spacing:-.05em}
+.hero h1 span{background:linear-gradient(92deg,#fff,#90c742 46%,#38d39a);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{font-size:clamp(15px,1.9vw,20px);line-height:1.8;color:var(--muted);max-width:660px;margin:0 auto}
+.hero-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:30px}
+.primary,.ghost{padding:14px 22px;border-radius:13px;font-weight:850;text-decoration:none;transition:.2s;cursor:pointer;border:0}
+.primary{background:linear-gradient(135deg,#0f7d52,#38d39a);color:#04140d;box-shadow:0 14px 36px rgba(15,125,82,.4)}
+.ghost{border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--txt)}
+.primary:hover,.ghost:hover{transform:translateY(-2px)}
+.notice{margin:32px auto 0;max-width:720px;border:1px solid rgba(246,196,83,.28);background:rgba(246,196,83,.07);color:#ffe7a8;border-radius:14px;padding:14px 16px;font-size:13px;line-height:1.7}
+.notice b{color:#ffd873}
+.scroll-cue{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:12px;color:#7f9a8c}
+.scroll-cue:after{content:"↓";display:block;text-align:center;font-size:22px;animation:bounce 1.5s infinite}
+@keyframes bounce{50%{transform:translateY(8px)}}
+
+.sec{position:relative;z-index:1;padding:88px 7vw;border-top:1px solid rgba(255,255,255,.05)}
+.sec-head{max-width:900px;margin:0 auto 38px;text-align:center}
+.sec-head .num{font-weight:900;font-size:13px;letter-spacing:.14em}
+.sec-head h2{font-size:clamp(27px,3.8vw,48px);letter-spacing:-.04em;margin:11px 0 12px;line-height:1.14}
+.sec-head p{color:var(--muted);font-size:16.5px;line-height:1.8}
+
+/* 카드 */
+.grid3{max-width:1020px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.card{padding:24px 20px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.015))}
+.card.ok{border-color:rgba(56,211,154,.28);background:linear-gradient(160deg,rgba(56,211,154,.08),rgba(255,255,255,.015))}
+.card.ver{border-color:rgba(90,168,255,.3);background:linear-gradient(160deg,rgba(90,168,255,.09),rgba(255,255,255,.015))}
+.card .ci{font-size:26px}
+.card b{display:block;margin:11px 0 7px;font-size:16.5px}
+.card small{color:var(--muted);line-height:1.62;font-size:13.5px;display:block}
+.chip{display:inline-block;margin-top:12px;font-size:11.5px;font-weight:800;padding:4px 11px;border-radius:999px}
+.chip.g{color:#8ef0c2;background:rgba(56,211,154,.14)}
+.chip.b{color:#a9ccff;background:rgba(90,168,255,.16)}
+
+/* 검증 수치 */
+.proof{max-width:1020px;margin:26px auto 0;border:1px solid rgba(90,168,255,.26);background:rgba(90,168,255,.06);border-radius:16px;padding:22px 24px}
+.proof h3{margin:0 0 6px;font-size:16px;color:#bcd8ff}
+.proof .sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+.pnums{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.pn{padding:14px;border-radius:12px;background:rgba(0,0,0,.22);border:1px solid var(--line);text-align:center}
+.pn b{display:block;font-size:21px;letter-spacing:-.02em;color:#e9f6ff}
+.pn small{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+
+/* 흐름 */
+.flow{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.fcard{padding:22px 18px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.015));position:relative}
+.fcard:not(:last-child):after{content:"→";position:absolute;right:-19px;top:50%;transform:translateY(-50%);color:#5b7a6c;font-size:20px}
+.fnum{font-size:12px;font-weight:900;color:var(--green);letter-spacing:.1em}
+.fcard .fi{font-size:24px;margin:8px 0 4px}
+.fcard b{display:block;margin:6px 0 6px;font-size:15.5px}
+.fcard small{color:var(--muted);line-height:1.55;font-size:13px}
+
+/* 레이어 스택 */
+.stack{max-width:540px;margin:34px auto 0;display:grid;gap:10px}
+.layer{display:flex;align-items:center;gap:13px;padding:14px 18px;border-radius:13px;border:1px solid var(--line);font-weight:800;opacity:.4;transform:translateY(6px);transition:.55s}
+.layer.on{opacity:1;transform:none}
+.layer .ln{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:15px;flex:none}
+.layer small{display:block;font-weight:600;color:var(--muted);font-size:12px;margin-top:1px}
+.layer.l1{background:rgba(90,168,255,.08)}.layer.l1 .ln{background:rgba(90,168,255,.2)}
+.layer.l2{background:rgba(246,196,83,.08)}.layer.l2 .ln{background:rgba(246,196,83,.2)}
+.layer.l3{background:rgba(56,211,154,.08)}.layer.l3 .ln{background:rgba(56,211,154,.2)}
+.stack-arrow{text-align:center;color:#5b7a6c;font-size:17px}
+.legend{max-width:640px;margin:24px auto 0;display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:13px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.03)}
+.legend span{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:#cfe6da}
+.legend i{width:15px;height:15px;border-radius:4px;display:inline-block}
+
+.footer{position:relative;z-index:1;padding:86px 6vw 60px;text-align:center;border-top:1px solid var(--line)}
+.footer h2{font-size:clamp(27px,4.2vw,48px);margin:0 0 14px;letter-spacing:-.04em}
+.footer p{color:var(--muted);line-height:1.8}
+.status{display:inline-flex;align-items:center;gap:9px;margin:18px auto 8px;padding:11px 18px;border:1px solid rgba(246,196,83,.3);background:rgba(246,196,83,.08);border-radius:999px;color:#ffe6a6;font-weight:800;font-size:14px}
+.status .led{width:9px;height:9px;border-radius:50%;background:#f6c453;animation:led 1.6s infinite}
+@keyframes led{50%{box-shadow:0 0 0 7px rgba(246,196,83,0)}}
+.mini{font-size:12px;color:#6f8a7c;margin-top:30px}
+
+.reveal{opacity:0;transform:translateY(38px);transition:.8s cubic-bezier(.2,.7,.2,1)}
+.reveal.show{opacity:1;transform:none}
+
+@media(max-width:900px){
+  .grid3{grid-template-columns:1fr}
+  .flow{grid-template-columns:1fr 1fr}.fcard:nth-child(2):after{display:none}
+  .pnums{grid-template-columns:1fr 1fr}
+  .top .badge{display:none}
+}
+@media(max-width:540px){
+  .hero{padding:110px 20px 60px}.sec{padding:64px 20px}
+  .flow{grid-template-columns:1fr}.fcard:after{display:none}
+  .pnums{grid-template-columns:1fr}
+  .top{padding:12px 16px}.top button{font-size:12px;padding:8px 11px}
+}
+</style>
+</head>
+<body>
+<div class="prog" id="prog"></div>
+
+<header class="top">
+  <div class="brand"><b>🌳 G-DSP</b> 환경등급 분석<em>Preview</em></div>
+  <span class="badge">기술 검증 완료 · 탑재 준비 중</span>
+  <div class="spacer"></div>
+  <button onclick="document.querySelector('#now').scrollIntoView()">둘러보기 ↓</button>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner reveal show">
+    <div class="eyebrow">ENVIRONMENT GRADE × SLOPE</div>
+    <!-- [정식화 시 교체 ②] 히어로 문구 -->
+    <h1>환경등급과 경사도를<br><span>겹쳐서 면적을 나눕니다.</span></h1>
+    <p>등급 경계선을 손으로 그리지 않아도 됩니다. 등급별 면적과 15도 이상 중첩 면적을 자동으로 산정하고, 도면으로 출력합니다.</p>
+    <div class="hero-actions">
+      <a class="primary" href="#now">기능 보기 ↓</a>
+      <a class="ghost" href="#how">사용 흐름</a>
+    </div>
+    <div class="notice"><b>기술 검증이 끝났습니다.</b> 실제 사업부지·경사도 성과품·환경등급 자료로 계산과 도면 출력을 확인했으며, 현재 G-DSP 화면에 붙이는 작업을 준비 중입니다.</div>
+  </div>
+  <div class="scroll-cue">스크롤</div>
+</section>
+
+<!-- ① 지금 되는 것 -->
+<section class="sec" id="now">
+  <div class="sec-head reveal">
+    <div class="num" style="color:var(--green)">01 · 지금 되는 것</div>
+    <h2>통합 지도에서<br>이미 확인할 수 있습니다</h2>
+  </div>
+  <div class="grid3 reveal">
+    <div class="card ok">
+      <div class="ci">🗺</div><b>환경등급 지도 표시</b>
+      <small>국토환경성평가지도(1~5등급)를 지도에 겹쳐 봅니다.</small>
+      <span class="chip g">✓ 사용 가능</span>
+    </div>
+    <div class="card ok">
+      <div class="ci">🔍</div><b>정밀분석 연동</b>
+      <small>필지 지번을 자동 전달해 환경성평가 정밀분석을 바로 엽니다.</small>
+      <span class="chip g">✓ 사용 가능</span>
+    </div>
+    <div class="card ok">
+      <div class="ci">📊</div><b>등급별 면적 · 엑셀</b>
+      <small>필지를 선택하면 등급별 면적을 표·차트로 산정하고 내려받습니다.</small>
+      <span class="chip g">✓ 사용 가능</span>
+    </div>
+  </div>
+  <div class="legend reveal">
+    <span><i style="background:var(--g1)"></i>1등급</span>
+    <span><i style="background:var(--g2)"></i>2등급</span>
+    <span><i style="background:var(--g3)"></i>3등급</span>
+    <span><i style="background:var(--g4)"></i>4등급</span>
+    <span><i style="background:var(--g5)"></i>5등급</span>
+  </div>
+</section>
+
+<!-- ② 검증 완료 -->
+<section class="sec">
+  <div class="sec-head reveal">
+    <div class="num" style="color:var(--blue)">02 · 검증 완료</div>
+    <h2>손으로 그리던 작업이<br>자동으로 끝납니다</h2>
+    <p>실제 성과품으로 계산·출력을 확인했습니다. G-DSP 화면 탑재만 남았습니다.</p>
+  </div>
+  <div class="grid3 reveal">
+    <div class="card ver">
+      <div class="ci">✏️</div><b>등급 경계선 자동 생성</b>
+      <small>등급 자료에서 경계선을 뽑아 도면 파일로 만듭니다. 좌표가 그대로라 기존 도면에 넣으면 제자리에 맞춰집니다.</small>
+      <span class="chip b">검증 완료 · 탑재 예정</span>
+    </div>
+    <div class="card ver">
+      <div class="ci">📐</div><b>중첩 면적 자동 산정</b>
+      <small>등급별로 나눈 뒤, 2등급 구역에서 15도 이상만 걸러 중첩 면적을 계산합니다.</small>
+      <span class="chip b">검증 완료 · 탑재 예정</span>
+    </div>
+    <div class="card ver">
+      <div class="ci">🖨</div><b>결과 도면 출력</b>
+      <small>경사구간별 색 구분 도면과 15도 이상만 남긴 도면, 면적표를 함께 출력합니다.</small>
+      <span class="chip b">검증 완료 · 탑재 예정</span>
+    </div>
+  </div>
+
+  <div class="proof reveal">
+    <h3>검증 사례</h3>
+    <div class="sub">실제 사업부지 · 경사도 성과품 · 환경등급 자료로 계산한 결과입니다.</div>
+    <div class="pnums">
+      <div class="pn"><b>10,605㎡</b><small>사업부지 면적</small></div>
+      <div class="pn"><b>9,384㎡</b><small>2등급지</small></div>
+      <div class="pn"><b>5,076㎡</b><small>15도 이상 중첩지</small></div>
+      <div class="pn"><b>0.13%</b><small>면적 오차</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- ③ 사용 흐름 -->
+<section class="sec" id="how">
+  <div class="sec-head reveal">
+    <div class="num" style="color:var(--green)">03 · 사용 흐름</div>
+    <h2>파일만 올리면<br>결과가 나옵니다</h2>
+  </div>
+  <div class="flow reveal">
+    <div class="fcard"><div class="fnum">STEP 1</div><div class="fi">📍</div><b>부지 지정</b><small>지도에서 위치를 찾아 지적선을 내려받습니다. 좌표의 기준이 됩니다.</small></div>
+    <div class="fcard"><div class="fnum">STEP 2</div><div class="fi">⛰</div><b>경사도 올리기</b><small>업체에서 받은 경사도 성과품을 그대로 올립니다.</small></div>
+    <div class="fcard"><div class="fnum">STEP 3</div><div class="fi">🌳</div><b>환경등급 올리기</b><small>해당 도엽 자료를 내려받아 올립니다. 여러 장도 자동으로 이어집니다.</small></div>
+    <div class="fcard"><div class="fnum">STEP 4</div><div class="fi">📄</div><b>결과 받기</b><small>등급 경계선·면적표·도면이 한 번에 나옵니다.</small></div>
+  </div>
+
+  <div class="stack reveal" id="stackBox">
+    <div class="layer l3" data-s="2"><span class="ln">③</span><div>환경등급 선<small>등급 경계 자동 생성</small></div></div>
+    <div class="stack-arrow">▲ 위에</div>
+    <div class="layer l2" data-s="1"><span class="ln">②</span><div>경사도 격자 · 색<small>경사구간별 구분</small></div></div>
+    <div class="stack-arrow">▲ 위에</div>
+    <div class="layer l1" data-s="0"><span class="ln">①</span><div>지적선 · 부지경계<small>좌표 기준</small></div></div>
+  </div>
+</section>
+
+<!-- footer -->
+<footer class="footer">
+  <div class="reveal">
+    <div class="status"><span class="led"></span> 계산·도면 검증 완료 · G-DSP 화면 탑재 준비 중</div>
+    <h2>곧 여기서 한 번에.</h2>
+    <p>지금은 자료를 따로 받아 도면 작업을 거쳐야 하지만,<br>이 환경 탭에서 부지 지정부터 면적·도면까지 한 흐름으로 처리하게 됩니다.</p>
+    <div class="mini">© G-DSP · 개발 중이며 화면과 기능은 진행에 따라 바뀔 수 있습니다.</div>
+  </div>
+</footer>
+
+<script>
+var prog=document.getElementById('prog');
+addEventListener('scroll',function(){var h=document.documentElement,max=h.scrollHeight-h.clientHeight;prog.style.width=(max>0?(h.scrollTop/max*100):0)+'%';},{passive:true});
+
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)e.target.classList.add('show')})},{threshold:.16});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
+
+var stackBox=document.getElementById('stackBox'),ran=false;
+var sio=new IntersectionObserver(function(es){es.forEach(function(e){
+  if(e.isIntersecting && !ran){
+    ran=true;
+    var ls=Array.prototype.slice.call(stackBox.querySelectorAll('.layer'));
+    ls.sort(function(a,b){return (+a.dataset.s)-(+b.dataset.s);});
+    ls.forEach(function(l,i){ setTimeout(function(){ l.classList.add('on'); }, 300*i); });
+  }
+})},{threshold:.35});
+if(stackBox) sio.observe(stackBox);
+</script>
+</body>
+</html>
