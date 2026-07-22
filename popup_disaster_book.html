@@ -442,6 +442,16 @@
         <div style="font-size:11px;color:#4ade80;margin-bottom:4px">✅ 작업구역 적용됨</div>
         <button class="btn btn-ghost" onclick="clearCrop()" style="font-size:11px;padding:5px">🗑 작업구역 초기화 (전체화면)</button>
       </div>
+
+      <!-- 한방에 분석 -->
+      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+        <button class="btn btn-primary" id="btnAutoRun" onclick="runAutoAnalysis()" style="width:100%;font-weight:800">⚡ 4~7번 한방에 분석</button>
+        <div style="font-size:10.5px;color:var(--tx3);margin-top:6px;line-height:1.55">
+          삼각망 → 음영기복(DEM) → 흐름·하천 분석까지 <b>자동으로</b> 이어서 실행하고,
+          마지막에 <b>경사도 창</b>을 열어줍니다. (경사도는 창에서 [분석 실행]만 누르면 끝)
+        </div>
+        <div id="autoRunMsg" style="display:none;margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--tx2)"></div>
+      </div>
     </div>
 
     <div class="sec pgsec" data-page="1" id="secRecog">
@@ -2770,10 +2780,12 @@ function render(){
     ctx.restore(); // clip 해제
     var cr2=S.cropRect;
     var ctl=w2s({x:cr2.minX,y:cr2.maxY}), cbr=w2s({x:cr2.maxX,y:cr2.minY});
-    ctx.save();
-    ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2.5; ctx.setLineDash([12,5]);
-    ctx.strokeRect(ctl.x,ctl.y,cbr.x-ctl.x,cbr.y-ctl.y);
-    ctx.setLineDash([]); ctx.restore();
+    if(!S._capturing){
+      ctx.save();
+      ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2.5; ctx.setLineDash([12,5]);
+      ctx.strokeRect(ctl.x,ctl.y,cbr.x-ctl.x,cbr.y-ctl.y);
+      ctx.setLineDash([]); ctx.restore();
+    }
   }
   /* ★ 검색 위치 핀 마커 — 맨 위에, 눈에 확 띄게 (지번검색 결과 표시) */
   if(S.searchMark){
@@ -5433,19 +5445,28 @@ function captureRect(rect, ow, done){
   var oh=Math.max(1,Math.round(ow/ar));
   var off=document.createElement('canvas'); off.width=ow; off.height=oh;
   var octx=off.getContext('2d');
-  octx.fillStyle='#0b1220'; octx.fillRect(0,0,ow,oh);
+
+  /* ① 먼저 도형을 그린다 — render()가 맨 앞에서 캔버스를 지우기 때문에
+        배경을 미리 깔면 같이 지워짐. 그래서 배경은 ②에서 "밑에" 넣는다. */
+  var _cv=cv, _ctx=ctx, _sc=S.scale, _ox=S.ox, _oy=S.oy, _bg=cadBg.on;
+  var tf=_shotTf(r, ow, oh);
+  cv=off; ctx=octx;
+  S.scale=tf.sc; S.ox=tf.ox; S.oy=tf.oy;
+  cadBg.on=false;              /* 배경은 ②에서 따로 (여기서 그리면 화면 타일이라 오염됨) */
+  S._capturing=true;           /* 구도 박스·작업구역 점선은 사진에 안 나오게 */
+  try{ render(); }catch(e){ console.error('capture render',e); }
+  S._capturing=false;
+  cv=_cv; ctx=_ctx; S.scale=_sc; S.ox=_ox; S.oy=_oy; cadBg.on=_bg;
+  render();                    /* 화면 복구 */
+
+  /* ② 배경을 도형 "아래"로 합성 (destination-over) */
+  octx.save();
+  octx.globalCompositeOperation='destination-over';
   _shotDrawBg(octx, ow, oh, r, function(){
-    /* 전역을 캡처 캔버스로 잠깐 바꿔치기 → 기존 render() 그대로 재사용 */
-    var _cv=cv, _ctx=ctx, _sc=S.scale, _ox=S.ox, _oy=S.oy, _bg=cadBg.on;
-    var tf=_shotTf(r, ow, oh);
-    cv=off; ctx=octx;
-    S.scale=tf.sc; S.ox=tf.ox; S.oy=tf.oy;
-    cadBg.on=false;              /* 배경은 위에서 이미 그림 (또 그리면 오염됨) */
-    S._capturing=true;           /* 구도 박스 자체는 그리지 않음 */
-    try{ render(); }catch(e){ console.error('capture render',e); }
-    S._capturing=false;
-    cv=_cv; ctx=_ctx; S.scale=_sc; S.ox=_ox; S.oy=_oy; cadBg.on=_bg;
-    render();                    /* 화면 복구 */
+    octx.globalCompositeOperation='destination-over';
+    octx.fillStyle='#0b1220';                  /* 지도가 없을 때의 바탕 */
+    octx.fillRect(0,0,ow,oh);
+    octx.restore();
     done(off);
   });
 }
@@ -5464,6 +5485,69 @@ function saveShotPNG(){
       a.href=c.toDataURL('image/png'); a.click();
       toast('PNG 저장 완료 · '+c.width+'×'+c.height,'ok');
     }catch(e){ toast('저장 실패: '+e.message,'err'); }
+  });
+}
+/* ═══ 한방에 분석 (3번 작업범위 → 4·5·6·7 자동) ═════════════════════
+   각 단계는 _deferHeavy 로 돌아가므로(화면 안 멈춤) 완료를 기다렸다가 다음으로.
+   사람 판단이 필요한 것(유역 유출구 클릭, 경사도 조정)은 자동화하지 않는다. */
+var _autoRun={busy:false, cancel:false};
+function _autoStep(name, coreFn, next){
+  if(_autoRun.cancel){ _autoFinish('중단됨'); return; }
+  _autoProgress(name);
+  setTimeout(function(){
+    try{ coreFn(); }
+    catch(e){ _autoFinish('오류: '+(e&&e.message||e)); return; }
+    setTimeout(next, 60);          /* 화면 갱신 여유 */
+  }, 40);
+}
+function _autoProgress(msg){
+  var el=document.getElementById('autoRunMsg');
+  if(el){ el.style.display=''; el.innerHTML='⏳ '+msg+' …'; }
+}
+function _autoFinish(msg, ok){
+  _autoRun.busy=false;
+  var el=document.getElementById('autoRunMsg');
+  if(el) el.innerHTML=(ok?'✅ ':'⚠️ ')+msg;
+  var b=document.getElementById('btnAutoRun');
+  if(b){ b.disabled=false; b.textContent='⚡ 4~7번 한방에 분석'; }
+  if(cv) cv.style.cursor='grab';
+  updateNav();
+  toast(msg, ok?'ok':'err');
+}
+function runAutoAnalysis(){
+  if(_autoRun.busy){ _autoRun.cancel=true; return; }
+  if(!S.contours.length && !S.surveys.length){ toast('먼저 지형도(1번)를 올리세요','err'); return; }
+  if(!S.cropRect && !confirm('작업범위(3번)를 안 잡으면 지형 전체로 계산해서 오래 걸릴 수 있어요.\n\n[확인] 그냥 진행  /  [취소] 작업범위 먼저')){ goToPage(3); return; }
+  _autoRun.busy=true; _autoRun.cancel=false;
+  var b=document.getElementById('btnAutoRun');
+  if(b){ b.disabled=true; b.textContent='⏳ 분석 중…'; }
+  if(cv) cv.style.cursor='progress';
+  var t0=Date.now();
+
+  _autoStep('① 삼각망 생성 (4번)', function(){
+    if(!S.triList.length) _runTINcore();
+  }, function(){
+    _autoStep('② 음영기복 DEM (5번)', function(){
+      if(!S.dem) _runDEMcore();
+    }, function(){
+      if(!S.dem){ _autoFinish('DEM 생성 실패 — 등고선을 확인하세요'); return; }
+      _autoStep('③ 흐름·하천 분석 (6번)', function(){
+        if(!S.flow) _runFlowcore();
+      }, function(){
+        if(!S.flow){ _autoFinish('흐름 분석 실패'); return; }
+        /* ④ 경사도 — 별도 창(iframe)에서 도는 구조라 계산까지 자동은 불가.
+           허가지선이 있으면 창을 열어주는 데까지 해주고, 안에서 [분석 실행]만 누르면 됨. */
+        var sec=((Date.now()-t0)/1000).toFixed(1);
+        render();
+        if(S.permit && S.permit.length){
+          _autoFinish('4·5·6번 완료 · '+sec+'초 → 경사도 창을 엽니다', true);
+          setTimeout(function(){ openSlopeWin(); }, 300);
+        } else {
+          _autoFinish('4·5·6번 완료 · '+sec+'초 (경사도는 허가지선 필요)', true);
+          goToPage(6);
+        }
+      });
+    });
   });
 }
 function showProfileResult(cls){
