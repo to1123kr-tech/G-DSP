@@ -4185,27 +4185,25 @@
             <!-- ④ 날짜 + 방문자 통계 -->
             <div class="nd-stat-bar">
               <span id="dashDate" style="color:var(--txt3)"></span>
-              <div class="nd-stat-chips">
-                <span class="nd-stat-chip nd-stat-today" title="오늘 방문">
+              <div class="nd-stat-chips" id="ndStatChips" style="cursor:pointer" title="클릭하면 사용량 분석">
+                <span class="nd-stat-chip nd-stat-today" title="오늘 방문한 사람 수 (같은 사람 여러 번 = 1명)">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <circle cx="12" cy="8" r="4" />
-                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                    <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
                   </svg>
                   오늘 <strong id="statToday">-</strong>명
                 </span>
-                <span class="nd-stat-chip nd-stat-total" title="누적 방문">
+                <span class="nd-stat-chip nd-stat-my" title="오늘 처음 들어온 사람">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  신규 <strong id="statNew">-</strong>명
+                </span>
+                <span class="nd-stat-chip nd-stat-total" title="지금까지 사용한 전체 사람 수 (중복 제외)">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
                     <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
                   </svg>
-                  누적 <strong id="statTotal">-</strong>명
-                </span>
-                <span class="nd-stat-chip nd-stat-my" title="내 방문횟수">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                  </svg>
-                  내 방문 <strong id="statMy">-</strong>회
+                  전체 <strong id="statTotal">-</strong>명
                 </span>
               </div>
             </div>
@@ -8741,11 +8739,15 @@
       var localToday = parseInt(localStorage.getItem(todayKey) || '0') + 1;
       localStorage.setItem(todayKey, localToday);
 
-      function updateStatUI(today, total) {
-        var elT = document.getElementById('statToday');
-        var elA = document.getElementById('statTotal');
-        if (elT) elT.textContent = (today || localToday).toLocaleString();
-        if (elA) elA.textContent = (total || localToday).toLocaleString();
+      // [G-DSP2·2026-07-22] 서버가 uid로 중복 제거한 "사람 수"를 돌려줌
+      //  today=오늘 방문자 / new=오늘 신규 / total=전체 사용자
+      function updateStatUI(d) {
+        function set(id, v) {
+          var el = document.getElementById(id);
+          if (el) el.textContent = (v === undefined || v === null) ? '-' : Number(v).toLocaleString();
+        }
+        if (!d) { set('statToday', null); set('statNew', null); set('statTotal', null); return; }
+        set('statToday', d.today); set('statNew', d['new']); set('statTotal', d.total);
       }
 
       // UID 생성
@@ -8763,12 +8765,11 @@
       })
         .then(function (r) { return r.json(); })
         .then(function (d) {
-          if (d && d.today !== undefined) updateStatUI(d.today, d.total);
-          else updateStatUI(localToday, null);
+          if (d && d.today !== undefined) updateStatUI(d);
+          else updateStatUI(null);      // 서버 집계 없으면 '-' (가짜 숫자 안 띄움)
         })
         .catch(function () {
-          // 서버 오프라인 → 로컬값 표시
-          updateStatUI(localToday, myVisits);
+          updateStatUI(null);           // 서버 오프라인 → '-'
         });
     })();
 
@@ -8946,6 +8947,100 @@
     function geoMapToggleEdit() { GM.toggleEdit(); }
 
   </script>
+
+<!-- ══ [G-DSP2·2026-07-22] 사용량 분석 패널 (통계칩 클릭 시) ══ -->
+<style>
+  #usePanel{position:fixed;inset:0;z-index:9999;display:none;place-items:center;
+    background:rgba(0,0,0,.5);backdrop-filter:blur(6px);padding:18px}
+  #usePanel.on{display:grid}
+  #usePanel .up-card{width:100%;max-width:520px;max-height:86vh;overflow:auto;
+    background:#fff;color:#1e293b;border-radius:18px;padding:22px 22px 18px;
+    box-shadow:0 30px 90px rgba(0,0,0,.4);animation:upIn .2s ease}
+  body.dark #usePanel .up-card{background:#131c2b;color:#e2e8f0}
+  @keyframes upIn{from{transform:scale(.95);opacity:0}}
+  #usePanel h3{margin:0 0 4px;font-size:18px;font-weight:900;letter-spacing:-.02em}
+  #usePanel .up-sub{font-size:12px;color:#64748b;margin-bottom:16px}
+  body.dark #usePanel .up-sub{color:#94a3b8}
+  #usePanel .up-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:12px}
+  #usePanel .up-n{padding:13px 10px;border-radius:12px;background:#f1f5f9;text-align:center}
+  body.dark #usePanel .up-n{background:rgba(255,255,255,.06)}
+  #usePanel .up-n b{display:block;font-size:20px;font-weight:900;letter-spacing:-.02em}
+  #usePanel .up-n small{display:block;font-size:11px;color:#64748b;margin-top:3px}
+  body.dark #usePanel .up-n small{color:#94a3b8}
+  #usePanel .c1 b{color:#2563eb} #usePanel .c2 b{color:#ea580c} #usePanel .c3 b{color:#0f9d58}
+  #usePanel .c4 b{color:#7c3aed} #usePanel .c5 b{color:#0891b2} #usePanel .c6 b{color:#be123c}
+  #usePanel .up-sec{font-size:12px;font-weight:800;color:#475569;margin:16px 0 8px}
+  body.dark #usePanel .up-sec{color:#cbd5e1}
+  #usePanel .up-bars{display:grid;gap:6px}
+  #usePanel .up-bar{display:flex;align-items:center;gap:9px;font-size:12px}
+  #usePanel .up-bar span:first-child{width:74px;color:#64748b;flex:none}
+  body.dark #usePanel .up-bar span:first-child{color:#94a3b8}
+  #usePanel .up-bar .tr{flex:1;height:9px;border-radius:99px;background:#e2e8f0;overflow:hidden}
+  body.dark #usePanel .up-bar .tr{background:rgba(255,255,255,.09)}
+  #usePanel .up-bar .fl{height:100%;border-radius:99px;background:linear-gradient(90deg,#2563eb,#60a5fa)}
+  #usePanel .up-bar b{width:46px;text-align:right;flex:none}
+  #usePanel .up-close{width:100%;margin-top:16px;padding:11px;border:0;border-radius:11px;
+    background:#1f6feb;color:#fff;font-weight:800;cursor:pointer;font-size:14px}
+  #usePanel .up-err{padding:14px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-size:13px;line-height:1.6}
+</style>
+<div id="usePanel" onclick="if(event.target===this)usePanelClose()">
+  <div class="up-card">
+    <h3>사용량 분석</h3>
+    <div class="up-sub" id="upDate"></div>
+    <div id="upBody"></div>
+    <button class="up-close" onclick="usePanelClose()">닫기</button>
+  </div>
+</div>
+<script>
+function usePanelClose(){ var p=document.getElementById('usePanel'); if(p) p.classList.remove('on'); }
+(function(){
+  var chips=document.getElementById('ndStatChips');
+  if(!chips) return;
+  chips.addEventListener('click', function(){
+    var p=document.getElementById('usePanel'), body=document.getElementById('upBody'), dt=document.getElementById('upDate');
+    if(!p) return;
+    p.classList.add('on');
+    var d=new Date();
+    if(dt) dt.textContent = d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일 기준';
+    body.innerHTML='<div class="up-sub">불러오는 중…</div>';
+    var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
+    fetch(PROXY+'/api/stats/summary?days=14')
+      .then(function(r){ return r.json(); })
+      .then(function(s){
+        if(!s || s.today===undefined) throw new Error('no data');
+        var rec = s.recent || [];
+        var maxP = Math.max.apply(null, rec.map(function(x){return x.people;}).concat([1]));
+        var bars = rec.slice().reverse().map(function(x){
+          return '<div class="up-bar"><span>'+String(x.date).slice(5)+'</span>'
+               + '<span class="tr"><span class="fl" style="width:'+Math.round(x.people/maxP*100)+'%"></span></span>'
+               + '<b>'+x.people+'명</b></div>';
+        }).join('') || '<div class="up-sub">기록 없음</div>';
+        var f = s.freq || {};
+        var fr = [['1','1회'],['2-4','2~4회'],['5-9','5~9회'],['10+','10회 이상']].map(function(k){
+          var v = f[k[0]] || 0;
+          return '<div class="up-bar"><span>'+k[1]+'</span><span class="tr"><span class="fl" style="width:'
+            + Math.round(v/Math.max(s.total||1,1)*100) + '%"></span></span><b>'+v+'명</b></div>';
+        }).join('');
+        body.innerHTML =
+          '<div class="up-grid">'
+          + '<div class="up-n c1"><b>'+s.today+'</b><small>오늘 방문자</small></div>'
+          + '<div class="up-n c2"><b>'+s['new']+'</b><small>오늘 신규</small></div>'
+          + '<div class="up-n c3"><b>'+s.total+'</b><small>전체 사용자</small></div>'
+          + '</div><div class="up-grid">'
+          + '<div class="up-n c4"><b>'+(s.revisit||0)+'</b><small>오늘 재방문</small></div>'
+          + '<div class="up-n c5"><b>'+(s.hits||0)+'</b><small>오늘 접속 횟수</small></div>'
+          + '<div class="up-n c6"><b>'+(s.avg||0)+'</b><small>1인당 평균</small></div>'
+          + '</div>'
+          + '<div class="up-sec">최근 방문자 추이 (일별 사람 수)</div><div class="up-bars">'+bars+'</div>'
+          + '<div class="up-sec">사용빈도 — 전체 사용자가 몇 번 썼나</div><div class="up-bars">'+fr+'</div>';
+      })
+      .catch(function(){
+        body.innerHTML='<div class="up-err">서버에서 통계를 가져오지 못했습니다.<br>크롤 서버(server.py)가 실행 중인지 확인해 주세요.</div>';
+      });
+  });
+})();
+</script>
+
 </body>
 
 </html>

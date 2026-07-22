@@ -1803,13 +1803,120 @@ def info():
 
 
 # ==== index.html이 호출하는 추가 엔드포인트들 (안 죽게 빈 응답) ====
+# ==================== 방문자 통계 (실사용자 집계) ====================
+# [G-DSP2·2026-07-22] 기존엔 빈 응답만 돌려줘서 화면 숫자가 전부 브라우저 로컬값이었음.
+#  → uid 기준으로 "사람 수"를 실제 집계. 같은 사람이 여러 번 들어와도 1명.
+#  저장: server.py 옆 gdsp_visits.json
+#    users = { uid: 최초방문일 }        → 전체 사용자 수
+#    daily = { 날짜: [uid, ...] }        → 오늘 방문자 수 (중복 제거)
+import threading
+_VISIT_LOCK = threading.Lock()
+_VISIT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gdsp_visits.json')
+_VISIT_KEEP_DAYS = 180   # 날짜별 기록 보관 일수(파일 비대화 방지)
+
+def _visit_load():
+    try:
+        with open(_VISIT_FILE, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+            if not isinstance(d, dict): raise ValueError
+            d.setdefault('users', {}); d.setdefault('daily', {})
+            return d
+    except Exception:
+        return {'users': {}, 'daily': {}}
+
+def _visit_save(d):
+    try:
+        tmp = _VISIT_FILE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(d, f, ensure_ascii=False)
+        os.replace(tmp, _VISIT_FILE)   # 원자적 저장(쓰다 죽어도 원본 보존)
+    except Exception as e:
+        logger.warning(f"[STATS] 저장 실패: {e}")
+
+def _visit_stats(d, today):
+    todays = d['daily'].get(today, {})           # {uid: 오늘 접속 횟수}
+    if isinstance(todays, list):                 # 구버전 호환
+        todays = {u: 1 for u in todays}
+    new_cnt = sum(1 for u, info in d['users'].items()
+                  if (info.get('f') if isinstance(info, dict) else info) == today)
+    hits = sum(todays.values())
+    ppl = len(todays)
+    return {
+        'today':   ppl,                          # 오늘 방문자(사람 수, 중복 제거)
+        'total':   len(d['users']),              # 전체 사용자(누적, 중복 제거)
+        'new':     new_cnt,                      # 오늘 처음 온 사람
+        'revisit': max(ppl - new_cnt, 0),        # 오늘 재방문자
+        'hits':    hits,                         # 오늘 총 접속 횟수
+        'avg':     round(hits / ppl, 1) if ppl else 0,   # 1인당 평균 접속
+    }
+
 @app.route('/api/stats/visit', methods=['POST', 'OPTIONS'])
 def stats_visit():
-    return jsonify({"ok": True})
+    if request.method == 'OPTIONS':
+        return jsonify({"ok": True})
+    try:
+        body = request.get_json(silent=True) or {}
+        uid = (body.get('uid') or '').strip()[:64]
+        today = (body.get('date') or datetime.now().strftime('%Y-%m-%d'))[:10]
+        if not uid:
+            return jsonify({"ok": True, "today": 0, "total": 0, "new": 0})
+
+        with _VISIT_LOCK:
+            d = _visit_load()
+            # 사용자 기록: f=최초방문일, l=최근방문일, n=총 접속횟수
+            u = d['users'].get(uid)
+            if not isinstance(u, dict):
+                u = {'f': u if isinstance(u, str) else today, 'l': today, 'n': 0}
+            u['l'] = today
+            u['n'] = int(u.get('n', 0)) + 1
+            d['users'][uid] = u
+            # 날짜별: {uid: 그날 접속 횟수}
+            day = d['daily'].setdefault(today, {})
+            if isinstance(day, list):                     # 구버전 호환
+                day = {x: 1 for x in day}; d['daily'][today] = day
+            day[uid] = int(day.get(uid, 0)) + 1
+            # 오래된 날짜 정리
+            if len(d['daily']) > _VISIT_KEEP_DAYS:
+                for k in sorted(d['daily'].keys())[:-_VISIT_KEEP_DAYS]:
+                    d['daily'].pop(k, None)
+            _visit_save(d)
+            st = _visit_stats(d, today)
+        st['ok'] = True
+        return jsonify(st)
+    except Exception as e:
+        logger.warning(f"[STATS] visit 오류: {e}")
+        return jsonify({"ok": False, "today": 0, "total": 0, "new": 0})
 
 @app.route('/api/stats/summary', methods=['GET'])
 def stats_summary():
-    return jsonify({"visits": 0, "ok": True})
+    """관리자용 요약 — 최근 N일 추이까지"""
+    try:
+        days = min(int(request.args.get('days', 14)), 180)
+    except Exception:
+        days = 14
+    today = datetime.now().strftime('%Y-%m-%d')
+    with _VISIT_LOCK:
+        d = _visit_load()
+        st = _visit_stats(d, today)
+        recent = sorted(d['daily'].items())[-days:]
+        st['recent'] = [{'date': k, 'people': len(v),
+                         'hits': (sum(v.values()) if isinstance(v, dict) else len(v))}
+                        for k, v in recent]
+        # 사용빈도 분포(전체 기간, 총 접속횟수 기준)
+        buckets = {'1': 0, '2-4': 0, '5-9': 0, '10+': 0}
+        for uid, info in d['users'].items():
+            n = int(info.get('n', 1)) if isinstance(info, dict) else 1
+            if n <= 1: buckets['1'] += 1
+            elif n <= 4: buckets['2-4'] += 1
+            elif n <= 9: buckets['5-9'] += 1
+            else: buckets['10+'] += 1
+        st['freq'] = buckets
+        # 많이 쓰는 순 상위(익명 uid 뒷자리만)
+        tops = sorted(((info.get('n',1) if isinstance(info,dict) else 1, uid)
+                       for uid, info in d['users'].items()), reverse=True)[:10]
+        st['top'] = [{'user': u[-4:], 'count': n} for n, u in tops]
+    st['ok'] = True
+    return jsonify(st)
 
 @app.route('/api/iros_list', methods=['POST', 'OPTIONS'])
 def iros_list():
