@@ -707,6 +707,24 @@
           </div>
           <div style="font-size:11px;color:var(--tx3);margin-top:8px">농도 <span id="gnAlphaVal" style="color:#f59e0b">95%</span></div>
           <input type="range" min="10" max="100" value="95" oninput="gnSetAlpha(this.value)" style="width:100%">
+
+          <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">
+            <div style="font-size:11px;color:var(--tx3);margin-bottom:5px">미세조정 (10m씩)</div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+              <button class="btn btn-ghost" onclick="gnNudge(-10,0)" style="font-size:12px;padding:5px">←</button>
+              <button class="btn btn-ghost" onclick="gnNudge(10,0)" style="font-size:12px;padding:5px">→</button>
+              <button class="btn btn-ghost" onclick="gnNudge(0,10)" style="font-size:12px;padding:5px">↑</button>
+              <button class="btn btn-ghost" onclick="gnNudge(0,-10)" style="font-size:12px;padding:5px">↓</button>
+            </div>
+            <div style="font-size:11px;color:var(--tx3);margin:6px 0 4px">축척 미세조정 (0.1%씩)</div>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-ghost" onclick="gnZoomFine(-0.1)" style="flex:1;font-size:12px;padding:5px">− 작게</button>
+              <button class="btn btn-ghost" onclick="gnZoomFine(0.1)" style="flex:1;font-size:12px;padding:5px">+ 크게</button>
+            </div>
+            <div id="gnCalib" style="margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--tx2)"></div>
+            <button class="btn btn-primary" onclick="gnCopyCalib()" style="width:100%;margin-top:6px;font-size:11.5px">📋 이 값 복사 (알려주시면 코드에 고정)</button>
+          </div>
+
           <div style="font-size:10px;color:var(--tx3);margin-top:8px;line-height:1.5">
             크기·위치는 관내도에 인쇄된 좌표격자로 <b>자동 정합</b>돼 있습니다(오차 40m 이내).
             어긋나 보이면 「위치 초기화」를 누르세요.
@@ -5686,13 +5704,44 @@ function gnSyncUI(){
   var b=document.getElementById('btnGwannae');
   if(b){ b.textContent=GN.on?'🗺 관내도 끄기':'🗺 관내도 켜기'; b.classList.toggle('active',GN.on); }
   var p=document.getElementById('gnPanel'); if(p) p.style.display=GN.on?'':'none';
+  gnCalib();
   var a=document.getElementById('btnGnAlign');
   if(a){ a.textContent=GN.align?'✔ 위치 고정':'✥ 위치 맞추기'; a.classList.toggle('active',GN.align); }
 }
 /* 정렬 모드일 때 캔버스 드래그로 이동 */
 function gnDragStart(w){ if(!GN.align||!GN.img) return false; GN.drag={ox:GN.wx-w.x, oy:GN.wy-w.y}; return true; }
 function gnDragMove(w){ if(!GN.drag) return false; GN.wx=w.x+GN.drag.ox; GN.wy=w.y+GN.drag.oy; render(); return true; }
-function gnDragEnd(){ if(GN.drag){ GN.drag=null; gnSaveTf(); } }
+function gnDragEnd(){ if(GN.drag){ GN.drag=null; gnSaveTf(); gnCalib(); } }
+/* ── 미세조정: 이동/축척 + 현재값 표시(복사해서 코드에 박을 수 있게) ── */
+function gnNudge(dx,dy){ if(!GN.img) return; GN.wx+=dx; GN.wy+=dy; gnSaveTf(); gnCalib(); render(); }
+function gnZoomFine(pct){
+  if(!GN.img) return;
+  var cx=GN.wx+GN.img.width*GN.mpp/2, cy=GN.wy-GN.img.height*GN.mpp/2;   /* 중심 고정 */
+  GN.mpp*=(1+pct/100);
+  GN.wx=cx-GN.img.width*GN.mpp/2; GN.wy=cy+GN.img.height*GN.mpp/2;
+  gnSaveTf(); gnCalib(); render();
+}
+function gnCalib(){
+  var el=document.getElementById('gnCalib'); if(!el||!GN.img) return;
+  var sc=GN_FIT.imgW/GN.img.width;
+  var wx=GN.wx, wy=GN.wy, mpp=GN.mpp*(GN.img.width/GN_FIT.imgW);
+  var dx=Math.round(wx-GN_FIT.wx), dy=Math.round(wy-GN_FIT.wy);
+  var dm=((mpp/GN_FIT.mpp)-1)*100;
+  el.innerHTML='<div style="color:#f59e0b;font-weight:700;margin-bottom:3px">현재 정합값</div>'
+    +'<div style="font-family:monospace;font-size:11px;line-height:1.7">'
+    +'wx: '+wx.toFixed(1)+'<br>wy: '+wy.toFixed(1)+'<br>mpp: '+mpp.toFixed(5)+'</div>'
+    +'<div style="color:#9fb0c8;font-size:10.5px;margin-top:4px">기준 대비 · 동서 '+(dx>=0?'+':'')+dx+'m · 남북 '+(dy>=0?'+':'')+dy+'m · 축척 '+(dm>=0?'+':'')+dm.toFixed(3)+'%</div>';
+}
+function gnCopyCalib(){
+  if(!GN.img){ return; }
+  var mpp=GN.mpp*(GN.img.width/GN_FIT.imgW);
+  var t='wx:'+GN.wx.toFixed(1)+', wy:'+GN.wy.toFixed(1)+', mpp:'+mpp.toFixed(5);
+  try{
+    if(navigator.clipboard) navigator.clipboard.writeText(t);
+    else { var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    toast('복사됨 · '+t,'ok');
+  }catch(e){ toast(t); }
+}
 function showProfileResult(cls){
   var box=document.getElementById('profResultBox'), body=document.getElementById('profResultBody'); if(!box||!body||!cls) return;
   var col={'상승':'#22c55e','평형':'#60a5fa','하강':'#f59e0b','복합':'#ef4444'}[cls.form];
