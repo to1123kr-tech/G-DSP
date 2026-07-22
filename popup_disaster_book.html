@@ -707,10 +707,9 @@
           </div>
           <div style="font-size:11px;color:var(--tx3);margin-top:8px">농도 <span id="gnAlphaVal" style="color:#f59e0b">95%</span></div>
           <input type="range" min="10" max="100" value="95" oninput="gnSetAlpha(this.value)" style="width:100%">
-          <div style="font-size:11px;color:var(--tx3);margin-top:4px">크기 <span id="gnScaleVal" style="color:#f59e0b">–</span></div>
-          <input type="range" id="gnScale" min="2" max="20" step="0.05" value="8.3" oninput="gnSetScale(this.value)" style="width:100%">
-          <div style="font-size:10px;color:var(--tx3);margin-top:6px;line-height:1.5">
-            「위치 맞추기」를 켜면 <b>끌어서 이동</b>, 크기는 슬라이더로. 다 맞추면 다시 눌러 고정하세요.
+          <div style="font-size:10px;color:var(--tx3);margin-top:8px;line-height:1.5">
+            크기·위치는 관내도에 인쇄된 좌표격자로 <b>자동 정합</b>돼 있습니다(오차 40m 이내).
+            어긋나 보이면 「위치 초기화」를 누르세요.
           </div>
         </div>
       </div>
@@ -5628,19 +5627,22 @@ var GN={ on:false, img:null, loading:false, alpha:0.95,
          align:false, drag:null, src:'/gwannae.jpg' };
 
 function gnSaveTf(){
-  try{ localStorage.setItem('gdsp_gwannae', JSON.stringify({wx:GN.wx,wy:GN.wy,mpp:GN.mpp})); }catch(e){}
+  /* 크기는 저장하지 않는다 — 실측 정합값 고정. 위치 미세조정만 기억 */
+  try{ localStorage.setItem('gdsp_gwannae', JSON.stringify({wx:GN.wx,wy:GN.wy})); }catch(e){}
 }
 function gnLoadTf(){
   try{
     var s=localStorage.getItem('gdsp_gwannae');
-    if(s){ var o=JSON.parse(s); if(o&&o.mpp>0){ GN.wx=o.wx; GN.wy=o.wy; GN.mpp=o.mpp; return true; } }
+    if(s){ var o=JSON.parse(s); if(o&&isFinite(o.wx)&&isFinite(o.wy)){ GN.wx=o.wx; GN.wy=o.wy; return true; } }
   }catch(e){}
   return false;
 }
-/* 관내도 실측 정합값 — 그림에 인쇄된 좌표격자(가로 167~, 세로 523~ km)를
-   라벨 83개로 최소제곱 맞춤. 1km=141.70px(원본), 잔차 4px(≈30m) 이하.
-   ※ 5200px 배포본(gwannae.jpg) 기준. 다른 크기로 바꾸면 mpp를 비례 조정할 것. */
-var GN_FIT={ wx:163754, wy:525751, mpp:10.4651, imgW:5200 };
+/* 관내도 실측 정합값 — 그림에 인쇄된 좌표격자(가로 166~, 세로 523~ km)를
+   라벨 83개로 최소제곱 맞춤. 1km=141.70px(원본).
+   ★모서리에 인쇄된 위경도(126°36'32" / 37°18'30")로 교차검증 → 오차 38m.
+     (인쇄 위경도가 초 단위 반올림이라 ±25m는 원래 한계)
+   ※ 5200px 배포본(gwannae.jpg) 기준. 크기 다른 그림이면 폭 비율로 자동 보정됨. */
+var GN_FIT={ wx:162754, wy:525751, mpp:10.4651, imgW:5200 };
 function gnDefaultPos(){
   if(!GN.img) return;
   /* 실측값 적용 — 이미지 크기가 달라도 폭 비율로 자동 보정 */
@@ -5668,16 +5670,6 @@ function gnToggle(){
   im.src=GN.src;                    /* 같은 출처 → 캡처(저장) 가능 */
 }
 function gnSetAlpha(v){ GN.alpha=parseFloat(v)/100; var e=document.getElementById('gnAlphaVal'); if(e)e.textContent=Math.round(GN.alpha*100)+'%'; render(); }
-function gnSetScale(v){
-  if(!GN.img) return;
-  var old=GN.mpp, nw=parseFloat(v);
-  /* 중심 고정 확대 — 맞춰놓은 위치가 안 틀어지게 */
-  var cx=GN.wx+GN.img.width*old/2, cy=GN.wy-GN.img.height*old/2;
-  GN.mpp=nw;
-  GN.wx=cx-GN.img.width*nw/2; GN.wy=cy+GN.img.height*nw/2;
-  var e=document.getElementById('gnScaleVal'); if(e)e.textContent=(GN.img.width*nw/1000).toFixed(1)+'km 폭';
-  gnSaveTf(); render();
-}
 function gnAlignToggle(){
   if(!GN.on){ toast('관내도를 먼저 켜세요','err'); return; }
   GN.align=!GN.align;
@@ -5685,15 +5677,17 @@ function gnAlignToggle(){
   gnSyncUI(); render();
   toast(GN.align?'관내도를 끌어서 옮기세요 (크기는 아래 슬라이더)':'위치 고정됨','ok');
 }
-function gnReset(){ if(!GN.img) return; gnDefaultPos(); gnSaveTf(); gnSyncUI(); render(); toast('관내도 위치 초기화','ok'); }
+function gnReset(){
+  if(!GN.img) return;
+  try{ localStorage.removeItem('gdsp_gwannae'); }catch(e){}   /* 저장된 미세조정 삭제 */
+  gnDefaultPos(); gnSyncUI(); render(); toast('실측 정합값으로 되돌림','ok');
+}
 function gnSyncUI(){
   var b=document.getElementById('btnGwannae');
   if(b){ b.textContent=GN.on?'🗺 관내도 끄기':'🗺 관내도 켜기'; b.classList.toggle('active',GN.on); }
   var p=document.getElementById('gnPanel'); if(p) p.style.display=GN.on?'':'none';
   var a=document.getElementById('btnGnAlign');
   if(a){ a.textContent=GN.align?'✔ 위치 고정':'✥ 위치 맞추기'; a.classList.toggle('active',GN.align); }
-  var s=document.getElementById('gnScale');
-  if(s&&GN.img){ s.value=GN.mpp; var e=document.getElementById('gnScaleVal'); if(e)e.textContent=(GN.img.width*GN.mpp/1000).toFixed(1)+'km 폭'; }
 }
 /* 정렬 모드일 때 캔버스 드래그로 이동 */
 function gnDragStart(w){ if(!GN.align||!GN.img) return false; GN.drag={ox:GN.wx-w.x, oy:GN.wy-w.y}; return true; }
