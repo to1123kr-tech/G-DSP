@@ -1109,6 +1109,8 @@
       <button class="thr" id="c3d_pastel" onclick="set3DColorMode('pastel')">파스텔</button>
       <button class="thr" id="c3d_jet" onclick="set3DColorMode('jet')">형광</button>
       <button class="thr" id="c3d_thermal" onclick="set3DColorMode('thermal')">열지도</button>
+      <button class="thr" id="c3d_sat" onclick="set3DPhoto('sat')">🛰 위성</button>
+      <button class="thr" id="c3d_air" onclick="set3DPhoto('air')">✈ 항공</button>
     </div>
     <label style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:#cdd8ea;margin-top:10px;cursor:pointer">
       <input type="checkbox" id="c3d_stream" checked onchange="set3DStream(this.checked)"> 🌊 하천선 (시안)
@@ -3868,6 +3870,142 @@ function densify3DLine(poly, dem, hp, exag, zLift){
   return pts;
 }
 
+/* ═══ 3D 사진 텍스처 (위성/항공) ══════════════════════════════════════
+   지형 메시에 실제 사진을 입힌다.
+   ★정합 원칙: 텍스처 이미지는 소스 좌표계(위성=웹메르카토르 / 항공=EPSG:5179)의
+   "타일격자 경계에 딱 맞는 축정렬 사각형"으로 만들고(리샘플·회전 없음),
+   UV는 정점마다 5186→소스좌표로 변환해 계산한다.
+   → 투영계 격자북 차이(5186 vs 5179 약 0.3°)로 인한 회전 오정합이 원천적으로 없음. */
+var _TEX = { mode:null, tex:null, uv:null, key:'', busy:false, year:null };
+var _AIR_ORG_X = -200000.0, _AIR_ORG_Y = 4000000.0, _TEX_TILE = 256;
+
+/* WGS84 → 웹메르카토르(EPSG:3857) */
+function _llToMerc(lng,lat){
+  var s=Math.sin(lat*Math.PI/180);
+  if(s>0.9999) s=0.9999; if(s<-0.9999) s=-0.9999;
+  return [ lng/180*_MERC_R, _MERC_R*Math.log((1+s)/(1-s))/2 ];
+}
+function _texKey(dem,kind,year){
+  return kind+'|'+(year||'')+'|'+dem.minX.toFixed(1)+'|'+dem.minY.toFixed(1)+'|'+dem.cols+'x'+dem.rows+'|'+dem.cell;
+}
+/* 5186 → 소스좌표 */
+function _texProj(kind,X,Y){
+  var ll=tm5186toWgs84(X,Y); if(!ll) return null;
+  return (kind==='sat') ? _llToMerc(ll[0],ll[1]) : _wgs84to5179(ll[0],ll[1]);
+}
+/* DEM 범위(5186 bbox) 네 모서리 → 소스좌표 bbox */
+function _texSrcBox(dem,kind){
+  var x0=dem.minX, y0=dem.minY,
+      x1=dem.minX+(dem.cols-1)*dem.cell, y1=dem.minY+(dem.rows-1)*dem.cell;
+  var ps=[[x0,y0],[x1,y0],[x1,y1],[x0,y1]], xs=[], ys=[];
+  for(var i=0;i<4;i++){
+    var p=_texProj(kind,ps[i][0],ps[i][1]); if(!p) return null;
+    xs.push(p[0]); ys.push(p[1]);
+  }
+  return { mnx:Math.min.apply(null,xs), mxx:Math.max.apply(null,xs),
+           mny:Math.min.apply(null,ys), mxy:Math.max.apply(null,ys) };
+}
+/* 정점별 UV = 5186 → 소스좌표 → 텍스처 사각형 내 비율 */
+function _texBuildUV(dem,kind,rect){
+  var cols=dem.cols, rows=dem.rows, uv=new Float32Array(cols*rows*2);
+  var W=rect.X1-rect.X0, H=rect.Ytop-rect.Ybot;
+  for(var r=0;r<rows;r++){
+    for(var c=0;c<cols;c++){
+      var p=_texProj(kind, dem.minX+c*dem.cell, dem.minY+r*dem.cell);
+      var i=(r*cols+c)*2;
+      if(p){ uv[i]=(p[0]-rect.X0)/W; uv[i+1]=(p[1]-rect.Ybot)/H; }
+    }
+  }
+  return uv;
+}
+/* 타일 모자이크 → CanvasTexture + UV */
+function _texBuild(kind, done){
+  var dem=S.dem;
+  if(!dem){ done(null,'DEM이 없습니다'); return; }
+  if(!_cadInitProj()){ done(null,'좌표변환(proj4) 실패 — 서버에서 열어주세요'); return; }
+  if(kind==='air' && !_air5179Init()){ done(null,'좌표변환(5179) 실패'); return; }
+  var bx=_texSrcBox(dem,kind); if(!bx){ done(null,'좌표변환 실패'); return; }
+
+  /* 타일 40장 이하가 되는 가장 선명한 줌 선택 */
+  var zTop=(kind==='sat')?19:20, zBot=(kind==='sat')?12:10;
+  var z,x0,x1,y0,y1,span,found=false;
+  for(z=zTop; z>=zBot; z--){
+    span = (kind==='sat') ? (2*_MERC_R/Math.pow(2,z)) : (_TEX_TILE*_AIR_RES[z]);
+    if(!span) continue;
+    if(kind==='sat'){
+      x0=Math.floor((bx.mnx+_MERC_R)/span); x1=Math.floor((bx.mxx+_MERC_R)/span);
+      y0=Math.floor((_MERC_R-bx.mxy)/span); y1=Math.floor((_MERC_R-bx.mny)/span);
+    } else {
+      x0=Math.floor((bx.mnx-_AIR_ORG_X)/span); x1=Math.floor((bx.mxx-_AIR_ORG_X)/span);
+      y0=Math.floor((_AIR_ORG_Y-bx.mxy)/span); y1=Math.floor((_AIR_ORG_Y-bx.mny)/span);
+    }
+    if((x1-x0+1)*(y1-y0+1) <= 40 && (x1-x0+1) <= 16 && (y1-y0+1) <= 16){ found=true; break; }
+  }
+  if(!found){ done(null,'범위가 너무 넓습니다'); return; }
+
+  /* 텍스처 사각형 = 타일격자 경계 그대로 (리샘플 없음) */
+  var rect = (kind==='sat')
+    ? { X0:x0*span-_MERC_R, X1:(x1+1)*span-_MERC_R, Ytop:_MERC_R-y0*span, Ybot:_MERC_R-(y1+1)*span }
+    : { X0:_AIR_ORG_X+x0*span, X1:_AIR_ORG_X+(x1+1)*span, Ytop:_AIR_ORG_Y-y0*span, Ybot:_AIR_ORG_Y-(y1+1)*span };
+
+  var nx=x1-x0+1, ny=y1-y0+1;
+  var cvs=document.createElement('canvas');
+  cvs.width=nx*_TEX_TILE; cvs.height=ny*_TEX_TILE;
+  var g=cvs.getContext('2d');
+  g.fillStyle='#233043'; g.fillRect(0,0,cvs.width,cvs.height);
+
+  var total=nx*ny, fin=0, got=0;
+  function finish(){
+    if(!got){ done(null,'사진 타일을 받지 못했습니다'); return; }
+    var tex=new THREE.CanvasTexture(cvs); tex.needsUpdate=true;
+    done({ tex:tex, uv:_texBuildUV(dem,kind,rect), z:z, tiles:total, got:got });
+  }
+  for(var tx=x0; tx<=x1; tx++){
+    for(var ty=y0; ty<=y1; ty++){
+      (function(tx,ty){
+        var img=new Image();
+        img.onload=function(){
+          try{ g.drawImage(img,(tx-x0)*_TEX_TILE,(ty-y0)*_TEX_TILE,_TEX_TILE,_TEX_TILE); got++; }catch(e){}
+          if(++fin===total) finish();
+        };
+        img.onerror=function(){ if(++fin===total) finish(); };
+        /* ★반드시 서버 프록시(같은 출처) — 직접 호출하면 WebGL이 tainted canvas로 막음 */
+        img.src = (kind==='sat')
+          ? '/api/vw-tile/Satellite/'+z+'/'+tx+'/'+ty+'.jpeg'
+          : '/api/ngii-tile/'+_TEX.year+'/'+z+'/'+tx+'/'+ty;
+      })(tx,ty);
+    }
+  }
+}
+/* 버튼: 3D 지형에 위성/항공 사진 입히기 */
+function set3DPhoto(kind){
+  if(!_three){ toast('3D를 먼저 열어주세요','err'); return; }
+  if(_TEX.busy){ toast('사진 불러오는 중…'); return; }
+  var dem=S.dem; if(!dem){ toast('DEM이 없습니다','err'); return; }
+  /* 항공은 연도 필요 — 가장 최근 연도 사용 */
+  if(kind==='air' && !_TEX.year){
+    var ys=(typeof AIR!=='undefined' && AIR.years && AIR.years.length) ? AIR.years.map(Number) : null;
+    if(ys && ys.length){ _TEX.year=Math.max.apply(null,ys); set3DPhoto('air'); return; }
+    _TEX.busy=true;
+    fetch('/api/air-years').then(function(r){return r.json();}).then(function(j){
+      var a=(j&&j.years&&j.years.length)?j.years.map(Number):[2023];
+      _TEX.year=Math.max.apply(null,a); _TEX.busy=false; set3DPhoto('air');
+    }).catch(function(){ _TEX.year=2023; _TEX.busy=false; set3DPhoto('air'); });
+    return;
+  }
+  var key=_texKey(dem,kind,_TEX.year);
+  if(_TEX.tex && _TEX.mode===kind && _TEX.key===key){ set3DColorMode(kind); return; }  /* 캐시 재사용 */
+  _TEX.busy=true;
+  toast(kind==='sat' ? '위성사진 불러오는 중…' : '항공사진('+_TEX.year+'년) 불러오는 중…');
+  _texBuild(kind, function(res,err){
+    _TEX.busy=false;
+    if(!res){ toast(err||'사진을 불러오지 못했습니다','err'); return; }
+    _TEX.tex=res.tex; _TEX.uv=res.uv; _TEX.mode=kind; _TEX.key=key;
+    set3DColorMode(kind);
+    toast((kind==='sat'?'위성':'항공 '+_TEX.year+'년')+' 적용 · 타일 '+res.got+'/'+res.tiles,'ok');
+  });
+}
+
 /* 지형 메쉬 + 허가지선/버퍼선 (재)생성 — 색상·골격·높이강조 바뀔 때마다 */
 function _rebuild3D(){
   if(!_three||!_three.scene) return;
@@ -3879,7 +4017,13 @@ function _rebuild3D(){
   geo.setAttribute('position', new THREE.BufferAttribute(hp.pos,3));
   geo.setIndex(gridIndices(dem.cols, dem.rows));
   var material;
-  if(_three.colorMode==='hypso'||_three.colorMode==='terrain'||_EXTRA_PALS[_three.colorMode]){
+  var _isPhoto=(_three.colorMode==='sat'||_three.colorMode==='air');
+  if(_isPhoto && _TEX.tex && _TEX.uv && _TEX.uv.length===dem.cols*dem.rows*2){
+    /* 위성/항공 사진 — UV는 정점별 5186→소스좌표로 계산돼 있음(회전오차 없음) */
+    geo.setAttribute('uv', new THREE.BufferAttribute(_TEX.uv,2));
+    geo.computeVertexNormals();
+    material=new THREE.MeshLambertMaterial({map:_TEX.tex, side:THREE.DoubleSide, wireframe:!!_three.wire});
+  } else if(_three.colorMode==='hypso'||_three.colorMode==='terrain'||_EXTRA_PALS[_three.colorMode]){
     var useTerrain=(_three.colorMode==='terrain'), _palName=_EXTRA_PALS[_three.colorMode]?_three.colorMode:null;
     var cols3=new Float32Array(dem.cols*dem.rows*3);
     for(var vi=0;vi<dem.cols*dem.rows;vi++){
@@ -4230,7 +4374,7 @@ function set3DGrid(v){
 /* 3D 컨트롤 UI 상태 동기화 */
 function _sync3DCtrlUI(){
   var m=_three?_three.colorMode:'shade';
-  [['c3d_hypso','hypso'],['c3d_terrain','terrain'],['c3d_shade','shade'],['c3d_sepia','sepia'],['c3d_forest','forest'],['c3d_autumn','autumn'],['c3d_pastel','pastel'],['c3d_jet','jet'],['c3d_thermal','thermal']].forEach(function(p){
+  [['c3d_hypso','hypso'],['c3d_terrain','terrain'],['c3d_shade','shade'],['c3d_sepia','sepia'],['c3d_forest','forest'],['c3d_autumn','autumn'],['c3d_pastel','pastel'],['c3d_jet','jet'],['c3d_thermal','thermal'],['c3d_sat','sat'],['c3d_air','air']].forEach(function(p){
     var b=document.getElementById(p[0]); if(b) b.className='thr'+(m===p[1]?' on':'');
   });
   var wc=document.getElementById('c3d_wire'); if(wc) wc.checked=_three?!!_three.wire:false;

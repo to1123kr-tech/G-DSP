@@ -1842,9 +1842,19 @@ def proxy():
 def fetch_title():
     return jsonify({"title": ""})
 
-@app.route('/api/ngii-tile/<int:z>/<int:x>/<int:y>')
-def ngii_tile(z, x, y):
-    return b'', 404
+@app.route('/api/ngii-tile/<int:year>/<int:z>/<int:x>/<int:y>')
+@cache.cached(timeout=86400)
+def ngii_tile(year, z, x, y):
+    """국토정보플랫폼 항공사진 타일 프록시 (3D 텍스처용).
+    NGIS_AIR 격자(EPSG:5179) 그대로 — x=TILECOL, y=TILEROW.
+    같은 출처로 내려줘야 WebGL 텍스처로 쓸 수 있음(tainted canvas 방지)."""
+    try:
+        b = _air_fetch_tile(year, z, x, y)
+        if not b:
+            return b'', 404
+        return b, 200, {'Content-Type': 'image/jpeg'}
+    except Exception:
+        return b'', 404
 
 @app.route('/api/wfs-area')
 def wfs_area():
