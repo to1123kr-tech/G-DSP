@@ -5637,14 +5637,16 @@ function gnLoadTf(){
   }catch(e){}
   return false;
 }
-/* 처음 켤 때 기본 위치 — 화면 중앙에 화성시 크기(약 43km)로 */
+/* 관내도 실측 정합값 — 그림에 인쇄된 좌표격자(가로 167~, 세로 523~ km)를
+   라벨 83개로 최소제곱 맞춤. 1km=141.70px(원본), 잔차 4px(≈30m) 이하.
+   ※ 5200px 배포본(gwannae.jpg) 기준. 다른 크기로 바꾸면 mpp를 비례 조정할 것. */
+var GN_FIT={ wx:163754, wy:525751, mpp:10.4651, imgW:5200 };
 function gnDefaultPos(){
   if(!GN.img) return;
-  var c=(typeof currentViewRect==='function')?currentViewRect():null;
-  var cx=c?(c.minX+c.maxX)/2:185293, cy=c?(c.minY+c.maxY)/2:509968;
-  GN.mpp=43000/GN.img.width;
-  GN.wx=cx-GN.img.width*GN.mpp/2;
-  GN.wy=cy+GN.img.height*GN.mpp/2;
+  /* 실측값 적용 — 이미지 크기가 달라도 폭 비율로 자동 보정 */
+  GN.mpp = GN_FIT.mpp * (GN_FIT.imgW / GN.img.width);
+  GN.wx  = GN_FIT.wx;
+  GN.wy  = GN_FIT.wy;
 }
 function gnToggle(){
   if(GN.on){ GN.on=false; GN.align=false; gnSyncUI(); render(); return; }
@@ -5654,9 +5656,10 @@ function gnToggle(){
   var im=new Image();
   im.onload=function(){
     GN.loading=false; GN.img=im; GN.on=true;
-    if(!gnLoadTf() || GN.wx===null) gnDefaultPos();
+    gnDefaultPos();                 /* 실측 정합값으로 먼저 앉히고 */
+    gnLoadTf();                     /* 사용자가 미세조정한 값이 있으면 그걸로 */
     gnSyncUI(); render();
-    toast('관내도 표시 · 「위치 맞추기」로 정렬하세요','ok');
+    toast('관내도 표시 (좌표 자동정합)','ok');
   };
   im.onerror=function(){
     GN.loading=false;
