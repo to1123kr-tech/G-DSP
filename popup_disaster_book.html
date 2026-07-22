@@ -681,6 +681,21 @@
         <span class="tag">🔧 수정중</span>
       </div>
       <div style="font-size:10.5px;color:var(--tx3);margin-top:9px;line-height:1.6">지금은 캔버스 우측 상단 📷(PNG)·📄(PDF) 버튼으로 화면 저장이 가능합니다.</div>
+
+      <!-- ① 구도 잡기 -->
+      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+        <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:4px">① 구도 잡기</div>
+        <div style="font-size:10.5px;color:var(--tx3);margin-bottom:8px;line-height:1.55">
+          보고서에 들어갈 <b>모든 그림을 같은 위치·같은 축척</b>으로 찍기 위한 틀입니다.
+          비율은 <b>A4 가로</b>로 자동 맞춰집니다. 한 번만 잡으면 이후 캡처가 전부 이 범위로 나옵니다.
+        </div>
+        <button class="btn btn-primary" id="btnShotFrame" onclick="startShotFrame()">🖼 구도 잡기 (A4 가로)</button>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="btn btn-ghost" onclick="autoShotRect()" style="flex:1">✨ 허가지선 기준 자동</button>
+          <button class="btn btn-ghost" onclick="clearShotRect()" style="flex:1">↺ 해제</button>
+        </div>
+        <div id="shotInfo" style="display:none;margin-top:9px;background:var(--panel2);border:1px solid #f59e0b;border-radius:8px;padding:9px 10px;font-size:12px;color:var(--tx2)"></div>
+      </div>
     </div>
 
     <!-- 경사도 (page 5) -->
@@ -1890,6 +1905,8 @@ window.addEventListener('keydown',function(e){
   if(S.mode==='section'){ S.mode='pan'; S.sectionPts=null; S.sectionGhost=null; cv.style.cursor='grab'; did=true; }
   if(S.mode==='crop'){ S.mode='pan'; S.cropPt1=null; S.cropGhost=null;
     var bc=document.getElementById('btnCrop'); if(bc){ bc.classList.remove('active'); bc.textContent='✂️ 작업구역 그리기'; } cv.style.cursor='grab'; did=true; }
+  if(S.mode==='shot'){ S.mode='pan'; S.shotPt1=null; S.shotGhost=null;
+    var bs=document.getElementById('btnShotFrame'); if(bs){ bs.classList.remove('active'); bs.textContent='🖼 구도 잡기 (A4 가로)'; } cv.style.cursor='grab'; did=true; }
   if(did){ e.preventDefault(); render(); toast('취소됨','ok'); }
 });
 window.addEventListener('mousemove',function(e){
@@ -1904,6 +1921,9 @@ window.addEventListener('mousemove',function(e){
   if(S.bounds){ var w=evWorld(e); var _sb=document.getElementById('sbXY'); if(_sb)_sb.textContent='X '+w.x.toFixed(1)+'  Y '+w.y.toFixed(1); }
   if(S.mode==='section' && S.sectionPts && S.sectionPts.length===1){
     S.sectionGhost=evWorld(e); render(); return;
+  }
+  if(S.mode==='shot' && S.shotPt1){
+    S.shotGhost=evWorld(e); render(); return;
   }
   if(S.mode==='crop' && S.cropPt1){
     S.cropGhost=evWorld(e); render(); return;
@@ -1965,6 +1985,17 @@ cv.addEventListener('click',function(e){
   else if(S.mode==='pan' && S.pickHover && S.polys && !S.permit){
     /* ★ 기본 모드에서 폐합선 클릭 → 바로 허가지선 선택 */
     pickPermitAtClick(w.x, w.y);
+  }
+  else if(S.mode==='shot'){
+    if(!S.shotPt1){
+      S.shotPt1=w; S.shotGhost=null; toast('반대편 꼭짓점을 클릭하세요');
+    } else {
+      S.shotGhost=null; S.mode='pan'; cv.style.cursor='grab';
+      var bsf=document.getElementById('btnShotFrame');
+      if(bsf){ bsf.classList.remove('active'); bsf.textContent='🖼 구도 다시 잡기'; }
+      applyShotRect(S.shotPt1.x, S.shotPt1.y, w.x, w.y);
+      S.shotPt1=null;
+    }
   }
   else if(S.mode==='crop'){
     if(!S.cropPt1){
@@ -2523,6 +2554,42 @@ function render(){
   }
 
   /* ★ 작업구역 그리는 중 미리보기 (clip 밖) */
+  /* ── 결과보고서 구도 박스 (A4 가로) ────────────────────── */
+  if(S.shotRect){
+    var sr=S.shotRect, stl=w2s({x:sr.minX,y:sr.maxY}), sbr=w2s({x:sr.maxX,y:sr.minY});
+    var sx=stl.x, sy=stl.y, sw=sbr.x-stl.x, sh=sbr.y-stl.y;
+    ctx.save();
+    /* 바깥 어둡게 = 찍힐 범위가 한눈에 */
+    ctx.fillStyle='rgba(4,9,20,0.55)';
+    ctx.fillRect(0,0,cv.width,sy);
+    ctx.fillRect(0,sy+sh,cv.width,cv.height-(sy+sh));
+    ctx.fillRect(0,sy,sx,sh);
+    ctx.fillRect(sx+sw,sy,cv.width-(sx+sw),sh);
+    ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2.5; ctx.strokeRect(sx,sy,sw,sh);
+    /* 모서리 표시 */
+    ctx.lineWidth=4; ctx.beginPath();
+    var cl=Math.min(26,sw/4,sh/4);
+    [[sx,sy,1,1],[sx+sw,sy,-1,1],[sx,sy+sh,1,-1],[sx+sw,sy+sh,-1,-1]].forEach(function(k){
+      ctx.moveTo(k[0]+cl*k[2],k[1]); ctx.lineTo(k[0],k[1]); ctx.lineTo(k[0],k[1]+cl*k[3]);
+    });
+    ctx.stroke();
+    ctx.fillStyle='#f59e0b'; ctx.font='bold 12px sans-serif'; ctx.textAlign='left';
+    ctx.fillText('보고서 구도 (A4 가로) · '+Math.round(sr.maxX-sr.minX)+'m × '+Math.round(sr.maxY-sr.minY)+'m', sx+6, sy-7);
+    ctx.restore();
+  }
+  if(S.mode==='shot' && S.shotPt1 && S.shotGhost){
+    var g=_shotFit(S.shotPt1.x,S.shotPt1.y,S.shotGhost.x,S.shotGhost.y);
+    var gtl=w2s({x:g.minX,y:g.maxY}), gbr=w2s({x:g.maxX,y:g.minY});
+    ctx.save(); ctx.strokeStyle='rgba(245,158,11,0.95)'; ctx.lineWidth=2.5;
+    ctx.setLineDash([8,4]); ctx.fillStyle='rgba(245,158,11,0.08)';
+    ctx.fillRect(gtl.x,gtl.y,gbr.x-gtl.x,gbr.y-gtl.y);
+    ctx.strokeRect(gtl.x,gtl.y,gbr.x-gtl.x,gbr.y-gtl.y);
+    ctx.setLineDash([]);
+    ctx.fillStyle='#f59e0b'; ctx.font='bold 12px sans-serif'; ctx.textAlign='left';
+    ctx.fillText('A4 가로 비율 자동 · '+Math.round(g.maxX-g.minX)+'m × '+Math.round(g.maxY-g.minY)+'m', gtl.x+6, gtl.y-7);
+    ctx.restore();
+  }
+
   if(S.mode==='crop' && S.cropPt1 && S.cropGhost){
     var p1s=w2s(S.cropPt1), p2s=w2s(S.cropGhost);
     ctx.save(); ctx.strokeStyle='rgba(255,220,0,0.9)'; ctx.lineWidth=2.5;
@@ -5202,6 +5269,61 @@ function _profDragEnd(){
   document.removeEventListener('mousemove',_profDragMove);
   document.removeEventListener('mouseup',_profDragEnd);
 }
+/* ═══ 결과보고서 구도 박스 (10번) ═══════════════════════════════
+   보고서에 들어갈 모든 그림을 "같은 위치·같은 축척"으로 찍기 위한 틀.
+   A4 가로(297:210) 비율 고정 — 드래그한 영역을 모두 품도록 자동 확장. */
+var SHOT_RATIO = 297/210;                       /* ≈ 1.4143 */
+function _shotFit(x1,y1,x2,y2){
+  var cx=(x1+x2)/2, cy=(y1+y2)/2;
+  var w=Math.abs(x2-x1), h=Math.abs(y2-y1);
+  if(w<1) w=1; if(h<1) h=1;
+  if(w/h < SHOT_RATIO) w = h*SHOT_RATIO; else h = w/SHOT_RATIO;   /* 드래그 영역 포함 */
+  return { minX:cx-w/2, maxX:cx+w/2, minY:cy-h/2, maxY:cy+h/2 };
+}
+function applyShotRect(x1,y1,x2,y2){
+  var r=_shotFit(x1,y1,x2,y2);
+  if((r.maxX-r.minX)<20){ toast('구도가 너무 작아요 (최소 20m)','err'); render(); return; }
+  S.shotRect=r;
+  updateShotInfo();
+  render();
+  toast('구도 확정 · '+Math.round(r.maxX-r.minX)+'m × '+Math.round(r.maxY-r.minY)+'m','ok');
+}
+function startShotFrame(){
+  if(S.mode==='shot'){ S.mode='pan'; S.shotPt1=null; S.shotGhost=null; cv.style.cursor='grab'; updateShotInfo(); render(); return; }
+  S.mode='shot'; S.shotPt1=null; S.shotGhost=null; cv.style.cursor='crosshair';
+  var b=document.getElementById('btnShotFrame');
+  if(b){ b.classList.add('active'); b.textContent='클릭 대기중… (ESC 취소)'; }
+  toast('찍을 범위의 한쪽 꼭짓점을 클릭하세요 · 비율은 A4 가로로 자동');
+}
+function clearShotRect(){
+  S.shotRect=null; S.shotPt1=null; S.shotGhost=null;
+  if(S.mode==='shot'){ S.mode='pan'; cv.style.cursor='grab'; }
+  updateShotInfo(); render(); toast('구도 해제','ok');
+}
+/* 허가지선 기준으로 자동 구도 (여백 40%) */
+function autoShotRect(){
+  var src=(S.permit&&S.permit.length)?S.permit:(S.cropRect?[[{x:S.cropRect.minX,y:S.cropRect.minY},{x:S.cropRect.maxX,y:S.cropRect.maxY}]]:null);
+  if(!src){ toast('허가지선이나 작업구역을 먼저 정하세요','err'); return; }
+  var mnx=1e18,mxx=-1e18,mny=1e18,mxy=-1e18;
+  src.forEach(function(ring){ ring.forEach(function(p){
+    if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x; if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y; }); });
+  var mx=(mxx-mnx)*0.20, my=(mxy-mny)*0.20;
+  applyShotRect(mnx-mx, mny-my, mxx+mx, mxy+my);
+}
+function updateShotInfo(){
+  var el=document.getElementById('shotInfo'); if(!el) return;
+  var b=document.getElementById('btnShotFrame');
+  if(S.shotRect){
+    var r=S.shotRect;
+    el.style.display='';
+    el.innerHTML='<b style="color:#f59e0b">✔ 구도 확정</b> · '+Math.round(r.maxX-r.minX)+'m × '+Math.round(r.maxY-r.minY)+'m (A4 가로)'
+      +'<div style="color:#9fb0c8;font-size:11px;margin-top:3px">이제 모든 그림이 이 범위·같은 축척으로 찍힙니다.</div>';
+    if(b) b.textContent='🖼 구도 다시 잡기';
+  } else {
+    el.style.display='none';
+    if(b){ b.classList.remove('active'); b.textContent='🖼 구도 잡기 (A4 가로)'; }
+  }
+}
 function showProfileResult(cls){
   var box=document.getElementById('profResultBox'), body=document.getElementById('profResultBody'); if(!box||!body||!cls) return;
   var col={'상승':'#22c55e','평형':'#60a5fa','하강':'#f59e0b','복합':'#ef4444'}[cls.form];
@@ -7128,10 +7250,17 @@ function _cadBgFetch(){
       if(cadBg.cache[key]) return;
       var ent={base:null,tl:_tileLL(t.x,t.y,t.z),br:_tileLL(t.x+1,t.y+1,t.z)};
       cadBg.cache[key]=ent;
-      var bimg=new Image();  /* crossOrigin 없음 — 직접 로드(빠름), 캔버스 표시용 */
+      var bimg=new Image();
       bimg.onload=function(){ ent.base=bimg; render(); };
-      bimg.onerror=function(){ ent.baseErr=true; };
-      bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
+      bimg.onerror=function(){
+        /* 프록시 실패 시 직접 호출로 폴백 — 지도는 뜨되 그 화면은 캡처 불가 */
+        if(ent._fb) { ent.baseErr=true; return; }
+        ent._fb=true; cadBg.tainted=true;
+        bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
+      };
+      /* ★서버 프록시(같은 출처)로 받아야 캔버스가 오염되지 않아 캡처(PNG/PDF)가 가능함.
+         VWorld를 브라우저가 직접 부르면 보안상 toDataURL이 막힘. */
+      bimg.src='/api/vw-tile/'+baseName+'/'+t.z+'/'+t.x+'/'+t.y+'.'+baseExt;
     });
   }
   if(cadBg.showCad) _cadVecFetch();     // 지적선 = 벡터(빠름)

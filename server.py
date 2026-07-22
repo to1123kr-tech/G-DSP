@@ -818,15 +818,19 @@ def list_layers():
     })
 
 
-@app.route('/api/vw-tile/<map_type>/<int:z>/<int:x>/<int:y>.jpeg')
+@app.route('/api/vw-tile/<map_type>/<int:z>/<int:x>/<int:y>.<ext>')
 @cache.cached(timeout=86400, query_string=True)
-def vw_tile_proxy(map_type, z, x, y):
-    """OpenLayers는 z/x/y로 호출, VWorld는 z/y/x로 받음"""
+def vw_tile_proxy(map_type, z, x, y, ext):
+    """OpenLayers는 z/x/y로 호출, VWorld는 z/y/x로 받음.
+    ext: 위성=jpeg / 일반지도=png (둘 다 지원해야 배경지도 캡처가 됨)."""
+    e = 'png' if str(ext).lower() == 'png' else 'jpeg'
     try:
-        url = f"https://api.vworld.kr/req/wmts/1.0.0/{VWORLD_KEY}/{map_type}/{z}/{y}/{x}.jpeg"
+        url = f"https://api.vworld.kr/req/wmts/1.0.0/{VWORLD_KEY}/{map_type}/{z}/{y}/{x}.{e}"
         r = req.get(url, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=10)
-        return r.content, 200, {'Content-Type': 'image/jpeg'}
-    except:
+        if r.status_code != 200 or not r.content:
+            return b'', 404
+        return r.content, 200, {'Content-Type': 'image/png' if e == 'png' else 'image/jpeg'}
+    except Exception:
         return b'', 404
 
 
