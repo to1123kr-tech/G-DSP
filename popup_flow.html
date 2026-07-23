@@ -8765,7 +8765,7 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
   var EXT_SRC = 'GDSP_EXT_FOREST';
   var PAGE_SRC = 'GDSP_PAGE_FOREST';
   /* 웹스토어 심사 통과 후 주소를 넣으면 안내문에 링크가 생깁니다. 비워두면 링크 없이 안내만 표시 */
-  var STORE_URL = '';
+  var STORE_URL = 'https://chromewebstore.google.com/detail/fbnmlndeiodmpfdnjolnjjcigkjckgaf';
 
   var EXT = { alive: false, last: 0 };
   window.FOREST_EXT = EXT;
@@ -8791,15 +8791,8 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
       if (EXT.alive) { ib.style.display = 'none'; }
       else {
         ib.style.display = 'flex';
-        if (STORE_URL) {
-          ib.href = STORE_URL; ib.target = '_blank';
-          ib.textContent = '🧩 자동받기 확장 설치';
-          ib.style.opacity = '1'; ib.style.cursor = 'pointer';
-        } else {
-          ib.removeAttribute('href');
-          ib.textContent = '🧩 자동받기 확장 (준비 중)';
-          ib.style.opacity = '.55'; ib.style.cursor = 'default';
-        }
+        ib.href = STORE_URL; ib.target = '_blank';
+        ib.textContent = '🧩 자동받기 확장 설치';
       }
     }
   }
