@@ -8849,6 +8849,12 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
     try { if (typeof _d8GetLoc === 'function') loc = _d8GetLoc(); } catch (e) {}
     if (!loc || !loc.lng) { cb('', ''); return; }
 
+    /* ★ 이미 정확한 주소 문자열이 있으면 그대로 쓴다.
+       좌표→주소 역변환은 부번(-2)이 깎여 본번으로 바뀌는 일이 있다(방4 실측). */
+    var lb = (loc.label || '').trim();
+    var lastTok = lb.split(/\s+/).pop() || '';
+    if (lb && /\d/.test(lastTok) && !/허가지선/.test(lb)) { cb(lb, loc.label || ''); return; }
+
     var gc = null;
     try {
       if (window.CAD && CAD.geocoder) gc = CAD.geocoder;
