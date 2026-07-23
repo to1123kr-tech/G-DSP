@@ -814,6 +814,7 @@
           <a href="https://map.forest.go.kr" target="_blank" id="forestSvcBtn" class="dbtn pri"
    onclick="return forestSvcClick(event)"
    style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;text-decoration:none">🔗 산림공간정보서비스</a>
+<a id="forestInstallBtn" class="dbtn" style="display:none;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;text-decoration:none;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;font-weight:700;border-color:transparent"></a>
 <div id="forestExtMsg" style="font-size:10px;line-height:1.5;margin-bottom:6px;color:var(--tx3)"></div>
           <a href="#" onclick="openForestGuide();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법</a>
           <div id="forestLayers" style="margin-top:8px;display:none"></div>
@@ -8783,9 +8784,23 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
       btn.textContent = '🔗 산림공간정보서비스';
       btn.style.background = '';
       btn.style.color = '';
-      if (msg) msg.innerHTML = STORE_URL
-        ? '💡 <a href="' + STORE_URL + '" target="_blank" style="color:#7cc5ff">자동받기 확장</a>을 설치하면 신청·다운로드가 자동으로 진행됩니다'
-        : '💡 자동받기 확장(준비 중)을 설치하면 신청·다운로드가 자동으로 진행됩니다';
+      if (msg) msg.innerHTML = '💡 확장을 설치하면 산림청 신청·다운로드가 자동으로 진행됩니다';
+    }
+    var ib = document.getElementById('forestInstallBtn');
+    if (ib) {
+      if (EXT.alive) { ib.style.display = 'none'; }
+      else {
+        ib.style.display = 'flex';
+        if (STORE_URL) {
+          ib.href = STORE_URL; ib.target = '_blank';
+          ib.textContent = '🧩 자동받기 확장 설치';
+          ib.style.opacity = '1'; ib.style.cursor = 'pointer';
+        } else {
+          ib.removeAttribute('href');
+          ib.textContent = '🧩 자동받기 확장 (준비 중)';
+          ib.style.opacity = '.55'; ib.style.cursor = 'default';
+        }
+      }
     }
   }
 
