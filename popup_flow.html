@@ -811,7 +811,10 @@
             📂 산림청 zip을 여기 놓거나 클릭<br><span style="font-size:9.5px">산사태·임상·토양 zip 한 번에 (여러 개 가능)</span>
           </div>
           <input type="file" id="forestFile" accept=".zip" multiple style="display:none" onchange="forestUpload(this.files)">
-          <a href="https://map.forest.go.kr" target="_blank" class="dbtn pri" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;text-decoration:none">🔗 산림공간정보서비스</a>
+          <a href="https://map.forest.go.kr" target="_blank" id="forestSvcBtn" class="dbtn pri"
+   onclick="return forestSvcClick(event)"
+   style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;text-decoration:none">🔗 산림공간정보서비스</a>
+<div id="forestExtMsg" style="font-size:10px;line-height:1.5;margin-bottom:6px;color:var(--tx3)"></div>
           <a href="#" onclick="openForestGuide();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법</a>
           <div id="forestLayers" style="margin-top:8px;display:none"></div>
           <div id="forestMsg" style="font-size:10px;margin-top:6px"></div>
@@ -8744,6 +8747,136 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
   window.addEventListener('pointermove',function(e){ if(!down)return; panel.style.left=Math.max(4,Math.min(window.innerWidth-40,sl+(e.clientX-sx)))+'px'; panel.style.top=Math.max(4,Math.min(window.innerHeight-40,st+(e.clientY-sy)))+'px'; });
   window.addEventListener('pointerup',function(){ down=false; });
 } if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded', init); })();
+</script>
+
+
+<!-- 🌲 산림청 확장 연동 (방4) -->
+<script>
+/* ══════════════════════════════════════════════════════════════
+   산림청 확장(forest-ext) 브릿지 — gdsp.kr 쪽
+   확장 -> 페이지 : {source:'GDSP_EXT_FOREST', type:'READY'|'DEAD'|'START_ACK'|'PROGRESS'|'DONE'}
+   페이지 -> 확장 : {source:'GDSP_PAGE_FOREST', type:'FOREST_START', addr, purpose1, purpose2, reason}
+   ※ NGII 확장과 이름공간이 분리돼 있어 동시 설치돼도 안 섞임
+   ══════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  var EXT_SRC = 'GDSP_EXT_FOREST';
+  var PAGE_SRC = 'GDSP_PAGE_FOREST';
+  /* 웹스토어 심사 통과 후 주소를 넣으면 안내문에 링크가 생깁니다. 비워두면 링크 없이 안내만 표시 */
+  var STORE_URL = '';
+
+  var EXT = { alive: false, last: 0 };
+  window.FOREST_EXT = EXT;
+
+  /* ── 확장 상태에 따라 버튼 모양 바꾸기 ───────────────── */
+  function ui() {
+    var btn = document.getElementById('forestSvcBtn');
+    var msg = document.getElementById('forestExtMsg');
+    if (!btn) return;
+    if (EXT.alive) {
+      btn.textContent = '🌲 산림청 자료 자동으로 받기';
+      btn.style.background = 'linear-gradient(135deg,#22c55e,#15803d)';
+      btn.style.color = '#fff';
+      if (msg) msg.innerHTML = '✅ 확장 설치됨 — 누르면 산림청이 열리고 신청까지 자동 진행됩니다';
+    } else {
+      btn.textContent = '🔗 산림공간정보서비스';
+      btn.style.background = '';
+      btn.style.color = '';
+      if (msg) msg.innerHTML = STORE_URL
+        ? '💡 <a href="' + STORE_URL + '" target="_blank" style="color:#7cc5ff">자동받기 확장</a>을 설치하면 신청·다운로드가 자동으로 진행됩니다'
+        : '💡 자동받기 확장(준비 중)을 설치하면 신청·다운로드가 자동으로 진행됩니다';
+    }
+  }
+
+  /* ── 확장 -> 페이지 ─────────────────────────────────── */
+  window.addEventListener('message', function (ev) {
+    if (ev.source && ev.source !== window) return;   /* iframe발 메시지 차단 (source가 null인 환경도 허용) */
+    var d = ev.data;
+    if (!d || d.source !== EXT_SRC) return;
+
+    if (d.type === 'READY') {
+      EXT.last = Date.now();
+      if (!EXT.alive) { EXT.alive = true; ui(); }
+      return;
+    }
+    if (d.type === 'DEAD') { EXT.alive = false; ui(); return; }
+
+    if (d.type === 'START_ACK') {
+      if (d.ok) t('산림청 창을 열었습니다 — 자동 진행 중', 'ok');
+      else t('시작 실패: ' + (d.msg || '알 수 없음'), 'err');
+      return;
+    }
+    if (d.type === 'PROGRESS') { var m = document.getElementById('forestExtMsg'); if (m && d.msg) m.textContent = '⏳ ' + d.msg; return; }
+    if (d.type === 'DONE') {
+      t(d.ok ? '산림청 다운로드 완료 — 받은 zip을 위 칸에 올리세요' : ('중단: ' + (d.msg || '')), d.ok ? 'ok' : 'err');
+      ui();
+    }
+  }, false);
+
+  /* 하트비트 끊기면 = 확장 삭제/갱신됨 (NGII v0.3.4 교훈) */
+  setInterval(function () {
+    if (EXT.alive && Date.now() - EXT.last > 5000) { EXT.alive = false; ui(); }
+  }, 2000);
+
+  function t(msg, type) {
+    if (typeof toast === 'function') { toast(msg, type); return; }
+    console.log('[FOREST]', msg);
+  }
+
+  /* ── 주소 정하기 ─────────────────────────────────────
+     페이지 공용 작업위치(_d8GetLoc)를 그대로 사용 — 지질도·강우 카드와 동일 기준
+       ① DATA8.loc  = 8번에서 검색한 작업 위치
+       ② _permitCenterLngLat() = 허가지선(S.permit) 중심 (EPSG:5186 → WGS84)
+     좌표 → 풀주소 역지오코딩 (§6㉓ 산림청은 "주소" 탭만 씀)                   */
+  function pickAddr(cb) {
+    var loc = null;
+    try { if (typeof _d8GetLoc === 'function') loc = _d8GetLoc(); } catch (e) {}
+    if (!loc || !loc.lng) { cb('', ''); return; }
+
+    var gc = null;
+    try {
+      if (window.CAD && CAD.geocoder) gc = CAD.geocoder;
+      else if (window.kakao && kakao.maps && kakao.maps.services) gc = new kakao.maps.services.Geocoder();
+    } catch (e) {}
+    if (!gc) { cb('', loc.label || ''); return; }
+
+    try {
+      gc.coord2Address(loc.lng, loc.lat, function (ar, as) {
+        if (as === kakao.maps.services.Status.OK && ar && ar[0] && ar[0].address) {
+          cb(ar[0].address.address_name, loc.label || '');
+        } else cb('', loc.label || '');
+      });
+    } catch (e) { cb('', loc.label || ''); }
+  }
+
+  /* ── 버튼 클릭 ──────────────────────────────────────── */
+  window.forestSvcClick = function (ev) {
+    if (!EXT.alive) return true;                 /* 확장 없으면 기존대로 새 탭 열기 */
+    if (ev && ev.preventDefault) ev.preventDefault();
+
+    pickAddr(function (addr, label) {
+      if (!addr) {
+        t('위에서 「작업 위치」를 검색하거나 허가지선을 먼저 만드세요', 'err');
+        return;
+      }
+      var reason = (window.FOREST_USE_SAMPLES && FOREST_USE_SAMPLES[0]) || '';
+      window.postMessage({
+        source: PAGE_SRC,
+        type: 'FOREST_START',
+        addr: addr,
+        purpose1: '업무활용용',
+        purpose2: '산림재해',
+        reason: reason
+      }, location.origin);
+      t('산림청 자동신청 시작 (' + (label || '작업위치') + ') — ' + addr, 'ok');
+    });
+    return false;
+  };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ui);
+  else ui();
+})();
 </script>
 
 </body>
