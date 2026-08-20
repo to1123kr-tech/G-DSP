@@ -1508,14 +1508,33 @@ function render(){
     }
   });
 
+  // ── [TEST] 선택된 지적 필지 (청록 강조) — 허가지선 바로 아래
+  if(typeof drawCadastral==='function') drawCadastral();
+
   // ── 허가지선 (빨강 굵게, 격자 위에)
   if(S.permit){
+    /* [TEST] 복수 필지를 '필지별'로 확정한 경우 — 나머지 필지도 함께 그림
+       (대표 필지만 그리면 나머지가 화면에서 사라져 확인이 안 됨) */
+    if(S.permitParcels && S.permitParcels.length>1){
+      ctx.save();
+      ctx.strokeStyle='#ef4444'; ctx.lineWidth=1.8; ctx.setLineDash([6,4]);
+      S.permitParcels.forEach(function(pp){
+        if(!pp.ring || pp.ring.length<3) return;
+        ctx.beginPath();
+        pp.ring.forEach(function(p,idx){ var sp=w2s(p); idx===0?ctx.moveTo(sp.x,sp.y):ctx.lineTo(sp.x,sp.y); });
+        ctx.closePath();
+        if(!S.gridCells || !S.gridCells.length){ ctx.fillStyle='rgba(239,68,68,.05)'; ctx.fill(); }
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+    /* 대표 허가지선(=분석 대상) 실선 */
     ctx.strokeStyle='#ef4444';
     ctx.lineWidth=2.4;
     ctx.beginPath();
     S.permit.pts.forEach(function(p,idx){
-      var s=w2s(p);
-      if(idx===0)ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y);
+      var sp=w2s(p);
+      if(idx===0)ctx.moveTo(sp.x,sp.y); else ctx.lineTo(sp.x,sp.y);
     });
     ctx.closePath();
     ctx.stroke();
