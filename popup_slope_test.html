@@ -5,7 +5,13 @@
 <title>G-DSP 경사도 검토 (테스트)</title>
 <!-- 지적/지도 기능용: proj4(좌표변환) + 카카오(주소↔좌표). 서버에서 열 때만 동작 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=c670e0bc85874ef6267220f09882b379&libraries=services"></script>
+<script>
+/* 카카오 지도 SDK — ★ JS키(0f432d…)를 써야 함. REST키(c670e0…)는 SDK에서 안 먹음 */
+(function(){
+  var jsKey = localStorage.getItem('gdsp_kakao_js') || '0f432d6e8470eed32f947e3c7db146b9';
+  document.write('<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey='+jsKey+'&libraries=services&autoload=false">\x3C/script>');
+})();
+</script>
 <style>
 :root{
   --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --line:#1e2a44;
@@ -794,18 +800,42 @@ function wgs84toTm5186(lng,lat){ if(!_cadInitProj())return null; try{ return pro
 function _cadKakaoReady(cb, _tries){
   if(CAD.geocoder){ cb(true); return; }
   _tries=_tries||0;
-  /* SDK 아직 로딩 중이면 잠깐 기다렸다 재시도 (최대 ~3초) */
-  if(typeof kakao==='undefined' || !kakao.maps || !kakao.maps.services){
-    if(_tries<30){ setTimeout(function(){ _cadKakaoReady(cb, _tries+1); }, 100); return; }
+
+  /* SDK 스크립트 자체가 아직 안 붙었으면 대기 (최대 ~6초) */
+  if(typeof kakao==='undefined' || !kakao.maps){
+    if(_tries<60){ setTimeout(function(){ _cadKakaoReady(cb, _tries+1); }, 100); return; }
+    console.log('[카카오] SDK 로드 실패 — JS키/도메인 등록 확인');
     cb(false); return;
   }
-  try{
-    /* autoload 기본(true)이라 services 바로 사용 가능. load 콜백도 즉시 실행됨 */
-    if(kakao.maps.services && kakao.maps.services.Geocoder){
-      CAD.geocoder=new kakao.maps.services.Geocoder(); cb(true); return;
+
+  /* services 이미 준비됨 (autoload=true인 경우) */
+  if(kakao.maps.services && kakao.maps.services.Geocoder){
+    try{ CAD.geocoder=new kakao.maps.services.Geocoder(); cb(true); }
+    catch(e){ console.log('[카카오] Geocoder 생성 실패', e); cb(false); }
+    return;
+  }
+
+  /* ★ autoload=false → kakao.maps.load()를 호출해야 services가 생김 */
+  if(typeof kakao.maps.load==='function'){
+    if(CAD._kakaoLoading){                       /* 중복 호출 방지 */
+      if(_tries<60){ setTimeout(function(){ _cadKakaoReady(cb, _tries+1); }, 100); return; }
+      cb(false); return;
     }
-    kakao.maps.load(function(){ try{ CAD.geocoder=new kakao.maps.services.Geocoder(); cb(true); }catch(e){ cb(false); } });
-  }catch(e){ cb(false); }
+    CAD._kakaoLoading=true;
+    kakao.maps.load(function(){
+      CAD._kakaoLoading=false;
+      try{
+        if(kakao.maps.services && kakao.maps.services.Geocoder){
+          CAD.geocoder=new kakao.maps.services.Geocoder(); cb(true);
+        } else {
+          console.log('[카카오] services 미포함 — libraries=services 확인');
+          cb(false);
+        }
+      }catch(e){ console.log('[카카오] load 후 실패', e); cb(false); }
+    });
+    return;
+  }
+  cb(false);
 }
 
 function toggleCadSelect(){
@@ -880,9 +910,42 @@ function cadHandleClick(worldPt){
   if(!ll){ toast('좌표 변환 실패','err'); return true; }
   var lng=ll[0], lat=ll[1];
   console.log('[지적선택] 클릭 → lng',lng.toFixed(6),'lat',lat.toFixed(6));
-  if(!CAD.geocoder){ console.log('[지적선택] geocoder 준비 대기'); _cadKakaoReady(function(ok){ if(ok) _cadFetchParcel(lng,lat); else toast('카카오 로드 실패 — 서버에서 열어주세요','err'); }); return true; }
+  if(!CAD.geocoder){
+    console.log('[지적선택] geocoder 준비 대기');
+    _cadKakaoReady(function(ok){
+      if(ok) _cadFetchParcel(lng,lat);
+      else {
+        /* ★ 카카오 없어도 필지 선택은 가능 — /api/wfs가 좌표만으로 조회 지원 */
+        console.log('[지적선택] 카카오 없음 → 좌표 직접조회로 진행');
+        _cadFetchParcelByXY(lng,lat);
+      }
+    });
+    return true;
+  }
   _cadFetchParcel(lng,lat);
   return true;
+}
+
+/* 카카오 없이 좌표만으로 필지 조회 (PNU는 응답 속성에서 가져옴) */
+function _cadFetchParcelByXY(lng,lat){
+  fetch('/api/wfs?lng='+lng+'&lat='+lat)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var fs=(data&&data.features)||[];
+      if(!fs.length){ toast('필지 정보를 못 찾았어요','err'); return; }
+      var f=fs[0], pr=f.properties||{}, geom=f.geometry;
+      var thisPnu=pr.pnu||pr.PNU||('XY'+lng.toFixed(6)+'_'+lat.toFixed(6));
+      var idx=CAD.parcels.findIndex(function(sp){ return sp.pnu===thisPnu; });
+      if(idx>=0){ CAD.parcels.splice(idx,1); toast('필지 해제: '+(pr.jibun||thisPnu),'ok'); }
+      else{
+        var rings5186=_cadGeomTo5186(geom);
+        if(!rings5186.length){ toast('필지 경계 변환 실패','err'); return; }
+        CAD.parcels.push({pnu:thisPnu, jibun:pr.jibun||pr.JIBUN||'', lng:lng, lat:lat, geom:geom, rings:rings5186});
+        toast('필지 추가: '+(pr.jibun||'선택됨')+' (총 '+CAD.parcels.length+'개)','ok');
+      }
+      _cadUpdateBar(); render();
+    })
+    .catch(function(e){ console.log('[지적선택] 좌표조회 실패',e); toast('필지 조회 실패','err'); });
 }
 /* PNU 생성 (map.html 검증본): 법정동10 + 산여부1 + 본번4 + 부번4 */
 function _cadBuildPnu(bcode, addr){
