@@ -659,7 +659,7 @@ function zoomAt(sx,sy,f){
   S.ox=sx-w.x*S.scale;
   S.oy=(cv.height-sy)-w.y*S.scale;
   render();
-  if(typeof cadBgRefresh==='function') cadBgRefresh();   // [TEST] 줌 → 지도타일 갱신
+  if(typeof cadBgRefresh==='function') cadBgRefresh(true);   // [TEST] 줌 → 지도타일 즉시 갱신
 }
 function w2s(p){ return {x:p.x*S.scale+S.ox, y:cv.height-(p.y*S.scale+S.oy)}; }
 function s2w(x,y){ return {x:(x-S.ox)/S.scale, y:(cv.height-y-S.oy)/S.scale}; }
@@ -1023,6 +1023,39 @@ function _cadUpdateBar(){
 }
 
 
+/* 검색 위치 마커 (핀 + 지번 라벨) */
+function drawSearchMarker(){
+  if(!CAD.marker) return;
+  var p=w2s({x:CAD.marker.x, y:CAD.marker.y});
+  if(p.x<-60||p.x>cv.width+60||p.y<-60||p.y>cv.height+60) return;
+  ctx.save();
+  /* 십자 조준선 */
+  ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.moveTo(p.x-14,p.y); ctx.lineTo(p.x+14,p.y);
+  ctx.moveTo(p.x,p.y-14); ctx.lineTo(p.x,p.y+14);
+  ctx.stroke();
+  ctx.strokeStyle='#ff4d9d'; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(p.x-14,p.y); ctx.lineTo(p.x+14,p.y);
+  ctx.moveTo(p.x,p.y-14); ctx.lineTo(p.x,p.y+14);
+  ctx.stroke();
+  /* 중심 원 */
+  ctx.beginPath(); ctx.arc(p.x,p.y,6,0,Math.PI*2);
+  ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=3.5; ctx.stroke();
+  ctx.strokeStyle='#ff4d9d'; ctx.lineWidth=2; ctx.stroke();
+  /* 지번 라벨 */
+  if(CAD.marker.label){
+    ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+    var tw=ctx.measureText(CAD.marker.label).width;
+    ctx.fillStyle='rgba(0,0,0,0.72)';
+    ctx.fillRect(p.x-tw/2-6, p.y-36, tw+12, 19);
+    ctx.fillStyle='#ff9ec8';
+    ctx.fillText(CAD.marker.label, p.x, p.y-21);
+  }
+  ctx.restore();
+}
+
 function drawCadastral(){
   if(!CAD.parcels.length) return;
   ctx.save();
@@ -1095,6 +1128,29 @@ function _cadBgComputeTiles(){
   }
   return [];
 }
+/* 현재 화면의 경위도 범위 */
+function _cadViewLngLat(){
+  if(!_cadInitProj()) return null;
+  var c=[s2w(0,0), s2w(cv.width,0), s2w(cv.width,cv.height), s2w(0,cv.height)];
+  var lls=c.map(function(p){ return tm5186toWgs84(p.x,p.y); }).filter(Boolean);
+  if(lls.length<4) return null;
+  var lngs=lls.map(function(l){return l[0];}), lats=lls.map(function(l){return l[1];});
+  return { minLng:Math.min.apply(null,lngs), maxLng:Math.max.apply(null,lngs),
+           minLat:Math.min.apply(null,lats), maxLat:Math.max.apply(null,lats) };
+}
+/* 캐시 상한 — 오래 쓰면 이미지가 계속 쌓이므로 정리 */
+function _cadBgTrimCache(){
+  var keys=Object.keys(cadBg.cache);
+  if(keys.length<=600) return;
+  var keep={};
+  cadBg.tiles.forEach(function(t){ keep[_cadBgTileKey(t)]=1; });   /* 현재 타일은 보존 */
+  var removed=0;
+  for(var i=0;i<keys.length && (keys.length-removed)>400;i++){
+    if(keep[keys[i]]) continue;
+    delete cadBg.cache[keys[i]]; removed++;
+  }
+}
+
 function _cadBgTileKey(t){ return cadBg.layers+'/'+t.z+'/'+t.x+'/'+t.y; }
 function _cadBgFetch(){
   if(!cadBg.on) return;
@@ -1102,6 +1158,7 @@ function _cadBgFetch(){
     var tiles=_cadBgComputeTiles();
     if(!tiles){ toast('좌표 변환 실패 — 서버에서 열어주세요','err'); return; }
     cadBg.tiles=tiles;
+    if(typeof _cadBgTrimCache==='function') _cadBgTrimCache();
     var baseName=(cadBg.layers==='sat')?'Satellite':'Base';
     var baseExt=(cadBg.layers==='sat')?'jpeg':'png';
     tiles.forEach(function(t){
@@ -1158,7 +1215,13 @@ function _cadVecFetch(){
     .catch(function(e){ _cadVecLoading=false; });
 }
 var _cadBgTimer=null;
-function cadBgRefresh(){ if(!cadBg.on) return; clearTimeout(_cadBgTimer); _cadBgTimer=setTimeout(_cadBgFetch,240); }
+function cadBgRefresh(now){
+  if(!cadBg.on) return;
+  clearTimeout(_cadBgTimer);
+  /* ★ 줌은 즉시 요청(늦게 뜨는 느낌 제거), 그 외는 짧게 묶어서 */
+  if(now){ _cadBgFetch(); return; }
+  _cadBgTimer=setTimeout(_cadBgFetch,120);
+}
 
 /* 타일(위성/일반) + 지적 벡터를 5186 캔버스에 그림 */
 /* 타일이 여러 장 도착해도 화면 다시 그리기는 한 프레임에 1번만.
@@ -1172,8 +1235,29 @@ function drawCadBg(){
   if(!cadBg.on) return;
   ctx.save();
   // 1) 바탕(위성/일반) 타일
-  if(cadBg.showBase && cadBg.tiles.length){
+  /* ★ 확대/축소 시 검은 바탕 깜박임 방지
+     줌이 바뀌면 타일 키가 전부 새것이라 로드 전까지 그릴 게 없어 화면이 까맣게 된다.
+     → 캐시에 남아있는 이전 줌 타일 중 현재 화면에 걸치는 것을 먼저 깔고(거친 것부터),
+       새 타일이 도착하는 대로 그 위에 덮는다. (지도 앱과 같은 방식) */
+  if(cadBg.showBase){
     ctx.globalAlpha=cadBg.alpha;
+    var curZ=(cadBg.tiles[0] && cadBg.tiles[0].z) || 0;
+    var view=_cadViewLngLat();
+    if(view && curZ){
+      var fallback=[];
+      for(var key in cadBg.cache){
+        var e=cadBg.cache[key];
+        if(!e || !e.base) continue;
+        var kz=parseInt(key.split('/')[1],10);
+        if(!(kz<curZ) || kz<curZ-5) continue;              /* 현재보다 거친 것만, 5단계까지 */
+        if(e.br[0]<view.minLng || e.tl[0]>view.maxLng) continue;   /* 화면 밖 제외 */
+        if(e.tl[1]<view.minLat || e.br[1]>view.maxLat) continue;
+        fallback.push({z:kz, e:e});
+      }
+      fallback.sort(function(a,b){ return a.z-b.z; });      /* 거친 것 → 세밀한 것 */
+      fallback.forEach(function(f){ _cadBgBlit(f.e, f.e.base); });
+    }
+    /* 현재 줌 타일을 맨 위에 */
     cadBg.tiles.forEach(function(t){ var e=cadBg.cache[_cadBgTileKey(t)]; if(!e||!e.base) return; _cadBgBlit(e,e.base); });
   }
   // 2) 지적선 벡터 (빨간선 + 지번) — DXF/위성 위에 선명
@@ -1206,11 +1290,15 @@ function _cadBgBlit(e, img){
   var a=w2s({x:tl5[0],y:tl5[1]}), b=w2s({x:br5[0],y:br5[1]});
   var x0=Math.min(a.x,b.x), y0=Math.min(a.y,b.y), x1=Math.max(a.x,b.x), y1=Math.max(a.y,b.y);
   if((x1-x0)<0.5||(y1-y0)<0.5) return;
-  /* 검은 줄 제거: 시작=floor, 끝=다음타일 시작과 맞물리게 floor + 1px 겹침.
-     이렇게 하면 이웃 타일의 좌변이 이 타일의 우변을 덮어 틈이 안 생김 */
+  /* ★ 검은 이음새 제거 (실측 원인)
+     타일 아래모서리는 (x+1,y+1), 아래 타일 위모서리는 (x,y+1)로 계산되는데
+     EPSG:5186(횡메르카토르)은 같은 위도라도 경도가 다르면 N값이 달라진다.
+     z18 기준 약 0.117m(≈0.25px) 어긋나고, 더 확대하면 1px을 넘어 검은 줄이 된다.
+     → 시작점은 floor, 끝점은 ceil + 여유 1px 오버드로우로 항상 이웃과 겹치게 한다.
+     (뒤에 그려지는 이웃 타일이 겹친 부분을 덮으므로 화질 손상 없음) */
   var xr=Math.floor(x0), yr=Math.floor(y0);
-  var xe=Math.floor(x1), ye=Math.floor(y1);
-  var wr=(xe-xr)+1, hr=(ye-yr)+1;   // +1 = 이웃과 1px 겹침
+  var wr=Math.ceil(x1)-xr+1, hr=Math.ceil(y1)-yr+1;
+  if(wr<1) wr=1; if(hr<1) hr=1;
   ctx.drawImage(img, xr, yr, wr, hr);
 }
 
@@ -1414,6 +1502,8 @@ function _gotoLngLat(lng, lat, label){
   if(!(S.scale>0)) S.scale=0.6;
   S.ox=(cv.width-dx*S.scale)/2 - S.bounds.minX*S.scale;
   S.oy=(cv.height-dy*S.scale)/2 - S.bounds.minY*S.scale;
+  /* ★ 검색한 지번 위치 마커 — 어디를 찾았는지 화면에서 바로 보이게 */
+  CAD.marker={ x:c[0], y:c[1], label:(label||'') };
   var em=document.getElementById('empty'); if(em) em.style.display='none';
   if(!cadBg.on) cadBgAutoOn(); else _cadBgFetch();
   _jibunMsg('✓ '+(label||'')+' — 지적 선택을 눌러 필지를 클릭하세요','#4ade80');
@@ -1702,6 +1792,7 @@ function render(){
 
   // ── [TEST] 선택된 지적 필지 (청록 강조) — 허가지선 바로 아래
   if(typeof drawCadastral==='function') drawCadastral();
+  if(typeof drawSearchMarker==='function') drawSearchMarker();
 
   // ── 허가지선 (확정선 = 형광 노랑, 격자 위에)
   if(S.permit){
