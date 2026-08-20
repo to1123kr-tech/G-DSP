@@ -205,7 +205,19 @@ canvas.grabbing{cursor:grabbing}
 
       <div class="sec" id="permitInfo" style="display:none">
         <div class="sec-t">확정된 허가지선</div>
-        <div id="permitAreaTx" style="font-size:12px;color:var(--ok);font-weight:700"></div>
+        <div id="permitAreaTx" style="font-size:12px;color:#facc15;font-weight:700;line-height:1.5"></div>
+        <div id="permitModeBox" style="display:none;margin-top:8px">
+          <div style="font-size:10px;color:var(--dim);margin-bottom:4px">확정 후에도 바꿀 수 있어요</div>
+          <div style="display:flex;gap:4px">
+            <button class="thr on" id="pmIndiv2" onclick="repermit(false)">필지별</button>
+            <button class="thr" id="pmMerge2" onclick="repermit(true)">하나로 합침</button>
+          </div>
+        </div>
+        <div style="border-top:1px solid var(--line);margin:9px 0 0;padding-top:9px">
+          <button class="btn btn-ghost" onclick="permitFetchDaejang()" style="color:#8ecbff;border-color:#2f4d70">🔍 대장면적 자동조회</button>
+          <div id="permDMsg" style="font-size:10px;margin-top:6px;line-height:1.5;color:var(--dim)"></div>
+          <div id="permitDaejangList" style="display:none;margin-top:5px"></div>
+        </div>
       </div>
     </div>
 
@@ -246,6 +258,8 @@ canvas.grabbing{cursor:grabbing}
       <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:7px">
         대장(공부)면적을 넣으면 면적표가<br>그 값에 맞게 환산됩니다 (경사도 불변)
       </div>
+      <div id="corrBase" style="display:none;font-size:10.5px;color:var(--txt);background:var(--panel2);
+        border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-bottom:7px;line-height:1.5"></div>
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:11px;color:var(--txt);white-space:nowrap">대장면적</span>
         <input type="number" id="daejangArea" placeholder="캐드 실측" min="0" step="0.01"
@@ -1386,7 +1400,47 @@ function cadUseAsPermit(){
   });
   if(!parcelsPolys.length){ toast('필지 경계가 유효하지 않아요','err'); return; }
 
-  /* ★ popup_slope의 S.permit은 {pts,layer,area} 객체 형태 — 점 배열이 아님 */
+  /* ★ 원본 보관 — 확정 후에도 필지별/합침을 다시 고를 수 있게 */
+  S._permitSrc=parcelsPolys;
+  S.daejangArea=null;
+  var dj=document.getElementById('daejangArea'); if(dj) dj.value='';
+
+  _applyPermitFrom(parcelsPolys);
+
+  /* 선택 상태 정리 */
+  CAD.selMode=false;
+  CAD.parcels=[];
+  _cadRenderParcelList(); _cadUpdateBar();
+  var b=document.getElementById('cadSelBtn'); if(b){ b.classList.remove('active'); b.textContent='📍 지적 선택'; }
+  var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display='none';
+  var db=document.getElementById('cadDoneBar'); if(db) db.style.display='none';
+
+  var dt=document.getElementById('detPermit');
+  if(dt){ dt.className='det-row ok'; dt.querySelector('.ct').textContent='확정'; }
+
+  toast(parcelsPolys.length+'필지 → 허가지선 확정','ok');
+
+  /* ★ 확정 즉시 대장(공부)면적 자동조회 — 재해위험성과 동일 동작 */
+  if(S._permitPnus && S._permitPnus.length) permitFetchDaejang();
+}
+
+/* ══ [TEST] 확정 후 필지별/합침 재전환 ══
+   원본 필지 링을 S._permitSrc에 보관해 두고, 언제든 다시 계산 */
+function repermit(merge){
+  if(!(S._permitSrc && S._permitSrc.length)){ toast('원본 필지 정보가 없어요','err'); return; }
+  S.permitMerge=!!merge;
+  _applyPermitFrom(S._permitSrc);
+  _syncPmBtns2();
+  toast(merge?'하나로 합침':'필지별','ok');
+}
+function _syncPmBtns2(){
+  var a=document.getElementById('pmIndiv2'), b=document.getElementById('pmMerge2');
+  if(a&&b){ var on=!!S.permitMerge; a.className='thr'+(on?'':' on'); b.className='thr'+(on?' on':''); }
+  if(typeof _syncPmBtns==='function') _syncPmBtns();
+}
+
+/* 필지 배열 → S.permit 확정 (확정/재전환 공용) */
+function _applyPermitFrom(parcelsPolys){
   var ring=null, label='';
   if(parcelsPolys.length>1 && S.permitMerge){
     var rings=mergePermitOutline(parcelsPolys.map(function(x){return x.ring;}));
@@ -1395,11 +1449,11 @@ function cadUseAsPermit(){
       for(var i=1;i<rings.length;i++){ var a=Math.abs(polyArea(rings[i])); if(a>ba){ big=rings[i]; ba=a; } }
       ring=big.map(function(pt){return {x:pt.x,y:pt.y};});
       label='지적('+parcelsPolys.length+'필지 합침)';
+      S.permitParcels=null;
     }
   }
   if(!ring){
     if(parcelsPolys.length>1){
-      /* 합치기 실패했거나 필지별 모드 → 면적 가장 큰 필지를 대표로 */
       var bp=parcelsPolys[0], bpa=Math.abs(polyArea(bp.ring));
       for(var k=1;k<parcelsPolys.length;k++){
         var aa=Math.abs(polyArea(parcelsPolys[k].ring));
@@ -1412,32 +1466,96 @@ function cadUseAsPermit(){
       label='지적('+(parcelsPolys[0].jibun||'')+')';
       S.permitParcels=null;
     }
-  } else {
-    S.permitParcels=null;
   }
   S.permit={ pts:ring, layer:label, area:Math.abs(polyArea(ring)) };
-  S.allPolys=S.allPolys||[];
-
   S._permitPnus=parcelsPolys.map(function(x){return x.pnu;}).filter(function(x){return x&&String(x).length===19;});
-  CAD.selMode=false;
-  CAD.parcels=[];
-  _cadRenderParcelList(); _cadUpdateBar();
-  var b=document.getElementById('cadSelBtn'); if(b){ b.classList.remove('active'); b.textContent='📍 지적 선택'; }
-  var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display='none';
-  var db=document.getElementById('cadDoneBar'); if(db) db.style.display='none';
+  _updatePermitPanel(parcelsPolys.length);
+  _updateRunBtn();
+  render();
+}
 
+/* 확정 패널 갱신 (면적 표시 + 모드 버튼 노출) */
+function _updatePermitPanel(nParcel){
   var pin=document.getElementById('permitInfo'); if(pin) pin.style.display='';
   var pa=document.getElementById('permitAreaTx');
   if(pa){
     var area=_permitTotalArea();
-    pa.textContent='면적 '+area.toFixed(1)+' ㎡ ('+(area/3.305785).toFixed(1)+'평) · '+parcelsPolys.length+'필지';
+    var tx='캐드 실측 '+area.toFixed(1)+' ㎡ ('+(area/3.305785).toFixed(1)+'평)';
+    if(nParcel>1) tx+=' · '+nParcel+'필지'+(S.permitMerge?' 합침':' (필지별)');
+    pa.textContent=tx;
   }
-  var dt=document.getElementById('detPermit');
-  if(dt){ dt.className='det-row ok'; dt.querySelector('.ct').textContent='확정'; }
-  _updateRunBtn();
-  toast(parcelsPolys.length+'필지 → 허가지선 확정','ok');
-  render();
+  var mb=document.getElementById('permitModeBox');
+  if(mb) mb.style.display=(nParcel>1)?'':'none';
+  _syncPmBtns2();
+  /* ★ 확정되면 면적보정 섹션 즉시 노출 + 캐드 실측면적 기준값 표시 */
+  var acs=document.getElementById('areaCorrSec'); if(acs) acs.style.display='';
+  if(typeof updateAreaCorrBase==='function') updateAreaCorrBase();
 }
+
+/* 면적보정 섹션 기준면적 안내 — 기존 corrInfo와 겹치지 않게 별도 칸(corrBase) 사용 */
+function updateAreaCorrBase(){
+  var el=document.getElementById('corrBase'); if(!el) return;
+  var cad=_permitTotalArea();
+  if(!(cad>0)){ el.style.display='none'; return; }
+  el.style.display='';
+  if(S.daejangArea && S.daejangArea>0){
+    var ratio=S.daejangArea/cad;
+    el.innerHTML='<span style="color:#4ade80">대장 '+S.daejangArea.toLocaleString()+'㎡</span>'
+      +' / 실측 '+cad.toFixed(1)+'㎡ · 계수 '+ratio.toFixed(4);
+  } else {
+    el.innerHTML='캐드 실측 <b>'+cad.toFixed(1)+'㎡</b> ('+(cad/3.305785).toFixed(1)+'평) 기준';
+  }
+}
+
+/* ══ [TEST] 대장(공부)면적 자동조회 — 재해위험성과 동일 방식 ══
+   /api/landinfo?pnu= → landCharacteristicss.field[].lndpclAr 합산 */
+function _permDMsg(html){
+  var el=document.getElementById('permDMsg'); if(el) el.innerHTML=html||'';
+}
+function permitFetchDaejang(){
+  var pnus=(S._permitPnus && S._permitPnus.length)? S._permitPnus.slice() : [];
+  if(!pnus.length){
+    _permDMsg('<span style="color:#fbbf24">지적 선택으로 잡은 허가지선만 자동조회돼요 (직접 그린 건 수동 입력)</span>');
+    return;
+  }
+  _permDMsg('⏳ 대장면적 조회 중… ('+pnus.length+'필지)');
+  var src=S._permitSrc||[];
+  var jobs=pnus.map(function(pnu){
+    return fetch('/api/landinfo?pnu='+encodeURIComponent(pnu))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var field=d && d.landCharacteristicss && d.landCharacteristicss.field;
+        if(!field || !field.length) return {pnu:pnu, area:null};
+        var pp=Array.isArray(field)?field[0]:field;
+        return {pnu:pnu, area:(pp.lndpclAr?Number(pp.lndpclAr):null), jimok:(pp.lndcgrCodeNm||'')};
+      })
+      .catch(function(){ return {pnu:pnu, area:null}; });
+  });
+  Promise.all(jobs).then(function(res){
+    var sum=0, ok=0, list='';
+    res.forEach(function(r,i){
+      if(r.area>0){ sum+=r.area; ok++; }
+      var nm=(src[i] && src[i].jibun) ? src[i].jibun : ('필지'+(i+1));
+      list+='<div style="display:flex;justify-content:space-between;font-size:10px;padding:1.5px 0">'
+          + '<span style="color:var(--dim)">'+nm+(r.jimok?(' <span style="opacity:.6">'+r.jimok+'</span>'):'')+'</span>'
+          + '<span style="color:var(--txt);font-weight:700">'+(r.area>0?r.area.toLocaleString()+'㎡':'-')+'</span></div>';
+    });
+    if(ok){
+      S.daejangArea=sum;
+      var dj=document.getElementById('daejangArea');
+      if(dj) dj.value=Math.round(sum*100)/100;
+      if(typeof onDaejangInput==='function') onDaejangInput();
+      updateAreaCorrBase();
+      _permDMsg('<span style="color:#4ade80">✅ 대장면적 '+sum.toLocaleString()+'㎡'
+        +(pnus.length>1?(' ('+ok+'필지 합산)'):'')+' → 면적보정 반영</span>');
+    } else {
+      _permDMsg('<span style="color:#f87171">❌ 대장면적 조회 실패 (PNU/서버 확인)</span>');
+    }
+    var le=document.getElementById('permitDaejangList');
+    if(le){ le.innerHTML=(pnus.length>1)?list:''; le.style.display=(pnus.length>1&&ok)?'':'none'; }
+  });
+}
+
 function _permitTotalArea(){
   if(S.permitParcels && S.permitParcels.length){
     var sum=0; S.permitParcels.forEach(function(x){ sum+=Math.abs(polyArea(x.ring)); }); return sum;
@@ -1511,36 +1629,53 @@ function render(){
   // ── [TEST] 선택된 지적 필지 (청록 강조) — 허가지선 바로 아래
   if(typeof drawCadastral==='function') drawCadastral();
 
-  // ── 허가지선 (빨강 굵게, 격자 위에)
+  // ── 허가지선 (확정선 = 형광 노랑, 격자 위에)
   if(S.permit){
     /* [TEST] 복수 필지를 '필지별'로 확정한 경우 — 나머지 필지도 함께 그림
        (대표 필지만 그리면 나머지가 화면에서 사라져 확인이 안 됨) */
     if(S.permitParcels && S.permitParcels.length>1){
       ctx.save();
-      ctx.strokeStyle='#ef4444'; ctx.lineWidth=1.8; ctx.setLineDash([6,4]);
+      ctx.setLineDash([7,5]); ctx.lineJoin='round';
       S.permitParcels.forEach(function(pp){
         if(!pp.ring || pp.ring.length<3) return;
         ctx.beginPath();
         pp.ring.forEach(function(p,idx){ var sp=w2s(p); idx===0?ctx.moveTo(sp.x,sp.y):ctx.lineTo(sp.x,sp.y); });
         ctx.closePath();
-        if(!S.gridCells || !S.gridCells.length){ ctx.fillStyle='rgba(239,68,68,.05)'; ctx.fill(); }
-        ctx.stroke();
+        if(!S.gridCells || !S.gridCells.length){ ctx.fillStyle='rgba(250,204,21,.07)'; ctx.fill(); }
+        /* 검은 외곽 → 노랑 본선 (shadowBlur는 색을 흐려서 안 씀) */
+        ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.lineWidth=4.5; ctx.stroke();
+        ctx.strokeStyle='#facc15';           ctx.lineWidth=2.2; ctx.stroke();
       });
+      ctx.setLineDash([]);
       ctx.restore();
     }
-    /* 대표 허가지선(=분석 대상) 실선 */
-    ctx.strokeStyle='#ef4444';
-    ctx.lineWidth=2.4;
-    ctx.beginPath();
-    S.permit.pts.forEach(function(p,idx){
-      var sp=w2s(p);
-      if(idx===0)ctx.moveTo(sp.x,sp.y); else ctx.lineTo(sp.x,sp.y);
-    });
-    ctx.closePath();
-    ctx.stroke();
-    if(!S.gridCells || !S.gridCells.length){
-      ctx.fillStyle='rgba(239,68,68,.05)';
-      ctx.fill();
+    /* [TEST] 대표 허가지선(=분석 대상) — 확정 표시를 확실히
+       빨강은 배경 지적선(#ff3b3b)과 겹쳐 구분이 안 돼서, 형광 노랑 + 검은 글로우로 변경 */
+    var _hasPermitPts = S.permit.pts && S.permit.pts.length>=3;
+    if(_hasPermitPts){
+      ctx.save();
+      ctx.lineJoin='round'; ctx.lineCap='round';
+      ctx.beginPath();
+      S.permit.pts.forEach(function(p,idx){
+        var sp=w2s(p);
+        if(idx===0)ctx.moveTo(sp.x,sp.y); else ctx.lineTo(sp.x,sp.y);
+      });
+      ctx.closePath();
+      if(!S.gridCells || !S.gridCells.length){
+        ctx.fillStyle='rgba(250,204,21,.10)'; ctx.fill();
+      }
+      ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.lineWidth=6.5; ctx.stroke();   /* 검은 글로우 */
+      ctx.strokeStyle='#facc15';           ctx.lineWidth=3.0; ctx.stroke();   /* 형광 노랑 본선 */
+      /* 정점 마커 — 확정된 선이라는 표시 */
+      if(S.scale>0.25){
+        ctx.fillStyle='#facc15'; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=1.5;
+        S.permit.pts.forEach(function(p){
+          var sp=w2s(p);
+          if(sp.x<-10||sp.x>cv.width+10||sp.y<-10||sp.y>cv.height+10) return;
+          ctx.beginPath(); ctx.arc(sp.x,sp.y,3.2,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        });
+      }
+      ctx.restore();
     }
   }
 
@@ -1921,6 +2056,7 @@ function onDaejangInput(){
     ci.style.display='none';
     rb.style.display='none';
   }
+  if(typeof updateAreaCorrBase==='function') updateAreaCorrBase();   // [TEST] 기준면적 안내 동기화
   // 면적표 다시 그리기 (현재 결과 재사용)
   if(S.avgSlope!==null && S.bins){
     showResult(S.avgSlope, S.bins, S.totalArea);
