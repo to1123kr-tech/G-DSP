@@ -185,9 +185,10 @@ canvas.grabbing{cursor:grabbing}
           <div id="cadParcelList" style="margin-bottom:7px"></div>
           <button class="btn btn-ghost" onclick="cadAddMore()" style="margin-bottom:5px">＋ 필지 더 추가</button>
           <div style="display:flex;gap:4px;margin-bottom:6px">
-            <button class="thr on" id="pmIndiv" onclick="setPermitMerge(false)">필지별</button>
-            <button class="thr" id="pmMerge" onclick="setPermitMerge(true)">하나로 합침</button>
+            <button class="thr" id="pmIndiv" onclick="setPermitMerge(false)">필지별</button>
+            <button class="thr on" id="pmMerge" onclick="setPermitMerge(true)">하나로 합침</button>
           </div>
+          <div style="font-size:10px;color:var(--dim);margin-bottom:6px;line-height:1.4">여러 필지는 하나로 합쳐 계산하는 게 기본이에요</div>
           <button class="btn btn-pri" onclick="cadUseAsPermit()" style="background:var(--ok)">✓ 허가지선으로 확정</button>
           <button class="btn btn-ghost" onclick="cadClearSel()" style="margin-top:5px;color:var(--err);border-color:var(--err)">선택 전체 해제</button>
         </div>
@@ -209,8 +210,8 @@ canvas.grabbing{cursor:grabbing}
         <div id="permitModeBox" style="display:none;margin-top:8px">
           <div style="font-size:10px;color:var(--dim);margin-bottom:4px">확정 후에도 바꿀 수 있어요</div>
           <div style="display:flex;gap:4px">
-            <button class="thr on" id="pmIndiv2" onclick="repermit(false)">필지별</button>
-            <button class="thr" id="pmMerge2" onclick="repermit(true)">하나로 합침</button>
+            <button class="thr" id="pmIndiv2" onclick="repermit(false)">필지별</button>
+            <button class="thr on" id="pmMerge2" onclick="repermit(true)">하나로 합침</button>
           </div>
         </div>
         <div style="border-top:1px solid var(--line);margin:9px 0 0;padding-top:9px">
@@ -686,6 +687,8 @@ cv.addEventListener('mousedown',function(e){
   }
   // 기본: 화면 팬
   S.isDown=true; S.lastM={x:e.clientX,y:e.clientY};
+  /* ★ 드래그 판정용 시작점 — 지도를 끌어 옮긴 것을 필지 클릭으로 오인하지 않게 */
+  S.downAt={x:e.clientX,y:e.clientY}; S.dragMoved=false;
   cv.classList.add('grabbing');
 });
 
@@ -722,6 +725,11 @@ window.addEventListener('mousemove',function(e){
   }
   // 화면 팬
   if(!S.isDown) return;
+  /* ★ 4px 넘게 움직였으면 '끌기'로 간주 → 뒤따르는 click 무시 */
+  if(S.downAt){
+    var _dx=e.clientX-S.downAt.x, _dy=e.clientY-S.downAt.y;
+    if(Math.abs(_dx)>4 || Math.abs(_dy)>4) S.dragMoved=true;
+  }
   S.ox+=e.clientX-S.lastM.x;
   S.oy-=e.clientY-S.lastM.y;
   S.lastM={x:e.clientX,y:e.clientY};
@@ -798,7 +806,9 @@ function switchPanel(t){
   });
 }
 
-var CAD = { selMode:false, parcels:[], geocoder:null, ready:false, bgOn:false, bgImg:null, bgAlpha:0.6 };
+var CAD = { selMode:false, parcels:[], geocoder:null, ready:false, bgOn:false, bgImg:null, bgAlpha:0.6, marker:null };
+/* ★ 허가지선 기본 = 여러 필지를 하나로 합침 (실무 99% 이 방식으로 계산) */
+S.permitMerge = true;
 
 /* proj4 정의 (일지 검증본) */
 function _cadInitProj(){
@@ -1537,6 +1547,11 @@ function cadUseAsPermit(){
 
   var dt=document.getElementById('detPermit');
   if(dt){ dt.className='det-row ok'; dt.querySelector('.ct').textContent='확정'; }
+
+  /* ★ 허가지선이 확정되면 검색 마커·지번 라벨은 지움 (역할 끝, 화면 정리) */
+  CAD.marker=null;
+  _jibunClearList();
+  _jibunMsg('');
 
   toast(parcelsPolys.length+'필지 → 허가지선 확정','ok');
 
