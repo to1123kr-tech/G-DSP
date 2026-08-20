@@ -214,11 +214,11 @@ select {
   </div>
 
   <div class="tabs">
-    <button class="tab on" id="tab-ngii" onclick="switchTab('ngii')">
+    <button class="tab" id="tab-ngii" onclick="switchTab('ngii')" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
       수치지형도변환
     </button>
-    <button class="tab" id="tab-sanrang" onclick="switchTab('sanrang')">
+    <button class="tab on" id="tab-sanrang" onclick="switchTab('sanrang')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 11l-3-3-7 7v3h3z"/><path d="M18 7l1-1a2.83 2.83 0 0 0 0-4 2.83 2.83 0 0 0-4 0L7 10v3h3l8-8z"/><path d="M3 21h18"/></svg>
       산e랑변환
     </button>
@@ -231,7 +231,7 @@ select {
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <!-- 탭 1: 수치지형도변환 -->
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <div class="tab-view on" id="view-ngii">
+  <div class="tab-view" id="view-ngii">
     <div class="container">
       <h2 style="margin-bottom:18px">수치지형도변환</h2>
 
@@ -257,7 +257,7 @@ select {
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <!-- 탭 2: 산e랑변환 -->
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <div class="tab-view" id="view-sanrang">
+  <div class="tab-view on" id="view-sanrang">
     <div class="container">
       <h2>🏔️ 산e랑 공간정보 변환</h2>
       <div class="desc">
