@@ -129,7 +129,7 @@ canvas.grabbing{cursor:grabbing}
 
 <div class="hdr">
   <span class="logo">G-DSP</span>
-  <span class="ttl">경사도 검토 <span style="font-size:10px;color:var(--dim);font-weight:400">(오토슬럼프 호환 엔진)</span></span>
+  <span class="ttl">경사도 검토</span>
   <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px">v4 · 자동맞춤+DXF출력</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
@@ -275,7 +275,7 @@ canvas.grabbing{cursor:grabbing}
       <div class="sec-t">④ 분석</div>
       <button class="btn btn-pri" id="btnRun" disabled onclick="runAnalysis()">경사도 분석 실행</button>
       <div style="font-size:10px;color:var(--dim);margin-top:7px;line-height:1.6">
-        TIN 생성 → 10m 격자 → 면적가중 평균<br>오토슬럼프와 동일 방식
+        TIN 생성 → 10m 격자 → 면적가중 평균
       </div>
     </div>
 
@@ -363,7 +363,7 @@ canvas.grabbing{cursor:grabbing}
       <div id="binTable"></div>
     </div>
     <div class="sec" style="border-bottom:none">
-      <button class="btn btn-primary" onclick="exportDXF()" style="margin-bottom:6px;width:100%">DXF 저장 (오토 스타일)</button>
+      <button class="btn btn-primary" onclick="exportDXF()" style="margin-bottom:6px;width:100%">DXF 저장</button>
       <button class="btn btn-ghost" onclick="exportPNG()" style="width:100%">PNG 저장</button>
     </div>
   </div>
@@ -948,7 +948,13 @@ function _cadFetchParcelByXY(lng,lat){
       var fs=(data&&data.features)||[];
       if(!fs.length){ toast('필지 정보를 못 찾았어요','err'); return; }
       var f=fs[0], pr=f.properties||{}, geom=f.geometry;
-      var thisPnu=pr.pnu||pr.PNU||('XY'+lng.toFixed(6)+'_'+lat.toFixed(6));
+      /* ★ VWorld 지적 응답에 PNU가 들어있음 → 그대로 사용해야 대장면적 조회가 됨.
+         (가짜 XY키를 쓰면 /api/landinfo가 19자리 아니라며 400 반환) */
+      var thisPnu=pr.pnu||pr.PNU||pr.PNU_CD||pr.pnu_cd||null;
+      if(!thisPnu || String(thisPnu).length!==19){
+        console.log('[지적선택] PNU 미확보 — 대장면적 자동조회 불가', pr);
+        thisPnu = thisPnu || ('XY'+lng.toFixed(6)+'_'+lat.toFixed(6));
+      }
       var idx=CAD.parcels.findIndex(function(sp){ return sp.pnu===thisPnu; });
       if(idx>=0){ CAD.parcels.splice(idx,1); toast('필지 해제: '+(pr.jibun||thisPnu),'ok'); }
       else{
@@ -1327,44 +1333,68 @@ function doJibunSearch(){
   if(!_cadInitProj()){ _jibunMsg('좌표 변환(proj4) 로드 실패 — 서버에서 열어주세요','#f87171'); return; }
   _jibunClearList();
   _jibunMsg('검색 중...','#94a3b8');
+  _kkSearchList(q, function(list){
+    if(list===null){ _jibunMsg('카카오 SDK 로딩 중 — 잠시 후 다시 눌러주세요','#f87171'); return; }
+    if(!list.length){ _jibunMsg('검색 결과 없음 — 지번을 다시 확인해주세요','#f87171'); return; }
+    /* ★ 항상 목록으로 보여주고 사용자가 고름 (1건이어도) — 엉뚱한 지역 자동선택 방지 */
+    _jibunShowList(list);
+  });
+}
+
+/* 지번 검색 (popup_download 검증본 방식)
+   1) addressSearch(지번/도로명)  2) 실패하면 keywordSearch(장소명)
+   결과는 항상 목록으로 반환 → 사용자가 선택 */
+function _kkSearchList(q, cb){
   _cadKakaoReady(function(ok){
-    if(!ok){ _jibunMsg('카카오 지도 API 로드 실패','#f87171'); return; }
-    CAD.geocoder.addressSearch(q, function(res, st){
-      if(st!==kakao.maps.services.Status.OK || !res.length){
-        _jibunMsg('주소를 찾지 못했어요 — 지번을 정확히 입력해보세요','#f87171'); return;
+    if(!ok){ cb(null); return; }
+    var gc=CAD.geocoder;
+    var OK=kakao.maps.services.Status.OK;
+    gc.addressSearch(q, function(docs, st){
+      if(st===OK && docs.length){
+        cb(docs.map(function(r){
+          return { addr:r.address_name, road:(r.road_address&&r.road_address.address_name)||'',
+                   lat:parseFloat(r.y), lng:parseFloat(r.x), address:r.address };
+        }));
+        return;
       }
-      /* ★ 결과가 여러 개면 고르게 함 (같은 지번이 여러 시군에 있을 수 있음) */
-      if(res.length>1){ _jibunShowList(res); return; }
-      var r=res[0];
-      _gotoLngLat(parseFloat(r.x), parseFloat(r.y), _jibunLabel(r));
+      /* 주소로 못 찾으면 키워드(장소) 검색 */
+      try{
+        var ps=new kakao.maps.services.Places();
+        ps.keywordSearch(q, function(d2, st2){
+          if(st2===OK && d2.length){
+            cb(d2.map(function(r){
+              return { addr:(r.address_name||r.place_name), road:(r.road_address_name||''),
+                       lat:parseFloat(r.y), lng:parseFloat(r.x), address:null };
+            }));
+          } else cb([]);
+        });
+      }catch(e){ cb([]); }
     });
   });
 }
-function _jibunLabel(r){
-  return (r.address && r.address.address_name) || r.address_name ||
-         (r.road_address && r.road_address.address_name) || '';
-}
+
+function _jibunLabel(r){ return r.addr || ''; }
 function _jibunClearList(){
   var box=document.getElementById('jibunList');
-  if(box){ box.innerHTML=''; box.style.display='none'; }
+  if(box){ box.innerHTML=''; box.style.display='none'; box._list=null; }
 }
 /* 검색 결과 후보 목록 — 클릭하면 그 위치로 이동 */
-function _jibunShowList(res){
+function _jibunShowList(list){
   var box=document.getElementById('jibunList');
   if(!box) return;
-  box.innerHTML=''; box.style.display='';
-  _jibunMsg('결과 '+res.length+'건 — 맞는 주소를 고르세요','#fbbf24');
-  res.slice(0,8).forEach(function(r){
+  box.innerHTML=''; box.style.display=''; box._list=list;
+  _jibunMsg('결과 '+list.length+'건 — 맞는 주소를 고르세요','#fbbf24');
+  list.slice(0,10).forEach(function(item){
     var row=document.createElement('div');
     row.className='jbRow';
-    var nm=_jibunLabel(r);
-    var road=(r.road_address && r.road_address.address_name)||'';
-    row.innerHTML='<div class="jbNm"></div>'+(road?'<div class="jbSub"></div>':'');
-    row.querySelector('.jbNm').textContent=nm;
-    if(road) row.querySelector('.jbSub').textContent=road;
+    row.innerHTML='<div class="jbNm"></div>'+(item.road?'<div class="jbSub"></div>':'');
+    row.querySelector('.jbNm').textContent=item.addr;
+    if(item.road) row.querySelector('.jbSub').textContent=item.road;
     row.onclick=function(){
       _jibunClearList();
-      _gotoLngLat(parseFloat(r.x), parseFloat(r.y), nm);
+      /* ★ 선택한 주소의 address 객체를 보관 → 필지 클릭 시 PNU 생성에 사용 */
+      CAD._pickedAddr = item.address || null;
+      _gotoLngLat(item.lng, item.lat, item.addr);
     };
     box.appendChild(row);
   });
@@ -1420,8 +1450,9 @@ function cadUseAsPermit(){
 
   toast(parcelsPolys.length+'필지 → 허가지선 확정','ok');
 
-  /* ★ 확정 즉시 대장(공부)면적 자동조회 — 재해위험성과 동일 동작 */
-  if(S._permitPnus && S._permitPnus.length) permitFetchDaejang();
+  /* ★ 확정 즉시 대장(공부)면적 자동조회 — 재해위험성과 동일 동작.
+     PNU가 없으면 permitFetchDaejang 안에서 지번으로 역산해 확보한다. */
+  permitFetchDaejang();
 }
 
 /* ══ [TEST] 확정 후 필지별/합침 재전환 ══
@@ -1512,12 +1543,55 @@ function updateAreaCorrBase(){
 function _permDMsg(html){
   var el=document.getElementById('permDMsg'); if(el) el.innerHTML=html||'';
 }
+/* 지번 주소 문자열 → PNU 19자리 (카카오 addressSearch 사용)
+   지적 응답에 PNU가 없을 때의 보조 경로 */
+function _pnuFromJibun(jibun){
+  return new Promise(function(resolve,reject){
+    if(!jibun){ reject('지번 없음'); return; }
+    _cadKakaoReady(function(ok){
+      if(!ok){ reject('카카오 SDK 없음'); return; }
+      CAD.geocoder.addressSearch(jibun, function(docs, st){
+        if(st!==kakao.maps.services.Status.OK || !docs.length){ reject('주소 검색 결과 없음'); return; }
+        var found=null;
+        for(var i=0;i<docs.length;i++){ if(docs[i].address){ found=docs[i].address; break; } }
+        if(!found){ reject('지번 주소 없음'); return; }
+        var bcode=found.b_code||'';
+        if(bcode.length!==10){ reject('법정동코드 오류'); return; }
+        var mtn=(found.mountain_yn==='Y')?'2':'1';
+        var bun=String(found.main_address_no||'0').padStart(4,'0');
+        var ji =String(found.sub_address_no ||'0').padStart(4,'0');
+        resolve(bcode+mtn+bun+ji);
+      });
+    });
+  });
+}
+
+/* 확정된 필지들의 PNU를 확보 (없으면 지번으로 역산) */
+function _ensurePermitPnus(){
+  var src=S._permitSrc||[];
+  var jobs=src.map(function(sp){
+    if(sp.pnu && String(sp.pnu).length===19) return Promise.resolve(String(sp.pnu));
+    return _pnuFromJibun(sp.jibun).then(function(p){ sp.pnu=p; return p; }).catch(function(){ return null; });
+  });
+  return Promise.all(jobs).then(function(arr){
+    var ok=arr.filter(function(x){ return x && String(x).length===19; });
+    S._permitPnus=ok;
+    return ok;
+  });
+}
+
 function permitFetchDaejang(){
-  var pnus=(S._permitPnus && S._permitPnus.length)? S._permitPnus.slice() : [];
-  if(!pnus.length){
-    _permDMsg('<span style="color:#fbbf24">지적 선택으로 잡은 허가지선만 자동조회돼요 (직접 그린 건 수동 입력)</span>');
-    return;
-  }
+  /* ★ PNU가 없으면 지번으로 역산해서 확보한 뒤 조회 */
+  _permDMsg('⏳ 필지 정보 확인 중…');
+  _ensurePermitPnus().then(function(ok){
+    if(!ok.length){
+      _permDMsg('<span style="color:#fbbf24">필지 PNU를 못 찾았어요 — 대장면적은 아래 칸에 직접 입력하세요</span>');
+      return;
+    }
+    _permitFetchDaejangRun(ok);
+  });
+}
+function _permitFetchDaejangRun(pnus){
   _permDMsg('⏳ 대장면적 조회 중… ('+pnus.length+'필지)');
   var src=S._permitSrc||[];
   var jobs=pnus.map(function(pnu){
