@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v5.4 · 08-22 사용목적</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v5.5 · 08-22 주소정규화</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -1812,7 +1812,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v5.4 (2026-08-22) 사용목적 선택 추가';
+var GDSP_VER = 'TEST v5.5 (2026-08-22) 산 중복 수정·시도명 정규화';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2164,6 +2164,7 @@ function ngiiFillAddrFromPermit(force){
   var lb=(CAD.marker && CAD.marker.label ? String(CAD.marker.label) : '').trim();
   var lastTok=lb.split(/\s+/).pop()||'';
   if(lb && /\d/.test(lastTok) && !/허가지선/.test(lb)){
+    lb=_normalizeJibunAddr(lb);
     el.value=lb; NGII.autoFilled=true; NGII._lastAddr=lb;
     _ngiiMsg('✓ '+lb,'#4ade80');
     return;
@@ -2202,19 +2203,41 @@ function ngiiFillAddrFromPermit(force){
 function _mergeJibunTail(full){
   var src=(S._permitSrc && S._permitSrc.length)?S._permitSrc[0]:null;
   var jb=src && src.jibun ? String(src.jibun).trim() : '';
-  if(!jb) return full;
+  if(!jb) return _normalizeJibunAddr(full);
   /* 지목 한 글자 제거: "산131-61임" → "산131-61" */
   jb=jb.replace(/\s*[가-힣]$/,'').trim();
-  if(!/\d/.test(jb)) return full;
+  if(!/\d/.test(jb)) return _normalizeJibunAddr(full);
+
   var parts=String(full).trim().split(/\s+/);
   if(parts.length<2) return full;
-  var tail=parts[parts.length-1];
-  /* 끝 토큰이 지번 형태면 교체 */
-  if(/^산?\d+(-\d+)?$/.test(tail)){
-    parts[parts.length-1]=jb;
-    return parts.join(' ');
+
+  /* ★ 끝에서부터 지번 조각을 모두 걷어낸다.
+     카카오가 "… 남양리 산 139-93" 처럼 '산'을 띄어서 주는 경우가 있어,
+     마지막 토큰만 바꾸면 "산 산139-93" 처럼 산이 중복된다(실측). */
+  while(parts.length>1){
+    var t=parts[parts.length-1];
+    if(/^산$/.test(t) || /^산?\d+(-\d+)?$/.test(t)){ parts.pop(); continue; }
+    break;
   }
-  return full+' '+jb;
+  parts.push(jb);
+  return _normalizeJibunAddr(parts.join(' '));
+}
+
+/* NGII 검색용 주소 정규화
+   - "산 139-93" 처럼 띄어쓴 산 → "산139-93"
+   - 시도 약칭을 정식 명칭으로 (카카오 "경기" ↔ NGII "경기도") */
+function _normalizeJibunAddr(a){
+  if(!a) return a;
+  var t=String(a).trim().replace(/\s+/g,' ');
+  t=t.replace(/\s산\s+(\d)/g,' 산$1');          /* 산 139-93 → 산139-93 */
+  var SIDO={ '서울':'서울특별시','부산':'부산광역시','대구':'대구광역시','인천':'인천광역시',
+             '광주':'광주광역시','대전':'대전광역시','울산':'울산광역시','세종':'세종특별자치시',
+             '경기':'경기도','강원':'강원특별자치도','충북':'충청북도','충남':'충청남도',
+             '전북':'전북특별자치도','전남':'전라남도','경북':'경상북도','경남':'경상남도',
+             '제주':'제주특별자치도' };
+  var p=t.split(' ');
+  if(p.length>1 && SIDO[p[0]]){ p[0]=SIDO[p[0]]; t=p.join(' '); }
+  return t;
 }
 
 /* 역지오코딩 실패 시 — 지목만 떼고 지번이라도 넣되 경고 */
