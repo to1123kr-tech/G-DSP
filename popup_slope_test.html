@@ -225,8 +225,33 @@ canvas.grabbing{cursor:grabbing}
     <!-- ══ 지형도 탭 ══ -->
     <div class="pview" id="pview-terrain">
 
+    <!-- ══ 수치지형도 자동 받기 (크롬 확장 연동) ══ -->
     <div class="sec">
-      <div class="sec-t">① 파일</div>
+      <div class="sec-t">① 수치지형도 받기</div>
+      <div id="extBox">
+        <input id="ngiiAddr" placeholder="지번 (예: 화성시 봉담읍 수기리 1)"
+          onkeydown="if(event.key==='Enter')ngiiStart()"
+          style="width:100%;box-sizing:border-box;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:7px 8px;font-size:12px;margin-bottom:6px">
+        <div style="display:flex;gap:4px;margin-bottom:6px">
+          <button class="thr on" id="scl5000" onclick="setNgiiScale('5000')">1:5000</button>
+          <button class="thr" id="scl1000" onclick="setNgiiScale('1000')">1:1000</button>
+        </div>
+        <button class="btn btn-pri" id="btnNgii" onclick="ngiiStart()">⬇ 수치지형도 받기</button>
+        <button class="btn btn-ghost" id="btnNgiiStop" onclick="ngiiStop()" style="display:none;margin-top:5px;color:var(--err);border-color:var(--err)">■ 중지</button>
+        <div id="ngiiMsg" style="font-size:10.5px;margin-top:7px;line-height:1.5;color:var(--dim)"></div>
+      </div>
+      <div id="extMissing" style="display:none">
+        <div style="font-size:11px;color:var(--warn);line-height:1.6;margin-bottom:7px">
+          크롬 확장이 설치되어 있지 않아요.<br>설치하면 지번만 넣고 자동으로 받을 수 있어요.
+        </div>
+        <div style="font-size:10px;color:var(--dim);line-height:1.5">
+          설치 후에도 안 뜨면 이 페이지를 새로고침하세요.
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-t">② 파일</div>
       <div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
         <div class="big">📂</div>
         DXF를 끌어다 놓거나<br>클릭해서 선택
@@ -235,7 +260,7 @@ canvas.grabbing{cursor:grabbing}
     </div>
 
     <div class="sec">
-      <div class="sec-t">② 자동 감지</div>
+      <div class="sec-t">③ 자동 감지</div>
       <div class="det">
         <div class="det-row" id="detCont"><div class="dot"></div><div class="nm">등고선</div><div class="ct">-</div></div>
         <div class="det-row" id="detSurv"><div class="dot"></div><div class="nm">표고점</div><div class="ct">-</div></div>
@@ -804,6 +829,8 @@ function switchPanel(t){
     if(b) b.classList.toggle('on', k===t);
     if(v) v.classList.toggle('on', k===t);
   });
+  /* 지형도 탭으로 오면 허가지선 지번을 자동으로 채워줌 */
+  if(t==='terrain' && typeof ngiiFillAddrFromPermit==='function') ngiiFillAddrFromPermit();
 }
 
 var CAD = { selMode:false, parcels:[], geocoder:null, ready:false, bgOn:false, bgImg:null, bgAlpha:0.6, marker:null };
@@ -1746,6 +1773,134 @@ function _permitTotalArea(){
 function _updateRunBtn(){
   var b=document.getElementById('btnRun');
   if(b) b.disabled=!(S.contours && S.contours.length && S.permit && S.permit.pts && S.permit.pts.length>=3);
+}
+
+
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 수치지형도 자동 받기 — 크롬 확장(gdsp-ext) 연동
+   페이지→확장 : {source:'GDSP_PAGE', type:'START'|'STOP'|'PING', addr, scale, purpose1, purpose2}
+   확장→페이지 : {source:'GDSP_EXT',  type:'READY'|'START_ACK'|'PROGRESS'|'DONE'|'DEAD'}
+   ⚠ 확장은 '다운로드까지'만 함. 받은 파일을 여는 건 아래 파일 선택.
+      (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
+   ══════════════════════════════════════════════════════════════ */
+var NGII = { scale:'5000', extAlive:false, lastSeen:0, running:false, purpose1:'기타', purpose2:'기타' };
+
+function _ngiiMsg(t,c){
+  var el=document.getElementById('ngiiMsg');
+  if(el){ el.textContent=t||''; el.style.color=c||'var(--dim)'; }
+}
+function setNgiiScale(v){
+  NGII.scale=v;
+  var a=document.getElementById('scl5000'), b=document.getElementById('scl1000');
+  if(a) a.className='thr'+(v==='5000'?' on':'');
+  if(b) b.className='thr'+(v==='1000'?' on':'');
+}
+function _ngiiSend(msg){
+  msg.source='GDSP_PAGE';
+  try{ window.postMessage(msg, window.location.origin); }catch(e){}
+}
+/* 확장 설치 여부에 따라 UI 전환 */
+function _ngiiSyncExtUI(){
+  var box=document.getElementById('extBox'), miss=document.getElementById('extMissing');
+  if(!box||!miss) return;
+  box.style.display  = NGII.extAlive ? '' : 'none';
+  miss.style.display = NGII.extAlive ? 'none' : '';
+}
+function _ngiiRunning(on){
+  NGII.running=!!on;
+  var b=document.getElementById('btnNgii'), st=document.getElementById('btnNgiiStop');
+  if(b){ b.disabled=!!on; b.textContent = on ? '⏳ 받는 중…' : '⬇ 수치지형도 받기'; }
+  if(st) st.style.display = on ? '' : 'none';
+}
+
+function ngiiStart(){
+  if(!NGII.extAlive){ _ngiiMsg('확장이 설치되어 있지 않아요','#f87171'); return; }
+  var addr=(document.getElementById('ngiiAddr').value||'').trim();
+  if(!addr){ _ngiiMsg('지번을 입력하세요','#f87171'); return; }
+  _ngiiRunning(true);
+  _ngiiMsg('확장에 요청 보냄 — 국토정보플랫폼 탭이 열립니다','#94a3b8');
+  _ngiiSend({ type:'START', addr:addr, scale:NGII.scale, purpose1:NGII.purpose1, purpose2:NGII.purpose2 });
+}
+function ngiiStop(){
+  _ngiiSend({ type:'STOP' });
+  _ngiiRunning(false);
+  _ngiiMsg('중지했어요','#fbbf24');
+}
+
+/* 확장 → 페이지 수신 */
+window.addEventListener('message', function(ev){
+  /* ★ ev.source 대신 origin으로 검사.
+     content script는 isolated world라 source가 window와 일치한다는 보장이 없음 */
+  if(ev.origin && ev.origin!==window.location.origin) return;
+  var d=ev.data;
+  if(!d || d.source!=='GDSP_EXT') return;
+
+  if(d.type==='READY'){
+    NGII.lastSeen=Date.now();
+    if(!NGII.extAlive){ NGII.extAlive=true; _ngiiSyncExtUI(); }
+    return;
+  }
+  if(d.type==='DEAD'){
+    NGII.extAlive=false; _ngiiSyncExtUI(); _ngiiRunning(false);
+    _ngiiMsg('확장 연결이 끊겼어요 — 새로고침 해보세요','#f87171');
+    return;
+  }
+  if(d.type==='START_ACK'){
+    if(d.ok) _ngiiMsg('진행 중… 국토정보플랫폼 탭에서 [허용]을 눌러주세요','#94a3b8');
+    else { _ngiiRunning(false); _ngiiMsg('시작 실패: '+(d.err||'알 수 없음'),'#f87171'); }
+    return;
+  }
+  if(d.type==='PROGRESS'){
+    if(d.step) _ngiiMsg('⏳ '+d.step,'#94a3b8');
+    return;
+  }
+  if(d.type==='DONE'){
+    _ngiiRunning(false);
+    if(d.ok){
+      _ngiiMsg('✅ 다운로드 완료 — 받은 DXF를 선택하면 바로 열립니다','#4ade80');
+      _ngiiOfferOpen();
+    } else {
+      _ngiiMsg('❌ 중단됨'+(d.err?(' — '+d.err):''),'#f87171');
+    }
+    return;
+  }
+});
+
+/* 다운로드 완료 후 파일 열기 안내 (사용자 제스처 필요) */
+function _ngiiOfferOpen(){
+  var box=document.getElementById('ngiiMsg');
+  if(!box) return;
+  var old=document.getElementById('ngiiOpenBtn');
+  if(old) old.parentNode.removeChild(old);
+  var b=document.createElement('button');
+  b.id='ngiiOpenBtn';
+  b.className='btn btn-pri';
+  b.style.cssText='margin-top:7px;background:var(--ok)';
+  b.textContent='📂 받은 DXF 열기';
+  b.onclick=function(){ document.getElementById('fileIn').click(); };
+  box.parentNode.insertBefore(b, box.nextSibling);
+  try{ toast('다운로드 완료 — 받은 DXF를 열어주세요','ok'); }catch(e){}
+}
+
+/* 확장 감지: PING 보내고 하트비트(2초) 끊기면 미설치로 판단 */
+(function _ngiiWatch(){
+  function tick(){
+    _ngiiSend({ type:'PING' });
+    if(NGII.extAlive && Date.now()-NGII.lastSeen>6000){
+      NGII.extAlive=false; _ngiiSyncExtUI();
+    }
+  }
+  if(document.readyState==='complete') setTimeout(function(){ tick(); setInterval(tick,3000); },300);
+  else window.addEventListener('load', function(){ setTimeout(function(){ tick(); setInterval(tick,3000); },300); });
+})();
+
+/* 허가지선이 확정돼 있으면 지번을 자동으로 채워줌 */
+function ngiiFillAddrFromPermit(){
+  var el=document.getElementById('ngiiAddr');
+  if(!el || el.value.trim()) return;
+  var src=(S._permitSrc&&S._permitSrc.length)?S._permitSrc[0]:null;
+  if(src && src.jibun){ el.value=src.jibun; }
 }
 
 /* ---------------- 렌더 ---------------- */
