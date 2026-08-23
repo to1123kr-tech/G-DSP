@@ -2,7 +2,16 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>G-DSP 경사도 검토</title>
+<title>G-DSP 경사도 검토 (테스트)</title>
+<!-- 지적/지도 기능용: proj4(좌표변환) + 카카오(주소↔좌표). 서버에서 열 때만 동작 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
+<script>
+/* 카카오 지도 SDK — ★ JS키(0f432d…)를 써야 함. REST키(c670e0…)는 SDK에서 안 먹음 */
+(function(){
+  var jsKey = localStorage.getItem('gdsp_kakao_js') || '0f432d6e8470eed32f947e3c7db146b9';
+  document.write('<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey='+jsKey+'&libraries=services&autoload=false">\x3C/script>');
+})();
+</script>
 <style>
 :root{
   --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --line:#1e2a44;
@@ -22,7 +31,7 @@ body{background:var(--bg);color:var(--txt);height:100vh;overflow:hidden;display:
 .main{flex:1;display:flex;overflow:hidden}
 
 /* 좌측 패널 */
-.side{width:240px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.side{width:288px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
 .sec{padding:12px 14px;border-bottom:1px solid var(--line)}
 .sec-t{font-size:10px;color:var(--dim);letter-spacing:1.5px;margin-bottom:8px;font-weight:700}
 
@@ -47,6 +56,34 @@ body{background:var(--bg);color:var(--txt);height:100vh;overflow:hidden;display:
 .btn-pri:disabled{background:var(--line);color:var(--dim);cursor:not-allowed}
 .btn-ghost{background:transparent;color:var(--dim);border:1px solid var(--line);font-size:11px;padding:8px}
 .btn-ghost:hover{color:var(--txt);border-color:var(--dim)}
+
+/* 좌측 패널 탭 (테스트: 지형도/허가지선/분석) */
+.ptabs{display:flex;border-bottom:1px solid var(--line);flex-shrink:0}
+.ptab{flex:1;padding:10px 3px;background:var(--panel2);border:none;border-right:1px solid var(--line);
+  color:var(--dim);font-size:11px;font-weight:700;cursor:pointer;transition:.15s;
+  white-space:nowrap;overflow:hidden}   /* 탭 이름이 두 줄로 접히지 않게 */
+.ptab:last-child{border-right:none}
+.ptab:hover{color:var(--txt)}
+.ptab.on{background:var(--panel);color:var(--pri);box-shadow:inset 0 -2px 0 var(--pri)}
+.pview{display:none;flex-direction:column;flex:1}
+.pview.on{display:flex}
+.side{overflow:hidden}
+.side-body{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+/* 주소 검색 결과 후보 */
+.jbRow{padding:7px 9px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+  margin-bottom:4px;cursor:pointer;transition:.12s}
+.jbRow:hover{border-color:var(--pri);background:rgba(59,130,246,.10)}
+.jbNm{font-size:11.5px;color:var(--txt);line-height:1.4}
+.jbSub{font-size:10px;color:var(--dim);margin-top:2px}
+/* 지적 필지 목록 */
+.cadPRow{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--panel2);
+  border:1px solid var(--line);border-radius:6px;margin-bottom:4px;font-size:11.5px}
+.cadPName{flex:1;color:var(--txt)}
+.cadPDel{background:transparent;border:none;color:var(--err);cursor:pointer;font-size:12px;padding:0 4px}
+.thr{flex:1;padding:6px;background:var(--panel2);border:1px solid var(--line);color:var(--dim);
+  border-radius:6px;font-size:11px;cursor:pointer}
+.thr.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.btn.active{background:var(--ok);color:#fff}
 
 /* 캔버스 영역 */
 .cv-wrap{flex:1;position:relative;background:#070d18}
@@ -94,7 +131,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px">v4 · 자동맞춤+DXF출력</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">v5.0 · 지형도 자동</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -102,20 +139,188 @@ canvas.grabbing{cursor:grabbing}
 <div class="main">
   <!-- 좌측 패널 -->
   <div class="side">
-    <div class="sec">
-      <div class="sec-t">① 파일</div>
-      <div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
-        <div class="big">📂</div>
-        DXF를 끌어다 놓거나<br>클릭해서 선택
+    <div class="ptabs">
+      <button class="ptab on" id="ptab-permit" onclick="switchPanel('permit')">① 허가지선</button>
+      <button class="ptab" id="ptab-terrain" onclick="switchPanel('terrain')">② 지형도</button>
+      <button class="ptab" id="ptab-analyze" onclick="switchPanel('analyze')">③ 분석</button>
+    </div>
+    <div class="side-body">
+
+    <!-- ══ 허가지선 탭 ══ -->
+    <div class="pview on" id="pview-permit">
+      <div class="sec">
+        <div class="sec-t">주소 검색</div>
+        <div style="display:flex;gap:4px">
+          <input id="jibunIn" placeholder="예: 화성시 봉담읍 수기리 산1"
+            onkeydown="if(event.key==='Enter')doJibunSearch()"
+            style="flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:7px 8px;font-size:12px;min-width:0">
+          <button class="btn btn-pri" onclick="doJibunSearch()" style="width:auto;padding:7px 11px;font-size:12px">검색</button>
+        </div>
+        <div id="jibunMsg" style="font-size:10.5px;margin-top:6px;line-height:1.5;color:var(--dim)"></div>
+        <div id="jibunList" style="display:none;margin-top:6px;max-height:180px;overflow-y:auto"></div>
       </div>
-      <input type="file" id="fileIn" accept=".dxf" style="display:none">
+
+      <div class="sec">
+        <div class="sec-t">지도 배경</div>
+        <button class="btn btn-ghost" id="cadBgBtn" onclick="toggleCadBg()">🗺 지도 배경 끄기</button>
+        <div id="cadBgCtrl" style="display:none;margin-top:7px">
+          <div style="display:flex;gap:4px;margin-bottom:6px">
+            <button class="thr on" id="cadBgL_sat" onclick="setCadBgLayers('sat')">위성</button>
+            <button class="thr" id="cadBgL_base" onclick="setCadBgLayers('base')">일반</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:10.5px;color:var(--dim);white-space:nowrap">투명도</span>
+            <input type="range" min="10" max="100" value="100" oninput="setCadBgAlpha(this.value)" style="flex:1">
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-t">필지 선택</div>
+        <button class="btn btn-pri" id="cadSelBtn" onclick="toggleCadSelect()">📍 지적 선택</button>
+        <div id="cadSelBar" style="display:none;margin-top:7px">
+          <div id="cadSelInfo" style="font-size:10.5px;color:var(--dim);line-height:1.5;margin-bottom:6px">필지를 클릭하세요 (여러 개 가능 · 다시 클릭=해제)</div>
+          <!-- 선택 중에도 목록·개별삭제·전체해제가 가능해야 한다.
+               (실수로 찍었을 때 그 필지를 다시 찾아가지 않고 여기서 바로 뺄 수 있게) -->
+          <div id="cadSelList" style="margin-bottom:6px"></div>
+          <button class="btn btn-pri" id="cadDoneBtn" onclick="cadFinishSelect()" disabled style="background:var(--ok)">✓ 선택 완료 →</button>
+          <button class="btn btn-ghost" id="cadUndoBtn" onclick="cadUndoLast()" style="margin-top:5px;display:none">↩ 마지막 선택 취소</button>
+          <button class="btn btn-ghost" onclick="cadClearSel()" style="margin-top:5px;color:var(--err);border-color:var(--err)">✕ 전체 해제</button>
+        </div>
+        <div id="cadDoneBar" style="display:none;margin-top:7px">
+          <div id="cadParcelList" style="margin-bottom:7px"></div>
+          <button class="btn btn-ghost" onclick="cadAddMore()" style="margin-bottom:5px">＋ 필지 더 추가</button>
+          <div style="display:flex;gap:4px;margin-bottom:6px">
+            <button class="thr" id="pmIndiv" onclick="setPermitMerge(false)">필지별</button>
+            <button class="thr on" id="pmMerge" onclick="setPermitMerge(true)">하나로 합침</button>
+          </div>
+          <div style="font-size:10px;color:var(--dim);margin-bottom:6px;line-height:1.4">여러 필지는 하나로 합쳐 계산하는 게 기본이에요</div>
+          <button class="btn btn-pri" onclick="cadUseAsPermit()" style="background:var(--ok)">✓ 허가지선으로 확정</button>
+          <button class="btn btn-ghost" onclick="cadClearSel()" style="margin-top:5px;color:var(--err);border-color:var(--err)">선택 전체 해제</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-t">허가지선 파일</div>
+        <div class="drop" id="permitDrop" onclick="document.getElementById('permitIn').click()" style="padding:14px 8px;font-size:11px">
+          <div class="big" style="font-size:18px">📐</div>
+          허가지선 DXF 올리기
+        </div>
+        <input type="file" id="permitIn" accept=".dxf" style="display:none">
+        <div style="font-size:10px;color:var(--dim);margin-top:6px;line-height:1.5">업체가 준 허가지선 도면 (R12도 가능)</div>
+      </div>
+
+      <div class="sec" id="permitInfo" style="display:none">
+        <div class="sec-t">확정된 허가지선</div>
+        <div id="permitAreaTx" style="font-size:12px;color:#facc15;font-weight:700;line-height:1.5"></div>
+        <div id="permitModeBox" style="display:none;margin-top:8px">
+          <div style="font-size:10px;color:var(--dim);margin-bottom:4px">확정 후에도 바꿀 수 있어요</div>
+          <div style="display:flex;gap:4px">
+            <button class="thr" id="pmIndiv2" onclick="repermit(false)">필지별</button>
+            <button class="thr on" id="pmMerge2" onclick="repermit(true)">하나로 합침</button>
+          </div>
+        </div>
+        <div style="border-top:1px solid var(--line);margin:9px 0 0;padding-top:9px">
+          <button class="btn btn-ghost" onclick="permitFetchDaejang()" style="color:#8ecbff;border-color:#2f4d70">🔍 대장면적 자동조회</button>
+          <div id="permDMsg" style="font-size:10px;margin-top:6px;line-height:1.5;color:var(--dim)"></div>
+          <div id="permitDaejangList" style="display:none;margin-top:5px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 지형도 탭 ══ -->
+    <div class="pview" id="pview-terrain">
+
+    <!-- ══ 수치지형도 자동 받기 (크롬 확장 연동) ══ -->
+    <!-- 허가지선이 있어야 진행 가능 — 허가지선 위치로 지형도를 받는 흐름 -->
+    <div class="sec" id="needPermitBox" style="display:none">
+      <div class="sec-t">① 수치지형도 받기</div>
+      <div style="font-size:11.5px;color:var(--warn);line-height:1.7;margin-bottom:9px">
+        먼저 <b>허가지선</b>을 만들어주세요.<br>
+        그 위치로 수치지형도를 받아옵니다.
+      </div>
+      <button class="btn btn-pri" onclick="switchPanel('permit')">① 허가지선 탭으로 가기</button>
+      <div style="font-size:10px;color:var(--dim);margin-top:8px;line-height:1.6">
+        지적에서 필지 선택 · 허가지선 DXF 올리기 · 직접 그리기<br>어느 방법이든 괜찮아요
+      </div>
+    </div>
+
+    <div class="sec" id="ngiiSec">
+      <div class="sec-t">① 수치지형도 받기</div>
+      <div id="permitAddrBox" style="background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:8px">
+        <div style="font-size:10px;color:var(--dim);margin-bottom:3px">허가지선 위치</div>
+        <div id="permitAddrTx" title="-"
+          style="font-size:11.5px;color:#facc15;font-weight:700;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">-</div>
+      </div>
+      <div id="extBox">
+        <div style="font-size:10px;color:var(--dim);margin-bottom:4px">검색할 지번 (필요하면 고치세요)</div>
+        <input id="ngiiAddr" placeholder="지번 (예: 화성시 봉담읍 수기리 1)"
+          oninput="NGII.autoFilled=false"
+          onkeydown="if(event.key==='Enter')ngiiStart()"
+          style="width:100%;box-sizing:border-box;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:7px 8px;font-size:12px;margin-bottom:6px">
+        <div style="display:flex;gap:4px;margin-bottom:8px">
+          <button class="thr on" id="scl5000" onclick="setNgiiScale('5000')">1:5000</button>
+          <button class="thr" id="scl1000" onclick="setNgiiScale('1000')">1:1000</button>
+        </div>
+        <div style="font-size:10px;color:var(--dim);margin-bottom:4px">사용 목적 (국토정보플랫폼 신청서)</div>
+        <select id="ngiiP1" onchange="onNgiiP1()"
+          style="width:100%;box-sizing:border-box;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:11.5px;margin-bottom:5px"></select>
+        <select id="ngiiP2" onchange="NGII.purpose2=this.value"
+          style="width:100%;box-sizing:border-box;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:11.5px;margin-bottom:8px"></select>
+        <button class="btn btn-pri" id="btnNgii" onclick="ngiiStart()">⬇ 수치지형도 받기</button>
+        <button class="btn btn-ghost" id="btnNgiiStop" onclick="ngiiStop()" style="display:none;margin-top:5px;color:var(--err);border-color:var(--err)">■ 중지</button>
+        <div id="ngiiMsg" style="font-size:10.5px;margin-top:7px;line-height:1.5;color:var(--dim)"></div>
+        <div id="fsaBox" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)"></div>
+      </div>
+      <div id="extMissing" style="display:none">
+        <div style="font-size:11px;color:var(--warn);line-height:1.6;margin-bottom:7px">
+          크롬 확장이 설치되어 있지 않아요.<br>설치하면 지번만 넣고 자동으로 받을 수 있어요.
+        </div>
+        <div style="font-size:10px;color:var(--dim);line-height:1.5">
+          설치 후에도 안 뜨면 이 페이지를 새로고침하세요.
+        </div>
+      </div>
     </div>
 
     <div class="sec">
-      <div class="sec-t">② 자동 감지</div>
+      <div class="sec-t">② 파일</div>
+      <div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
+        <div class="big">📂</div>
+        DXF를 끌어다 놓거나<br>클릭해서 선택<br><span style="font-size:10px;opacity:.7">여러 도엽을 한 번에 선택하거나<br>나눠서 올려도 계속 누적됩니다</span>
+      </div>
+      <input type="file" id="fileIn" accept=".dxf" multiple style="display:none">
+      <div id="sheetBox" style="display:none;margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:10.5px;color:#4ade80" id="sheetCnt">-</span>
+          <button class="thr" onclick="clearSheets()" style="flex:0 0 auto;padding:3px 8px;font-size:10px;color:var(--err);border-color:var(--err)">비우기</button>
+        </div>
+        <div id="sheetList" style="max-height:96px;overflow-y:auto"></div>
+        <div style="font-size:10px;color:var(--dim);margin-top:5px;line-height:1.5">더 올리면 계속 <b>누적</b>됩니다. 도엽이 여러 장이면 한 번에 골라도 돼요.</div>
+      </div>
+    </div>
+
+    <!-- 좌표계(원점) — 자동 판별이 틀렸을 때 직접 고침 -->
+    <div class="sec" id="beltBox" style="display:none">
+      <div class="sec-t">좌표계 원점</div>
+      <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:6px">
+        수치지형도는 지역마다 원점이 달라요.<br>위치가 엉뚱하면 여기서 바꾸세요.
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="thr" id="belt5185" onclick="setBelt('5185')">서부</button>
+        <button class="thr on" id="belt5186" onclick="setBelt('5186')">중부</button>
+        <button class="thr" id="belt5187" onclick="setBelt('5187')">동부</button>
+        <button class="thr" id="belt5188" onclick="setBelt('5188')">동해</button>
+      </div>
+      <div id="beltInfo" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
+    </div>
+
+
+    <div class="sec">
+      <div class="sec-t">③ 자동 감지</div>
       <div class="det">
         <div class="det-row" id="detCont"><div class="dot"></div><div class="nm">등고선</div><div class="ct">-</div></div>
         <div class="det-row" id="detSurv"><div class="dot"></div><div class="nm">표고점</div><div class="ct">-</div></div>
+        <div class="det-row" id="detWater"><div class="dot"></div><div class="nm">수계·하천</div><div class="ct">-</div></div>
         <div class="det-row" id="detPermit"><div class="dot"></div><div class="nm">허가지선</div><div class="ct">-</div></div>
       </div>
       <button class="btn btn-ghost" id="btnRepick" onclick="startRepick()" style="margin-top:7px;display:none">허가지선 다시 잡기</button>
@@ -125,12 +330,49 @@ canvas.grabbing{cursor:grabbing}
       <button class="btn btn-pri" id="btnRepickOk" onclick="confirmRepick()" style="margin-top:6px;display:none;background:var(--ok)">이 선으로 확정</button>
     </div>
 
+    </div><!-- /pview-terrain -->
+
+    <!-- ══ 분석 탭 ══ -->
+    <div class="pview" id="pview-analyze">
+
     <!-- ③ 면적 보정 — 파일업로드 → 허가지선 → 면적보정 순서 -->
+
+    <!-- 작업범위 — 허가지선 버퍼로 계산 구역 한정 (분석 조건이라 분석 탭에 둠) -->
+    <div class="sec">
+      <div class="sec-t">① 작업범위</div>
+      <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:6px">
+        도엽 전체는 허가지보다 훨씬 넓어요.<br>필요한 범위만 남기면 분석이 정확·빨라집니다.
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:5px">
+        <button class="thr on" id="wr0" onclick="setWorkRange(0)">전체</button>
+        <button class="thr" id="wr100" onclick="setWorkRange(100)">100m</button>
+        <button class="thr" id="wr200" onclick="setWorkRange(200)">200m</button>
+        <button class="thr" id="wr300" onclick="setWorkRange(300)">300m</button>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <input id="wrCustom" type="number" min="10" max="2000" step="10" placeholder="직접 입력(m)"
+          style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:11.5px">
+        <button class="thr" onclick="setWorkRange(document.getElementById('wrCustom').value)">적용</button>
+      </div>
+      <div id="workInfo" style="font-size:10.5px;color:var(--dim);margin-top:6px">전체 도면 사용</div>
+    </div>
+
+    <!-- 삼각망(TIN) 보기 -->
+    <div class="sec">
+      <div class="sec-t">② 삼각망 (TIN)</div>
+      <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:6px">
+        경사도 계산에 쓰인 삼각망이에요.<br>작업범위 안쪽만 그립니다.
+      </div>
+      <button class="btn btn-ghost" id="tinBtn" onclick="toggleTIN()">🔺 삼각망 보기</button>
+      <div id="tinInfo" style="font-size:10.5px;color:var(--dim);margin-top:6px">분석을 실행하면 볼 수 있어요</div>
+    </div>
     <div class="sec" id="areaCorrSec" style="display:none">
       <div class="sec-t">③ 면적 보정</div>
       <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:7px">
         대장(공부)면적을 넣으면 면적표가<br>그 값에 맞게 환산됩니다 (경사도 불변)
       </div>
+      <div id="corrBase" style="display:none;font-size:10.5px;color:var(--txt);background:var(--panel2);
+        border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-bottom:7px;line-height:1.5"></div>
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:11px;color:var(--txt);white-space:nowrap">대장면적</span>
         <input type="number" id="daejangArea" placeholder="캐드 실측" min="0" step="0.01"
@@ -185,9 +427,12 @@ canvas.grabbing{cursor:grabbing}
       </div>
     </div>
 
+    </div><!-- /pview-analyze -->
+
     <div class="sec" style="border-bottom:none;margin-top:auto">
       <button class="btn btn-ghost" onclick="resetAll()">처음부터 다시</button>
     </div>
+    </div><!-- /side-body -->
   </div>
 
   <!-- 캔버스 -->
@@ -201,6 +446,7 @@ canvas.grabbing{cursor:grabbing}
       <button onclick="zoomBy(1.3)" title="확대">＋</button>
       <button onclick="zoomBy(1/1.3)" title="축소">－</button>
       <button onclick="fitView()" title="화면 맞춤">⛶</button>
+      <button id="cvBgBtn" onclick="toggleCadBg()" title="지도·지적 배경 켜기/끄기">🗺</button>
     </div>
     <div class="legend" id="legend">
       <div class="lg-row"><div class="sw" style="background:#ef4444;height:3px"></div>허가지선</div>
@@ -307,9 +553,45 @@ function polyArea(pts){
 }
 
 /* ---------------- DXF 파서 ---------------- */
+/* 등고선 레이어 판정 — F0017 계열 전체 + 이름에 '등고'가 들어간 레이어
+   (F0017111 주곡선 / F0017114 계곡선 / F0017121 등, 도엽마다 다름) */
+function isContourLayer(lay){
+  var L=String(lay||'').toUpperCase().trim();
+  if(!L) return false;
+  if(/^F0017/.test(L)) return true;          // 수치지형도 등고선 계열
+  if(/등고/.test(lay)) return true;           // 한글 레이어명
+  if(/^CONTOUR/i.test(L)) return true;
+  return false;
+}
+/* 계곡선(굵은 등고선) 판정
+   레이어 코드(F0017114)가 표준이지만 도엽마다 다를 수 있어,
+   표고가 10m 배수인지로도 판단한다. (주곡선 5m / 계곡선 10m) */
+function _isIndexContour(c){
+  var L=String(c.layer||'').toUpperCase();
+  if(L==='F0017114') return true;
+  var e=c.elev;
+  if(!isFinite(e)) return false;
+  return Math.abs(e/10 - Math.round(e/10)) < 0.02;
+}
+
+/* 수계(하천·수로) 레이어 판정 — E 계열. 재해·우수분석에서 사용 */
+function isWaterLayer(lay){
+  var L=String(lay||'').toUpperCase().trim();
+  if(!L) return false;
+  if(/^E/.test(L)) return true;
+  if(/하천|수로|수계/.test(lay)) return true;
+  return false;
+}
+/* 표고점 레이어 판정 — F0027/H0027 계열 */
+function isElevLayer(lay){
+  var L=String(lay||'').toUpperCase().trim();
+  return /^F0027/.test(L) || /^H0027/.test(L) || /표고/.test(lay);
+}
+
 function parseDXF(text){
   var lines = text.split(/\r\n|\n/);
-  var contours=[], surveys=[], texts=[], polys=[];
+  var contours=[], surveys=[], texts=[], polys=[], waters=[];
+  var layerStat={};   /* 진단용: 레이어별 폴리라인 수 */
   var i=0, n=lines.length;
 
   // 코드/값 페어 순회
@@ -322,35 +604,88 @@ function parseDXF(text){
   }
 
   // ENTITIES 섹션 찾기
-  var inEnt=false;
-  while(i<n-1){
-    var p = next();
-    if(!p) break;
-    if(p.c===2 && p.v.trim()==='ENTITIES'){ inEnt=true; break; }
+  /* ★ 예전엔 next()로 2줄씩 짝지어 읽으며 찾았는데,
+     파일 앞부분에 줄이 하나라도 어긋나면 짝이 밀려 영영 못 찾는다(실측: 파싱 실패).
+     줄을 직접 훑어 '2' 다음 줄이 ENTITIES 인 지점을 찾는다. */
+  var entAt=-1;
+  for(var k=0;k<n-1;k++){
+    if(lines[k].trim()==='2' && lines[k+1].trim().toUpperCase()==='ENTITIES'){ entAt=k+2; break; }
   }
-  if(!inEnt){ throw new Error('ENTITIES 섹션 없음'); }
+  if(entAt<0){
+    /* 폴백: SECTION 없이 엔티티만 있는 파일도 있으므로 첫 LWPOLYLINE/POLYLINE 지점부터 */
+    for(var k2=0;k2<n-1;k2++){
+      var v2=lines[k2+1].trim().toUpperCase();
+      if(lines[k2].trim()==='0' && (v2==='LWPOLYLINE'||v2==='POLYLINE'||v2==='INSERT')){ entAt=k2; break; }
+    }
+  }
+  if(entAt<0){
+    var head=lines.slice(0,6).join(' | ').slice(0,120);
+    throw new Error('DXF 형식이 아니에요 (앞부분: '+head+')');
+  }
+  i=entAt;
 
   var cur=null; // 현재 엔티티
+  /* POLYLINE의 현재 VERTEX를 확정 (x,y 유효할 때만) */
+  function _pushVtx(c){
+    if(!c || !c._v) return;
+    var v=c._v; c._v=null;
+    if(isFinite(v.x) && isFinite(v.y)){
+      c.pts.push({x:v.x, y:v.y});
+      if(isFinite(v.z)) c.zs.push(v.z);
+    }
+  }
   function flush(){
     if(!cur) return;
+    /* POLYLINE 마무리 — VERTEX z의 중앙값을 등고선 높이로 (헤더 elevation은 0인 경우 많음) */
+    if(cur.type==='POLYLINE'){
+      _pushVtx(cur);
+      if(cur.pts.length>=2){
+        var elev=cur.elev||0;
+        if(!elev && cur.zs && cur.zs.length){
+          var z=cur.zs.slice().sort(function(a,b){return a-b;});
+          elev=z[Math.floor(z.length/2)];
+        }
+        var lay2=(cur.layer||'').toUpperCase();
+        layerStat[lay2]=(layerStat[lay2]||0)+1;
+        var ent2={layer:cur.layer, elev:elev||0, pts:cur.pts, closed:!!(cur.flags&1)};
+        if(isContourLayer(lay2)){
+          contours.push(ent2);
+        }
+        else if(isWaterLayer(lay2)){   /* 수계(E 계열) — 재해·우수용 보관 */
+          waters.push(ent2);
+        }
+        var f2=cur.pts[0], l2=cur.pts[cur.pts.length-1];
+        var closed2=(cur.flags&1) || (Math.hypot(f2.x-l2.x, f2.y-l2.y)<5);
+        if(closed2 && cur.pts.length>=3 && !isContourLayer(lay2)){
+          polys.push({layer:cur.layer, pts:cur.pts, area:polyArea(cur.pts)});
+        }
+      }
+      cur=null; return;
+    }
     if(cur.type==='LWPOLYLINE' && cur.pts.length>=2){
       var lay=(cur.layer||'').toUpperCase();
+      layerStat[lay]=(layerStat[lay]||0)+1;
       var ent={layer:cur.layer, elev:cur.elev||0, pts:cur.pts, closed:!!(cur.flags&1)};
-      // 등고선
-      if(lay==='F0017111'||lay==='F0017114'){
+      // 등고선 — 레이어 코드를 두 개만 박아두면 도엽에 따라 0개가 된다(실측).
+      // 수치지형도 등고선은 F0017 계열(F0017111 주곡선, F0017114 계곡선, F0017121 등).
+      if(isContourLayer(lay)){
         contours.push(ent);
+      }
+      /* 수계(E 계열) — 경사도에선 안 쓰고, 재해·우수에서 꺼내 쓰려고 보관 */
+      else if(isWaterLayer(lay)){
+        waters.push(ent);
       }
       // 닫힌 폴리곤 후보 (첫=끝 근접도 닫힘 취급)
       var f=cur.pts[0], l=cur.pts[cur.pts.length-1];
       var closed = (cur.flags&1) || (Math.hypot(f.x-l.x,f.y-l.y)<5);
-      if(closed && cur.pts.length>=3 && lay!=='F0017111' && lay!=='F0017114'){
+      if(closed && cur.pts.length>=3 && !isContourLayer(lay)){
         polys.push({layer:cur.layer, pts:cur.pts, area:polyArea(cur.pts)});
       }
     }
-    else if(cur.type==='INSERT' && (cur.layer||'').toUpperCase()==='F0027217'){
+    else if(cur.type==='INSERT' && isElevLayer(cur.layer)){
       surveys.push({x:cur.ix, y:cur.iy, z:(cur.iz||0), val:null});
     }
-    else if(cur.type==='TEXT' && (cur.layer||'').toUpperCase()==='F0027132'){
+    else if(cur.type==='TEXT' && isElevLayer(cur.layer)){
       var m=/^[\d.]+/.exec((cur.text||'').trim());
       if(m) texts.push({x:cur.ix, y:cur.iy, val:parseFloat(m[0])});
     }
@@ -362,9 +697,18 @@ function parseDXF(text){
     if(!p) break;
     if(p.c===0){
       var t=p.v.trim();
+      /* ★ VERTEX/SEQEND는 POLYLINE의 '속' 엔티티 — flush()보다 먼저 처리해야 한다.
+         먼저 flush()를 부르면 정점을 모으기 전에 POLYLINE이 닫혀버린다. */
+      if(t==='VERTEX' && cur && cur.type==='POLYLINE'){
+        _pushVtx(cur); cur._v={x:NaN,y:NaN,z:NaN}; continue;
+      }
+      if(t==='SEQEND' && cur && cur.type==='POLYLINE'){
+        _pushVtx(cur); flush(); continue;
+      }
       flush();
       if(t==='ENDSEC') break;
       if(t==='LWPOLYLINE') cur={type:t, pts:[], flags:0, elev:0, _px:null};
+      else if(t==='POLYLINE') cur={type:'POLYLINE', pts:[], flags:0, elev:0, zs:[], _v:null};
       else if(t==='INSERT'||t==='TEXT') cur={type:t};
       else cur=null;
       continue;
@@ -373,21 +717,24 @@ function parseDXF(text){
     var v=p.v;
     switch(p.c){
       case 8: cur.layer=v.trim(); break;
-      case 38: if(cur.type==='LWPOLYLINE') cur.elev=parseFloat(v)||0; break;
-      case 70: if(cur.type==='LWPOLYLINE') cur.flags=parseInt(v,10)||0; break;
+      case 38: if(cur.type==='LWPOLYLINE'||cur.type==='POLYLINE'){ if(!cur._v) cur.elev=parseFloat(v)||0; } break;
+      case 70: if(cur.type==='LWPOLYLINE'||cur.type==='POLYLINE'){ if(!cur._v) cur.flags=parseInt(v,10)||0; } break;
       case 10:
         if(cur.type==='LWPOLYLINE'){ cur._px=parseFloat(v); }
+        else if(cur.type==='POLYLINE'){ if(cur._v) cur._v.x=parseFloat(v); }
         else { cur.ix=parseFloat(v); }
         break;
       case 20:
         if(cur.type==='LWPOLYLINE' && cur._px!==null){
           cur.pts.push({x:cur._px, y:parseFloat(v)});
           cur._px=null;
-        } else { cur.iy=parseFloat(v); }
+        } else if(cur.type==='POLYLINE'){ if(cur._v) cur._v.y=parseFloat(v); }
+        else { cur.iy=parseFloat(v); }
         break;
       case 30:
-        // INSERT/TEXT 의 z좌표 (표고점 INSERT의 실제 표고)
-        if(cur.type==='INSERT'||cur.type==='TEXT') cur.iz=parseFloat(v);
+        /* POLYLINE: 헤더 elevation은 0인 경우가 많고 실제 높이는 VERTEX의 z(30)에 있다 */
+        if(cur.type==='POLYLINE'){ if(cur._v) cur._v.z=parseFloat(v); else cur.elev=parseFloat(v)||0; }
+        else if(cur.type==='INSERT'||cur.type==='TEXT') cur.iz=parseFloat(v);
         break;
       case 1: if(cur.type==='TEXT') cur.text=v; break;
     }
@@ -404,7 +751,12 @@ function parseDXF(text){
     if(best && bd<30) s.val=best.val;
   });
 
-  return {contours:contours, surveys:surveys, polys:polys};
+  /* 등고선이 0개면 어떤 레이어가 들어있었는지 콘솔에 찍는다 (도엽마다 코드가 달라서) */
+  if(!contours.length){
+    var top=Object.keys(layerStat).sort(function(a,b){return layerStat[b]-layerStat[a];}).slice(0,15);
+    console.log('[DXF] 등고선 0개 — 폴리라인 레이어 상위:', top.map(function(k){return k+'('+layerStat[k]+')';}).join(', '));
+  }
+  return {contours:contours, surveys:surveys, polys:polys, waters:waters, layerStat:layerStat};
 }
 
 /* ---------------- 허가지선 자동 감지 ----------------
@@ -420,37 +772,189 @@ function detectPermit(polys){
 }
 
 /* ---------------- 파일 로드 ---------------- */
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 여러 DXF 합쳐 열기 — 허가지가 도엽 경계에 걸치면 2~4장이 받아진다.
+   한 장만 열면 나머지 구역의 등고선이 비어 경사도가 틀리게 나온다.
+   각 파일을 따로 파싱·원점변환한 뒤 하나로 합쳐 적용한다.
+   ══════════════════════════════════════════════════════════════ */
+function loadFiles(files){
+  files=Array.prototype.slice.call(files||[]).filter(function(f){ return /\.dxf$/i.test(f.name); });
+  if(!files.length){ toast('DXF 파일이 없어요','err'); return; }
+  /* 한 장이어도 누적 처리를 태운다 (기존 도면에 더하기) */
+
+  /* ★ 누적 모드 — 도엽을 여러 번 나눠 올릴 수 있게 기존 것에 더한다.
+     기준은 항상 S._allSheets(원본 누적본) 하나. S.contours는 작업범위로 잘린
+     상태일 수 있으므로 절대 기준으로 쓰면 안 된다(중복 누적됨). */
+  if(!S._allSheets) S._allSheets={contours:[], surveys:[], polys:[], waters:[]};
+  var keep = S._allSheets.contours.length>0 || S._allSheets.surveys.length>0;
+  var merged={
+    contours: S._allSheets.contours.slice(),
+    surveys:  S._allSheets.surveys.slice(),
+    polys:    S._allSheets.polys.slice(),
+    waters:   S._allSheets.waters.slice(),
+    layerStat:{}
+  };
+  var names=[], belts={}, idx=0, t0=Date.now();
+
+  function step(){
+    if(idx>=files.length){ finish(); return; }
+    var f=files[idx++];
+    _ngiiMsg('📖 도엽 '+idx+'/'+files.length+' 읽는 중… ('+f.name.slice(0,28)+')','#94a3b8');
+    var fr=new FileReader();
+    fr.onerror=function(){ console.log('[합치기] 읽기 실패:', f.name); step(); };
+    fr.onload=function(){
+      var text;
+      try{ text=new TextDecoder('utf-8',{fatal:true}).decode(fr.result); }
+      catch(e){ text=new TextDecoder('euc-kr').decode(fr.result); }
+      try{
+        var r=parseDXF(text);
+        var belt=detectBelt(r);
+        if(belt!=='5186') reprojectParsed(r, belt);
+        belts[belt]=(belts[belt]||0)+1;
+        merged.contours=merged.contours.concat(r.contours||[]);
+        merged.surveys =merged.surveys.concat(r.surveys||[]);
+        merged.polys   =merged.polys.concat(r.polys||[]);
+        merged.waters  =merged.waters.concat(r.waters||[]);
+        names.push(f.name);
+        console.log('[합치기] '+f.name+' → 등고선 '+(r.contours||[]).length+' · 표고점 '+(r.surveys||[]).length+' (원점 '+belt+')');
+      }catch(err){
+        console.log('[합치기] 건너뜀 —', f.name, err.message);
+        toast(f.name+' 은(는) 읽지 못했어요','err');
+      }
+      setTimeout(step, 20);
+    };
+    fr.readAsArrayBuffer(f);
+  }
+
+  function finish(){
+    if(!merged.contours.length && !merged.surveys.length){
+      _ngiiMsg('❌ 읽을 수 있는 도엽이 없었어요','#f87171');
+      return;
+    }
+    S._srcBelt=Object.keys(belts).length===1?Object.keys(belts)[0]:'5186';
+    /* 원본 누적본 갱신 — 다음 업로드의 기준이 된다 */
+    S._allSheets={contours:merged.contours.slice(), surveys:merged.surveys.slice(),
+                  polys:merged.polys.slice(), waters:merged.waters.slice()};
+    /* 도엽 이름은 중복 제거 — 같은 파일을 다시 올려도 장수가 늘지 않게 */
+    var prevNames=(S._sheetNames||[]).slice();
+    names.forEach(function(nm){ if(prevNames.indexOf(nm)<0) prevNames.push(nm); });
+    S._sheetNames=prevNames;
+    var totalSheets=prevNames.length;
+    var label=(totalSheets>1) ? (totalSheets+'개 도엽 합침') : prevNames[0];
+    applyParsed(label, merged);
+    _syncSheetList();
+    var sec=((Date.now()-t0)/1000).toFixed(1);
+    _ngiiMsg('✅ '+(keep?('+'+names.length+'장 추가 → 총 '+totalSheets+'장'):(names.length+'개 도엽 합침'))
+      +' · 등고선 '+merged.contours.length
+      +' · 표고점 '+merged.surveys.length
+      +(merged.waters.length?(' · 수계 '+merged.waters.length):'')+' ('+sec+'초)','#4ade80');
+    toast(keep? (names.length+'장 추가 (총 '+totalSheets+'장)') : (names.length+'개 도엽을 합쳤어요'),'ok');
+  }
+  step();
+}
+
 function loadFile(file){
   if(!/\.dxf$/i.test(file.name)){ toast('DXF 파일만 가능해요','err'); return; }
   document.getElementById('hdrStat').textContent='읽는 중...';
+  var mb=(file.size/1048576).toFixed(1);
+  if(typeof _ngiiMsg==='function') _ngiiMsg('📖 '+file.name+' 읽는 중… ('+mb+'MB)','#94a3b8');
+
   var fr=new FileReader();
+  fr.onerror=function(){
+    toast('파일을 읽지 못했어요','err');
+    document.getElementById('hdrStat').textContent='오류';
+    if(typeof _ngiiMsg==='function') _ngiiMsg('❌ 파일을 읽지 못했어요','#f87171');
+  };
   fr.onload=function(){
     var text;
     try{ text=new TextDecoder('utf-8',{fatal:true}).decode(fr.result); }
     catch(e){ text=new TextDecoder('euc-kr').decode(fr.result); }
-    try{
-      var r=parseDXF(text);
-      applyParsed(file.name, r);
-    }catch(err){
-      toast('파싱 실패: '+err.message,'err');
-      document.getElementById('hdrStat').textContent='오류';
-    }
+
+    /* 큰 파일은 파싱이 수 초 걸린다 — 화면에 상태를 먼저 그린 뒤 처리 */
+    if(typeof _ngiiMsg==='function') _ngiiMsg('⏳ 도면 해석 중… ('+mb+'MB, 잠시만요)','#94a3b8');
+    document.getElementById('hdrStat').textContent='해석 중...';
+    setTimeout(function(){
+      var t0=Date.now();
+      try{
+        var r=parseDXF(text);
+        /* ★ 원점(벨트) 자동 판별 → 캔버스 좌표계(5186)로 변환 */
+        var belt=detectBelt(r);
+        S._srcBelt=belt;
+        if(belt!=='5186'){
+          var cnt=reprojectParsed(r, belt);
+          console.log('[좌표계] EPSG:'+belt+' → 5186 변환:', cnt+'점');
+        }
+        /* ★ 이미 지형도가 있으면 덧붙인다 (도엽을 한 장씩 올리는 경우) */
+        var _app = !!(S.contours && S.contours.length) && !S._replaceOnce;
+        S._replaceOnce=false;
+        applyParsed(file.name, r, _app);
+        S._sheetNames=(S._sheetNames||[]); S._sheetNames.push(file.name);
+        _syncSheetList();
+        var sec=((Date.now()-t0)/1000).toFixed(1);
+        if(typeof _ngiiMsg==='function'){
+          if(r.contours && r.contours.length){
+            var beltTx=(S._srcBelt && S._srcBelt!=='5186') ? (' · 원점 '+_beltName(S._srcBelt)+'→중부 변환') : '';
+            _ngiiMsg('✅ 등고선 '+r.contours.length+' · 표고점 '+r.surveys.length
+              +(r.waters&&r.waters.length?(' · 수계 '+r.waters.length):'')+' ('+sec+'초)'+beltTx,'#4ade80');
+          } else {
+            _ngiiMsg('⚠ 등고선을 못 찾았어요 — 콘솔(F12)의 [DXF] 줄을 확인해주세요','#fbbf24');
+          }
+        }
+      }catch(err){
+        console.log('[DXF] 파싱 실패', err);
+        toast('파싱 실패: '+err.message,'err');
+        document.getElementById('hdrStat').textContent='오류';
+        if(typeof _ngiiMsg==='function') _ngiiMsg('❌ 파싱 실패: '+err.message,'#f87171');
+      }
+    }, 60);
   };
   fr.readAsArrayBuffer(file);
 }
 
-function applyParsed(name, r){
-  S.fileName=name;
+function applyParsed(name, r, append){
+    S.fileName=name;
   S.contours=r.contours;
+  S._rawTerrain=null; S._workRings=null; S.workDist=0;   /* 새 도면 → 작업범위 초기화 */
+  S.waters=r.waters||[];      /* 수계(E계열) — 재해·우수에서 재사용 */
+  var _dw=document.getElementById('detWater');
+  if(_dw){
+    _dw.className='det-row'+(S.waters.length?' ok':'');
+    _dw.querySelector('.ct').textContent=S.waters.length?(S.waters.length+'개'):'없음';
+  }
   S.surveys=r.surveys;
   S.allPolys=r.polys;
-  S.permit=detectPermit(r.polys);
+  /* ★ 이미 확정된 허가지선이 있으면 지형도를 열어도 유지한다.
+     지형도 DXF에는 허가지선이 없으므로 detectPermit이 null을 돌려주고,
+     그대로 대입하면 애써 만든 허가지선이 지워진다(실측). */
+  var _keepPermit = (S.permit && S.permit.pts && S.permit.pts.length>=3) ? S.permit : null;
+  var _keepParcels = S.permitParcels, _keepSrc = S._permitSrc, _keepPnus = S._permitPnus;
+  var _keepDaejang = S.daejangArea;
+
+  var _found = detectPermit(r.polys);
+  if(_keepPermit){
+    S.permit = _keepPermit;                     /* 기존 허가지선 유지 */
+    if(_found) console.log('[지형도] 도면에서도 폴리곤을 찾았지만, 확정된 허가지선을 유지합니다');
+  } else {
+    S.permit = _found;
+    if(S.permit){ S._permitSrc=null; NGII._lastAddr=null; NGII.autoFilled=false; }
+  }
   // 새 도면이므로 이전 분석/절단선 캐시 비움
   S.triList=null; S.effectivePermit=null; S.cut=null; S.cutPieces=null;
   S.gridCells=[]; S.mode='view'; S.drawPts=[]; S.ghostPt=null; S.selCut=false; S.hoverSide=null;
   S.daejangArea=null;
   var daIn=document.getElementById('daejangArea'); if(daIn) daIn.value='';
   var ci=document.getElementById('corrInfo'); if(ci) ci.style.display='none';
+
+  /* ★ 허가지선을 유지한 경우 딸린 정보(필지·PNU·대장면적)도 함께 되돌린다 */
+  if(_keepPermit){
+    S.permitParcels=_keepParcels; S._permitSrc=_keepSrc; S._permitPnus=_keepPnus;
+    S.daejangArea=_keepDaejang;
+    if(daIn && _keepDaejang) daIn.value=Math.round(_keepDaejang*100)/100;
+    var dt2=document.getElementById('detPermit');
+    if(dt2){ dt2.className='det-row ok'; dt2.querySelector('.ct').textContent='확정'; }
+    if(typeof _updatePermitPanel==='function') _updatePermitPanel(_keepSrc?_keepSrc.length:1);
+    if(typeof updateAreaCorrBase==='function') updateAreaCorrBase();
+  }
   var rb=document.getElementById('btnResetArea'); if(rb) rb.style.display='none';
   document.getElementById('cutSec').style.display='none';
   document.getElementById('cutCtrl').style.display='none';
@@ -477,8 +981,13 @@ function applyParsed(name, r){
     name + ' · 등고선 ' + S.contours.length + ' · 표고점 ' + S.surveys.length;
 
   if(!S.permit) toast('허가지선(닫힌 폴리곤)을 못 찾았어요','err');
-  else if(!S.contours.length) toast('등고선(F0017111/F0017114)이 없어요','err');
+  else if(!S.contours.length) toast('등고선을 못 찾았어요 (F0017 계열)','err');
   else toast('자동 감지 완료 — 분석 실행을 눌러주세요');
+
+  /* ★ 열린 지형도가 허가지선 위치를 덮는지 확인 (엉뚱한 도엽 방지) */
+  if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
+  if(typeof _syncSheetList==='function') _syncSheetList();
+  if(typeof _syncBeltBtns==='function') _syncBeltBtns();
   render();
 }
 
@@ -497,7 +1006,10 @@ function computeBounds(){
     var pad=80;
     minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
   } else {
+    /* [TEST] 등고선만 보면 수계·표고점이 화면 밖으로 밀려난다 — 전부 포함 */
     S.contours.forEach(function(c){ c.pts.forEach(eat); });
+    if(S.waters) S.waters.forEach(function(c){ c.pts.forEach(eat); });
+    if(S.surveys) S.surveys.forEach(eat);
   }
   S.bounds={minX:minX,minY:minY,maxX:maxX,maxY:maxY};
 }
@@ -527,6 +1039,7 @@ function zoomAt(sx,sy,f){
   S.ox=sx-w.x*S.scale;
   S.oy=(cv.height-sy)-w.y*S.scale;
   render();
+  if(typeof cadBgRefresh==='function') cadBgRefresh(true);   // [TEST] 줌 → 지도타일 즉시 갱신
 }
 function w2s(p){ return {x:p.x*S.scale+S.ox, y:cv.height-(p.y*S.scale+S.oy)}; }
 function s2w(x,y){ return {x:(x-S.ox)/S.scale, y:(cv.height-y-S.oy)/S.scale}; }
@@ -553,6 +1066,8 @@ cv.addEventListener('mousedown',function(e){
   }
   // 기본: 화면 팬
   S.isDown=true; S.lastM={x:e.clientX,y:e.clientY};
+  /* ★ 드래그 판정용 시작점 — 지도를 끌어 옮긴 것을 필지 클릭으로 오인하지 않게 */
+  S.downAt={x:e.clientX,y:e.clientY}; S.dragMoved=false;
   cv.classList.add('grabbing');
 });
 
@@ -589,6 +1104,11 @@ window.addEventListener('mousemove',function(e){
   }
   // 화면 팬
   if(!S.isDown) return;
+  /* ★ 4px 넘게 움직였으면 '끌기'로 간주 → 뒤따르는 click 무시 */
+  if(S.downAt){
+    var _dx=e.clientX-S.downAt.x, _dy=e.clientY-S.downAt.y;
+    if(Math.abs(_dx)>4 || Math.abs(_dy)>4) S.dragMoved=true;
+  }
   S.ox+=e.clientX-S.lastM.x;
   S.oy-=e.clientY-S.lastM.y;
   S.lastM={x:e.clientX,y:e.clientY};
@@ -603,6 +1123,7 @@ window.addEventListener('mouseup',function(){
     document.getElementById('avgNum').style.opacity='1';
     applyCut();
   }
+  if(S.isDown && typeof cadBgRefresh==='function') cadBgRefresh();  // [TEST] 이동 → 지도타일 갱신
   S.isDown=false; cv.classList.remove('grabbing');
 });
 
@@ -610,6 +1131,8 @@ window.addEventListener('mouseup',function(){
 cv.addEventListener('click',function(e){
   if(S.dragMoved){ S.dragMoved=false; return; }
   var w=evWorld(e);
+  // ── [TEST] 지적 선택 모드면 필지 클릭 처리 후 종료
+  if(typeof cadHandleClick==='function' && cadHandleClick(w)) return;
   if(S.mode==='drawCut'){ addDrawPt(w.x, w.y); }
   else if(S.mode==='pickSide'){ pickSide(w.x, w.y); }
   else if(S.mode==='repick'){ pickPermit(w.x, w.y); }
@@ -646,10 +1169,2181 @@ cv.addEventListener('wheel',function(e){
   zoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.15:1/1.15);
 },{passive:false});
 
+
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 허가지선 탭 — 지도배경 · 주소검색 · 지적필지 선택 · 병합
+   popup_flow.html(재해위험성 책)에서 이식. 좌표계 EPSG:5186 공용.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 패널 탭 전환 ── */
+function switchPanel(t){
+  ['terrain','permit','analyze'].forEach(function(k){
+    var b=document.getElementById('ptab-'+k), v=document.getElementById('pview-'+k);
+    if(b) b.classList.toggle('on', k===t);
+    if(v) v.classList.toggle('on', k===t);
+  });
+  /* 지형도 탭으로 오면: 허가지선 유무 확인 → 지번 자동 채움 */
+  if(t==='terrain' && typeof ngiiSyncGate==='function') ngiiSyncGate();
+}
+
+var CAD = { selMode:false, parcels:[], geocoder:null, ready:false, bgOn:false, bgImg:null, bgAlpha:0.6, marker:null };
+/* ★ 허가지선 기본 = 여러 필지를 하나로 합침 (실무 99% 이 방식으로 계산) */
+S.permitMerge = true;
+
+/* proj4 정의 (일지 검증본) */
+function _cadInitProj(){
+  if(typeof proj4==='undefined') return false;
+  if(!proj4.defs['EPSG:5186']){
+    try{
+      /* 한국 평면직각좌표계 4개 원점 — 수치지형도는 지역에 따라 원점이 다르다.
+         서부 5185(125°) / 중부 5186(127°) / 동부 5187(129°) / 동해 5188(131°)
+         캔버스는 5186 고정이므로, 다른 원점 도면은 읽은 뒤 5186으로 변환해야 한다.
+         (동부 좌표를 중부로 오독하면 약 178km 서쪽으로 밀린다 — 실측) */
+      var _BELTS={ '5185':125, '5186':127, '5187':129, '5188':131 };
+      for(var _e in _BELTS){
+        proj4.defs('EPSG:'+_e, '+proj=tmerc +lat_0=38 +lon_0='+_BELTS[_e]
+          +' +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+      }
+    }catch(e){ return false; }
+  }
+  return true;
+}
+function tm5186toWgs84(E,N){ if(!_cadInitProj())return null; try{ return proj4('EPSG:5186','WGS84',[E,N]); }catch(e){ return null; } }  // [lon,lat]
+function wgs84toTm5186(lng,lat){ if(!_cadInitProj())return null; try{ return proj4('WGS84','EPSG:5186',[lng,lat]); }catch(e){ return null; } }  // [E,N]
+
+function _cadKakaoReady(cb, _tries){
+  if(CAD.geocoder){ cb(true); return; }
+  _tries=_tries||0;
+
+  /* SDK 스크립트 자체가 아직 안 붙었으면 대기 (최대 ~6초) */
+  if(typeof kakao==='undefined' || !kakao.maps){
+    if(_tries<60){ setTimeout(function(){ _cadKakaoReady(cb, _tries+1); }, 100); return; }
+    console.log('[카카오] SDK 로드 실패 — JS키/도메인 등록 확인');
+    cb(false); return;
+  }
+
+  /* services 이미 준비됨 (autoload=true인 경우) */
+  if(kakao.maps.services && kakao.maps.services.Geocoder){
+    try{ CAD.geocoder=new kakao.maps.services.Geocoder(); cb(true); }
+    catch(e){ console.log('[카카오] Geocoder 생성 실패', e); cb(false); }
+    return;
+  }
+
+  /* ★ autoload=false → kakao.maps.load()를 호출해야 services가 생김 */
+  if(typeof kakao.maps.load==='function'){
+    if(CAD._kakaoLoading){                       /* 중복 호출 방지 */
+      if(_tries<60){ setTimeout(function(){ _cadKakaoReady(cb, _tries+1); }, 100); return; }
+      cb(false); return;
+    }
+    CAD._kakaoLoading=true;
+    kakao.maps.load(function(){
+      CAD._kakaoLoading=false;
+      try{
+        if(kakao.maps.services && kakao.maps.services.Geocoder){
+          CAD.geocoder=new kakao.maps.services.Geocoder(); cb(true);
+        } else {
+          console.log('[카카오] services 미포함 — libraries=services 확인');
+          cb(false);
+        }
+      }catch(e){ console.log('[카카오] load 후 실패', e); cb(false); }
+    });
+    return;
+  }
+  cb(false);
+}
+
+function toggleCadSelect(){
+  if(!_cadInitProj()){ toast('좌표 변환(proj4) 로드 실패 — 서버에서 열어주세요','err'); return; }
+  CAD.selMode=!CAD.selMode;
+  var b=document.getElementById('cadSelBtn');
+  if(b){ b.classList.toggle('active',CAD.selMode); b.textContent=CAD.selMode?'✓ 지적 선택 중 (필지 클릭)':'📍 지적 선택'; }
+  /* 1단계(선택 중) 바 표시, 2단계(검증) 바 숨김 */
+  var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display=CAD.selMode?'':'none';
+  var db=document.getElementById('cadDoneBar'); if(db) db.style.display='none';
+  if(CAD.selMode){
+    /* ★ 지적 선택 = 지도(위성+지적) 자동 켜기 — 필지를 봐야 하니까 (DXF 있어도) */
+    if(typeof cadBg!=='undefined' && !cadBg.on && typeof cadBgAutoOn==='function'){ cadBgAutoOn(); }
+    else if(!S.bounds){ if(!_cadEnsureView()){ toast('지도 준비 실패 — 서버에서 열어주세요','err'); } }
+    _cadKakaoReady(function(ok){ if(!ok) toast('카카오 지도 API 로드 실패 — 서버에서 열어야 해요','err'); });
+    toast('필지를 클릭하세요 (여러 개 가능, 다시 클릭=해제)','ok');
+    _cadUpdateBar(); render();
+  }
+}
+/* "선택 완료" → 2단계(검증) 화면으로. 선택모드는 끄되 목록 확인·수정 가능 */
+function cadFinishSelect(){
+  if(!CAD.parcels.length){ toast('먼저 필지를 선택하세요','err'); return; }
+  CAD.selMode=false;
+  var b=document.getElementById('cadSelBtn'); if(b){ b.classList.remove('active'); b.textContent='📍 지적 선택'; }
+  var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display='none';
+  var db=document.getElementById('cadDoneBar'); if(db) db.style.display='';
+  _cadRenderParcelList();
+  render();
+  toast('선택 완료 — 목록을 확인하세요 ('+CAD.parcels.length+'필지)','ok');
+}
+/* "필지 더 추가" → 다시 1단계 선택모드로 (기존 선택 유지) */
+function cadAddMore(){
+  CAD.selMode=true;
+  var b=document.getElementById('cadSelBtn'); if(b){ b.classList.add('active'); b.textContent='✓ 지적 선택 중 (필지 클릭)'; }
+  var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display='';
+  var db=document.getElementById('cadDoneBar'); if(db) db.style.display='none';
+  _cadUpdateBar();
+  toast('추가할 필지를 클릭하세요','ok');
+}
+/* 2단계 검증 목록 렌더 (각 필지 + 개별 ✕ 빼기) */
+function _cadRenderParcelList(){
+  var box=document.getElementById('cadParcelList'); if(!box) return;
+  box.innerHTML='';
+  if(!CAD.parcels.length){ box.innerHTML='<div style="font-size:11px;color:var(--tx3);text-align:center;padding:8px 0">선택된 필지가 없습니다</div>'; return; }
+  CAD.parcels.forEach(function(sp, i){
+    var row=document.createElement('div'); row.className='cadPRow';
+    var nm=sp.jibun||('필지 '+(i+1));
+    row.innerHTML='<span class="cadPName">✓ '+nm+'</span><button class="cadPDel" title="빼기">✕</button>';
+    row.querySelector('.cadPDel').onclick=function(){ _cadRemoveParcel(i); };
+    box.appendChild(row);
+  });
+}
+/* 검증 화면에서 개별 필지 빼기 */
+function _cadRemoveParcel(i){
+  if(i<0||i>=CAD.parcels.length) return;
+  var nm=CAD.parcels[i].jibun||'필지';
+  CAD.parcels.splice(i,1);
+  _cadRenderParcelList(); render();
+  toast('제외: '+nm+' (남은 '+CAD.parcels.length+'필지)','ok');
+  if(!CAD.parcels.length){
+    /* 다 빼면 1단계로 되돌림 */
+    var db=document.getElementById('cadDoneBar'); if(db) db.style.display='none';
+    toggleCadSelect(); // off
+    var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display='none';
+  }
+}
+
+/* 캔버스 클릭 → 필지 선택 (S.mode 처리부에서 호출) */
+function cadHandleClick(worldPt){
+  if(!CAD.selMode) return false;
+  var ll=tm5186toWgs84(worldPt.x, worldPt.y);
+  if(!ll){ toast('좌표 변환 실패','err'); return true; }
+  var lng=ll[0], lat=ll[1];
+  console.log('[지적선택] 클릭 → lng',lng.toFixed(6),'lat',lat.toFixed(6));
+  if(!CAD.geocoder){
+    console.log('[지적선택] geocoder 준비 대기');
+    _cadKakaoReady(function(ok){
+      if(ok) _cadFetchParcel(lng,lat);
+      else {
+        /* ★ 카카오 없어도 필지 선택은 가능 — /api/wfs가 좌표만으로 조회 지원 */
+        console.log('[지적선택] 카카오 없음 → 좌표 직접조회로 진행');
+        _cadFetchParcelByXY(lng,lat);
+      }
+    });
+    return true;
+  }
+  _cadFetchParcel(lng,lat);
+  return true;
+}
+
+/* 카카오 없이 좌표만으로 필지 조회 (PNU는 응답 속성에서 가져옴) */
+function _cadFetchParcelByXY(lng,lat){
+  fetch('/api/wfs?lng='+lng+'&lat='+lat)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var fs=(data&&data.features)||[];
+      if(!fs.length){ toast('필지 정보를 못 찾았어요','err'); return; }
+      var f=fs[0], pr=f.properties||{}, geom=f.geometry;
+      /* ★ VWorld 지적 응답에 PNU가 들어있음 → 그대로 사용해야 대장면적 조회가 됨.
+         (가짜 XY키를 쓰면 /api/landinfo가 19자리 아니라며 400 반환) */
+      var thisPnu=pr.pnu||pr.PNU||pr.PNU_CD||pr.pnu_cd||null;
+      if(!thisPnu || String(thisPnu).length!==19){
+        console.log('[지적선택] PNU 미확보 — 대장면적 자동조회 불가', pr);
+        thisPnu = thisPnu || ('XY'+lng.toFixed(6)+'_'+lat.toFixed(6));
+      }
+      var idx=CAD.parcels.findIndex(function(sp){ return sp.pnu===thisPnu; });
+      if(idx>=0){ CAD.parcels.splice(idx,1); toast('필지 해제: '+(pr.jibun||thisPnu),'ok'); }
+      else{
+        var rings5186=_cadGeomTo5186(geom);
+        if(!rings5186.length){ toast('필지 경계 변환 실패','err'); return; }
+        CAD.parcels.push({pnu:thisPnu, jibun:pr.jibun||pr.JIBUN||'', lng:lng, lat:lat, geom:geom, rings:rings5186});
+        toast('필지 추가: '+(pr.jibun||'선택됨')+' (총 '+CAD.parcels.length+'개)','ok');
+      }
+      _cadUpdateBar(); render();
+    })
+    .catch(function(e){ console.log('[지적선택] 좌표조회 실패',e); toast('필지 조회 실패','err'); });
+}
+/* PNU 생성 (map.html 검증본): 법정동10 + 산여부1 + 본번4 + 부번4 */
+function _cadBuildPnu(bcode, addr){
+  var b=String(bcode||'').replace(/[^0-9]/g,'').padEnd(10,'0').substring(0,10);
+  var isMt=(addr && (addr.mountain_yn==='Y' || (addr.address_name && addr.address_name.indexOf(' 산')!==-1)));
+  var g=isMt?'2':'1';
+  var bun=String(parseInt(addr&&addr.main_address_no)||0).padStart(4,'0');
+  var ji =String(parseInt(addr&&addr.sub_address_no)||0).padStart(4,'0');
+  return b+g+bun+ji;
+}
+function _cadFetchParcel(lng,lat){
+  CAD.geocoder.coord2RegionCode(lng,lat,function(rr,rs){
+    if(rs!==kakao.maps.services.Status.OK||!rr.length){ console.log('[지적선택] coord2RegionCode 실패',rs); toast('주소 조회 실패','err'); return; }
+    var bt=rr.find(function(r){return r.region_type==='B';}); if(!bt){ console.log('[지적선택] 법정동(B) 코드 없음'); toast('법정동코드 없음','err'); return; }
+    var bcode=bt.code;
+    console.log('[지적선택] 법정동코드',bcode);
+    CAD.geocoder.coord2Address(lng,lat,function(ar,as){
+      if(as!==kakao.maps.services.Status.OK||!ar.length||!ar[0].address){ console.log('[지적선택] coord2Address 실패',as); toast('지번 조회 실패','err'); return; }
+      var addr=ar[0].address;
+      var pnu=_cadBuildPnu(bcode, addr);
+      console.log('[지적선택] PNU',pnu,'/ 지번',addr.address_name);
+      fetch('/api/wfs?pnu='+pnu+'&lng='+lng+'&lat='+lat).then(function(r){return r.json();}).then(function(data){
+        var fs=(data&&data.response&&data.response.result&&data.response.result.featureCollection&&data.response.result.featureCollection.features)||(data&&data.features)||[];
+        console.log('[지적선택] /api/wfs 응답 필지수',fs.length);
+        if(!fs.length){ toast('필지 정보를 못 찾았어요 (PNU: '+pnu+')','err'); return; }
+        var f=fs[0], p=f.properties||{}, geom=f.geometry, thisPnu=p.pnu||pnu;
+        var idx=CAD.parcels.findIndex(function(sp){return sp.pnu===thisPnu;});
+        if(idx>=0){ CAD.parcels.splice(idx,1); toast('필지 해제: '+(p.jibun||thisPnu),'ok'); }
+        else {
+          var rings5186=_cadGeomTo5186(geom);
+          console.log('[지적선택] 링 변환 개수',rings5186.length);
+          CAD.parcels.push({pnu:thisPnu, jibun:p.jibun||(addr.address_name||'').split(' ').pop()||'', lng:lng, lat:lat, geom:geom, rings:rings5186});
+          toast('필지 추가: '+(p.jibun||'선택됨')+' (총 '+CAD.parcels.length+'개)','ok');
+        }
+        _cadUpdateBar(); render();
+      }).catch(function(e){ console.log('[지적선택] /api/wfs 예외',e); toast('필지 조회 실패','err'); });
+    });
+  });
+}
+/* GeoJSON 경위도 geometry → 5186 링 배열 [[{x,y}...], ...] */
+function _cadGeomTo5186(geom){
+  if(!geom) return [];
+  var polys=[];
+  if(geom.type==='MultiPolygon') polys=geom.coordinates.map(function(pp){return pp[0];});
+  else if(geom.type==='Polygon') polys=[geom.coordinates[0]];
+  else return [];
+  return polys.map(function(ring){
+    return ring.map(function(c){ var tm=wgs84toTm5186(c[0],c[1]); return tm?{x:tm[0],y:tm[1]}:null; }).filter(Boolean);
+  }).filter(function(r){return r.length>=3;});
+}
+function _cadUpdateBar(){
+  var n=CAD.parcels.length;
+  var el=document.getElementById('cadSelInfo'); if(el) el.textContent=n?(n+'개 필지 선택됨 · 다시 클릭=해제'):'필지를 클릭하세요 (여러 개 가능 · 다시 클릭=해제)';
+  var done=document.getElementById('cadDoneBtn'); if(done){ done.disabled=!n; done.textContent=n?('✓ 선택 완료 → ('+n+'필지)'):'✓ 선택 완료 →'; }
+  /* 선택 중 목록·되돌리기 — 실수로 찍은 필지를 여기서 바로 뺄 수 있게 */
+  var undo=document.getElementById('cadUndoBtn');
+  if(undo) undo.style.display = n ? '' : 'none';
+  _cadRenderSelList();
+}
+
+/* 선택 중 필지 목록 (확정 전) */
+function _cadRenderSelList(){
+  var box=document.getElementById('cadSelList'); if(!box) return;
+  box.innerHTML='';
+  if(!CAD.parcels.length) return;
+  CAD.parcels.forEach(function(sp, i){
+    var row=document.createElement('div'); row.className='cadPRow';
+    var nm=sp.jibun||('필지 '+(i+1));
+    row.innerHTML='<span class="cadPName">'+(i+1)+'. '+nm+'</span><button class="cadPDel" title="빼기">✕</button>';
+    row.querySelector('.cadPDel').onclick=function(){ _cadRemoveParcel(i); };
+    box.appendChild(row);
+  });
+}
+
+/* 마지막에 고른 필지 하나 취소 */
+function cadUndoLast(){
+  if(!CAD.parcels.length) return;
+  var sp=CAD.parcels.pop();
+  _cadUpdateBar();
+  if(typeof _cadRenderParcelList==='function') _cadRenderParcelList();
+  toast('취소: '+(sp.jibun||'필지'),'ok');
+  render();
+}
+
+
+/* 검색 위치 마커 (핀 + 지번 라벨) */
+function drawSearchMarker(){
+  if(!CAD.marker) return;
+  var p=w2s({x:CAD.marker.x, y:CAD.marker.y});
+  if(p.x<-60||p.x>cv.width+60||p.y<-60||p.y>cv.height+60) return;
+  ctx.save();
+  /* 십자 조준선 */
+  ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.moveTo(p.x-14,p.y); ctx.lineTo(p.x+14,p.y);
+  ctx.moveTo(p.x,p.y-14); ctx.lineTo(p.x,p.y+14);
+  ctx.stroke();
+  ctx.strokeStyle='#ff4d9d'; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(p.x-14,p.y); ctx.lineTo(p.x+14,p.y);
+  ctx.moveTo(p.x,p.y-14); ctx.lineTo(p.x,p.y+14);
+  ctx.stroke();
+  /* 중심 원 */
+  ctx.beginPath(); ctx.arc(p.x,p.y,6,0,Math.PI*2);
+  ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=3.5; ctx.stroke();
+  ctx.strokeStyle='#ff4d9d'; ctx.lineWidth=2; ctx.stroke();
+  /* 지번 라벨 */
+  if(CAD.marker.label){
+    ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+    var tw=ctx.measureText(CAD.marker.label).width;
+    ctx.fillStyle='rgba(0,0,0,0.72)';
+    ctx.fillRect(p.x-tw/2-6, p.y-36, tw+12, 19);
+    ctx.fillStyle='#ff9ec8';
+    ctx.fillText(CAD.marker.label, p.x, p.y-21);
+  }
+  ctx.restore();
+}
+
+function drawCadastral(){
+  if(!CAD.parcels.length) return;
+  ctx.save();
+  CAD.parcels.forEach(function(sp){
+    (sp.rings||[]).forEach(function(ring){
+      ctx.beginPath();
+      for(var i=0;i<ring.length;i++){ var s=w2s(ring[i]); if(i===0)ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y); }
+      ctx.closePath();
+      /* 은은한 채움 + 밝은 청록 굵은 테두리(+검은 외곽 글로우로 어디서든 잘 보임) */
+      ctx.fillStyle='rgba(0,229,255,0.14)'; ctx.fill();
+      ctx.lineJoin='round';
+      ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=5; ctx.stroke();   // 검은 외곽(글로우)
+      ctx.strokeStyle='#00e5ff'; ctx.lineWidth=2.6; ctx.stroke();          // 청록 본선
+    });
+    /* 지번 라벨 (첫 링 중심) */
+    if(sp.jibun && sp.rings && sp.rings[0] && sp.rings[0].length){
+      var cx=0,cy=0,r0=sp.rings[0]; r0.forEach(function(pt){cx+=pt.x;cy+=pt.y;}); cx/=r0.length; cy/=r0.length;
+      var sc=w2s({x:cx,y:cy});
+      ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.strokeText(sp.jibun,sc.x,sc.y);
+      ctx.fillStyle='#fff'; ctx.fillText(sp.jibun,sc.x,sc.y);
+    }
+  });
+  ctx.restore();
+}
+
+var cadBg = { on:false, alpha:1.0, layers:'sat', cache:{}, tiles:[], loadingN:0, showBase:true, showCad:true, vecParcels:[], vecTooWide:false };
+var VWORLD_KEY_BOOK = '16B90D39-90BB-3197-987A-54983A46F250';
+var CAD_BG_DOMAIN = (location.hostname && location.hostname.indexOf('nip.io')>=0) ? location.hostname : '168-107-15-68.nip.io';
+var _MERC_R = 20037508.342789244;
+
+function toggleCadBg(){
+  if(!_cadInitProj()){ toast('좌표 변환(proj4) 로드 실패 — 서버에서 열어주세요','err'); return; }
+  if(!S.bounds){ if(!_cadEnsureView()){ toast('지도 준비 실패 — 서버에서 열어주세요','err'); return; } }  // DXF 없어도 화성 기준 뷰
+  cadBg.on=!cadBg.on;
+  _cadBgSyncBtn();
+  if(cadBg.on) _cadBgFetch(); else render();
+}
+function _cadBgSyncBtn(){
+  /* 캔버스 위 지도 토글 버튼 — 탭과 무관하게 항상 접근 가능 */
+  var cb=document.getElementById('cvBgBtn');
+  if(cb){
+    cb.textContent = cadBg.on ? '🗺' : '🚫';
+    cb.title = cadBg.on ? '지도 배경 끄기' : '지도 배경 켜기';
+    cb.style.opacity = cadBg.on ? '1' : '0.55';
+  }
+  var b=document.getElementById('cadBgBtn'); if(b){ b.classList.toggle('active',cadBg.on); b.textContent=cadBg.on?'🗺 지도 배경 끄기':'🗺 지도·지적 배경'; }
+  var sl=document.getElementById('cadBgCtrl'); if(sl) sl.style.display=cadBg.on?'':'none';
+}
+function setCadBgLayers(v){ cadBg.layers=v; ['sat','base'].forEach(function(k){ var b=document.getElementById('cadBgL_'+k); if(b)b.className='thr'+(k===v?' on':''); }); cadBg.cache={}; if(cadBg.on) _cadBgFetch(); }
+function setCadBgAlpha(v){ cadBg.alpha=Math.max(0.1,Math.min(1,(parseFloat(v)||100)/100)); render(); }
+
+/* 타일 좌표 유틸 (웹메르카토르 z/x/y) */
+function _tileLL(x,y,z){ var n=Math.pow(2,z); var lng=x/n*360-180; var lat=Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI; return [lng,lat]; }
+function _tile3857(x,y,z){ var n=Math.pow(2,z); return [ x/n*2*_MERC_R-_MERC_R, _MERC_R-(y+1)/n*2*_MERC_R, (x+1)/n*2*_MERC_R-_MERC_R, _MERC_R-y/n*2*_MERC_R ]; }
+
+/* 현재 화면을 덮는 타일 목록 계산 */
+function _cadBgComputeTiles(){
+  if(!_cadInitProj()) return null;
+  var corners=[s2w(0,0), s2w(cv.width,0), s2w(cv.width,cv.height), s2w(0,cv.height)];
+  var lls=corners.map(function(p){return tm5186toWgs84(p.x,p.y);}).filter(Boolean);
+  if(lls.length<4) return null;
+  var lngs=lls.map(function(l){return l[0];}), lats=lls.map(function(l){return l[1];});
+  var minLng=Math.min.apply(null,lngs),maxLng=Math.max.apply(null,lngs),minLat=Math.min.apply(null,lats),maxLat=Math.max.apply(null,lats);
+  var dLng=(maxLng-minLng)||0.0005;
+  var z=Math.round(Math.log2(360/dLng * cv.width/256));
+  z=Math.max(12,Math.min(19,z));
+  for(var guard=0; guard<6; guard++){
+    var n=Math.pow(2,z);
+    var x0=Math.floor((minLng+180)/360*n), x1=Math.floor((maxLng+180)/360*n);
+    function _y(lat){ var r=lat*Math.PI/180; return Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n); }
+    var y0=_y(maxLat), y1=_y(minLat);
+    if((x1-x0+1)*(y1-y0+1) <= 90 || z<=12){ 
+      var arr=[]; for(var x=x0;x<=x1;x++) for(var y=y0;y<=y1;y++) arr.push({x:x,y:y,z:z}); return arr;
+    }
+    z--; // 타일 너무 많으면 한 단계 축소
+  }
+  return [];
+}
+/* 현재 화면의 경위도 범위 */
+function _cadViewLngLat(){
+  if(!_cadInitProj()) return null;
+  var c=[s2w(0,0), s2w(cv.width,0), s2w(cv.width,cv.height), s2w(0,cv.height)];
+  var lls=c.map(function(p){ return tm5186toWgs84(p.x,p.y); }).filter(Boolean);
+  if(lls.length<4) return null;
+  var lngs=lls.map(function(l){return l[0];}), lats=lls.map(function(l){return l[1];});
+  return { minLng:Math.min.apply(null,lngs), maxLng:Math.max.apply(null,lngs),
+           minLat:Math.min.apply(null,lats), maxLat:Math.max.apply(null,lats) };
+}
+/* 캐시 상한 — 오래 쓰면 이미지가 계속 쌓이므로 정리 */
+function _cadBgTrimCache(){
+  var keys=Object.keys(cadBg.cache);
+  if(keys.length<=600) return;
+  var keep={};
+  cadBg.tiles.forEach(function(t){ keep[_cadBgTileKey(t)]=1; });   /* 현재 타일은 보존 */
+  var removed=0;
+  for(var i=0;i<keys.length && (keys.length-removed)>400;i++){
+    if(keep[keys[i]]) continue;
+    delete cadBg.cache[keys[i]]; removed++;
+  }
+}
+
+function _cadBgTileKey(t){ return cadBg.layers+'/'+t.z+'/'+t.x+'/'+t.y; }
+function _cadBgFetch(){
+  if(!cadBg.on) return;
+  if(cadBg.showBase){
+    var tiles=_cadBgComputeTiles();
+    if(!tiles){ toast('좌표 변환 실패 — 서버에서 열어주세요','err'); return; }
+    cadBg.tiles=tiles;
+    if(typeof _cadBgTrimCache==='function') _cadBgTrimCache();
+    var baseName=(cadBg.layers==='sat')?'Satellite':'Base';
+    var baseExt=(cadBg.layers==='sat')?'jpeg':'png';
+    tiles.forEach(function(t){
+      var key=_cadBgTileKey(t);
+      if(cadBg.cache[key]) return;
+      var ent={base:null,tl:_tileLL(t.x,t.y,t.z),br:_tileLL(t.x+1,t.y+1,t.z)};
+      cadBg.cache[key]=ent;
+      var bimg=new Image();
+      /* ★타일 1장 받을 때마다 render()를 부르면 등고선·DEM까지 매번 다시 그려 느림.
+         → _cadBgRenderSoon()으로 한 프레임에 1번만 그린다. */
+      bimg.onload=function(){ ent.base=bimg; _cadBgRenderSoon(); };
+      bimg.onerror=function(){ ent.baseErr=true; };
+      bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
+    });
+  }
+  if(cadBg.showCad) _cadVecFetch();     // 지적선 = 벡터(빠름)
+  render();
+}
+/* 지적선 벡터 로드 (/api/cad-box → GeoJSON → 5186) — index.html 방식(빠름) */
+var _cadVecLoading=false, _cadVecKey='';
+function _cadVecFetch(){
+  if(!_cadInitProj()||!S.bounds) return;
+  /* 화면 5186 bbox → 경위도 */
+  var c=[s2w(0,0), s2w(cv.width,0), s2w(cv.width,cv.height), s2w(0,cv.height)];
+  var lls=c.map(function(p){return tm5186toWgs84(p.x,p.y);}).filter(Boolean);
+  if(lls.length<4) return;
+  var lngs=lls.map(function(l){return l[0];}), lats=lls.map(function(l){return l[1];});
+  var mnLng=Math.min.apply(null,lngs),mxLng=Math.max.apply(null,lngs),mnLat=Math.min.apply(null,lats),mxLat=Math.max.apply(null,lats);
+  /* 너무 넓으면(줌 아웃) 필지 과다 → 생략 */
+  if((mxLng-mnLng)>0.02){ cadBg.vecTooWide=true; render(); return; }
+  cadBg.vecTooWide=false;
+  var key=mnLng.toFixed(4)+','+mnLat.toFixed(4)+','+mxLng.toFixed(4)+','+mxLat.toFixed(4);
+  if(key===_cadVecKey||_cadVecLoading) return;
+  _cadVecLoading=true; _cadVecKey=key;
+  fetch('/api/cad-box?minx='+mnLng+'&miny='+mnLat+'&maxx='+mxLng+'&maxy='+mxLat+'&size=1000')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      _cadVecLoading=false;
+      var fs=(d&&d.features)||[]; var out=[];
+      fs.forEach(function(f){
+        var g=f.geometry; if(!g) return;
+        var rings;
+        if(g.type==='MultiPolygon') rings=g.coordinates.map(function(p){return p[0];});
+        else if(g.type==='Polygon') rings=[g.coordinates[0]];
+        else return;
+        var jibun=(f.properties&&(f.properties.jibun||f.properties.JIBUN))||'';
+        rings.forEach(function(ring){
+          var r5=ring.map(function(cc){ var t=wgs84toTm5186(cc[0],cc[1]); return t?{x:t[0],y:t[1]}:null; }).filter(Boolean);
+          if(r5.length>=3) out.push({ring:r5, jibun:jibun});
+        });
+      });
+      cadBg.vecParcels=out; render();
+    })
+    .catch(function(e){ _cadVecLoading=false; });
+}
+var _cadBgTimer=null;
+function cadBgRefresh(now){
+  if(!cadBg.on) return;
+  clearTimeout(_cadBgTimer);
+  /* ★ 줌은 즉시 요청(늦게 뜨는 느낌 제거), 그 외는 짧게 묶어서 */
+  if(now){ _cadBgFetch(); return; }
+  _cadBgTimer=setTimeout(_cadBgFetch,120);
+}
+
+/* 타일(위성/일반) + 지적 벡터를 5186 캔버스에 그림 */
+/* 타일이 여러 장 도착해도 화면 다시 그리기는 한 프레임에 1번만.
+   (예전엔 타일 30장이면 render()가 30번 = 등고선·DEM까지 30번 다시 그림) */
+var _cadBgRafId=null;
+function _cadBgRenderSoon(){
+  if(_cadBgRafId) return;
+  _cadBgRafId=requestAnimationFrame(function(){ _cadBgRafId=null; render(); });
+}
+function drawCadBg(){
+  if(!cadBg.on) return;
+  ctx.save();
+  // 1) 바탕(위성/일반) 타일
+  /* ★ 확대/축소 시 검은 바탕 깜박임 방지
+     줌이 바뀌면 타일 키가 전부 새것이라 로드 전까지 그릴 게 없어 화면이 까맣게 된다.
+     → 캐시에 남아있는 이전 줌 타일 중 현재 화면에 걸치는 것을 먼저 깔고(거친 것부터),
+       새 타일이 도착하는 대로 그 위에 덮는다. (지도 앱과 같은 방식) */
+  if(cadBg.showBase){
+    ctx.globalAlpha=cadBg.alpha;
+    var curZ=(cadBg.tiles[0] && cadBg.tiles[0].z) || 0;
+    var view=_cadViewLngLat();
+    if(view && curZ){
+      var fallback=[];
+      for(var key in cadBg.cache){
+        var e=cadBg.cache[key];
+        if(!e || !e.base) continue;
+        var kz=parseInt(key.split('/')[1],10);
+        if(!(kz<curZ) || kz<curZ-5) continue;              /* 현재보다 거친 것만, 5단계까지 */
+        if(e.br[0]<view.minLng || e.tl[0]>view.maxLng) continue;   /* 화면 밖 제외 */
+        if(e.tl[1]<view.minLat || e.br[1]>view.maxLat) continue;
+        fallback.push({z:kz, e:e});
+      }
+      fallback.sort(function(a,b){ return a.z-b.z; });      /* 거친 것 → 세밀한 것 */
+      fallback.forEach(function(f){ _cadBgBlit(f.e, f.e.base); });
+    }
+    /* 현재 줌 타일을 맨 위에 */
+    cadBg.tiles.forEach(function(t){ var e=cadBg.cache[_cadBgTileKey(t)]; if(!e||!e.base) return; _cadBgBlit(e,e.base); });
+  }
+  // 2) 지적선 벡터 (빨간선 + 지번) — DXF/위성 위에 선명
+  if(cadBg.showCad && cadBg.vecParcels && cadBg.vecParcels.length){
+    ctx.globalAlpha=1; ctx.lineWidth=1.4; ctx.strokeStyle='#ff3b3b';
+    ctx.beginPath();
+    for(var i=0;i<cadBg.vecParcels.length;i++){ var rg=cadBg.vecParcels[i].ring; var s0=w2s(rg[0]); ctx.moveTo(s0.x,s0.y); for(var j=1;j<rg.length;j++){ var sj=w2s(rg[j]); ctx.lineTo(sj.x,sj.y); } ctx.closePath(); }
+    ctx.stroke();
+    // 지번 라벨 (배율 충분할 때)
+    if(S.scale>0.35){
+      ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      for(var k=0;k<cadBg.vecParcels.length;k++){
+        var vp=cadBg.vecParcels[k]; if(!vp.jibun) continue;
+        var cx=0,cy=0,rr=vp.ring; for(var m=0;m<rr.length;m++){cx+=rr[m].x;cy+=rr[m].y;} cx/=rr.length; cy/=rr.length;
+        var sc=w2s({x:cx,y:cy}); if(sc.x<0||sc.x>cv.width||sc.y<0||sc.y>cv.height) continue;
+        ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.85)'; ctx.strokeText(vp.jibun,sc.x,sc.y);
+        ctx.fillStyle='#ffffff'; ctx.fillText(vp.jibun,sc.x,sc.y);
+      }
+    }
+  } else if(cadBg.showCad && cadBg.vecTooWide){
+    /* 너무 넓으면 안내 */
+    ctx.globalAlpha=1; ctx.fillStyle='rgba(255,90,90,0.9)'; ctx.font='12px sans-serif'; ctx.textAlign='left';
+    ctx.fillText('지적선 — 더 확대하세요 (필지가 너무 많음)', 14, 24);
+  }
+  ctx.restore();
+}
+function _cadBgBlit(e, img){
+  /* ★ 타일 검은 줄(이음새) 제거 — 네 모서리를 모두 변환해 감싸는 사각형에 그린다.
+     타일 아래모서리는 (x+1,y+1), 아래 타일 위모서리는 (x,y+1)로 계산되는데
+     EPSG:5186은 횡메르카토르라 같은 위도라도 경도가 다르면 N값이 달라진다.
+     오차는 중앙자오선(127°)에서 멀수록 커진다 — 실측:
+        화성(126.9°) 0.115m ≈ 0.2px  /  강릉(128.9°) 2.43m ≈ 5.1px
+     두 모서리만 쓰고 1px 여유를 주던 방식으론 동해안에서 굵은 검은 띠가 생긴다. */
+  var lng0=e.tl[0], lat0=e.tl[1], lng1=e.br[0], lat1=e.br[1];
+  var c=[ wgs84toTm5186(lng0,lat0), wgs84toTm5186(lng1,lat1),
+          wgs84toTm5186(lng0,lat1), wgs84toTm5186(lng1,lat0) ];
+  var xs=[], ys=[];
+  for(var k=0;k<4;k++){
+    if(!c[k]) return;
+    var sp=w2s({x:c[k][0], y:c[k][1]});
+    xs.push(sp.x); ys.push(sp.y);
+  }
+  var x0=Math.min.apply(null,xs), x1=Math.max.apply(null,xs);
+  var y0=Math.min.apply(null,ys), y1=Math.max.apply(null,ys);
+  if((x1-x0)<0.5||(y1-y0)<0.5) return;
+  /* 시작은 내림, 끝은 올림 + 1px 여유 → 이웃 타일과 항상 겹치게 (겹친 부분은 덮어써짐) */
+  var xr=Math.floor(x0), yr=Math.floor(y0);
+  var wr=Math.ceil(x1)-xr+1, hr=Math.ceil(y1)-yr+1;
+  if(wr<1) wr=1; if(hr<1) hr=1;
+  ctx.drawImage(img, xr, yr, wr, hr);
+}
+
+/* DXF 없어도 지도 표시 가능하게 — 화면 기본 범위 세팅 */
+function _cadEnsureView(){
+  if(S.bounds) return true;
+  if(!_cadInitProj()) return false;
+  /* 지형도 없으면 화성 기준으로 기본 화면 잡기 (5186) */
+  var c=wgs84toTm5186(126.84, 37.19); if(!c) return false;
+  S._viewFromUser=false;   /* ★ 기본 화면(화성)은 좌표계 판별 기준으로 쓰면 안 된다 */
+  var half=1500;  // ±1.5km
+  S.bounds={minX:c[0]-half,minY:c[1]-half,maxX:c[0]+half,maxY:c[1]+half};
+  S.mode='pan';
+  /* 캔버스 크기 확실히 (레이아웃 완료 전이면 부모 크기로) */
+  if(!cv.width || cv.width<10 || !cv.height || cv.height<10){
+    var st=cv.parentElement;
+    cv.width=(st&&st.clientWidth)||900; cv.height=(st&&st.clientHeight)||600;
+  }
+  /* 스케일 직접 세팅 (fitView가 캔버스 0일 때 음수 나는 것 방지) */
+  var dx=S.bounds.maxX-S.bounds.minX, dy=S.bounds.maxY-S.bounds.minY, pad=46;
+  S.scale=Math.min((cv.width-pad*2)/(dx||1),(cv.height-pad*2)/(dy||1));
+  if(!(S.scale>0)) S.scale=0.15;
+  S.ox=(cv.width-dx*S.scale)/2 - S.bounds.minX*S.scale;
+  S.oy=(cv.height-dy*S.scale)/2 - S.bounds.minY*S.scale;
+  return true;
+}
+
+
+function _ringSelfInt(r){
+  var n=r.length,c=0;
+  function o(p,q,s){return(q.y-p.y)*(s.x-q.x)-(q.x-p.x)*(s.y-q.y);}
+  for(var i=0;i<n;i++){ var a=r[i],b=r[(i+1)%n];
+    for(var k=i+2;k<n;k++){ if(i===0&&k===n-1)continue;
+      var c1=r[k],c2=r[(k+1)%n];
+      var d1=o(c1,c2,a),d2=o(c1,c2,b),d3=o(a,b,c1),d4=o(a,b,c2);
+      if(((d1>0)!==(d2>0))&&((d3>0)!==(d4>0)))c++;
+    }
+  }
+  return c;
+}
+function _mergeByEdges(polys){   // 공유변(짝수 등장) 제거 → 바깥 테두리만 스티칭. 정확·점 적음
+  var R=100; function key(p){ return Math.round(p.x*R)+'_'+Math.round(p.y*R); }
+  var coord={},ec={},ee={};
+  polys.forEach(function(ring){ var n=ring.length;
+    for(var i=0;i<n;i++){ var a=ring[i],b=ring[(i+1)%n]; var ka=key(a),kb=key(b); if(ka===kb)continue;
+      coord[ka]=a; coord[kb]=b; var ek=(ka<kb)?(ka+'|'+kb):(kb+'|'+ka); ec[ek]=(ec[ek]||0)+1; ee[ek]=[ka,kb]; }
+  });
+  var adj={},any=false;
+  for(var ek in ec){ if(ec[ek]%2===1){ var e=ee[ek]; (adj[e[0]]||(adj[e[0]]=[])).push(e[1]); (adj[e[1]]||(adj[e[1]]=[])).push(e[0]); any=true; } }
+  if(!any) return null;
+  var vis={},rings=[];
+  for(var sk in adj){ if(vis[sk]||!adj[sk].length)continue;
+    var ring=[],cur=sk,prev=null,gd=0;
+    while(cur&&!vis[cur]&&gd++<200000){ vis[cur]=1; ring.push(coord[cur]);
+      var nb=adj[cur],nx=null; for(var t=0;t<nb.length;t++){ if(nb[t]!==prev&&!vis[nb[t]]){nx=nb[t];break;} } prev=cur; cur=nx; }
+    if(ring.length>=3) rings.push(ring);
+  }
+  return rings.length?rings:null;
+}
+function mergePermitOutline(polys){
+  if(!polys||!polys.length) return null;
+  var ec=_mergeByEdges(polys);   // 1) 정확
+  if(ec && ec.every(function(r){ return _ringSelfInt(r)===0; })) return ec;
+  if(typeof bufferRings==='function'){ try{ var bf=bufferRings(polys,0); if(bf&&bf.length) return bf; }catch(e){} }   // 2) 견고 폴백(거리장 union)
+  return ec;
+}
+function _permitParcelsKey(){
+  if(!(S.permitParcels&&S.permitParcels.length)) return '';
+  var k=S.permitParcels.length+':';
+  for(var i=0;i<S.permitParcels.length;i++){ var r=S.permitParcels[i].ring; k+=(r?r.length:0)+','+(r&&r[0]?Math.round(r[0].x)+'_'+Math.round(r[0].y):'')+';'; }
+  return k;
+}
+function ensurePermitMerged(){
+  if(!(S.permitParcels&&S.permitParcels.length>1)){ S._permitMergedRings=null; return null; }
+  var key=_permitParcelsKey();
+  if(S._permitMergeKey===key && S._permitMergedRings) return S._permitMergedRings;
+  S._permitMergedRings=mergePermitOutline(S.permitParcels.map(function(p){return p.ring;}));
+  S._permitMergeKey=key;
+  return S._permitMergedRings;
+}
+
+/* ── 지도 자동 켜기 (지적 선택 시) ── */
+function cadBgAutoOn(){
+  if(!_cadEnsureView()) return;
+  cadBg.on=true; cadBg.showBase=true; cadBg.showCad=true;
+  _cadBgSyncBtn(); _cadBgFetch();
+}
+
+/* ── 필지별 / 하나로 합침 전환 ── */
+function setPermitMerge(on){
+  S.permitMerge=!!on;
+  _syncPmBtns();
+  if(typeof render==='function') render();
+}
+/* ── 필지별/합침 버튼 동기화 ── */
+function _syncPmBtns(){
+  var a=document.getElementById('pmIndiv'), b=document.getElementById('pmMerge');
+  if(!a||!b) return;
+  var on=!!S.permitMerge;
+  a.className='thr'+(on?'':' on');
+  b.className='thr'+(on?' on':'');
+}
+
+/* ── 선택 전체 해제 ── */
+function cadClearSel(){
+  CAD.parcels=[];
+  _cadUpdateBar();
+  _cadRenderParcelList();
+  var db=document.getElementById('cadDoneBar'); if(db) db.style.display='none';
+  render();
+}
+
+/* ── 주소 검색 (카카오 → 5186 → 해당 위치로 이동) ── */
+function _jibunMsg(t,c){
+  var el=document.getElementById('jibunMsg');
+  if(el){ el.textContent=t||''; el.style.color=c||'var(--dim)'; }
+}
+function doJibunSearch(){
+  var q=(document.getElementById('jibunIn').value||'').trim();
+  if(!q){ _jibunMsg('주소(지번)를 입력하세요','#f87171'); return; }
+  if(!_cadInitProj()){ _jibunMsg('좌표 변환(proj4) 로드 실패 — 서버에서 열어주세요','#f87171'); return; }
+  _jibunClearList();
+  _jibunMsg('검색 중...','#94a3b8');
+  _kkSearchList(q, function(list){
+    if(list===null){ _jibunMsg('카카오 SDK 로딩 중 — 잠시 후 다시 눌러주세요','#f87171'); return; }
+    if(!list.length){ _jibunMsg('검색 결과 없음 — 지번을 다시 확인해주세요','#f87171'); return; }
+    /* ★ 항상 목록으로 보여주고 사용자가 고름 (1건이어도) — 엉뚱한 지역 자동선택 방지 */
+    _jibunShowList(list);
+  });
+}
+
+/* 지번 검색 (popup_download 검증본 방식)
+   1) addressSearch(지번/도로명)  2) 실패하면 keywordSearch(장소명)
+   결과는 항상 목록으로 반환 → 사용자가 선택 */
+function _kkSearchList(q, cb){
+  _cadKakaoReady(function(ok){
+    if(!ok){ cb(null); return; }
+    var gc=CAD.geocoder;
+    var OK=kakao.maps.services.Status.OK;
+    gc.addressSearch(q, function(docs, st){
+      if(st===OK && docs.length){
+        cb(docs.map(function(r){
+          return { addr:r.address_name, road:(r.road_address&&r.road_address.address_name)||'',
+                   lat:parseFloat(r.y), lng:parseFloat(r.x), address:r.address };
+        }));
+        return;
+      }
+      /* 주소로 못 찾으면 키워드(장소) 검색 */
+      try{
+        var ps=new kakao.maps.services.Places();
+        ps.keywordSearch(q, function(d2, st2){
+          if(st2===OK && d2.length){
+            cb(d2.map(function(r){
+              return { addr:(r.address_name||r.place_name), road:(r.road_address_name||''),
+                       lat:parseFloat(r.y), lng:parseFloat(r.x), address:null };
+            }));
+          } else cb([]);
+        });
+      }catch(e){ cb([]); }
+    });
+  });
+}
+
+function _jibunLabel(r){ return r.addr || ''; }
+function _jibunClearList(){
+  var box=document.getElementById('jibunList');
+  if(box){ box.innerHTML=''; box.style.display='none'; box._list=null; }
+}
+/* 검색 결과 후보 목록 — 클릭하면 그 위치로 이동 */
+function _jibunShowList(list){
+  var box=document.getElementById('jibunList');
+  if(!box) return;
+  box.innerHTML=''; box.style.display=''; box._list=list;
+  _jibunMsg('결과 '+list.length+'건 — 맞는 주소를 고르세요','#fbbf24');
+  list.slice(0,10).forEach(function(item){
+    var row=document.createElement('div');
+    row.className='jbRow';
+    row.innerHTML='<div class="jbNm"></div>'+(item.road?'<div class="jbSub"></div>':'');
+    row.querySelector('.jbNm').textContent=item.addr;
+    if(item.road) row.querySelector('.jbSub').textContent=item.road;
+    row.onclick=function(){
+      _jibunClearList();
+      /* ★ 선택한 주소의 address 객체를 보관 → 필지 클릭 시 PNU 생성에 사용 */
+      CAD._pickedAddr = item.address || null;
+      _gotoLngLat(item.lng, item.lat, item.addr);
+    };
+    box.appendChild(row);
+  });
+}
+/* 경위도 위치로 화면 이동 + 지도 켜기 */
+function _gotoLngLat(lng, lat, label){
+  var c=wgs84toTm5186(lng, lat);
+  if(!c){ _jibunMsg('좌표 변환 실패','#f87171'); return; }
+  var half=350;   // ±350m 화면
+  S.bounds={minX:c[0]-half, minY:c[1]-half, maxX:c[0]+half, maxY:c[1]+half};
+  if(!cv.width||cv.width<10||!cv.height||cv.height<10){
+    var st=cv.parentElement;
+    cv.width=(st&&st.clientWidth)||900; cv.height=(st&&st.clientHeight)||600;
+  }
+  var dx=half*2, dy=half*2, pad=40;
+  S.scale=Math.min((cv.width-pad*2)/dx,(cv.height-pad*2)/dy);
+  if(!(S.scale>0)) S.scale=0.6;
+  S.ox=(cv.width-dx*S.scale)/2 - S.bounds.minX*S.scale;
+  S.oy=(cv.height-dy*S.scale)/2 - S.bounds.minY*S.scale;
+  /* ★ 검색한 지번 위치 마커 — 어디를 찾았는지 화면에서 바로 보이게 */
+  CAD.marker={ x:c[0], y:c[1], label:(label||'') };
+  S._viewFromUser=true;   /* 사용자가 실제 위치로 이동함 */
+  var em=document.getElementById('empty'); if(em) em.style.display='none';
+  if(!cadBg.on) cadBgAutoOn(); else _cadBgFetch();
+  _jibunMsg('✓ '+(label||'')+' — 지적 선택을 눌러 필지를 클릭하세요','#4ade80');
+  render();
+}
+
+/* ── 선택 지적 → 허가지선 확정 ── */
+function cadUseAsPermit(){
+  if(!CAD.parcels.length){ toast('먼저 필지를 선택하세요','err'); return; }
+  var parcelsPolys=[];
+  CAD.parcels.forEach(function(sp){
+    var r0=sp.rings&&sp.rings[0];
+    if(r0&&r0.length>=3) parcelsPolys.push({jibun:sp.jibun||'', pnu:sp.pnu||null, ring:r0.map(function(pt){return {x:pt.x,y:pt.y};})});
+  });
+  if(!parcelsPolys.length){ toast('필지 경계가 유효하지 않아요','err'); return; }
+
+  /* ★ 원본 보관 — 확정 후에도 필지별/합침을 다시 고를 수 있게 */
+  S._permitSrc=parcelsPolys;
+  S.daejangArea=null;
+  var dj=document.getElementById('daejangArea'); if(dj) dj.value='';
+
+  _applyPermitFrom(parcelsPolys);
+
+  /* 선택 상태 정리 */
+  CAD.selMode=false;
+  CAD.parcels=[];
+  _cadRenderParcelList(); _cadUpdateBar();
+  var b=document.getElementById('cadSelBtn'); if(b){ b.classList.remove('active'); b.textContent='📍 지적 선택'; }
+  var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display='none';
+  var db=document.getElementById('cadDoneBar'); if(db) db.style.display='none';
+
+  var dt=document.getElementById('detPermit');
+  if(dt){ dt.className='det-row ok'; dt.querySelector('.ct').textContent='확정'; }
+
+  /* ★ 허가지선이 확정되면 검색 마커·지번 라벨은 지움 (역할 끝, 화면 정리) */
+  CAD.marker=null;
+  _jibunClearList();
+  _jibunMsg('');
+
+  toast(parcelsPolys.length+'필지 → 허가지선 확정','ok');
+
+  /* ★ 확정 즉시 대장(공부)면적 자동조회 — 재해위험성과 동일 동작.
+     PNU가 없으면 permitFetchDaejang 안에서 지번으로 역산해 확보한다. */
+  permitFetchDaejang();
+}
+
+/* ══ [TEST] 확정 후 필지별/합침 재전환 ══
+   원본 필지 링을 S._permitSrc에 보관해 두고, 언제든 다시 계산 */
+function repermit(merge){
+  if(!(S._permitSrc && S._permitSrc.length)){ toast('원본 필지 정보가 없어요','err'); return; }
+  S.permitMerge=!!merge;
+  _applyPermitFrom(S._permitSrc);
+  _syncPmBtns2();
+  toast(merge?'하나로 합침':'필지별','ok');
+}
+function _syncPmBtns2(){
+  var a=document.getElementById('pmIndiv2'), b=document.getElementById('pmMerge2');
+  if(a&&b){ var on=!!S.permitMerge; a.className='thr'+(on?'':' on'); b.className='thr'+(on?' on':''); }
+  if(typeof _syncPmBtns==='function') _syncPmBtns();
+}
+
+/* 필지 배열 → S.permit 확정 (확정/재전환 공용) */
+function _applyPermitFrom(parcelsPolys){
+  var ring=null, label='';
+  if(parcelsPolys.length>1 && S.permitMerge){
+    var rings=mergePermitOutline(parcelsPolys.map(function(x){return x.ring;}));
+    if(rings && rings.length){
+      var big=rings[0], ba=Math.abs(polyArea(big));
+      for(var i=1;i<rings.length;i++){ var a=Math.abs(polyArea(rings[i])); if(a>ba){ big=rings[i]; ba=a; } }
+      ring=big.map(function(pt){return {x:pt.x,y:pt.y};});
+      label='지적('+parcelsPolys.length+'필지 합침)';
+      S.permitParcels=null;
+    }
+  }
+  if(!ring){
+    if(parcelsPolys.length>1){
+      var bp=parcelsPolys[0], bpa=Math.abs(polyArea(bp.ring));
+      for(var k=1;k<parcelsPolys.length;k++){
+        var aa=Math.abs(polyArea(parcelsPolys[k].ring));
+        if(aa>bpa){ bp=parcelsPolys[k]; bpa=aa; }
+      }
+      ring=bp.ring.slice(); label='지적('+(bp.jibun||'대표필지')+')';
+      S.permitParcels=parcelsPolys;
+    } else {
+      ring=parcelsPolys[0].ring.slice();
+      label='지적('+(parcelsPolys[0].jibun||'')+')';
+      S.permitParcels=null;
+    }
+  }
+  S.permit={ pts:ring, layer:label, area:Math.abs(polyArea(ring)) };
+  S._permitPnus=parcelsPolys.map(function(x){return x.pnu;}).filter(function(x){return x&&String(x).length===19;});
+  _updatePermitPanel(parcelsPolys.length);
+  _updateRunBtn();
+  render();
+}
+
+/* 확정 패널 갱신 (면적 표시 + 모드 버튼 노출) */
+function _updatePermitPanel(nParcel){
+  var pin=document.getElementById('permitInfo'); if(pin) pin.style.display='';
+  var pa=document.getElementById('permitAreaTx');
+  if(pa){
+    var area=_permitTotalArea();
+    var tx='캐드 실측 '+area.toFixed(1)+' ㎡ ('+(area/3.305785).toFixed(1)+'평)';
+    if(nParcel>1) tx+=' · '+nParcel+'필지'+(S.permitMerge?' 합침':' (필지별)');
+    pa.textContent=tx;
+  }
+  var mb=document.getElementById('permitModeBox');
+  if(mb) mb.style.display=(nParcel>1)?'':'none';
+  _syncPmBtns2();
+  /* ★ 확정되면 면적보정 섹션 즉시 노출 + 캐드 실측면적 기준값 표시 */
+  var acs=document.getElementById('areaCorrSec'); if(acs) acs.style.display='';
+  if(typeof updateAreaCorrBase==='function') updateAreaCorrBase();
+  if(typeof ngiiSyncGate==='function') ngiiSyncGate();   /* 지형도 탭 게이트 해제 */
+}
+
+/* 면적보정 섹션 기준면적 안내 — 기존 corrInfo와 겹치지 않게 별도 칸(corrBase) 사용 */
+function updateAreaCorrBase(){
+  var el=document.getElementById('corrBase'); if(!el) return;
+  var cad=_permitTotalArea();
+  if(!(cad>0)){ el.style.display='none'; return; }
+  el.style.display='';
+  if(S.daejangArea && S.daejangArea>0){
+    var ratio=S.daejangArea/cad;
+    el.innerHTML='<span style="color:#4ade80">대장 '+S.daejangArea.toLocaleString()+'㎡</span>'
+      +' / 실측 '+cad.toFixed(1)+'㎡ · 계수 '+ratio.toFixed(4);
+  } else {
+    el.innerHTML='캐드 실측 <b>'+cad.toFixed(1)+'㎡</b> ('+(cad/3.305785).toFixed(1)+'평) 기준';
+  }
+}
+
+/* ══ [TEST] 대장(공부)면적 자동조회 — 재해위험성과 동일 방식 ══
+   /api/landinfo?pnu= → landCharacteristicss.field[].lndpclAr 합산 */
+function _permDMsg(html){
+  var el=document.getElementById('permDMsg'); if(el) el.innerHTML=html||'';
+}
+/* 지번 주소 문자열 → PNU 19자리 (카카오 addressSearch 사용)
+   지적 응답에 PNU가 없을 때의 보조 경로 */
+function _pnuFromJibun(jibun){
+  return new Promise(function(resolve,reject){
+    if(!jibun){ reject('지번 없음'); return; }
+    _cadKakaoReady(function(ok){
+      if(!ok){ reject('카카오 SDK 없음'); return; }
+      CAD.geocoder.addressSearch(jibun, function(docs, st){
+        if(st!==kakao.maps.services.Status.OK || !docs.length){ reject('주소 검색 결과 없음'); return; }
+        var found=null;
+        for(var i=0;i<docs.length;i++){ if(docs[i].address){ found=docs[i].address; break; } }
+        if(!found){ reject('지번 주소 없음'); return; }
+        var bcode=found.b_code||'';
+        if(bcode.length!==10){ reject('법정동코드 오류'); return; }
+        var mtn=(found.mountain_yn==='Y')?'2':'1';
+        var bun=String(found.main_address_no||'0').padStart(4,'0');
+        var ji =String(found.sub_address_no ||'0').padStart(4,'0');
+        resolve(bcode+mtn+bun+ji);
+      });
+    });
+  });
+}
+
+/* 확정된 필지들의 PNU를 확보 (없으면 지번으로 역산) */
+function _ensurePermitPnus(){
+  var src=S._permitSrc||[];
+  var jobs=src.map(function(sp){
+    if(sp.pnu && String(sp.pnu).length===19) return Promise.resolve(String(sp.pnu));
+    return _pnuFromJibun(sp.jibun).then(function(p){ sp.pnu=p; return p; }).catch(function(){ return null; });
+  });
+  return Promise.all(jobs).then(function(arr){
+    var ok=arr.filter(function(x){ return x && String(x).length===19; });
+    S._permitPnus=ok;
+    return ok;
+  });
+}
+
+function permitFetchDaejang(){
+  /* ★ PNU가 없으면 지번으로 역산해서 확보한 뒤 조회 */
+  _permDMsg('⏳ 필지 정보 확인 중…');
+  _ensurePermitPnus().then(function(ok){
+    if(!ok.length){
+      _permDMsg('<span style="color:#fbbf24">필지 PNU를 못 찾았어요 — 대장면적은 아래 칸에 직접 입력하세요</span>');
+      return;
+    }
+    _permitFetchDaejangRun(ok);
+  });
+}
+function _permitFetchDaejangRun(pnus){
+  _permDMsg('⏳ 대장면적 조회 중… ('+pnus.length+'필지)');
+  var src=S._permitSrc||[];
+  var jobs=pnus.map(function(pnu){
+    return fetch('/api/landinfo?pnu='+encodeURIComponent(pnu))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var field=d && d.landCharacteristicss && d.landCharacteristicss.field;
+        if(!field || !field.length) return {pnu:pnu, area:null};
+        var pp=Array.isArray(field)?field[0]:field;
+        return {pnu:pnu, area:(pp.lndpclAr?Number(pp.lndpclAr):null), jimok:(pp.lndcgrCodeNm||'')};
+      })
+      .catch(function(){ return {pnu:pnu, area:null}; });
+  });
+  Promise.all(jobs).then(function(res){
+    var sum=0, ok=0, list='';
+    res.forEach(function(r,i){
+      if(r.area>0){ sum+=r.area; ok++; }
+      var nm=(src[i] && src[i].jibun) ? src[i].jibun : ('필지'+(i+1));
+      list+='<div style="display:flex;justify-content:space-between;font-size:10px;padding:1.5px 0">'
+          + '<span style="color:var(--dim)">'+nm+(r.jimok?(' <span style="opacity:.6">'+r.jimok+'</span>'):'')+'</span>'
+          + '<span style="color:var(--txt);font-weight:700">'+(r.area>0?r.area.toLocaleString()+'㎡':'-')+'</span></div>';
+    });
+    if(ok){
+      S.daejangArea=sum;
+      var dj=document.getElementById('daejangArea');
+      if(dj) dj.value=Math.round(sum*100)/100;
+      if(typeof onDaejangInput==='function') onDaejangInput();
+      updateAreaCorrBase();
+      _permDMsg('<span style="color:#4ade80">✅ 대장면적 '+sum.toLocaleString()+'㎡'
+        +(pnus.length>1?(' ('+ok+'필지 합산)'):'')+' → 면적보정 반영</span>');
+    } else {
+      _permDMsg('<span style="color:#f87171">❌ 대장면적 조회 실패 (PNU/서버 확인)</span>');
+    }
+    var le=document.getElementById('permitDaejangList');
+    if(le){ le.innerHTML=(pnus.length>1)?list:''; le.style.display=(pnus.length>1&&ok)?'':'none'; }
+  });
+}
+
+function _permitTotalArea(){
+  if(S.permitParcels && S.permitParcels.length){
+    var sum=0; S.permitParcels.forEach(function(x){ sum+=Math.abs(polyArea(x.ring)); }); return sum;
+  }
+  if(S.permit && S.permit.pts && S.permit.pts.length>=3) return Math.abs(polyArea(S.permit.pts));
+  return 0;
+}
+/* 등고선 + 허가지선 둘 다 있으면 분석 버튼 활성 */
+function _updateRunBtn(){
+  var b=document.getElementById('btnRun');
+  if(b) b.disabled=!(S.contours && S.contours.length && S.permit && S.permit.pts && S.permit.pts.length>=3);
+}
+
+
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 수치지형도 자동 받기 — 크롬 확장(gdsp-ext) 연동
+   페이지→확장 : {source:'GDSP_PAGE', type:'START'|'STOP'|'PING', addr, scale, purpose1, purpose2}
+   확장→페이지 : {source:'GDSP_EXT',  type:'READY'|'START_ACK'|'PROGRESS'|'DONE'|'DEAD'}
+   ⚠ 확장은 '다운로드까지'만 함. 받은 파일을 여는 건 아래 파일 선택.
+      (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
+   ══════════════════════════════════════════════════════════════ */
+/* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
+var GDSP_VER = 'v5.0 (2026-08-23) 허가지선·지형도 자동·좌표계 자동판별';
+console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
+
+/* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
+   ⚠ 확장은 옵션 '텍스트에 포함되는지'로 찾으므로 문구가 정확해야 한다.
+      없는 값(예: '기타')을 보내면 소분류에서 멈춘다. */
+var NGII_PURPOSE = {
+  '행위허가': ['지형·지물 등의 위치확인','상권·대지·환경 등 공간분석','교육시설 사전 조사'],
+  '도시계획': ['토목·건축·하천 등 설계','국토·도시·지역 등 계획 수립·평가','도로 및 교통 활용','설계 및 공사 활용'],
+  '제작 및 활용': ['응·복합 등을 통한 주제도 제작','내비·인터넷 등 지도서비스','응용시스템 및 플랫폼 구축','공간정보 분석 활용','측량 및 지도 제작','교육, 학술, 연구','콘텐츠 제작'],
+  '행정 및 소송': ['민원 및 소송','행정업무']
+};
+/* 경사도 검토 기본값 — 도시계획 › 토목·건축·하천 등 설계 */
+var NGII = { scale:'5000', extAlive:false, lastSeen:0, running:false,
+             purpose1:'도시계획', purpose2:'토목·건축·하천 등 설계',
+             autoFilled:false, _lastAddr:null };
+
+function _ngiiFillPurpose(){
+  var s1=document.getElementById('ngiiP1'), s2=document.getElementById('ngiiP2');
+  if(!s1||!s2) return;
+  s1.innerHTML=Object.keys(NGII_PURPOSE).map(function(k){
+    return '<option value="'+k+'"'+(k===NGII.purpose1?' selected':'')+'>'+k+'</option>';
+  }).join('');
+  _ngiiFillP2(NGII.purpose1, NGII.purpose2);
+}
+function _ngiiFillP2(cat, pick){
+  var s2=document.getElementById('ngiiP2');
+  if(!s2) return;
+  var list=NGII_PURPOSE[cat]||[];
+  s2.innerHTML=list.map(function(v){
+    return '<option value="'+v+'"'+(v===pick?' selected':'')+'>'+v+'</option>';
+  }).join('');
+  NGII.purpose2 = (list.indexOf(pick)>=0) ? pick : (list[0]||'');
+  s2.value=NGII.purpose2;
+}
+function onNgiiP1(){
+  var s1=document.getElementById('ngiiP1');
+  NGII.purpose1=s1.value;
+  _ngiiFillP2(NGII.purpose1, null);
+}
+
+function _ngiiMsg(t,c){
+  var el=document.getElementById('ngiiMsg');
+  if(el){ el.textContent=t||''; el.style.color=c||'var(--dim)'; }
+}
+function setNgiiScale(v){
+  NGII.scale=v;
+  var a=document.getElementById('scl5000'), b=document.getElementById('scl1000');
+  if(a) a.className='thr'+(v==='5000'?' on':'');
+  if(b) b.className='thr'+(v==='1000'?' on':'');
+}
+function _ngiiSend(msg){
+  msg.source='GDSP_PAGE';
+  try{ window.postMessage(msg, window.location.origin); }catch(e){}
+}
+/* 확장 설치 여부에 따라 UI 전환 */
+function _ngiiSyncExtUI(){
+  var box=document.getElementById('extBox'), miss=document.getElementById('extMissing');
+  if(!box||!miss) return;
+  box.style.display  = NGII.extAlive ? '' : 'none';
+  miss.style.display = NGII.extAlive ? 'none' : '';
+}
+function _ngiiRunning(on){
+  NGII.running=!!on;
+  var b=document.getElementById('btnNgii'), st=document.getElementById('btnNgiiStop');
+  if(b){ b.disabled=!!on; b.textContent = on ? '⏳ 받는 중…' : '⬇ 수치지형도 받기'; }
+  if(st) st.style.display = on ? '' : 'none';
+}
+
+function ngiiStart(){
+  if(!NGII.extAlive){ _ngiiMsg('확장이 설치되어 있지 않아요','#f87171'); return; }
+  var addr=(document.getElementById('ngiiAddr').value||'').trim();
+  if(!addr){ _ngiiMsg('지번을 입력하세요','#f87171'); return; }
+  if(!NGII.purpose1 || !NGII.purpose2){ _ngiiMsg('사용 목적을 선택하세요','#f87171'); return; }
+  /* ★ 이 클릭 안에서 폴더 권한을 미리 확보한다.
+     다운로드가 끝난 시점은 '사용자 제스처'가 아니라 권한 요청이 거부된다(실측). */
+  if(FSA.dir && FSA.supported){
+    try{
+      FSA.dir.queryPermission({mode:'read'}).then(function(st){
+        if(st!=='granted'){
+          FSA.dir.requestPermission({mode:'read'}).then(function(st2){ _fsaSyncUI(st2); });
+        }
+      });
+    }catch(e){}
+  }
+  NGII._startedAt=Date.now();   /* 이 시각 이후 저장된 파일만 '새 파일'로 인정 */
+  S._replaceOnce=true;          /* 새로 받는 것이므로 기존 지형도를 대체 */
+  NGII._openedName=null;
+  _ngiiRunning(true);
+  _ngiiMsg('확장에 요청 보냄 — 국토정보플랫폼 탭이 열립니다','#94a3b8');
+  _ngiiSend({ type:'START', addr:addr, scale:NGII.scale, purpose1:NGII.purpose1, purpose2:NGII.purpose2 });
+}
+function ngiiStop(){
+  _ngiiSend({ type:'STOP' });
+  _ngiiRunning(false);
+  _ngiiMsg('중지했어요','#fbbf24');
+}
+
+/* 확장 → 페이지 수신 */
+window.addEventListener('message', function(ev){
+  /* ★ ev.source 대신 origin으로 검사.
+     content script는 isolated world라 source가 window와 일치한다는 보장이 없음 */
+  if(ev.origin && ev.origin!==window.location.origin) return;
+  var d=ev.data;
+  if(!d || d.source!=='GDSP_EXT') return;
+
+  if(d.type==='READY'){
+    NGII.lastSeen=Date.now();
+    if(!NGII.extAlive){ NGII.extAlive=true; _ngiiSyncExtUI(); }
+    return;
+  }
+  if(d.type==='DEAD'){
+    NGII.extAlive=false; _ngiiSyncExtUI(); _ngiiRunning(false);
+    _ngiiMsg('확장 연결이 끊겼어요 — 새로고침 해보세요','#f87171');
+    return;
+  }
+  if(d.type==='START_ACK'){
+    if(d.ok) _ngiiMsg('진행 중… 국토정보플랫폼 탭에서 [허용]을 눌러주세요','#94a3b8');
+    else { _ngiiRunning(false); _ngiiMsg('시작 실패: '+(d.err||'알 수 없음'),'#f87171'); }
+    return;
+  }
+  if(d.type==='PROGRESS'){
+    if(d.step) _ngiiMsg('⏳ '+d.step,'#94a3b8');
+    return;
+  }
+  if(d.type==='DONE'){
+    _ngiiRunning(false);
+    if(d.ok){
+      _ngiiMsg('✅ 다운로드 완료 — 받은 DXF를 선택하면 바로 열립니다','#4ade80');
+      _ngiiOfferOpen();
+    } else {
+      _ngiiMsg('❌ 중단됨'+(d.err?(' — '+d.err):''),'#f87171');
+    }
+    return;
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 받은 DXF 자동 열기 — File System Access API
+   INNORIX는 브라우저 밖에서 디스크에 쓰므로 웹은 경로를 알 수 없다.
+   대신 '다운로드\지형도' 폴더를 한 번만 허용받아 핸들을 IndexedDB에 보관하고,
+   다운로드가 끝나면 그 폴더에서 가장 최근 DXF를 찾아 자동으로 연다.
+   지원: 크롬·엣지 (HTTPS 필수). 미지원이면 기존 파일선택으로 폴백.
+   ══════════════════════════════════════════════════════════════ */
+var FSA = { dir:null, _inited:false };
+/* 로드 시점에 고정하지 않고 쓸 때 확인 (확장/폴리필이 늦게 붙는 경우 대비) */
+Object.defineProperty(FSA,'supported',{ get:function(){
+  return typeof window.showDirectoryPicker==='function' && typeof indexedDB!=='undefined';
+}});
+
+/* ── IndexedDB에 폴더 핸들 보관 ── */
+function _idb(){
+  return new Promise(function(res,rej){
+    var q=indexedDB.open('gdsp_fsa',1);
+    q.onupgradeneeded=function(){ q.result.createObjectStore('kv'); };
+    q.onsuccess=function(){ res(q.result); };
+    q.onerror=function(){ rej(q.error); };
+  });
+}
+function _idbSet(k,v){
+  return _idb().then(function(db){
+    return new Promise(function(res,rej){
+      var t=db.transaction('kv','readwrite');
+      t.objectStore('kv').put(v,k);
+      t.oncomplete=function(){ res(true); };
+      t.onerror=function(){ rej(t.error); };
+    });
+  });
+}
+function _idbGet(k){
+  return _idb().then(function(db){
+    return new Promise(function(res,rej){
+      var t=db.transaction('kv','readonly');
+      var r=t.objectStore('kv').get(k);
+      r.onsuccess=function(){ res(r.result||null); };
+      r.onerror=function(){ rej(r.error); };
+    });
+  });
+}
+
+/* ── 폴더 한 번 허용 (사용자 클릭 안에서만 호출 가능) ── */
+function fsaPickFolder(){
+  if(!FSA.supported){ _ngiiMsg('이 브라우저는 폴더 자동읽기를 지원하지 않아요 (크롬·엣지 권장)','#fbbf24'); return; }
+  window.showDirectoryPicker({ id:'gdsp_dem', mode:'read', startIn:'downloads' })
+    .then(function(h){
+      FSA.dir=h;
+      _fsaSyncUI('granted');
+      _ngiiMsg('✅ 폴더 연결됨 — 다음부터 받으면 자동으로 열립니다','#4ade80');
+      toast('폴더 연결: '+h.name,'ok');
+      /* 저장은 부가기능 — 실패해도 이번 세션은 그대로 동작한다 */
+      return _idbSet('demDir',h).catch(function(e){
+        console.log('[FSA] 핸들 저장 실패(이번 세션만 유효)', e);
+      });
+    })
+    .catch(function(e){
+      if(e && e.name==='AbortError') return;      /* 사용자가 취소 */
+      console.log('[FSA] 폴더 선택 실패', e);
+      _ngiiMsg('폴더 연결에 실패했어요','#f87171');
+    });
+}
+
+/* 사용자 클릭 안에서 권한 재요청 (버튼용) */
+function fsaGrantNow(){
+  if(!FSA.dir){ fsaPickFolder(); return; }
+  FSA.dir.requestPermission({mode:'read'}).then(function(st){
+    _fsaSyncUI(st);
+    if(st==='granted'){ _ngiiMsg('✅ 폴더 권한 확인됨 — 자동 열기 준비 완료','#4ade80'); }
+    else { _ngiiMsg('권한이 거부됐어요 — [폴더 연결]로 다시 골라주세요','#f87171'); }
+  }).catch(function(){ fsaPickFolder(); });
+}
+
+/* ── 저장된 핸들 복구 + 권한 확인 ── */
+function _fsaRestore(){
+  if(!FSA.supported) return Promise.resolve(null);
+  return _idbGet('demDir').then(function(h){
+    if(!h) return null;
+    FSA.dir=h;
+    return h.queryPermission({mode:'read'}).then(function(st){
+      _fsaSyncUI(st);
+      return st==='granted' ? h : null;
+    });
+  }).catch(function(){ return null; });
+}
+/* 권한이 prompt면 클릭 안에서 다시 요청 */
+function _fsaEnsure(){
+  if(!FSA.dir) return Promise.resolve(null);
+  return FSA.dir.queryPermission({mode:'read'}).then(function(st){
+    if(st==='granted') return FSA.dir;
+    return FSA.dir.requestPermission({mode:'read'}).then(function(st2){
+      return st2==='granted' ? FSA.dir : null;
+    });
+  }).catch(function(){ return null; });
+}
+
+/* ── 폴더에서 DXF 찾기 ──
+   since를 주면 그 시각 이후에 만들어진 파일만 인정한다.
+   (안 그러면 새 파일이 도착하기 전에 '예전에 받아둔 도엽'이 열려버린다 — 실측) */
+function _fsaListDXF(dir, since){
+  var out=[];
+  return (async function(){
+    for await (var ent of dir.values()){
+      if(ent.kind!=='file') continue;
+      if(!/\.dxf$/i.test(ent.name)) continue;
+      var f=await ent.getFile();
+      if(since && f.lastModified < since) continue;
+      if(f.size < 20000) continue;             /* 20KB 미만은 지형도가 아님 */
+      out.push(f);
+    }
+    out.sort(function(a,b){ return b.lastModified-a.lastModified; });   /* 최신순 */
+    return out;
+  })();
+}
+
+/* 앞부분 64KB만 읽어 실제 DXF인지 확인
+   (같은 이름의 HTML 안내파일 2KB 등이 폴더에 섞여 있음) */
+function _sniffDXF(file){
+  /* slice/text 미지원 환경이면 검사 생략하고 통과 (자동열기 자체가 죽으면 안 됨) */
+  if(!file || typeof file.slice!=='function'){ return Promise.resolve(true); }
+  var part;
+  try{ part=file.slice(0, 65536); }catch(e){ return Promise.resolve(true); }
+  if(!part || typeof part.text!=='function'){ return Promise.resolve(true); }
+  return part.text().then(function(head){
+    var h=head.toUpperCase();
+    if(/<HTML|<!DOCTYPE/.test(h)) return false;
+    return h.indexOf('ENTITIES')>=0 || h.indexOf('SECTION')>=0 || h.indexOf('AUTOCAD')>=0;
+  }).catch(function(){ return true; });        /* 못 읽으면 일단 시도 */
+}
+
+/* 후보 중 실제 DXF인 파일들 (최신순).
+   ★ 허가지가 도엽 경계에 걸치면 2~4장이 함께 받아지므로 전부 모은다. */
+function _fsaPickDXF(dir, since){
+  return _fsaListDXF(dir, since).then(function(list){
+    if(!list.length) return null;
+    var out=[], idx=0;
+    function step(){
+      if(idx>=list.length) return Promise.resolve(out.length?out:null);
+      var f=list[idx++];
+      return _sniffDXF(f).then(function(ok){
+        if(ok) out.push(f);
+        else console.log('[FSA] DXF가 아니라 건너뜀:', f.name);
+        return step();
+      });
+    }
+    return step();
+  });
+}
+
+/* ── 다운로드 완료 후: 새로 받은 파일이 "다 나올 때까지" 기다렸다 열기 ──
+   ★ 첫 파일을 찾자마자 열면 안 된다. INNORIX가 도엽을 순차로 저장하므로
+     허가지가 경계에 걸려 2~4장이 오는 경우 한 장만 열려 나머지 등고선이 통째로 빈다(실측).
+     → 파일 개수가 더 늘지 않을 때까지(안정될 때까지) 기다린 뒤 한꺼번에 연다. */
+function fsaAutoOpen(silent){
+  return _fsaEnsure().then(function(dir){
+    if(!dir){
+      if(FSA.dir) _ngiiMsg('폴더 권한이 풀렸어요 — 아래 [폴더 권한 허용]을 눌러주세요','#fbbf24');
+      else if(!silent) _ngiiMsg('폴더가 연결되지 않았어요 — [폴더 연결]을 눌러주세요','#fbbf24');
+      return false;
+    }
+    var since = NGII._startedAt ? (NGII._startedAt-10000) : 0;
+    var deadline = Date.now()+120000;   /* 최대 2분 */
+    var lastN=0, stable=0;
+    var STABLE_NEED=4;                  /* 1.5초 × 4회 = 6초간 변화 없으면 완료로 봄 */
+
+    function tryOnce(){
+      return _fsaPickDXF(dir, since).then(function(fl){
+        var n = fl ? fl.length : 0;
+
+        if(n>0){
+          if(n===lastN){ stable++; } else { stable=0; lastN=n; }
+          if(stable>=STABLE_NEED){
+            NGII._openedName=fl.map(function(x){return x.name;}).join(', ');
+            if(fl.length>1){
+              _ngiiMsg('📂 도엽 '+fl.length+'장 합치는 중…','#94a3b8');
+              loadFiles(fl);
+            } else {
+              _ngiiMsg('📂 '+fl[0].name+' 여는 중…','#94a3b8');
+              _openTerrainFile(fl[0]);
+            }
+            return true;
+          }
+          _ngiiMsg('⏳ 도엽 '+n+'장 확인됨 — 더 오는지 확인 중…','#94a3b8');
+        } else {
+          _ngiiMsg('⏳ 파일 저장 대기 중…','#94a3b8');
+        }
+
+        if(Date.now()>deadline){
+          if(n>0){   /* 시간 초과라도 받은 건 연다 */
+            NGII._openedName=fl.map(function(x){return x.name;}).join(', ');
+            if(fl.length>1) loadFiles(fl); else _openTerrainFile(fl[0]);
+            return true;
+          }
+          _ngiiMsg('새로 받은 DXF를 못 찾았어요 — [받은 DXF 열기]로 직접 골라주세요','#fbbf24');
+          return false;
+        }
+        return new Promise(function(res){ setTimeout(function(){ res(tryOnce()); },1500); });
+      });
+    }
+    return tryOnce();
+  }).catch(function(e){
+    console.log('[FSA] 자동열기 실패', e);
+    if(!silent) _ngiiMsg('자동 열기에 실패했어요 — 직접 선택해주세요','#f87171');
+    return false;
+  });
+}
+
+/* ══ 올린 도엽 목록 / 비우기 ══ */
+function _syncSheetList(){
+  var box=document.getElementById('sheetBox'), list=document.getElementById('sheetList'),
+      cnt=document.getElementById('sheetCnt');
+  if(!box||!list) return;
+  var ns=S._sheetNames||[];
+  if(!ns.length){ box.style.display='none'; list.innerHTML=''; if(cnt) cnt.textContent='-'; return; }
+  box.style.display='';
+  if(cnt) cnt.textContent='✅ 올린 도엽 '+ns.length+'장';
+  list.innerHTML=ns.map(function(n,i){
+    var short=n.length>34 ? (n.slice(0,16)+'…'+n.slice(-14)) : n;
+    return '<div style="font-size:10px;color:var(--dim);padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+n+'">'
+      +(i+1)+'. '+short+'</div>';
+  }).join('');
+}
+
+/* 지형도 전부 비우기 (허가지선은 유지) */
+function clearSheets(){
+  S.contours=[]; S.surveys=[]; S.waters=[]; S.allPolys=[];
+  S._sheetNames=[]; S._rawTerrain=null; S._workRings=null; S.workDist=0; S._allSheets=null;
+  S.showTIN=false;
+  S.triList=null; S.gridCells=[]; S.avgSlope=null; S.bins=null;
+  S.fileName=null;
+  setDet('detCont', false, '-');
+  setDet('detSurv', false, '-');
+  var dw=document.getElementById('detWater');
+  if(dw){ dw.className='det-row'; dw.querySelector('.ct').textContent='-'; }
+  _syncSheetList();
+  if(typeof _syncWorkBtns==='function') _syncWorkBtns();
+  var hs=document.getElementById('hdrStat');
+  if(hs) hs.textContent='DXF 파일을 올려주세요';
+  if(typeof _updateRunBtn==='function') _updateRunBtn();
+  if(typeof _ngiiMsg==='function') _ngiiMsg('지형도를 비웠어요 — 다시 올려주세요','#fbbf24');
+  /* 허가지선이 있으면 그 주변으로, 없으면 지도 뷰 유지 */
+  if(S.permit && S.permit.pts && S.permit.pts.length>=3){ computeBounds(); fitView(); }
+  toast('지형도를 비웠어요 (허가지선은 유지)','ok');
+  render();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 작업범위 — 허가지선 버퍼로 계산 구역 한정
+   수치지형도 한 도엽은 허가지보다 훨씬 넓어(4장이면 더더욱)
+   전 구간 등고선을 다 계산할 필요가 없다. 허가지선에서 N m 이격한
+   버퍼 안쪽만 남기면 화면도 정리되고 분석도 가벼워진다.
+   버퍼 생성은 재해위험성(popup_flow)에서 검증된 마칭스퀘어 방식을 그대로 사용.
+   ══════════════════════════════════════════════════════════════ */
+function bufferRings(polys, d){
+  var minX=1e18,minY=1e18,maxX=-1e18,maxY=-1e18;
+  polys.forEach(function(r){ r.forEach(function(p){ if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y; if(p.x>maxX)maxX=p.x; if(p.y>maxY)maxY=p.y; }); });
+  var diag=Math.hypot(maxX-minX,maxY-minY)||1;
+  var cell=Math.max(d/7, diag/500);           /* 셀=매끄러움 vs 격자수 균형(상한 ~500/축) */
+  var pad=d+cell*3;
+  minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
+  var nx=Math.ceil((maxX-minX)/cell)+1, ny=Math.ceil((maxY-minY)/cell)+1;
+  var edges=[]; polys.forEach(function(r){ var m=r.length; for(var i=0,j=m-1;i<m;j=i++) edges.push([r[j].x,r[j].y,r[i].x,r[i].y]); });
+  function dseg(px,py,ax,ay,bx,by){ var dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy; if(l2<1e-12) return Math.hypot(px-ax,py-ay); var t=((px-ax)*dx+(py-ay)*dy)/l2; if(t<0)t=0; else if(t>1)t=1; return Math.hypot(px-(ax+t*dx),py-(ay+t*dy)); }
+  function pin(px,py,r){ var ins=false,m=r.length; for(var i=0,j=m-1;i<m;j=i++){ var xi=r[i].x,yi=r[i].y,xj=r[j].x,yj=r[j].y; if(((yi>py)!==(yj>py)) && (px<(xj-xi)*(py-yi)/(yj-yi)+xi)) ins=!ins; } return ins; }
+  var g=new Float64Array(nx*ny);
+  for(var gy=0;gy<ny;gy++){ for(var gx=0;gx<nx;gx++){
+    var X=minX+gx*cell, Y=minY+gy*cell, dm=1e18;
+    for(var e=0;e<edges.length;e++){ var q=dseg(X,Y,edges[e][0],edges[e][1],edges[e][2],edges[e][3]); if(q<dm)dm=q; }
+    var insG=false; for(var pi=0;pi<polys.length;pi++){ if(pin(X,Y,polys[pi])){ insG=true; break; } }
+    g[gy*nx+gx]=(insG?-dm:dm)-d;              /* 부호거리 - 이격거리: <0=버퍼 내부 */
+  }}
+  var pts={}, adj={};
+  function cr(x0,y0,v0,x1,y1,v1){ var t=v0/(v0-v1); return {x:x0+t*(x1-x0), y:y0+t*(y1-y0)}; }
+  function lk(a,b){ (adj[a]||(adj[a]=[])).push(b); (adj[b]||(adj[b]=[])).push(a); }
+  function pH(gx,gy){ var k='H'+gx+'_'+gy; if(!pts[k]){ var i0=gy*nx+gx,i1=gy*nx+(gx+1); pts[k]=cr(minX+gx*cell,minY+gy*cell,g[i0],minX+(gx+1)*cell,minY+gy*cell,g[i1]); } return k; }
+  function pV(gx,gy){ var k='V'+gx+'_'+gy; if(!pts[k]){ var i0=gy*nx+gx,i1=(gy+1)*nx+gx; pts[k]=cr(minX+gx*cell,minY+gy*cell,g[i0],minX+gx*cell,minY+(gy+1)*cell,g[i1]); } return k; }
+  for(var gy=0;gy<ny-1;gy++){ for(var gx=0;gx<nx-1;gx++){
+    var i00=gy*nx+gx,i10=gy*nx+(gx+1),i11=(gy+1)*nx+(gx+1),i01=(gy+1)*nx+gx;
+    var c=(g[i00]<0?1:0)+(g[i10]<0?2:0)+(g[i11]<0?4:0)+(g[i01]<0?8:0);
+    if(c===0||c===15) continue;
+    var B=pH(gx,gy), T=pH(gx,gy+1), L=pV(gx,gy), R=pV(gx+1,gy);
+    switch(c){
+      case 1: lk(L,B); break; case 2: lk(B,R); break; case 3: lk(L,R); break; case 4: lk(R,T); break;
+      case 6: lk(B,T); break; case 7: lk(L,T); break; case 8: lk(T,L); break; case 9: lk(T,B); break;
+      case 11: lk(T,R); break; case 12: lk(R,L); break; case 13: lk(B,R); break; case 14: lk(L,B); break;
+      case 5: { var ct=(g[i00]+g[i10]+g[i11]+g[i01])/4; if(ct<0){ lk(L,T); lk(R,B); } else { lk(L,B); lk(R,T); } } break;
+      case 10:{ var ct=(g[i00]+g[i10]+g[i11]+g[i01])/4; if(ct<0){ lk(T,R); lk(B,L); } else { lk(T,L); lk(B,R); } } break;
+    }
+  }}
+  var rings=[], used={};
+  for(var sk in adj){
+    if(used[sk] || !adj[sk].length) continue;
+    var ring=[], cur=sk, prev=null, gd=0;
+    while(cur && !used[cur] && gd++<2000000){
+      used[cur]=1; ring.push(pts[cur]);
+      var nb=adj[cur], nxt=null;
+      for(var t=0;t<nb.length;t++){ if(nb[t]!==prev && !used[nb[t]]){ nxt=nb[t]; break; } }
+      prev=cur; cur=nxt;
+    }
+    if(ring.length>=3) rings.push(ring);
+  }
+  return rings;
+}
+
+/* 지형도 비우기 — clearSheets() 하나로 통합 (예전 clearTerrain 제거) */
+function clearTerrain(){ clearSheets(); }
+
+
+
+/* ══ 삼각망(TIN) 보기 ══
+   계산에 쓰인 삼각형을 그대로 보여준다. 작업범위(버퍼) 안쪽만 그려 화면이 무겁지 않게.
+   DXF 저장에도 같은 기준으로 포함된다. */
+S.showTIN = false;
+
+function toggleTIN(){
+  if(!(S.triList && S.triList.length)){ toast('먼저 분석을 실행하세요','err'); return; }
+  S.showTIN = !S.showTIN;
+  _syncTinBtn();
+  render();
+}
+function _syncTinBtn(){
+  var b=document.getElementById('tinBtn'), inf=document.getElementById('tinInfo');
+  var has=!!(S.triList && S.triList.length);
+  if(b){
+    b.textContent = S.showTIN ? '🔺 삼각망 숨기기' : '🔺 삼각망 보기';
+    b.classList.toggle('active', !!S.showTIN);
+    b.disabled = !has;
+  }
+  if(inf){
+    if(!has){
+      /* 작업범위를 바꾸면 등고선이 달라져 삼각망도 무효가 된다 → 다시 분석 필요 */
+      inf.textContent = (S.contours&&S.contours.length) ? '분석을 실행하면 볼 수 있어요'
+                                                       : '지형도를 올린 뒤 분석하세요';
+      inf.style.color='var(--dim)';
+      S.showTIN=false;
+    }
+    else{
+      var n=_tinInRange().length;
+      inf.textContent='삼각형 '+n.toLocaleString()+'개'+(S.workDist?(' (작업범위 '+S.workDist+'m 안)'):' (전체)');
+      inf.style.color='#4ade80';
+    }
+  }
+}
+/* 작업범위(없으면 허가지선 주변) 안쪽 삼각형만 */
+function _tinInRange(){
+  if(!(S.triList && S.triList.length)) return [];
+  var rings=S._workRings;
+  if(!rings || !rings.length){
+    /* 작업범위가 없으면 허가지선 bbox + 여유 100m */
+    if(!(S.permit && S.permit.pts)) return S.triList;
+    var b=getBounds(S.permit.pts), pad=100;
+    return S.triList.filter(function(t){
+      return t.maxX>=b.minX-pad && t.minX<=b.maxX+pad && t.maxY>=b.minY-pad && t.minY<=b.maxY+pad;
+    });
+  }
+  var bb=_ringsBBox(rings);
+  return S.triList.filter(function(t){
+    if(t.maxX<bb.mnx||t.minX>bb.mxx||t.maxY<bb.mny||t.minY>bb.mxy) return false;
+    var cx=(t.minX+t.maxX)/2, cy=(t.minY+t.maxY)/2;
+    return _inWork({x:cx,y:cy}, bb);
+  });
+}
+
+/* 작업범위 상태 */
+S.workDist = 0;          /* 0 = 끄기(전체) */
+S._workRings = null;     /* 버퍼 링들 */
+S._rawTerrain = null;    /* 자르기 전 원본 (거리 바꿀 때 되살리려고) */
+
+function setWorkRange(d){
+  d = +d || 0;
+  if(!(S.permit && S.permit.pts && S.permit.pts.length>=3)){
+    toast('허가지선을 먼저 만들어주세요','err'); return;
+  }
+  S.workDist = d;
+  _syncWorkBtns();
+
+  /* 원본 보관 (최초 1회) */
+  if(!S._rawTerrain){
+    S._rawTerrain = { contours:S.contours||[], surveys:S.surveys||[], waters:S.waters||[] };
+  }
+  var raw = S._rawTerrain;
+
+  if(!d){                                  /* 끄기 → 전체 복원 */
+    S._workRings=null;
+    S.contours=raw.contours; S.surveys=raw.surveys; S.waters=raw.waters;
+    _afterWorkRange('작업범위 해제 — 전체 표시');
+    return;
+  }
+
+  /* 버퍼 링 생성 (허가지선 기준) */
+  var polys=[];
+  if(S.permitParcels && S.permitParcels.length){
+    S.permitParcels.forEach(function(pp){ if(pp.ring&&pp.ring.length>=3) polys.push(pp.ring); });
+  }
+  if(!polys.length) polys=[S.permit.pts];
+
+  try{
+    S._workRings = bufferRings(polys, d);
+  }catch(e){
+    console.log('[작업범위] 버퍼 생성 실패', e);
+    toast('작업범위를 만들지 못했어요','err');
+    return;
+  }
+  if(!S._workRings || !S._workRings.length){ toast('작업범위를 만들지 못했어요','err'); return; }
+
+  /* 버퍼 바깥 요소 제거 — 선은 '한 점이라도 안에 있으면' 남긴다(경계 잘림 방지) */
+  var bb=_ringsBBox(S._workRings);
+  function keepLine(c){
+    for(var i=0;i<c.pts.length;i++){ if(_inWork(c.pts[i], bb)) return true; }
+    return false;
+  }
+  S.contours = raw.contours.filter(keepLine);
+  S.waters   = raw.waters.filter(keepLine);
+  S.surveys  = raw.surveys.filter(function(sv){ return _inWork(sv, bb); });
+
+  _afterWorkRange('작업범위 '+d+'m — 등고선 '+S.contours.length+' · 표고점 '+S.surveys.length);
+}
+
+function _ringsBBox(rings){
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+  rings.forEach(function(r){ r.forEach(function(p){
+    if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+    if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y; }); });
+  return {mnx:mnx,mny:mny,mxx:mxx,mxy:mxy};
+}
+/* 점이 작업범위 안인가 (bbox로 먼저 거르고 링 판정) */
+function _inWork(p, bb){
+  if(!S._workRings) return true;
+  if(p.x<bb.mnx||p.x>bb.mxx||p.y<bb.mny||p.y>bb.mxy) return false;
+  for(var i=0;i<S._workRings.length;i++){
+    if(_pointInRing(p, S._workRings[i])) return true;
+  }
+  return false;
+}
+function _pointInRing(p, r){
+  var ins=false, m=r.length;
+  for(var i=0,j=m-1;i<m;j=i++){
+    var xi=r[i].x, yi=r[i].y, xj=r[j].x, yj=r[j].y;
+    if(((yi>p.y)!==(yj>p.y)) && (p.x < (xj-xi)*(p.y-yi)/(yj-yi)+xi)) ins=!ins;
+  }
+  return ins;
+}
+function _afterWorkRange(msg){
+  setDet('detCont', S.contours.length>0, S.contours.length? (S.contours.length+'개'):'없음');
+  setDet('detSurv', S.surveys.length>0, S.surveys.length? (S.surveys.length+'개'):'없음');
+  var dw=document.getElementById('detWater');
+  if(dw){ dw.className='det-row'+(S.waters.length?' ok':''); dw.querySelector('.ct').textContent=S.waters.length?(S.waters.length+'개'):'없음'; }
+  /* 분석 결과는 무효 — 다시 실행해야 함 */
+  S.triList=null; S.gridCells=[]; S.avgSlope=null; S.bins=null;
+  computeBounds(); fitView();
+  if(typeof _syncTinBtn==='function') _syncTinBtn();
+  toast(msg,'ok');
+  render();
+}
+function _syncWorkBtns(){
+  ['0','100','200','300'].forEach(function(v){
+    var b=document.getElementById('wr'+v);
+    if(b) b.className='thr'+(String(S.workDist)===v?' on':'');
+  });
+  var info=document.getElementById('workInfo');
+  if(info){
+    info.textContent = S.workDist ? ('허가지선에서 '+S.workDist+'m 이격') : '전체 도면 사용';
+    info.style.color = S.workDist ? '#4ade80' : 'var(--dim)';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 수치지형도 원점(벨트) 자동 판별 → 캔버스 좌표계(5186)로 변환
+   수치지형도는 지역별로 평면직각좌표계 원점이 다르다.
+     서부 5185(125°) · 중부 5186(127°) · 동부 5187(129°) · 동해 5188(131°)
+   전부 x_0=200000 / y_0=600000 이라 숫자만 봐서는 구분이 안 된다.
+   (동부 좌표를 중부로 오독하면 약 178km 서쪽으로 밀린다 — 실측)
+   → 도면 중심을 각 원점으로 해석해 보고, 기준 위치와 가장 가까운 것을 채택한다.
+   ══════════════════════════════════════════════════════════════ */
+var BELT_LON={ '5185':125, '5186':127, '5187':129, '5188':131 };
+function _beltName(e){ return ({'5185':'서부','5186':'중부','5187':'동부','5188':'동해'})[e]||e; }
+
+function _dxfCenter(r){
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18,n=0;
+  function eat(p){ if(!p)return; n++;
+    if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+    if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y; }
+  (r.contours||[]).forEach(function(c){ c.pts.forEach(eat); });
+  (r.surveys||[]).forEach(eat);
+  (r.waters||[]).forEach(function(c){ c.pts.forEach(eat); });
+  if(!n) return null;
+  return { x:(mnx+mxx)/2, y:(mny+mxy)/2, minX:mnx, minY:mny, maxX:mxx, maxY:mxy };
+}
+
+/* 도면 좌표계를 판별해 EPSG 코드 문자열 반환 (판별 실패 시 '5186') */
+function detectBelt(r){
+  if(!_cadInitProj()) return '5186';
+  var c=_dxfCenter(r);
+  if(!c) return '5186';
+
+  /* 기준 위치(5186) — 좌표만으로는 원점 구분이 불가능하다.
+     네 원점이 정확히 2°씩 떨어져 있어 어느 것으로 읽어도 '한국 안'이 되기 때문. */
+  var target=null, tsrc='';
+  if(S.permit && S.permit.pts && S.permit.pts.length>=3){ target=_permitCentroid(); tsrc='허가지선'; }
+  if(!target && CAD.marker){ target={x:CAD.marker.x, y:CAD.marker.y}; tsrc='검색위치'; }
+  /* 지도 화면은 '사용자가 실제로 옮긴' 경우에만 기준으로 쓴다.
+     기본 화면(화성)을 기준 삼으면 강원 도면이 중부로 오판되어 178km 밀린다(실측). */
+  if(!target && S._viewFromUser && S.bounds && isFinite(S.bounds.minX)){
+    target={x:(S.bounds.minX+S.bounds.maxX)/2, y:(S.bounds.minY+S.bounds.maxY)/2};
+    tsrc='지도화면';
+  }
+
+  var best=null;
+  Object.keys(BELT_LON).forEach(function(e){
+    var ll;
+    try{ ll=proj4('EPSG:'+e,'WGS84',[c.x,c.y]); }catch(err){ return; }
+    if(!ll || !isFinite(ll[0]) || !isFinite(ll[1])) return;
+    if(ll[0]<123 || ll[0]>133 || ll[1]<32 || ll[1]>44) return;   /* 한국 밖 */
+    var score;
+    if(target){
+      var t5=wgs84toTm5186(ll[0],ll[1]);
+      if(!t5) return;
+      score=Math.hypot(t5[0]-target.x, t5[1]-target.y);
+    } else {
+      var off=Math.abs(ll[0]-BELT_LON[e]);
+      if(off>1.3) return;
+      score=off;
+    }
+    if(!best || score<best.score) best={epsg:e, score:score, lng:ll[0], lat:ll[1]};
+  });
+
+  if(!best){ console.log('[좌표계] 판별 실패 — 5186으로 가정'); return '5186'; }
+  console.log('[좌표계] 판별:', 'EPSG:'+best.epsg,
+              '(중심 '+best.lng.toFixed(4)+','+best.lat.toFixed(4)+
+              (target?(' · '+tsrc+'과 '+Math.round(best.score)+'m'):' · 기준점 없음')+')');
+  if(!target) console.log('[좌표계] ⚠ 기준 위치가 없어 원점을 확신할 수 없습니다.');
+  return best.epsg;
+}
+
+/* ── 좌표계 수동 변경 ──
+   자동 판별은 기준 위치(허가지선/검색위치)가 있어야 정확하다.
+   기준 없이 올린 경우를 위해 사용자가 직접 고를 수 있게 한다.
+   현재 데이터는 이미 5186으로 옮겨진 상태이므로,
+   "원래 원점(S._srcBelt)으로 되돌린 뒤 → 새 원점으로 다시 변환"한다. */
+function setBelt(newEpsg){
+  newEpsg=String(newEpsg);
+  var cur=String(S._srcBelt||'5186');
+  if(cur===newEpsg){ toast('이미 '+_beltName(newEpsg)+'원점이에요','ok'); _syncBeltBtns(); return; }
+  if(!_cadInitProj()) return;
+  if(!(S._allSheets && S._allSheets.contours)){ toast('먼저 지형도를 올려주세요','err'); return; }
+
+  function move(p){
+    try{
+      /* 5186 → WGS84 → (원래 원점) 원본좌표 복원 */
+      var ll1=proj4('EPSG:5186','WGS84',[p.x,p.y]);
+      var orig=proj4('WGS84','EPSG:'+cur, ll1);
+      /* 원본좌표를 새 원점으로 해석 → 5186 */
+      var ll2=proj4('EPSG:'+newEpsg,'WGS84', orig);
+      var c=wgs84toTm5186(ll2[0],ll2[1]);
+      if(c){ p.x=c[0]; p.y=c[1]; }
+    }catch(e){}
+  }
+  var A=S._allSheets;
+  (A.contours||[]).forEach(function(c){ c.pts.forEach(move); });
+  (A.waters||[]).forEach(function(c){ c.pts.forEach(move); });
+  (A.surveys||[]).forEach(move);
+  (A.polys||[]).forEach(function(pl){ pl.pts.forEach(move); });
+
+  S._srcBelt=newEpsg;
+  S.contours=A.contours.slice(); S.surveys=A.surveys.slice();
+  S.waters=(A.waters||[]).slice(); S.allPolys=(A.polys||[]).slice();
+  S._rawTerrain=null; S._workRings=null; S.workDist=0;
+  S.triList=null; S.gridCells=[]; S.avgSlope=null; S.bins=null;
+  _syncBeltBtns(); _syncWorkBtns();
+  computeBounds(); fitView();
+  if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
+  toast('좌표계를 '+_beltName(newEpsg)+'원점으로 변경','ok');
+  render();
+}
+
+function _syncBeltBtns(){
+  var box=document.getElementById('beltBox');
+  if(!box) return;
+  var has=!!(S.contours && S.contours.length);
+  box.style.display = has ? '' : 'none';
+  ['5185','5186','5187','5188'].forEach(function(e){
+    var b=document.getElementById('belt'+e);
+    if(b) b.className='thr'+(String(S._srcBelt||'5186')===e?' on':'');
+  });
+  var inf=document.getElementById('beltInfo');
+  if(inf){
+    var ok=(typeof checkTerrainCoversPermit==='function') ? checkTerrainCoversPermit() : null;
+    if(ok===false){ inf.textContent='⚠ 허가지선과 위치가 안 맞아요 — 원점을 바꿔보세요'; inf.style.color='#f87171'; }
+    else if(ok===true){ inf.textContent='✓ 허가지선 위치와 일치'; inf.style.color='#4ade80'; }
+    else { inf.textContent='허가지선을 만들면 자동으로 맞춰집니다'; inf.style.color='var(--dim)'; }
+  }
+}
+
+/* 도면 전체 좌표를 5186으로 옮긴다 (제자리 변환) */
+function reprojectParsed(r, fromEpsg){
+  if(fromEpsg==='5186') return 0;
+  var n=0;
+  function conv(p){
+    try{
+      var ll=proj4('EPSG:'+fromEpsg,'WGS84',[p.x,p.y]);
+      var cc=wgs84toTm5186(ll[0],ll[1]);
+      if(cc){ p.x=cc[0]; p.y=cc[1]; n++; }
+    }catch(e){}
+  }
+  (r.contours||[]).forEach(function(c){ c.pts.forEach(conv); });
+  (r.waters||[]).forEach(function(c){ c.pts.forEach(conv); });
+  (r.surveys||[]).forEach(conv);
+  (r.polys||[]).forEach(function(pl){ pl.pts.forEach(conv); });
+  return n;
+}
+
+/* ── 열린 지형도가 허가지선 위치를 덮는지 검증 ──
+   엉뚱한 도엽이 열리면 경사도 계산이 통째로 틀어지므로 반드시 확인한다. */
+function checkTerrainCoversPermit(){
+  if(!(S.permit && S.permit.pts && S.permit.pts.length>=3)) return null;
+  if(!(S.contours && S.contours.length)) return null;
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+  S.contours.forEach(function(c){
+    c.pts.forEach(function(p){
+      if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+      if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y;
+    });
+  });
+  var c0=_permitCentroid();
+  if(!c0) return null;
+  /* 여유 500m — 허가지선이 도엽 가장자리에 걸치거나 등고선이 성긴 지역이면
+     중심이 살짝 밖으로 나올 수 있다. 명백히 다른 도엽(수 km)만 걸러내는 것이 목적. */
+  var PAD=500;
+  var inside = (c0.x>=mnx-PAD && c0.x<=mxx+PAD && c0.y>=mny-PAD && c0.y<=mxy+PAD);
+  if(!inside){
+    var dx=Math.max(mnx-c0.x, c0.x-mxx, 0), dy=Math.max(mny-c0.y, c0.y-mxy, 0);
+    var dist=Math.round(Math.hypot(dx,dy));
+    var msg='⚠ 이 지형도는 허가지선 위치가 아니에요 (약 '+dist.toLocaleString()+'m 떨어짐)';
+    _ngiiMsg(msg+' — 다른 파일을 열어주세요','#f87171');
+    try{ toast('엉뚱한 도엽입니다 — '+dist.toLocaleString()+'m 떨어져 있어요','err'); }catch(e){}
+    console.log('[검증] 허가지선 중심', c0, '지형도 범위', {mnx:mnx,mny:mny,mxx:mxx,mxy:mxy});
+    return false;
+  }
+  return true;
+}
+
+/* 지형도 DXF를 기존 업로드 경로와 동일하게 처리 */
+function _openTerrainFile(file){
+  /* 업로드 경로와 완전히 동일하게 처리 — loadFile()이 파싱·자동감지까지 담당 */
+  if(typeof loadFile==='function'){ loadFile(file); return; }
+  /* 만약을 위한 폴백: input에 주입해 change 발생 */
+  try{
+    var inp=document.getElementById('fileIn');
+    var dt=new DataTransfer();
+    dt.items.add(file);
+    inp.files=dt.files;
+    inp.dispatchEvent(new Event('change',{bubbles:true}));
+  }catch(e){
+    console.log('[FSA] 파일 열기 실패', e);
+    toast('파일을 열지 못했어요 — 직접 선택해주세요','err');
+  }
+}
+
+/* ── UI 동기화 ── */
+function _fsaSyncUI(state){
+  var box=document.getElementById('fsaBox');
+  if(!box) return;
+  if(!FSA.supported){
+    box.innerHTML='<div style="font-size:10.5px;color:var(--dim);line-height:1.5">이 브라우저는 자동 열기를 지원하지 않아요. 받은 뒤 파일을 직접 선택하세요. (크롬·엣지 권장)</div>';
+    return;
+  }
+  var nm=FSA.dir?FSA.dir.name:null;
+  if(nm && state==='prompt'){
+    /* 크롬은 페이지를 새로 열면 폴더 권한을 prompt로 되돌린다.
+       이때 재허용은 '사용자 클릭 안에서만' 가능하다. */
+    box.innerHTML='<div style="font-size:10.5px;color:#fbbf24;line-height:1.5">'
+      +'⚠ <b>'+nm+'</b> 폴더 — 권한 확인이 필요해요</div>'
+      +'<button class="btn btn-ghost" onclick="fsaGrantNow()" style="margin-top:5px;color:#8ecbff;border-color:#2f4d70">🔓 폴더 권한 허용</button>';
+  } else if(nm && state!=='denied'){
+    box.innerHTML='<div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#4ade80">'
+      +'<span>✅ 자동 열기 켜짐 · <b>'+nm+'</b> 폴더</span></div>'
+      +'<button class="btn btn-ghost" onclick="fsaPickFolder()" style="margin-top:5px;font-size:11px">폴더 바꾸기</button>';
+  } else {
+    box.innerHTML='<div style="font-size:10.5px;color:var(--dim);line-height:1.5;margin-bottom:5px">'
+      +'받은 파일을 자동으로 열려면 <b>다운로드\\지형도</b> 폴더를 한 번만 연결하세요.</div>'
+      +'<button class="btn btn-ghost" onclick="fsaPickFolder()" style="color:#8ecbff;border-color:#2f4d70">📁 폴더 연결 (1회)</button>';
+  }
+}
+
+/* 다운로드 완료 후 — 자동 열기 시도, 안 되면 직접 선택 버튼 */
+function _ngiiOfferOpen(){
+  var box=document.getElementById('ngiiMsg');
+  if(!box) return;
+  var old=document.getElementById('ngiiOpenBtn');
+  if(old) old.parentNode.removeChild(old);
+
+  fsaAutoOpen(true).then(function(ok){
+    if(ok) return;
+    var b=document.createElement('button');
+    b.id='ngiiOpenBtn';
+    b.className='btn btn-pri';
+    b.style.cssText='margin-top:7px;background:var(--ok)';
+    b.textContent='📂 받은 DXF 열기';
+    b.onclick=function(){ document.getElementById('fileIn').click(); };
+    box.parentNode.insertBefore(b, box.nextSibling);
+    try{ toast('다운로드 완료 — 받은 DXF를 열어주세요','ok'); }catch(e){}
+  });
+}
+
+/* 확장 감지: PING 보내고 하트비트(2초) 끊기면 미설치로 판단 */
+(function _ngiiWatch(){
+  function tick(){
+    _ngiiSend({ type:'PING' });
+    if(NGII.extAlive && Date.now()-NGII.lastSeen>6000){
+      NGII.extAlive=false; _ngiiSyncExtUI();
+    }
+  }
+  if(document.readyState==='complete') setTimeout(function(){ tick(); setInterval(tick,3000); },300);
+  else window.addEventListener('load', function(){ setTimeout(function(){ tick(); setInterval(tick,3000); },300); });
+})();
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 허가지선 DXF 업로드 — 업체가 준 도면(허가지선만) 받기
+   지형도가 아니라 '허가지선 폴리곤 1개'만 뽑아 쓴다. R12도 읽힘.
+   ══════════════════════════════════════════════════════════════ */
+(function _bindPermitUpload(){
+  function bind(){
+    var inp=document.getElementById('permitIn');
+    var drop=document.getElementById('permitDrop');
+    if(!inp||!drop) return;
+
+    inp.addEventListener('change', function(){
+      var f=this.files && this.files[0];
+      if(f) _loadPermitDXF(f);
+      this.value='';
+    });
+    ['dragenter','dragover'].forEach(function(t){
+      drop.addEventListener(t, function(e){ e.preventDefault(); e.stopPropagation(); drop.classList.add('over'); });
+    });
+    ['dragleave','drop'].forEach(function(t){
+      drop.addEventListener(t, function(e){ e.preventDefault(); e.stopPropagation(); drop.classList.remove('over'); });
+    });
+    drop.addEventListener('drop', function(e){
+      var f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if(f) _loadPermitDXF(f);
+    });
+  }
+  if(document.readyState==='complete') bind();
+  else window.addEventListener('load', bind);
+})();
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] R12(POLYLINE/VERTEX) 폴리곤 파서 — 허가지선 업로드 전용
+   이 파일의 parseDXF는 LWPOLYLINE만 처리한다. 업체가 주는 허가지선 도면은
+   R12로 저장돼 오는 경우가 있어(LWPOLYLINE이 POLYLINE+VERTEX로 내려감)
+   허가지선 업로드 경로에서만 보조로 읽는다. (지형도는 항상 최신 포맷이라 불필요)
+   ══════════════════════════════════════════════════════════════ */
+function parsePolylineR12(text){
+  var L=text.split(/\r\n|\r|\n/);
+  var out=[], i=0, cur=null, vtx=null;
+  function pushVtx(){ if(cur && vtx && isFinite(vtx.x) && isFinite(vtx.y)) cur.pts.push(vtx); vtx=null; }
+  function flush(){
+    if(cur && cur.pts.length>=3){
+      var pts=cur.pts.slice();
+      var a=pts[0], b=pts[pts.length-1];
+      if(Math.abs(a.x-b.x)<1e-6 && Math.abs(a.y-b.y)<1e-6) pts.pop();
+      if(pts.length>=3) out.push({ layer:cur.layer||'0', pts:pts, closed:!!(cur.flag&1) });
+    }
+    cur=null; vtx=null;
+  }
+  while(i<L.length-1){
+    var code=L[i].trim(), val=L[i+1];
+    if(code==='0'){
+      var t=(val||'').trim().toUpperCase();
+      if(t==='POLYLINE'){ flush(); cur={layer:'0', flag:0, pts:[]}; }
+      else if(t==='VERTEX'){ pushVtx(); if(cur) vtx={x:NaN,y:NaN}; }
+      else { pushVtx(); flush(); }
+    } else if(cur){
+      var v=(val||'').trim();
+      if(!vtx){
+        if(code==='8') cur.layer=v;
+        else if(code==='70') cur.flag=parseInt(v,10)||0;
+      } else {
+        if(code==='10') vtx.x=parseFloat(v);
+        else if(code==='20') vtx.y=parseFloat(v);
+      }
+    }
+    i+=2;
+  }
+  pushVtx(); flush();
+  return out;
+}
+
+function _loadPermitDXF(file){
+  if(!/\.dxf$/i.test(file.name)){ toast('DXF 파일만 올려주세요','err'); return; }
+  var rd=new FileReader();
+  rd.onload=function(){
+    var r;
+    try{ r=parseDXF(String(rd.result)); }
+    catch(e){ toast('DXF를 읽지 못했어요','err'); return; }
+
+    /* 폐합선 후보 중 면적이 가장 큰 것을 허가지선으로 */
+    var cands=(r.polys||[]).filter(function(p){ return p.pts && p.pts.length>=3; });
+    /* ★ LWPOLYLINE이 하나도 없으면 R12(POLYLINE/VERTEX)로 다시 읽어본다 */
+    if(!cands.length){
+      try{ cands=parsePolylineR12(String(rd.result)); }catch(e){ cands=[]; }
+      if(cands.length) console.log('[허가지선] R12 폴리라인으로 읽음:', cands.length+'개');
+    }
+    if(!cands.length){ toast('닫힌 폴리곤(허가지선)을 찾지 못했어요','err'); return; }
+    var best=cands[0], ba=Math.abs(polyArea(best.pts));
+    for(var i=1;i<cands.length;i++){
+      var a=Math.abs(polyArea(cands[i].pts));
+      if(a>ba){ best=cands[i]; ba=a; }
+    }
+
+    S.permit={ pts:best.pts.map(function(p){return {x:p.x,y:p.y};}),
+               layer:'업로드('+(best.layer||file.name)+')',
+               area:ba };
+    S.permitParcels=null;
+    S._permitSrc=null;
+    S._permitPnus=[];
+    S.allPolys=(S.allPolys&&S.allPolys.length)?S.allPolys:cands;
+    NGII._lastAddr=null; NGII.autoFilled=false;
+
+    /* 지형도가 아직 없으면 이 폴리곤 기준으로 화면 잡기 */
+    if(!(S.contours&&S.contours.length)) _fitToPermit();
+
+    S.daejangArea=null;
+    var da=document.getElementById('daejangArea'); if(da) da.value='';
+    _updatePermitPanel(1);
+    CAD.marker=null;
+    var dt=document.getElementById('detPermit');
+    if(dt){ dt.className='det-row ok'; dt.querySelector('.ct').textContent='확정'; }
+    _updateRunBtn();
+    toast('허가지선 불러옴 — '+Math.round(ba).toLocaleString()+'㎡ ('+cands.length+'개 중 최대)','ok');
+    render();
+
+    /* 좌표로 주소 역추적 (지형도 받기용) */
+    if(typeof ngiiFillAddrFromPermit==='function') ngiiFillAddrFromPermit(true);
+  };
+  rd.onerror=function(){ toast('파일을 읽지 못했어요','err'); };
+  rd.readAsText(file);
+}
+
+/* 허가지선만 있을 때 화면 맞춤 */
+function _fitToPermit(){
+  var pts=S.permit&&S.permit.pts; if(!pts||pts.length<3) return;
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+  pts.forEach(function(p){
+    if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+    if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y;
+  });
+  var padM=Math.max((mxx-mnx),(mxy-mny))*0.8+50;
+  S.bounds={minX:mnx-padM, minY:mny-padM, maxX:mxx+padM, maxY:mxy+padM};
+  if(!cv.width||cv.width<10){
+    var st=cv.parentElement;
+    cv.width=(st&&st.clientWidth)||900; cv.height=(st&&st.clientHeight)||600;
+  }
+  var dx=S.bounds.maxX-S.bounds.minX, dy=S.bounds.maxY-S.bounds.minY, pad=40;
+  S.scale=Math.min((cv.width-pad*2)/dx,(cv.height-pad*2)/dy);
+  S.ox=(cv.width-dx*S.scale)/2 - S.bounds.minX*S.scale;
+  S.oy=(cv.height-dy*S.scale)/2 - S.bounds.minY*S.scale;
+  var em=document.getElementById('empty'); if(em) em.style.display='none';
+  if(cadBg.on) _cadBgFetch();
+}
+
+/* ══ 지형도 탭 게이트 — 허가지선이 있어야 진행 ══ */
+function _hasPermit(){
+  return !!(S.permit && S.permit.pts && S.permit.pts.length>=3);
+}
+function ngiiSyncGate(){
+  if(!document.getElementById('ngiiP1').options.length) _ngiiFillPurpose();
+  if(!FSA._inited){ FSA._inited=true; _fsaSyncUI(); _fsaRestore(); }
+  var need=document.getElementById('needPermitBox');
+  var sec =document.getElementById('ngiiSec');
+  var ok=_hasPermit();
+  if(need) need.style.display = ok ? 'none' : '';
+  if(sec)  sec.style.display  = ok ? '' : 'none';
+  if(!ok) return;
+
+  /* 허가지선 요약 표시 */
+  var tx=document.getElementById('permitAddrTx');
+  if(tx){
+    var area=_permitTotalArea();
+    var nm=(NGII._lastAddr || (CAD.marker&&CAD.marker.label) || (S.permit.layer||'허가지선'));
+    var full=nm+'  ·  '+area.toFixed(0)+'㎡';
+    tx.textContent=full;
+    tx.title=full;              /* 잘리면 마우스를 올려 전체 확인 */
+  }
+  ngiiFillAddrFromPermit();
+}
+
+/* ══ 허가지선 → NGII 검색용 전체주소 자동 채움 ══
+   ⚠ VWorld 지적의 jibun 필드는 "1856-113 수"처럼 본번-부번+지목뿐이라
+     시/군/읍면/리가 없어 NGII 검색이 0건 난다.
+     → 허가지선 중심좌표를 카카오 역지오코딩해서 전체 지번주소를 만든다. */
+function _permitCentroid(){
+  var pts=(S.permit&&S.permit.pts)||null;
+  if(!pts||pts.length<3) return null;
+  var a=0,cx=0,cy=0;
+  for(var i=0;i<pts.length;i++){
+    var p=pts[i], q=pts[(i+1)%pts.length];
+    var f=p.x*q.y-q.x*p.y;
+    a+=f; cx+=(p.x+q.x)*f; cy+=(p.y+q.y)*f;
+  }
+  if(Math.abs(a)<1e-9){   /* 면적 0이면 단순 평균 */
+    var sx=0,sy=0; pts.forEach(function(p){sx+=p.x;sy+=p.y;});
+    return {x:sx/pts.length, y:sy/pts.length};
+  }
+  a*=0.5;
+  return {x:cx/(6*a), y:cy/(6*a)};
+}
+
+function ngiiFillAddrFromPermit(force){
+  var el=document.getElementById('ngiiAddr');
+  if(!el) return;
+  /* 사용자가 직접 고친 값은 덮지 않음 */
+  if(el.value.trim() && !NGII.autoFilled && !force) return;
+
+  /* ★★ 1순위: 검색으로 고른 정확한 주소 문자열 (재해 pickAddr와 동일 원칙)
+     좌표→주소 역변환은 부번(-61)이 깎여 본번(산131)으로 바뀌는 일이 있다(방4 실측).
+     그래서 사람이 고른 주소가 있으면 무조건 그걸 먼저 쓴다. */
+  var lb=(CAD.marker && CAD.marker.label ? String(CAD.marker.label) : '').trim();
+  var lastTok=lb.split(/\s+/).pop()||'';
+  if(lb && /\d/.test(lastTok) && !/허가지선/.test(lb)){
+    lb=_normalizeJibunAddr(lb);
+    el.value=lb; NGII.autoFilled=true; NGII._lastAddr=lb;
+    _ngiiMsg('✓ '+lb,'#4ade80');
+    return;
+  }
+  if(NGII._lastAddr){ el.value=NGII._lastAddr; NGII.autoFilled=true; return; }
+
+  /* 2순위: 허가지선 중심좌표 → 역지오코딩 (부번 깎임 주의) */
+  var c=_permitCentroid();
+  if(!c) return;
+  if(!_cadInitProj()) return;
+  var ll=tm5186toWgs84(c.x,c.y);
+  if(!ll) return;
+
+  _ngiiMsg('주소 확인 중…','#94a3b8');
+  _cadKakaoReady(function(ok){
+    if(!ok){ _fallbackJibun(el); return; }
+    try{
+      CAD.geocoder.coord2Address(ll[0], ll[1], function(res, st){
+        if(st===kakao.maps.services.Status.OK && res.length && res[0].address){
+          var full=res[0].address.address_name;
+          /* ★ 지적에서 받은 지번(본번-부번)과 대조 — 부번이 깎였으면 보정 */
+          full=_mergeJibunTail(full);
+          NGII._lastAddr=full;
+          el.value=full; NGII.autoFilled=true;
+          _ngiiMsg('✓ '+full+'  (틀리면 직접 고치세요)','#4ade80');
+        } else {
+          _fallbackJibun(el);
+        }
+      });
+    }catch(e){ _fallbackJibun(el); }
+  });
+}
+
+/* 역지오코딩 결과의 끝 지번을, 지적에서 받은 실제 지번으로 교체
+   예) 역변환 "…덕우리 산131"  +  지적 jibun "산131-61임"  →  "…덕우리 산131-61" */
+function _mergeJibunTail(full){
+  var src=(S._permitSrc && S._permitSrc.length)?S._permitSrc[0]:null;
+  var jb=src && src.jibun ? String(src.jibun).trim() : '';
+  if(!jb) return _normalizeJibunAddr(full);
+  /* 지목 한 글자 제거: "산131-61임" → "산131-61" */
+  jb=jb.replace(/\s*[가-힣]$/,'').trim();
+  if(!/\d/.test(jb)) return _normalizeJibunAddr(full);
+
+  var parts=String(full).trim().split(/\s+/);
+  if(parts.length<2) return full;
+
+  /* ★ 끝에서부터 지번 조각을 모두 걷어낸다.
+     카카오가 "… 남양리 산 139-93" 처럼 '산'을 띄어서 주는 경우가 있어,
+     마지막 토큰만 바꾸면 "산 산139-93" 처럼 산이 중복된다(실측). */
+  while(parts.length>1){
+    var t=parts[parts.length-1];
+    if(/^산$/.test(t) || /^산?\d+(-\d+)?$/.test(t)){ parts.pop(); continue; }
+    break;
+  }
+  parts.push(jb);
+  return _normalizeJibunAddr(parts.join(' '));
+}
+
+/* NGII 검색용 주소 정규화
+   - "산 139-93" 처럼 띄어쓴 산 → "산139-93"
+   - 시도 약칭을 정식 명칭으로 (카카오 "경기" ↔ NGII "경기도") */
+function _normalizeJibunAddr(a){
+  if(!a) return a;
+  var t=String(a).trim().replace(/\s+/g,' ');
+  t=t.replace(/\s산\s+(\d)/g,' 산$1');          /* 산 139-93 → 산139-93 */
+  var SIDO={ '서울':'서울특별시','부산':'부산광역시','대구':'대구광역시','인천':'인천광역시',
+             '광주':'광주광역시','대전':'대전광역시','울산':'울산광역시','세종':'세종특별자치시',
+             '경기':'경기도','강원':'강원특별자치도','충북':'충청북도','충남':'충청남도',
+             '전북':'전북특별자치도','전남':'전라남도','경북':'경상북도','경남':'경상남도',
+             '제주':'제주특별자치도' };
+  var p=t.split(' ');
+  if(p.length>1 && SIDO[p[0]]){ p[0]=SIDO[p[0]]; t=p.join(' '); }
+  return t;
+}
+
+/* 역지오코딩 실패 시 — 지목만 떼고 지번이라도 넣되 경고 */
+function _fallbackJibun(el){
+  var src=(S._permitSrc&&S._permitSrc.length)?S._permitSrc[0]:null;
+  var jb=src&&src.jibun?String(src.jibun).replace(/\s*[가-힣]$/,'').trim():'';
+  if(jb){ el.value=jb; NGII.autoFilled=true; }
+  _ngiiMsg('⚠ 시·군·읍면까지 직접 넣어주세요 (예: 화성시 팔탄면 덕우리 '+(jb||'000')+')','#fbbf24');
+}
+
 /* ---------------- 렌더 ---------------- */
 function render(){
   ctx.clearRect(0,0,cv.width,cv.height);
   if(!S.bounds) return;
+
+  // ── [TEST] 지도·지적 배경 (가장 아래)
+  if(typeof drawCadBg==='function') drawCadBg();
 
   // ── 분석 결과 격자 (등고선 아래에 그려서 등고선이 위에 보임)
   if(S.gridCells && S.gridCells.length){
@@ -668,12 +3362,42 @@ function render(){
   S.contours.forEach(function(c){ if(c.elev<zmin)zmin=c.elev; if(c.elev>zmax)zmax=c.elev; });
   var zr=(zmax-zmin)||1;
 
+  /* [TEST] 수계·하천(E계열) — 등고선과 헷갈리지 않게 파란 선으로 */
+  if(S.showWater!==false && S.waters && S.waters.length){
+    ctx.save();
+    ctx.strokeStyle='#4aa8ff';
+    ctx.lineWidth=1.6;
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    S.waters.forEach(function(c){
+      if(!c.pts || c.pts.length<2) return;
+      ctx.beginPath();
+      c.pts.forEach(function(p,idx){
+        var sp=w2s(p);
+        if(idx===0)ctx.moveTo(sp.x,sp.y); else ctx.lineTo(sp.x,sp.y);
+      });
+      if(c.closed) ctx.closePath();
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  /* [TEST] 주곡선/계곡선을 색으로 확실히 구분.
+     기존엔 둘 다 회색 계열이라 굵기 차이만 있어 알아보기 어려웠음.
+     계곡선(10m마다) = 밝은 갈색, 주곡선(5m) = 청회색. */
+  var _idxLines=[];
   S.contours.forEach(function(c){
     var t=(c.elev-zmin)/zr;
-    var isIndex=(c.layer||'').toUpperCase()==='F0017114'; // 계곡선=굵게
-    var g=Math.round(70+110*t);
-    ctx.strokeStyle='rgb('+g+','+(g+8)+','+(g+22)+')';
-    ctx.lineWidth=isIndex?1.6:0.8;
+    var isIndex=_isIndexContour(c);
+    if(isIndex){
+      var b=Math.round(150+70*t);
+      ctx.strokeStyle='rgb('+b+','+Math.round(b*0.78)+','+Math.round(b*0.45)+')';  /* 갈색 */
+      ctx.lineWidth=1.9;
+      _idxLines.push(c);
+    } else {
+      var g=Math.round(78+95*t);
+      ctx.strokeStyle='rgb('+g+','+(g+10)+','+(g+26)+')';
+      ctx.lineWidth=0.9;
+    }
     ctx.beginPath();
     c.pts.forEach(function(p,idx){
       var s=w2s(p);
@@ -683,8 +3407,33 @@ function render(){
     ctx.stroke();
   });
 
+  /* 계곡선 표고 라벨 — 선 위에 값 표시 (겹치면 건너뜀) */
+  if(S.scale>0.35 && _idxLines.length){
+    var _used=[];
+    ctx.font='bold 11px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    _idxLines.forEach(function(c){
+      if(!c.pts.length) return;
+      var mid=c.pts[Math.floor(c.pts.length/2)];
+      var sp=w2s(mid);
+      if(sp.x<24||sp.x>cv.width-24||sp.y<14||sp.y>cv.height-14) return;
+      for(var i=0;i<_used.length;i++){
+        if(Math.abs(_used[i].x-sp.x)<52 && Math.abs(_used[i].y-sp.y)<22) return;
+      }
+      _used.push(sp);
+      var tx=(Math.round(c.elev*10)/10)+'';
+      var wdt=ctx.measureText(tx).width;
+      ctx.fillStyle='rgba(8,12,20,0.82)';
+      ctx.fillRect(sp.x-wdt/2-3, sp.y-8, wdt+6, 16);
+      ctx.fillStyle='#f0b775';
+      ctx.fillText(tx, sp.x, sp.y);
+    });
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  }
+
   // ── 표고점 (✕ + 값)
-  ctx.font='10px sans-serif';
+  /* [TEST] 라벨 임계 1.2 → 0.30 으로 낮춤. 예전엔 많이 확대해야 숫자가 보였음.
+     어두운 배경 박스를 깔아 등고선 위에서도 읽히게 함. */
   S.surveys.forEach(function(s){
     var p=w2s(s);
     if(p.x<-20||p.x>cv.width+20||p.y<-20||p.y>cv.height+20)return;
@@ -694,26 +3443,101 @@ function render(){
     ctx.moveTo(p.x-4,p.y-4);ctx.lineTo(p.x+4,p.y+4);
     ctx.moveTo(p.x+4,p.y-4);ctx.lineTo(p.x-4,p.y+4);
     ctx.stroke();
-    if(s.val!==null && S.scale>1.2){
-      ctx.fillStyle='#fbbf24';
-      ctx.fillText(s.val.toFixed(1), p.x+6, p.y-5);
+    var val=(s.val!==null && s.val!==undefined) ? s.val : (isFinite(s.z)&&s.z ? s.z : null);
+    if(val!==null && S.scale>0.30){
+      var tx=val.toFixed(1);
+      ctx.font='bold 11px sans-serif';
+      var wdt=ctx.measureText(tx).width;
+      ctx.fillStyle='rgba(8,12,20,0.78)';
+      ctx.fillRect(p.x+5, p.y-15, wdt+5, 14);
+      ctx.fillStyle='#ffd25e';
+      ctx.fillText(tx, p.x+7, p.y-5);
     }
   });
 
-  // ── 허가지선 (빨강 굵게, 격자 위에)
-  if(S.permit){
-    ctx.strokeStyle='#ef4444';
-    ctx.lineWidth=2.4;
+  /* [TEST] 삼각망(TIN) — 계산에 쓰인 삼각형 */
+  if(S.showTIN && S.triList && S.triList.length){
+    var _tris=_tinInRange();
+    ctx.save();
+    ctx.strokeStyle='rgba(148,163,184,0.42)';
+    ctx.lineWidth=0.6;
     ctx.beginPath();
-    S.permit.pts.forEach(function(p,idx){
-      var s=w2s(p);
-      if(idx===0)ctx.moveTo(s.x,s.y); else ctx.lineTo(s.x,s.y);
+    _tris.forEach(function(t){
+      var a=w2s(t.p0), b=w2s(t.p1), c=w2s(t.p2);
+      if((a.x<-50&&b.x<-50&&c.x<-50)||(a.x>cv.width+50&&b.x>cv.width+50&&c.x>cv.width+50)) return;
+      if((a.y<-50&&b.y<-50&&c.y<-50)||(a.y>cv.height+50&&b.y>cv.height+50&&c.y>cv.height+50)) return;
+      ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.closePath();
     });
-    ctx.closePath();
     ctx.stroke();
-    if(!S.gridCells || !S.gridCells.length){
-      ctx.fillStyle='rgba(239,68,68,.05)';
-      ctx.fill();
+    ctx.restore();
+  }
+
+  /* [TEST] 작업범위 경계 (파란 점선) */
+  if(S._workRings && S._workRings.length){
+    ctx.save();
+    ctx.strokeStyle='rgba(96,165,250,0.85)';
+    ctx.lineWidth=1.6; ctx.setLineDash([8,5]);
+    S._workRings.forEach(function(r){
+      if(!r || r.length<3) return;
+      ctx.beginPath();
+      r.forEach(function(p,i){ var sp=w2s(p); i===0?ctx.moveTo(sp.x,sp.y):ctx.lineTo(sp.x,sp.y); });
+      ctx.closePath(); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // ── [TEST] 선택된 지적 필지 (청록 강조) — 허가지선 바로 아래
+  if(typeof drawCadastral==='function') drawCadastral();
+  if(typeof drawSearchMarker==='function') drawSearchMarker();
+
+  // ── 허가지선 (확정선 = 형광 노랑, 격자 위에)
+  if(S.permit){
+    /* [TEST] 복수 필지를 '필지별'로 확정한 경우 — 나머지 필지도 함께 그림
+       (대표 필지만 그리면 나머지가 화면에서 사라져 확인이 안 됨) */
+    if(S.permitParcels && S.permitParcels.length>1){
+      ctx.save();
+      ctx.setLineDash([7,5]); ctx.lineJoin='round';
+      S.permitParcels.forEach(function(pp){
+        if(!pp.ring || pp.ring.length<3) return;
+        ctx.beginPath();
+        pp.ring.forEach(function(p,idx){ var sp=w2s(p); idx===0?ctx.moveTo(sp.x,sp.y):ctx.lineTo(sp.x,sp.y); });
+        ctx.closePath();
+        if(!S.gridCells || !S.gridCells.length){ ctx.fillStyle='rgba(250,204,21,.07)'; ctx.fill(); }
+        /* 검은 외곽 → 노랑 본선 (shadowBlur는 색을 흐려서 안 씀) */
+        ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.lineWidth=4.5; ctx.stroke();
+        ctx.strokeStyle='#facc15';           ctx.lineWidth=2.2; ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+    /* [TEST] 대표 허가지선(=분석 대상) — 확정 표시를 확실히
+       빨강은 배경 지적선(#ff3b3b)과 겹쳐 구분이 안 돼서, 형광 노랑 + 검은 글로우로 변경 */
+    var _hasPermitPts = S.permit.pts && S.permit.pts.length>=3;
+    if(_hasPermitPts){
+      ctx.save();
+      ctx.lineJoin='round'; ctx.lineCap='round';
+      ctx.beginPath();
+      S.permit.pts.forEach(function(p,idx){
+        var sp=w2s(p);
+        if(idx===0)ctx.moveTo(sp.x,sp.y); else ctx.lineTo(sp.x,sp.y);
+      });
+      ctx.closePath();
+      if(!S.gridCells || !S.gridCells.length){
+        ctx.fillStyle='rgba(250,204,21,.10)'; ctx.fill();
+      }
+      ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.lineWidth=6.5; ctx.stroke();   /* 검은 글로우 */
+      ctx.strokeStyle='#facc15';           ctx.lineWidth=3.0; ctx.stroke();   /* 형광 노랑 본선 */
+      /* 정점 마커 — 확정된 선이라는 표시 */
+      if(S.scale>0.25){
+        ctx.fillStyle='#facc15'; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=1.5;
+        S.permit.pts.forEach(function(p){
+          var sp=w2s(p);
+          if(sp.x<-10||sp.x>cv.width+10||sp.y<-10||sp.y>cv.height+10) return;
+          ctx.beginPath(); ctx.arc(sp.x,sp.y,3.2,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        });
+      }
+      ctx.restore();
     }
   }
 
@@ -1094,6 +3918,7 @@ function onDaejangInput(){
     ci.style.display='none';
     rb.style.display='none';
   }
+  if(typeof updateAreaCorrBase==='function') updateAreaCorrBase();   // [TEST] 기준면적 안내 동기화
   // 면적표 다시 그리기 (현재 결과 재사용)
   if(S.avgSlope!==null && S.bins){
     showResult(S.avgSlope, S.bins, S.totalArea);
@@ -1276,6 +4101,7 @@ function dxfHeader(){
           // 레이어 정의 (영문 — 캐드 호환)
           '0','LAYER','2','PERMIT','70','0','62','5','6','CONTINUOUS',
           '0','LAYER','2','GRID','70','0','62','8','6','CONTINUOUS',
+          '0','LAYER','2','TIN','70','0','62','8','6','CONTINUOUS',
           '0','LAYER','2','SLOPE_FILL','70','0','62','3','6','CONTINUOUS',
           '0','LAYER','2','SLOPE_DEG','70','0','62','7','6','CONTINUOUS',
           '0','LAYER','2','AREA_TABLE','70','0','62','7','6','CONTINUOUS',
@@ -1334,6 +4160,15 @@ function exportDXF(){
     var cx=(g.minX+g.maxX)/2, cy=(g.minY+g.maxY)/2;
     ent=ent.concat(dxfText(cx-2, cy-1, 1.2, g.slope.toFixed(1), 'SLOPE_DEG', 7));
   });
+  // 3-1) 삼각망(TIN) — 화면에서 켜둔 경우 같은 기준으로 저장
+  if(S.showTIN && S.triList && S.triList.length){
+    var _t=_tinInRange();
+    _t.forEach(function(t){
+      ent=ent.concat(dxfPolyline([{x:t.p0.x,y:t.p0.y},{x:t.p1.x,y:t.p1.y},{x:t.p2.x,y:t.p2.y}], 'TIN', 8, true));
+    });
+    console.log('[DXF] 삼각망 '+_t.length+'개 포함');
+  }
+
   // 4) 신청구역 경계 (빨강, 두껍게)
   ent=ent.concat(dxfPolyline(permitPts.map(function(p){return{x:p.x,y:p.y};}), 'PERMIT', 5, true));
 
@@ -1466,6 +4301,7 @@ function _runEngine(){
 
   render();
   showResult(result.avgSlope, result.bins, result.totalArea);
+  if(typeof _syncTinBtn==='function') _syncTinBtn();
   document.getElementById('legend').style.display='block';
   document.getElementById('cutSec').style.display='block';
   toast('분석 완료 ― 평균경사도 '+result.avgSlope.toFixed(2)+'°');
@@ -1911,6 +4747,8 @@ function confirmRepick(){
   document.getElementById('btnRepickOk').style.display='none';
   cv.style.cursor='grab';
   toast('허가지선 확정 — '+Math.round(S.permit.area).toLocaleString()+'㎡ · 다시 분석하세요');
+  NGII._lastAddr=null; NGII.autoFilled=false;
+  if(typeof ngiiSyncGate==='function') ngiiSyncGate();
   render();
 }
 
@@ -1954,10 +4792,11 @@ var drop=document.getElementById('drop');
 });
 document.body.addEventListener('drop',function(e){
   e.preventDefault();
-  if(e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+  /* 도엽 경계에 걸치면 2~4장이 오므로 여러 파일을 함께 받는다 */
+  if(e.dataTransfer.files.length) loadFiles(e.dataTransfer.files);
 });
 document.getElementById('fileIn').addEventListener('change',function(){
-  if(this.files.length) loadFile(this.files[0]);
+  if(this.files.length) loadFiles(this.files);
   this.value='';
 });
 
@@ -1977,6 +4816,13 @@ window.addEventListener('message', function(ev){
       document.getElementById('btnRun').disabled = !(S.contours.length && S.permit);
       computeBounds(); fitView(); render();
     }
+    /* 책에서 열면 등고선·허가지선이 이미 준비된 상태 → 바로 분석 탭으로 */
+    if(typeof switchPanel==='function') switchPanel('analyze');
+    if(typeof _syncSheetList==='function') _syncSheetList();
+    if(typeof _syncBeltBtns==='function') _syncBeltBtns();
+    if(typeof _syncTinBtn==='function') _syncTinBtn();
+    /* 책 데이터는 이미 5186 좌표 → 원점 변환 불필요 */
+    S._srcBelt='5186';
   }catch(e){ toast('책 데이터 수신 오류: '+e.message,'err'); }
 });
 /* 분석 결과를 책으로 회신 (재해 채점 연동) */
@@ -1987,6 +4833,34 @@ window.addEventListener('message', function(ev){
     try{ if(window.parent!==window) window.parent.postMessage({type:'gdsp-slope-result',
       avgSlope:avgSlope, bins:bins, totalArea:totalArea, nCells:(S.gridCells||[]).length}, '*'); }catch(e){}
   };
+})();
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 초기 진입 — 열자마자 지도부터 표시
+   (DXF·postMessage로 도면이 들어오면 그때 그쪽 뷰로 전환됨)
+   ══════════════════════════════════════════════════════════════ */
+(function _initMapFirst(){
+  function go(_n){
+    _n=_n||0;
+    /* proj4 로딩 대기 (최대 ~4초) */
+    if(typeof proj4==='undefined'){
+      if(_n<40){ setTimeout(function(){ go(_n+1); },100); return; }
+      _jibunMsg('좌표 변환(proj4) 로드 실패 — 지도 없이 사용 가능','#f87171');
+      return;
+    }
+    /* 이미 도면이 올라와 있으면 건드리지 않음 */
+    if(S.contours && S.contours.length) return;
+    if(!_cadEnsureView()) return;
+    cadBg.on=true; cadBg.showBase=true; cadBg.showCad=true;
+    _cadBgSyncBtn();
+    _cadBgFetch();
+    var em=document.getElementById('empty');
+    if(em) em.style.display='none';
+    _jibunMsg('주소를 검색하거나, 지도를 움직여 위치를 잡으세요','#94a3b8');
+    render();
+  }
+  if(document.readyState==='complete') setTimeout(go,80);
+  else window.addEventListener('load', function(){ setTimeout(go,80); });
 })();
 </script>
 </body>
