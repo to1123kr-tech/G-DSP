@@ -31,7 +31,7 @@ body{background:var(--bg);color:var(--txt);height:100vh;overflow:hidden;display:
 .main{flex:1;display:flex;overflow:hidden}
 
 /* 좌측 패널 */
-.side{width:240px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.side{width:288px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
 .sec{padding:12px 14px;border-bottom:1px solid var(--line)}
 .sec-t{font-size:10px;color:var(--dim);letter-spacing:1.5px;margin-bottom:8px;font-weight:700}
 
@@ -59,8 +59,9 @@ body{background:var(--bg);color:var(--txt);height:100vh;overflow:hidden;display:
 
 /* 좌측 패널 탭 (테스트: 지형도/허가지선/분석) */
 .ptabs{display:flex;border-bottom:1px solid var(--line);flex-shrink:0}
-.ptab{flex:1;padding:10px 4px;background:var(--panel2);border:none;border-right:1px solid var(--line);
-  color:var(--dim);font-size:11.5px;font-weight:700;cursor:pointer;transition:.15s}
+.ptab{flex:1;padding:10px 3px;background:var(--panel2);border:none;border-right:1px solid var(--line);
+  color:var(--dim);font-size:11px;font-weight:700;cursor:pointer;transition:.15s;
+  white-space:nowrap;overflow:hidden}   /* 탭 이름이 두 줄로 접히지 않게 */
 .ptab:last-child{border-right:none}
 .ptab:hover{color:var(--txt)}
 .ptab.on{background:var(--panel);color:var(--pri);box-shadow:inset 0 -2px 0 var(--pri)}
@@ -130,7 +131,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.9 · 08-23 원점수동</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v7.0 · 08-23 삼각망</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -139,9 +140,9 @@ canvas.grabbing{cursor:grabbing}
   <!-- 좌측 패널 -->
   <div class="side">
     <div class="ptabs">
-      <button class="ptab on" id="ptab-permit" onclick="switchPanel('permit')">① 📍 허가지선</button>
-      <button class="ptab" id="ptab-terrain" onclick="switchPanel('terrain')">② 🗻 지형도</button>
-      <button class="ptab" id="ptab-analyze" onclick="switchPanel('analyze')">③ 📐 분석</button>
+      <button class="ptab on" id="ptab-permit" onclick="switchPanel('permit')">① 허가지선</button>
+      <button class="ptab" id="ptab-terrain" onclick="switchPanel('terrain')">② 지형도</button>
+      <button class="ptab" id="ptab-analyze" onclick="switchPanel('analyze')">③ 분석</button>
     </div>
     <div class="side-body">
 
@@ -288,10 +289,6 @@ canvas.grabbing{cursor:grabbing}
         DXF를 끌어다 놓거나<br>클릭해서 선택<br><span style="font-size:10px;opacity:.7">여러 도엽을 한 번에 선택하거나<br>나눠서 올려도 계속 누적됩니다</span>
       </div>
       <input type="file" id="fileIn" accept=".dxf" multiple style="display:none">
-      <div style="display:flex;align-items:center;gap:6px;margin-top:7px">
-        <div id="sheetInfo" style="flex:1;font-size:10.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">올라간 도엽 없음</div>
-        <button class="thr" onclick="clearTerrain()" style="flex:0 0 auto;color:#f87171;border-color:#5b2b2b">🗑 비우기</button>
-      </div>
       <div id="sheetBox" style="display:none;margin-top:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <span style="font-size:10.5px;color:#4ade80" id="sheetCnt">-</span>
@@ -302,7 +299,6 @@ canvas.grabbing{cursor:grabbing}
       </div>
     </div>
 
-    <!-- 작업범위 — 허가지선 버퍼로 계산 구역 한정 -->
     <!-- 좌표계(원점) — 자동 판별이 틀렸을 때 직접 고침 -->
     <div class="sec" id="beltBox" style="display:none">
       <div class="sec-t">좌표계 원점</div>
@@ -318,24 +314,6 @@ canvas.grabbing{cursor:grabbing}
       <div id="beltInfo" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
     </div>
 
-    <div class="sec">
-      <div class="sec-t">④ 작업범위</div>
-      <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:6px">
-        도엽 전체는 허가지보다 훨씬 넓어요.<br>필요한 범위만 남기면 분석이 정확·빨라집니다.
-      </div>
-      <div style="display:flex;gap:4px;margin-bottom:5px">
-        <button class="thr on" id="wr0" onclick="setWorkRange(0)">전체</button>
-        <button class="thr" id="wr100" onclick="setWorkRange(100)">100m</button>
-        <button class="thr" id="wr200" onclick="setWorkRange(200)">200m</button>
-        <button class="thr" id="wr300" onclick="setWorkRange(300)">300m</button>
-      </div>
-      <div style="display:flex;gap:4px;align-items:center">
-        <input id="wrCustom" type="number" min="10" max="2000" step="10" placeholder="직접 입력(m)"
-          style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:11.5px">
-        <button class="thr" onclick="setWorkRange(document.getElementById('wrCustom').value)">적용</button>
-      </div>
-      <div id="workInfo" style="font-size:10.5px;color:var(--dim);margin-top:6px">전체 도면 사용</div>
-    </div>
 
     <div class="sec">
       <div class="sec-t">③ 자동 감지</div>
@@ -358,6 +336,36 @@ canvas.grabbing{cursor:grabbing}
     <div class="pview" id="pview-analyze">
 
     <!-- ③ 면적 보정 — 파일업로드 → 허가지선 → 면적보정 순서 -->
+
+    <!-- 작업범위 — 허가지선 버퍼로 계산 구역 한정 (분석 조건이라 분석 탭에 둠) -->
+    <div class="sec">
+      <div class="sec-t">① 작업범위</div>
+      <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:6px">
+        도엽 전체는 허가지보다 훨씬 넓어요.<br>필요한 범위만 남기면 분석이 정확·빨라집니다.
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:5px">
+        <button class="thr on" id="wr0" onclick="setWorkRange(0)">전체</button>
+        <button class="thr" id="wr100" onclick="setWorkRange(100)">100m</button>
+        <button class="thr" id="wr200" onclick="setWorkRange(200)">200m</button>
+        <button class="thr" id="wr300" onclick="setWorkRange(300)">300m</button>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <input id="wrCustom" type="number" min="10" max="2000" step="10" placeholder="직접 입력(m)"
+          style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:11.5px">
+        <button class="thr" onclick="setWorkRange(document.getElementById('wrCustom').value)">적용</button>
+      </div>
+      <div id="workInfo" style="font-size:10.5px;color:var(--dim);margin-top:6px">전체 도면 사용</div>
+    </div>
+
+    <!-- 삼각망(TIN) 보기 -->
+    <div class="sec">
+      <div class="sec-t">② 삼각망 (TIN)</div>
+      <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:6px">
+        경사도 계산에 쓰인 삼각망이에요.<br>작업범위 안쪽만 그립니다.
+      </div>
+      <button class="btn btn-ghost" id="tinBtn" onclick="toggleTIN()">🔺 삼각망 보기</button>
+      <div id="tinInfo" style="font-size:10.5px;color:var(--dim);margin-top:6px">분석을 실행하면 볼 수 있어요</div>
+    </div>
     <div class="sec" id="areaCorrSec" style="display:none">
       <div class="sec-t">③ 면적 보정</div>
       <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:7px">
@@ -834,7 +842,7 @@ function loadFiles(files){
     var totalSheets=prevNames.length;
     var label=(totalSheets>1) ? (totalSheets+'개 도엽 합침') : prevNames[0];
     applyParsed(label, merged);
-    _syncSheetInfo();
+    _syncSheetList();
     var sec=((Date.now()-t0)/1000).toFixed(1);
     _ngiiMsg('✅ '+(keep?('+'+names.length+'장 추가 → 총 '+totalSheets+'장'):(names.length+'개 도엽 합침'))
       +' · 등고선 '+merged.contours.length
@@ -978,7 +986,7 @@ function applyParsed(name, r, append){
 
   /* ★ 열린 지형도가 허가지선 위치를 덮는지 확인 (엉뚱한 도엽 방지) */
   if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
-  if(typeof _syncSheetInfo==='function') _syncSheetInfo();
+  if(typeof _syncSheetList==='function') _syncSheetList();
   if(typeof _syncBeltBtns==='function') _syncBeltBtns();
   render();
 }
@@ -2187,7 +2195,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v6.9 (2026-08-23) 좌표계 오판 방지·수동 원점 변경';
+var GDSP_VER = 'TEST v7.0 (2026-08-23) 삼각망 보기·작업범위 분석탭 이동';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2538,7 +2546,7 @@ function _syncSheetList(){
       cnt=document.getElementById('sheetCnt');
   if(!box||!list) return;
   var ns=S._sheetNames||[];
-  if(!ns.length){ box.style.display='none'; return; }
+  if(!ns.length){ box.style.display='none'; list.innerHTML=''; if(cnt) cnt.textContent='-'; return; }
   box.style.display='';
   if(cnt) cnt.textContent='✅ 올린 도엽 '+ns.length+'장';
   list.innerHTML=ns.map(function(n,i){
@@ -2551,7 +2559,8 @@ function _syncSheetList(){
 /* 지형도 전부 비우기 (허가지선은 유지) */
 function clearSheets(){
   S.contours=[]; S.surveys=[]; S.waters=[]; S.allPolys=[];
-  S._sheetNames=[]; S._rawTerrain=null; S._workRings=null; S.workDist=0;
+  S._sheetNames=[]; S._rawTerrain=null; S._workRings=null; S.workDist=0; S._allSheets=null;
+  S.showTIN=false;
   S.triList=null; S.gridCells=[]; S.avgSlope=null; S.bins=null;
   S.fileName=null;
   setDet('detCont', false, '-');
@@ -2628,39 +2637,63 @@ function bufferRings(polys, d){
   return rings;
 }
 
-/* ── 지형도 비우기 (누적된 도엽 전부 제거) ── */
-function clearTerrain(){
-  S.contours=[]; S.surveys=[]; S.waters=[]; S.allPolys=[];
-  S._rawTerrain=null; S._workRings=null; S.workDist=0; S._sheetNames=[]; S._allSheets=null;
-  S.triList=null; S.gridCells=[]; S.avgSlope=null; S.bins=null;
-  S.fileName=null;
-  setDet('detCont', false, '-');
-  setDet('detSurv', false, '-');
-  var dw=document.getElementById('detWater');
-  if(dw){ dw.className='det-row'; dw.querySelector('.ct').textContent='-'; }
-  var hs=document.getElementById('hdrStat');
-  if(hs) hs.textContent='DXF 파일을 올려주세요';
-  _syncWorkBtns();
-  _syncSheetInfo();
-  if(typeof _syncBeltBtns==='function') _syncBeltBtns();
-  _updateRunBtn();
-  if(typeof _ngiiMsg==='function') _ngiiMsg('지형도를 비웠어요','#fbbf24');
-  /* 허가지선이 있으면 거기로, 없으면 기본 화면 */
-  if(S.permit && S.permit.pts && S.permit.pts.length>=3){ _fitToPermit(); }
-  toast('지형도 비움','ok');
+/* 지형도 비우기 — clearSheets() 하나로 통합 (예전 clearTerrain 제거) */
+function clearTerrain(){ clearSheets(); }
+
+
+
+/* ══ 삼각망(TIN) 보기 ══
+   계산에 쓰인 삼각형을 그대로 보여준다. 작업범위(버퍼) 안쪽만 그려 화면이 무겁지 않게.
+   DXF 저장에도 같은 기준으로 포함된다. */
+S.showTIN = false;
+
+function toggleTIN(){
+  if(!(S.triList && S.triList.length)){ toast('먼저 분석을 실행하세요','err'); return; }
+  S.showTIN = !S.showTIN;
+  _syncTinBtn();
   render();
 }
-/* 올라간 도엽 수 표시 */
-function _syncSheetInfo(){
-  var el=document.getElementById('sheetInfo');
-  if(!el) return;
-  var n=(S._sheetNames||[]).length;
-  if(!n){ el.textContent='올라간 도엽 없음'; el.style.color='var(--dim)'; }
-  else{
-    el.textContent='도엽 '+n+'장 · 등고선 '+(S.contours?S.contours.length:0);
-    el.style.color='#4ade80';
-    el.title=(S._sheetNames||[]).join('\n');
+function _syncTinBtn(){
+  var b=document.getElementById('tinBtn'), inf=document.getElementById('tinInfo');
+  var has=!!(S.triList && S.triList.length);
+  if(b){
+    b.textContent = S.showTIN ? '🔺 삼각망 숨기기' : '🔺 삼각망 보기';
+    b.classList.toggle('active', !!S.showTIN);
+    b.disabled = !has;
   }
+  if(inf){
+    if(!has){
+      /* 작업범위를 바꾸면 등고선이 달라져 삼각망도 무효가 된다 → 다시 분석 필요 */
+      inf.textContent = (S.contours&&S.contours.length) ? '분석을 실행하면 볼 수 있어요'
+                                                       : '지형도를 올린 뒤 분석하세요';
+      inf.style.color='var(--dim)';
+      S.showTIN=false;
+    }
+    else{
+      var n=_tinInRange().length;
+      inf.textContent='삼각형 '+n.toLocaleString()+'개'+(S.workDist?(' (작업범위 '+S.workDist+'m 안)'):' (전체)');
+      inf.style.color='#4ade80';
+    }
+  }
+}
+/* 작업범위(없으면 허가지선 주변) 안쪽 삼각형만 */
+function _tinInRange(){
+  if(!(S.triList && S.triList.length)) return [];
+  var rings=S._workRings;
+  if(!rings || !rings.length){
+    /* 작업범위가 없으면 허가지선 bbox + 여유 100m */
+    if(!(S.permit && S.permit.pts)) return S.triList;
+    var b=getBounds(S.permit.pts), pad=100;
+    return S.triList.filter(function(t){
+      return t.maxX>=b.minX-pad && t.minX<=b.maxX+pad && t.maxY>=b.minY-pad && t.minY<=b.maxY+pad;
+    });
+  }
+  var bb=_ringsBBox(rings);
+  return S.triList.filter(function(t){
+    if(t.maxX<bb.mnx||t.minX>bb.mxx||t.maxY<bb.mny||t.minY>bb.mxy) return false;
+    var cx=(t.minX+t.maxX)/2, cy=(t.minY+t.maxY)/2;
+    return _inWork({x:cx,y:cy}, bb);
+  });
 }
 
 /* 작업범위 상태 */
@@ -2750,6 +2783,7 @@ function _afterWorkRange(msg){
   /* 분석 결과는 무효 — 다시 실행해야 함 */
   S.triList=null; S.gridCells=[]; S.avgSlope=null; S.bins=null;
   computeBounds(); fitView();
+  if(typeof _syncTinBtn==='function') _syncTinBtn();
   toast(msg,'ok');
   render();
 }
@@ -3421,6 +3455,23 @@ function render(){
     }
   });
 
+  /* [TEST] 삼각망(TIN) — 계산에 쓰인 삼각형 */
+  if(S.showTIN && S.triList && S.triList.length){
+    var _tris=_tinInRange();
+    ctx.save();
+    ctx.strokeStyle='rgba(148,163,184,0.42)';
+    ctx.lineWidth=0.6;
+    ctx.beginPath();
+    _tris.forEach(function(t){
+      var a=w2s(t.p0), b=w2s(t.p1), c=w2s(t.p2);
+      if((a.x<-50&&b.x<-50&&c.x<-50)||(a.x>cv.width+50&&b.x>cv.width+50&&c.x>cv.width+50)) return;
+      if((a.y<-50&&b.y<-50&&c.y<-50)||(a.y>cv.height+50&&b.y>cv.height+50&&c.y>cv.height+50)) return;
+      ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.closePath();
+    });
+    ctx.stroke();
+    ctx.restore();
+  }
+
   /* [TEST] 작업범위 경계 (파란 점선) */
   if(S._workRings && S._workRings.length){
     ctx.save();
@@ -4050,6 +4101,7 @@ function dxfHeader(){
           // 레이어 정의 (영문 — 캐드 호환)
           '0','LAYER','2','PERMIT','70','0','62','5','6','CONTINUOUS',
           '0','LAYER','2','GRID','70','0','62','8','6','CONTINUOUS',
+          '0','LAYER','2','TIN','70','0','62','8','6','CONTINUOUS',
           '0','LAYER','2','SLOPE_FILL','70','0','62','3','6','CONTINUOUS',
           '0','LAYER','2','SLOPE_DEG','70','0','62','7','6','CONTINUOUS',
           '0','LAYER','2','AREA_TABLE','70','0','62','7','6','CONTINUOUS',
@@ -4108,6 +4160,15 @@ function exportDXF(){
     var cx=(g.minX+g.maxX)/2, cy=(g.minY+g.maxY)/2;
     ent=ent.concat(dxfText(cx-2, cy-1, 1.2, g.slope.toFixed(1), 'SLOPE_DEG', 7));
   });
+  // 3-1) 삼각망(TIN) — 화면에서 켜둔 경우 같은 기준으로 저장
+  if(S.showTIN && S.triList && S.triList.length){
+    var _t=_tinInRange();
+    _t.forEach(function(t){
+      ent=ent.concat(dxfPolyline([{x:t.p0.x,y:t.p0.y},{x:t.p1.x,y:t.p1.y},{x:t.p2.x,y:t.p2.y}], 'TIN', 8, true));
+    });
+    console.log('[DXF] 삼각망 '+_t.length+'개 포함');
+  }
+
   // 4) 신청구역 경계 (빨강, 두껍게)
   ent=ent.concat(dxfPolyline(permitPts.map(function(p){return{x:p.x,y:p.y};}), 'PERMIT', 5, true));
 
@@ -4240,6 +4301,7 @@ function _runEngine(){
 
   render();
   showResult(result.avgSlope, result.bins, result.totalArea);
+  if(typeof _syncTinBtn==='function') _syncTinBtn();
   document.getElementById('legend').style.display='block';
   document.getElementById('cutSec').style.display='block';
   toast('분석 완료 ― 평균경사도 '+result.avgSlope.toFixed(2)+'°');
