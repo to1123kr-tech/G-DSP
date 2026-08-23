@@ -274,7 +274,7 @@
   <div class="logo">
     <div class="ic">🌊</div>
     재해·우수분석 <small>수계 · 유역 · 우수</small>
-    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.6 · 08-23 허가지선 업로드</span>
+    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.7 · 08-23 드롭 상자 제한</span>
   </div>
   <div class="steps">
     <div class="bookcrumb" id="bookCrumb">1. 지형도 올리기</div>
@@ -1684,6 +1684,28 @@ document.getElementById('file').addEventListener('change',function(e){
     }
   }
   /* 드래그가 어느 카드 드롭존 위인지 (없으면 null) */
+  /* [TEST] 허가지선 전용 드롭 박스 위인가 — 전체화면 오버레이를 띄우지 않기 위함 */
+  function _overPermitDrop(e){
+    var t=e.target;
+    while(t){ if(t.id==='permitDrop') return true; t=t.parentNode; }
+    return false;
+  }
+  /* 지형도 드롭존 위인가 */
+  function _overZone(e){
+    var t=e.target;
+    while(t){ if(t.id==='dropzone') return true; t=t.parentNode; }
+    return false;
+  }
+  function _hiZone(on){
+    var el=document.getElementById('dropzone');
+    if(el) el.classList.toggle('dragover', !!on);
+  }
+  function _hiPermit(on){
+    var el=document.getElementById('permitDrop');
+    if(!el) return;
+    el.style.borderColor = on ? '#38bdf8' : '';
+    el.style.background  = on ? 'rgba(56,189,248,.10)' : '';
+  }
   function _whichCardDrop(e){
     var t=e.target;
     while(t){
@@ -1714,8 +1736,13 @@ document.getElementById('file').addEventListener('change',function(e){
     if(!hasFile(e))return;
     var cd=_whichCardDrop(e);
     if(cd){ e.preventDefault(); _hiCard(cd); lay._card=cd; return; }   // 카드별 하이라이트 (전체 오버레이 X)
-    if(_overForestDrop(e)){ _hiCard(null); return; }  // 8번 페이지 나머지 = 아무 것도 안 함
-    e.preventDefault(); depth++; _setLayText(null); lay._card=null; lay.classList.add('on');  // 다른 페이지 = DXF 전체 오버레이
+    /* [TEST] 전체화면 오버레이 폐기 — 상자 위에서만 하이라이트.
+       예전엔 화면 어디든 놓으면 지형도로 들어가서 허가지선을 넣을 수가 없었다. */
+    if(_overPermitDrop(e)){ e.preventDefault(); _hiPermit(true); _hiZone(false); return; }
+    _hiPermit(false);
+    if(_overZone(e)){ e.preventDefault(); _hiZone(true); return; }
+    _hiZone(false);
+    _hiCard(null);
   });
   window.addEventListener('dragover', function(e){
     if(!hasFile(e))return;
@@ -1726,16 +1753,18 @@ document.getElementById('file').addEventListener('change',function(e){
       if(lay._card!==cd){ _hiCard(cd); lay._card=cd; }
       return;
     }
-    if(_overForestDrop(e)){ _hiCard(null); lay._card=null; return; }  // 8번서 카드 밖 = 하이라이트 해제
-    e.preventDefault();
-    if(!lay.classList.contains('on')){ _setLayText(null); lay.classList.add('on'); }
+    if(_overPermitDrop(e)){ e.preventDefault(); _hiPermit(true); _hiZone(false); return; }
+    _hiPermit(false);
+    if(_overZone(e)){ e.preventDefault(); _hiZone(true); return; }
+    _hiZone(false);
+    _hiCard(null); lay._card=null;
   });
   window.addEventListener('dragleave',function(e){
     e.preventDefault();
     /* relatedTarget = 커서가 이동해 들어간 요소. null이면 창(문서) 밖으로 나간 것 = 진짜 종료 */
     var to = e.relatedTarget;
     if(to===null || to===undefined){
-      depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);  // 카드 하이라이트도 해제
+      depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null); _hiPermit(false);  // 카드·허가지선 하이라이트 해제
       return;
     }
     /* 문서 안에서 요소 간 이동은 무시 (하이라이트/오버레이 유지) */
@@ -1744,11 +1773,12 @@ document.getElementById('file').addEventListener('change',function(e){
     /* [TEST] 허가지선 전용 박스 위에 놓은 경우 — 지형도로 새지 않게 먼저 가로챈다 */
     var _pd=e.target; while(_pd){ if(_pd.id==='permitDrop') break; _pd=_pd.parentNode; }
     if(_pd){
-      e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);
+      e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null); _hiPermit(false);
       var _f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
       if(_f && typeof loadPermitDXF==='function') loadPermitDXF(_f);
       return;
     }
+    _hiZone(false);
     var cd=_whichCardDrop(e);
     if(cd){
       e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);  // 하이라이트 해제
@@ -1763,7 +1793,11 @@ document.getElementById('file').addEventListener('change',function(e){
     }
     /* 8번 페이지 나머지 = DXF 안 받음 */
     if(_overForestDrop(e)){ e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null); return; }
-    e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);
+    /* [TEST] 지형도는 드롭존 위에 놓았을 때만 받는다.
+       예전엔 화면 어디든 놓으면 들어가서 허가지선 칸을 쓸 수가 없었다. */
+    depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null); _hiZone(false);
+    if(!_overZone(e)) return;                 /* 상자 밖 = 무시 */
+    e.preventDefault();
     var fl=e.dataTransfer&&e.dataTransfer.files;
     if(fl && fl.length>1 && typeof loadFiles==='function') loadFiles(fl);
     else if(fl && fl.length) loadDXFFile(fl[0]); });
@@ -9814,7 +9848,7 @@ window.addEventListener('message', function(ev){
 })();
 
 
-var GDSP_FLOW_VER='TEST v1.6 (2026-08-23) 허가지선 DXF 업로드 추가';
+var GDSP_FLOW_VER='TEST v1.7 (2026-08-23) 허가지선 업로드·드롭은 상자에만';
 console.log('%c[G-DSP 재해] '+GDSP_FLOW_VER,'color:#60a5fa;font-weight:700');
 
 /* ══════════════════════════════════════════════════════════════
@@ -10133,13 +10167,7 @@ function _fitToPermitFlow(){
       if(this.files && this.files[0]) loadPermitDXF(this.files[0]);
       this.value='';
     });
-    ['dragenter','dragover'].forEach(function(t){
-      drop.addEventListener(t, function(e){ e.preventDefault(); e.stopPropagation(); drop.style.borderColor='#38bdf8'; });
-    });
-    ['dragleave','drop'].forEach(function(t){
-      drop.addEventListener(t, function(e){ e.preventDefault(); e.stopPropagation(); drop.style.borderColor=''; });
-    });
-    /* drop 처리는 전역 리스너가 담당 (중복 방지) */
+    /* 드래그 하이라이트·drop 처리는 전역 리스너가 담당 (중복 방지) */
   }
   if(document.readyState==='complete') bind();
   else window.addEventListener('load', bind);
