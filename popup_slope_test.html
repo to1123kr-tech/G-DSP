@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.5 · 08-23 도엽합치기</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.6 · 08-23 도엽대기</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -2076,7 +2076,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v6.5 (2026-08-23) 여러 도엽 자동 합치기';
+var GDSP_VER = 'TEST v6.6 (2026-08-23) 도엽 전부 도착 대기 후 합치기';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2362,7 +2362,10 @@ function _fsaPickDXF(dir, since){
   });
 }
 
-/* ── 다운로드 완료 후: 새로 받은 파일이 나타날 때까지 기다렸다 열기 ── */
+/* ── 다운로드 완료 후: 새로 받은 파일이 "다 나올 때까지" 기다렸다 열기 ──
+   ★ 첫 파일을 찾자마자 열면 안 된다. INNORIX가 도엽을 순차로 저장하므로
+     허가지가 경계에 걸려 2~4장이 오는 경우 한 장만 열려 나머지 등고선이 통째로 빈다(실측).
+     → 파일 개수가 더 늘지 않을 때까지(안정될 때까지) 기다린 뒤 한꺼번에 연다. */
 function fsaAutoOpen(silent){
   return _fsaEnsure().then(function(dir){
     if(!dir){
@@ -2370,30 +2373,42 @@ function fsaAutoOpen(silent){
       else if(!silent) _ngiiMsg('폴더가 연결되지 않았어요 — [폴더 연결]을 눌러주세요','#fbbf24');
       return false;
     }
-    /* 받기 시작 시각 이후 파일만 인정 (10초 여유) */
     var since = NGII._startedAt ? (NGII._startedAt-10000) : 0;
-    var deadline = Date.now()+60000;
+    var deadline = Date.now()+120000;   /* 최대 2분 */
+    var lastN=0, stable=0;
+    var STABLE_NEED=4;                  /* 1.5초 × 4회 = 6초간 변화 없으면 완료로 봄 */
 
     function tryOnce(){
       return _fsaPickDXF(dir, since).then(function(fl){
-        if(fl && fl.length){
-          NGII._openedName=fl.map(function(x){return x.name;}).join(', ');
-          if(fl.length>1){
-            /* 도엽 경계에 걸쳐 여러 장이 온 경우 — 합쳐서 연다 */
-            _ngiiMsg('📂 도엽 '+fl.length+'장 합치는 중…','#94a3b8');
-            loadFiles(fl);
-          } else {
-            _ngiiMsg('📂 '+fl[0].name+' 여는 중…','#94a3b8');
-            _openTerrainFile(fl[0]);
+        var n = fl ? fl.length : 0;
+
+        if(n>0){
+          if(n===lastN){ stable++; } else { stable=0; lastN=n; }
+          if(stable>=STABLE_NEED){
+            NGII._openedName=fl.map(function(x){return x.name;}).join(', ');
+            if(fl.length>1){
+              _ngiiMsg('📂 도엽 '+fl.length+'장 합치는 중…','#94a3b8');
+              loadFiles(fl);
+            } else {
+              _ngiiMsg('📂 '+fl[0].name+' 여는 중…','#94a3b8');
+              _openTerrainFile(fl[0]);
+            }
+            return true;
           }
-          return true;
+          _ngiiMsg('⏳ 도엽 '+n+'장 확인됨 — 더 오는지 확인 중…','#94a3b8');
+        } else {
+          _ngiiMsg('⏳ 파일 저장 대기 중…','#94a3b8');
         }
+
         if(Date.now()>deadline){
-          /* 시간 초과 — 예전 파일을 대신 열지 않는다 */
+          if(n>0){   /* 시간 초과라도 받은 건 연다 */
+            NGII._openedName=fl.map(function(x){return x.name;}).join(', ');
+            if(fl.length>1) loadFiles(fl); else _openTerrainFile(fl[0]);
+            return true;
+          }
           _ngiiMsg('새로 받은 DXF를 못 찾았어요 — [받은 DXF 열기]로 직접 골라주세요','#fbbf24');
           return false;
         }
-        _ngiiMsg('⏳ 파일 저장 대기 중…','#94a3b8');
         return new Promise(function(res){ setTimeout(function(){ res(tryOnce()); },1500); });
       });
     }
@@ -2410,8 +2425,8 @@ function fsaAutoOpen(silent){
    수치지형도는 지역별로 평면직각좌표계 원점이 다르다.
      서부 5185(125°) · 중부 5186(127°) · 동부 5187(129°) · 동해 5188(131°)
    전부 x_0=200000 / y_0=600000 이라 숫자만 봐서는 구분이 안 된다.
-   → 도면 중심을 각 원점으로 해석해 보고, 허가지선 위치와 가장 가까운 것을 채택한다.
-     (허가지선이 없으면 "그 경도가 그 원점 담당 구역 안인지"로 판별)
+   (동부 좌표를 중부로 오독하면 약 178km 서쪽으로 밀린다 — 실측)
+   → 도면 중심을 각 원점으로 해석해 보고, 기준 위치와 가장 가까운 것을 채택한다.
    ══════════════════════════════════════════════════════════════ */
 var BELT_LON={ '5185':125, '5186':127, '5187':129, '5188':131 };
 function _beltName(e){ return ({'5185':'서부','5186':'중부','5187':'동부','5188':'동해'})[e]||e; }
@@ -2435,8 +2450,7 @@ function detectBelt(r){
   if(!c) return '5186';
 
   /* 기준 위치(5186) — 좌표만으로는 원점 구분이 불가능하다.
-     네 원점이 정확히 2°씩 떨어져 있어 어느 것으로 읽어도 '한국 안'이 되기 때문.
-     그래서 반드시 '이 도면이 어디인지' 알려주는 기준점이 필요하다. */
+     네 원점이 정확히 2°씩 떨어져 있어 어느 것으로 읽어도 '한국 안'이 되기 때문. */
   var target=null, tsrc='';
   if(S.permit && S.permit.pts && S.permit.pts.length>=3){ target=_permitCentroid(); tsrc='허가지선'; }
   if(!target && CAD.marker){ target={x:CAD.marker.x, y:CAD.marker.y}; tsrc='검색위치'; }
@@ -2455,12 +2469,10 @@ function detectBelt(r){
     if(target){
       var t5=wgs84toTm5186(ll[0],ll[1]);
       if(!t5) return;
-      score=Math.hypot(t5[0]-target.x, t5[1]-target.y);          /* 허가지선과의 거리 */
+      score=Math.hypot(t5[0]-target.x, t5[1]-target.y);
     } else {
-      /* 허가지선이 없을 때: 해석된 경도가 그 원점의 담당 구역(±1°) 안이어야 한다.
-         단순히 '중심 경도와 가까운 것'만 보면 엉뚱한 원점이 뽑힌다(실측). */
       var off=Math.abs(ll[0]-BELT_LON[e]);
-      if(off>1.3) return;                 /* 담당 구역 밖 → 후보 제외 */
+      if(off>1.3) return;
       score=off;
     }
     if(!best || score<best.score) best={epsg:e, score:score, lng:ll[0], lat:ll[1]};
@@ -2470,9 +2482,7 @@ function detectBelt(r){
   console.log('[좌표계] 판별:', 'EPSG:'+best.epsg,
               '(중심 '+best.lng.toFixed(4)+','+best.lat.toFixed(4)+
               (target?(' · '+tsrc+'과 '+Math.round(best.score)+'m'):' · 기준점 없음')+')');
-  if(!target){
-    console.log('[좌표계] ⚠ 기준 위치가 없어 원점을 확신할 수 없습니다. 허가지선을 먼저 만들면 정확해집니다.');
-  }
+  if(!target) console.log('[좌표계] ⚠ 기준 위치가 없어 원점을 확신할 수 없습니다.');
   return best.epsg;
 }
 
@@ -2483,8 +2493,8 @@ function reprojectParsed(r, fromEpsg){
   function conv(p){
     try{
       var ll=proj4('EPSG:'+fromEpsg,'WGS84',[p.x,p.y]);
-      var c=wgs84toTm5186(ll[0],ll[1]);
-      if(c){ p.x=c[0]; p.y=c[1]; n++; }
+      var cc=wgs84toTm5186(ll[0],ll[1]);
+      if(cc){ p.x=cc[0]; p.y=cc[1]; n++; }
     }catch(e){}
   }
   (r.contours||[]).forEach(function(c){ c.pts.forEach(conv); });
