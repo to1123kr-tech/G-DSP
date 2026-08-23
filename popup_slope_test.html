@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v5.6 · 08-23 자동열기</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v5.7 · 08-23 등고선인식</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -490,9 +490,26 @@ function polyArea(pts){
 }
 
 /* ---------------- DXF 파서 ---------------- */
+/* 등고선 레이어 판정 — F0017 계열 전체 + 이름에 '등고'가 들어간 레이어
+   (F0017111 주곡선 / F0017114 계곡선 / F0017121 등, 도엽마다 다름) */
+function isContourLayer(lay){
+  var L=String(lay||'').toUpperCase().trim();
+  if(!L) return false;
+  if(/^F0017/.test(L)) return true;          // 수치지형도 등고선 계열
+  if(/등고/.test(lay)) return true;           // 한글 레이어명
+  if(/^CONTOUR/i.test(L)) return true;
+  return false;
+}
+/* 표고점 레이어 판정 — F0027/H0027 계열 */
+function isElevLayer(lay){
+  var L=String(lay||'').toUpperCase().trim();
+  return /^F0027/.test(L) || /^H0027/.test(L) || /표고/.test(lay);
+}
+
 function parseDXF(text){
   var lines = text.split(/\r\n|\n/);
   var contours=[], surveys=[], texts=[], polys=[];
+  var layerStat={};   /* 진단용: 레이어별 폴리라인 수 */
   var i=0, n=lines.length;
 
   // 코드/값 페어 순회
@@ -518,22 +535,24 @@ function parseDXF(text){
     if(!cur) return;
     if(cur.type==='LWPOLYLINE' && cur.pts.length>=2){
       var lay=(cur.layer||'').toUpperCase();
+      layerStat[lay]=(layerStat[lay]||0)+1;
       var ent={layer:cur.layer, elev:cur.elev||0, pts:cur.pts, closed:!!(cur.flags&1)};
-      // 등고선
-      if(lay==='F0017111'||lay==='F0017114'){
+      // 등고선 — 레이어 코드를 두 개만 박아두면 도엽에 따라 0개가 된다(실측).
+      // 수치지형도 등고선은 F0017 계열(F0017111 주곡선, F0017114 계곡선, F0017121 등).
+      if(isContourLayer(lay)){
         contours.push(ent);
       }
       // 닫힌 폴리곤 후보 (첫=끝 근접도 닫힘 취급)
       var f=cur.pts[0], l=cur.pts[cur.pts.length-1];
       var closed = (cur.flags&1) || (Math.hypot(f.x-l.x,f.y-l.y)<5);
-      if(closed && cur.pts.length>=3 && lay!=='F0017111' && lay!=='F0017114'){
+      if(closed && cur.pts.length>=3 && !isContourLayer(lay)){
         polys.push({layer:cur.layer, pts:cur.pts, area:polyArea(cur.pts)});
       }
     }
-    else if(cur.type==='INSERT' && (cur.layer||'').toUpperCase()==='F0027217'){
+    else if(cur.type==='INSERT' && isElevLayer(cur.layer)){
       surveys.push({x:cur.ix, y:cur.iy, z:(cur.iz||0), val:null});
     }
-    else if(cur.type==='TEXT' && (cur.layer||'').toUpperCase()==='F0027132'){
+    else if(cur.type==='TEXT' && isElevLayer(cur.layer)){
       var m=/^[\d.]+/.exec((cur.text||'').trim());
       if(m) texts.push({x:cur.ix, y:cur.iy, val:parseFloat(m[0])});
     }
@@ -587,7 +606,12 @@ function parseDXF(text){
     if(best && bd<30) s.val=best.val;
   });
 
-  return {contours:contours, surveys:surveys, polys:polys};
+  /* 등고선이 0개면 어떤 레이어가 들어있었는지 콘솔에 찍는다 (도엽마다 코드가 달라서) */
+  if(!contours.length){
+    var top=Object.keys(layerStat).sort(function(a,b){return layerStat[b]-layerStat[a];}).slice(0,15);
+    console.log('[DXF] 등고선 0개 — 폴리라인 레이어 상위:', top.map(function(k){return k+'('+layerStat[k]+')';}).join(', '));
+  }
+  return {contours:contours, surveys:surveys, polys:polys, layerStat:layerStat};
 }
 
 /* ---------------- 허가지선 자동 감지 ----------------
@@ -627,15 +651,38 @@ function applyParsed(name, r){
   S.contours=r.contours;
   S.surveys=r.surveys;
   S.allPolys=r.polys;
-  S.permit=detectPermit(r.polys);
-  /* 업로드 도면에서 허가지선이 잡히면 지형도 탭 게이트도 갱신 */
-  if(S.permit){ S._permitSrc=null; NGII._lastAddr=null; NGII.autoFilled=false; }
+  /* ★ 이미 확정된 허가지선이 있으면 지형도를 열어도 유지한다.
+     지형도 DXF에는 허가지선이 없으므로 detectPermit이 null을 돌려주고,
+     그대로 대입하면 애써 만든 허가지선이 지워진다(실측). */
+  var _keepPermit = (S.permit && S.permit.pts && S.permit.pts.length>=3) ? S.permit : null;
+  var _keepParcels = S.permitParcels, _keepSrc = S._permitSrc, _keepPnus = S._permitPnus;
+  var _keepDaejang = S.daejangArea;
+
+  var _found = detectPermit(r.polys);
+  if(_keepPermit){
+    S.permit = _keepPermit;                     /* 기존 허가지선 유지 */
+    if(_found) console.log('[지형도] 도면에서도 폴리곤을 찾았지만, 확정된 허가지선을 유지합니다');
+  } else {
+    S.permit = _found;
+    if(S.permit){ S._permitSrc=null; NGII._lastAddr=null; NGII.autoFilled=false; }
+  }
   // 새 도면이므로 이전 분석/절단선 캐시 비움
   S.triList=null; S.effectivePermit=null; S.cut=null; S.cutPieces=null;
   S.gridCells=[]; S.mode='view'; S.drawPts=[]; S.ghostPt=null; S.selCut=false; S.hoverSide=null;
   S.daejangArea=null;
   var daIn=document.getElementById('daejangArea'); if(daIn) daIn.value='';
   var ci=document.getElementById('corrInfo'); if(ci) ci.style.display='none';
+
+  /* ★ 허가지선을 유지한 경우 딸린 정보(필지·PNU·대장면적)도 함께 되돌린다 */
+  if(_keepPermit){
+    S.permitParcels=_keepParcels; S._permitSrc=_keepSrc; S._permitPnus=_keepPnus;
+    S.daejangArea=_keepDaejang;
+    if(daIn && _keepDaejang) daIn.value=Math.round(_keepDaejang*100)/100;
+    var dt2=document.getElementById('detPermit');
+    if(dt2){ dt2.className='det-row ok'; dt2.querySelector('.ct').textContent='확정'; }
+    if(typeof _updatePermitPanel==='function') _updatePermitPanel(_keepSrc?_keepSrc.length:1);
+    if(typeof updateAreaCorrBase==='function') updateAreaCorrBase();
+  }
   var rb=document.getElementById('btnResetArea'); if(rb) rb.style.display='none';
   document.getElementById('cutSec').style.display='none';
   document.getElementById('cutCtrl').style.display='none';
@@ -1813,7 +1860,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v5.6 (2026-08-23) 받은 DXF 자동 열기';
+var GDSP_VER = 'TEST v5.7 (2026-08-23) 등고선 레이어 일반화·허가지선 보존';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
