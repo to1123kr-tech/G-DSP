@@ -274,10 +274,10 @@
   <div class="logo">
     <div class="ic">🌊</div>
     재해·우수분석 <small>수계 · 유역 · 우수</small>
-    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.7 · 08-23 드롭 상자 제한</span>
+    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.8 · 08-23 페이지 재구성</span>
   </div>
   <div class="steps">
-    <div class="bookcrumb" id="bookCrumb">1. 지형도 올리기</div>
+    <div class="bookcrumb" id="bookCrumb">1. 허가지선</div>
   </div>
 </header>
 
@@ -285,9 +285,9 @@
   <!-- ══ 책 목차 네비 (목차+체크+점프) ══ -->
   <nav class="booknav" id="booknav">
     <div class="bn-title">📖 작업 순서</div>
-    <button class="navitem" data-go="1" onclick="goToPage(1)"><span class="bn-no">1</span><span class="bn-nm">지형도 올리기</span><span class="bn-st"></span></button>
-    <button class="navitem" data-go="2" onclick="goToPage(2)"><span class="bn-no">2</span><span class="bn-nm">허가지선·버퍼선</span><span class="bn-st"></span></button>
-    <button class="navitem" data-go="3" onclick="goToPage(3)"><span class="bn-no">3</span><span class="bn-nm">작업범위</span><span class="bn-st"></span></button>
+    <button class="navitem" data-go="1" onclick="goToPage(1)"><span class="bn-no">1</span><span class="bn-nm">허가지선</span><span class="bn-st"></span></button>
+    <button class="navitem" data-go="2" onclick="goToPage(2)"><span class="bn-no">2</span><span class="bn-nm">지형도</span><span class="bn-st"></span></button>
+    <button class="navitem" data-go="3" onclick="goToPage(3)"><span class="bn-no">3</span><span class="bn-nm">작업범위·버퍼선</span><span class="bn-st"></span></button>
     <button class="navitem" data-go="4" onclick="goToPage(4)"><span class="bn-no">4</span><span class="bn-nm">삼각망 생성</span><span class="bn-st"></span></button>
     <button class="navitem" data-go="5" onclick="goToPage(5)"><span class="bn-no">5</span><span class="bn-nm">음영기복 (DEM)</span><span class="bn-st"></span></button>
     <button class="navitem" data-go="6" onclick="goToPage(6)"><span class="bn-no">6</span><span class="bn-nm">수계·단면</span><span class="bn-st"></span></button>
@@ -299,7 +299,7 @@
   <!-- 좌측 패널 -->
   <aside>
     <div class="sec pgsec" data-page="1">
-      <h3>지형 자료</h3>
+      <h3>허가지선 만들기</h3>
 
       <!-- ① 통합 검색 (지번·도로명·명칭) -->
       <div class="jibunWrap">
@@ -339,24 +339,21 @@
         </div>
       </div>
 
-      <!-- ★ [TEST] 허가지선 DXF 업로드 — 업체가 준 도면(허가지선만) -->
-      <div style="margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px">
-        <div style="font-size:11.5px;font-weight:700;color:var(--tx2);margin-bottom:6px">📐 허가지선 도면 올리기</div>
-        <div style="font-size:10px;color:var(--tx3);line-height:1.55;margin-bottom:8px">
-          업체가 준 <b>허가지선만 있는 DXF</b>를 여기에 올리세요.<br>
-          (아래 지형도 칸은 등고선이 있어야 열립니다)
-        </div>
-        <div id="permitDrop" onclick="document.getElementById('permitFile').click()"
-          style="border:1.5px dashed var(--line);border-radius:8px;padding:14px 8px;text-align:center;cursor:pointer;transition:.15s">
-          <div style="font-size:20px;line-height:1.2">📐</div>
-          <div style="font-size:11px;color:var(--tx2);margin-top:4px">허가지선 DXF 끌어다 놓거나<br>클릭해서 선택</div>
-        </div>
-        <input type="file" id="permitFile" accept=".dxf" style="display:none">
-        <div style="font-size:9.5px;color:var(--tx3);margin-top:6px;line-height:1.5">
-          닫힌 폴리곤 중 <b>면적이 가장 큰 것</b>을 허가지선으로 씁니다. R12 도면도 읽어요.
-        </div>
+      <!-- 허가지선 DXF 업로드 (업체가 준 도면) -->
+      <div id="permitDrop" onclick="document.getElementById('permitFile').click()"
+        title="업체가 준 허가지선 DXF · 닫힌 폴리곤 중 면적 최대 사용 · R12 가능"
+        style="margin-top:9px;border:1.5px dashed var(--line);border-radius:8px;padding:9px 10px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:9px">
+        <span style="font-size:17px;line-height:1">📐</span>
+        <span style="flex:1;min-width:0">
+          <span style="display:block;font-size:11px;color:var(--tx2);font-weight:700">허가지선 도면 올리기</span>
+          <span style="display:block;font-size:9.5px;color:var(--tx3);margin-top:1px">허가지선만 있는 DXF (끌어놓기 가능)</span>
+        </span>
       </div>
+      <input type="file" id="permitFile" accept=".dxf" style="display:none">
+    </div>
 
+    <div class="sec pgsec" data-page="2">
+      <h3>수치지형도</h3>
       <!-- ★ [TEST] 수치지형도 자동 받기 (크롬 확장 연동) — 경사도에서 이식 -->
       <div id="needPermitBox" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px">
         <div style="font-size:11.5px;color:var(--warn);line-height:1.7;margin-bottom:9px">
@@ -443,7 +440,7 @@
       </button>
     </div>
 
-    <div class="sec pgsec" data-page="2">
+    <div class="sec pgsec" data-page="1">
       <h3>허가지선 (산지전용예정지)</h3>
       <div id="polyLayerPicker" style="margin-bottom:8px"></div>
       <!-- 허가지선 선택 (DXF 폐합선 클릭) -->
@@ -495,7 +492,7 @@
     </div>
 
     <!-- 버퍼선 (허가지선 다음) -->
-    <div class="sec pgsec" data-page="2">
+    <div class="sec pgsec" data-page="3">
       <h3>🔲 버퍼선</h3>
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
         <button class="thr on" id="buf0" onclick="setBuffer(0)">끄기</button>
@@ -523,7 +520,7 @@
       <h3>📦 작업구역 (범위 자르기)</h3>
       <div style="font-size:10.5px;color:var(--tx3);line-height:1.6;margin-bottom:8px">
         원본 지형도가 넓을 때 사각형으로 분석 범위를 한정합니다.<br>
-        <b style="color:#fbbf24">허가지선·버퍼선을 모두 확인한 뒤</b> 마지막에 잡으세요.
+        <b style="color:#fbbf24">허가지선을 확인한 뒤</b> 버퍼선과 함께 잡으세요.
       </div>
       <button class="btn btn-ghost" id="btnCrop" onclick="toggleCrop()" style="font-size:12px">✂️ 작업구역 그리기</button>
       <div id="cropInfo" style="display:none;margin-top:6px">
@@ -542,7 +539,7 @@
       </div>
     </div>
 
-    <div class="sec pgsec" data-page="1" id="secRecog">
+    <div class="sec pgsec" data-page="2" id="secRecog">
       <h3>인식 결과</h3>
       <div class="info-grid">
         <div class="stat"><div class="v" id="nCont">–</div><div class="k">등고선</div></div>
@@ -6907,7 +6904,7 @@ function toast(msg,type){
 var BOOK = {
   page: 1,
   total: 10,
-  titles: ['지형도 올리기','허가지선·버퍼선','작업범위','삼각망 생성','음영기복 (DEM)',
+  titles: ['허가지선','지형도','작업범위·버퍼선','삼각망 생성','음영기복 (DEM)',
            '수계·단면','경사도','자료 겹치기','과거항공','결과 보고서']
 };
 
@@ -8098,19 +8095,10 @@ function cadUseAsPermit(){
   var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display='none';
   document.getElementById('cadDoneBar').style.display='none';
   updateNav && updateNav(); render();
-  /* [TEST] 예전엔 바로 2번으로 넘어갔지만, 이제 1번에서 지형도를 받아야 하므로 머문다.
-     (허가지선 위치로 수치지형도를 자동 다운로드 → 여기서 바로 열림) */
-  if(parcelsPolys.length>1) toast(parcelsPolys.length+'필지 → 허가지선 확정 — 아래에서 지형도를 받으세요','ok');
-  else toast('허가지선 확정 — 아래에서 수치지형도를 받으세요','ok');
-  if(!(S.contours && S.contours.length)){
-    /* 지형도가 아직 없으면 1번에 머물며 받기 섹션으로 안내 */
-    setTimeout(function(){
-      var el=document.getElementById('ngiiSec');
-      if(el && el.style.display!=='none') el.scrollIntoView({behavior:'smooth', block:'center'});
-    }, 250);
-  } else {
-    goToPage(2);   /* 이미 지형도가 있으면 예전처럼 2번으로 */
-  }
+  /* [TEST] 1 허가지선 → 2 지형도 순서. 확정하면 지형도 받으러 2번으로 넘어간다. */
+  if(parcelsPolys.length>1) toast(parcelsPolys.length+'필지 → 허가지선 확정 — 2번에서 지형도를 받으세요','ok');
+  else toast('허가지선 확정 — 2번에서 수치지형도를 받으세요','ok');
+  goToPage(2);
 }
 /* 허가지선 총 면적 (복수 필지면 합산) — ㎡ */
 function permitTotalArea(){
@@ -9848,7 +9836,7 @@ window.addEventListener('message', function(ev){
 })();
 
 
-var GDSP_FLOW_VER='TEST v1.7 (2026-08-23) 허가지선 업로드·드롭은 상자에만';
+var GDSP_FLOW_VER='TEST v1.8 (2026-08-23) 1허가지선 2지형도 3작업범위·버퍼선';
 console.log('%c[G-DSP 재해] '+GDSP_FLOW_VER,'color:#60a5fa;font-weight:700');
 
 /* ══════════════════════════════════════════════════════════════
