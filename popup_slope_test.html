@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.8 · 08-23 누적업로드</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.9 · 08-23 원점수동</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -303,6 +303,21 @@ canvas.grabbing{cursor:grabbing}
     </div>
 
     <!-- 작업범위 — 허가지선 버퍼로 계산 구역 한정 -->
+    <!-- 좌표계(원점) — 자동 판별이 틀렸을 때 직접 고침 -->
+    <div class="sec" id="beltBox" style="display:none">
+      <div class="sec-t">좌표계 원점</div>
+      <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:6px">
+        수치지형도는 지역마다 원점이 달라요.<br>위치가 엉뚱하면 여기서 바꾸세요.
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="thr" id="belt5185" onclick="setBelt('5185')">서부</button>
+        <button class="thr on" id="belt5186" onclick="setBelt('5186')">중부</button>
+        <button class="thr" id="belt5187" onclick="setBelt('5187')">동부</button>
+        <button class="thr" id="belt5188" onclick="setBelt('5188')">동해</button>
+      </div>
+      <div id="beltInfo" style="font-size:10.5px;color:var(--dim);margin-top:6px"></div>
+    </div>
+
     <div class="sec">
       <div class="sec-t">④ 작업범위</div>
       <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:6px">
@@ -964,6 +979,7 @@ function applyParsed(name, r, append){
   /* ★ 열린 지형도가 허가지선 위치를 덮는지 확인 (엉뚱한 도엽 방지) */
   if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
   if(typeof _syncSheetInfo==='function') _syncSheetInfo();
+  if(typeof _syncBeltBtns==='function') _syncBeltBtns();
   render();
 }
 
@@ -1728,6 +1744,7 @@ function _cadEnsureView(){
   if(!_cadInitProj()) return false;
   /* 지형도 없으면 화성 기준으로 기본 화면 잡기 (5186) */
   var c=wgs84toTm5186(126.84, 37.19); if(!c) return false;
+  S._viewFromUser=false;   /* ★ 기본 화면(화성)은 좌표계 판별 기준으로 쓰면 안 된다 */
   var half=1500;  // ±1.5km
   S.bounds={minX:c[0]-half,minY:c[1]-half,maxX:c[0]+half,maxY:c[1]+half};
   S.mode='pan';
@@ -1924,6 +1941,7 @@ function _gotoLngLat(lng, lat, label){
   S.oy=(cv.height-dy*S.scale)/2 - S.bounds.minY*S.scale;
   /* ★ 검색한 지번 위치 마커 — 어디를 찾았는지 화면에서 바로 보이게 */
   CAD.marker={ x:c[0], y:c[1], label:(label||'') };
+  S._viewFromUser=true;   /* 사용자가 실제 위치로 이동함 */
   var em=document.getElementById('empty'); if(em) em.style.display='none';
   if(!cadBg.on) cadBgAutoOn(); else _cadBgFetch();
   _jibunMsg('✓ '+(label||'')+' — 지적 선택을 눌러 필지를 클릭하세요','#4ade80');
@@ -2169,7 +2187,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v6.8 (2026-08-23) 도엽 누적 업로드';
+var GDSP_VER = 'TEST v6.9 (2026-08-23) 좌표계 오판 방지·수동 원점 변경';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2624,6 +2642,7 @@ function clearTerrain(){
   if(hs) hs.textContent='DXF 파일을 올려주세요';
   _syncWorkBtns();
   _syncSheetInfo();
+  if(typeof _syncBeltBtns==='function') _syncBeltBtns();
   _updateRunBtn();
   if(typeof _ngiiMsg==='function') _ngiiMsg('지형도를 비웠어요','#fbbf24');
   /* 허가지선이 있으면 거기로, 없으면 기본 화면 */
@@ -2780,7 +2799,9 @@ function detectBelt(r){
   var target=null, tsrc='';
   if(S.permit && S.permit.pts && S.permit.pts.length>=3){ target=_permitCentroid(); tsrc='허가지선'; }
   if(!target && CAD.marker){ target={x:CAD.marker.x, y:CAD.marker.y}; tsrc='검색위치'; }
-  if(!target && S.bounds && isFinite(S.bounds.minX)){
+  /* 지도 화면은 '사용자가 실제로 옮긴' 경우에만 기준으로 쓴다.
+     기본 화면(화성)을 기준 삼으면 강원 도면이 중부로 오판되어 178km 밀린다(실측). */
+  if(!target && S._viewFromUser && S.bounds && isFinite(S.bounds.minX)){
     target={x:(S.bounds.minX+S.bounds.maxX)/2, y:(S.bounds.minY+S.bounds.maxY)/2};
     tsrc='지도화면';
   }
@@ -2810,6 +2831,65 @@ function detectBelt(r){
               (target?(' · '+tsrc+'과 '+Math.round(best.score)+'m'):' · 기준점 없음')+')');
   if(!target) console.log('[좌표계] ⚠ 기준 위치가 없어 원점을 확신할 수 없습니다.');
   return best.epsg;
+}
+
+/* ── 좌표계 수동 변경 ──
+   자동 판별은 기준 위치(허가지선/검색위치)가 있어야 정확하다.
+   기준 없이 올린 경우를 위해 사용자가 직접 고를 수 있게 한다.
+   현재 데이터는 이미 5186으로 옮겨진 상태이므로,
+   "원래 원점(S._srcBelt)으로 되돌린 뒤 → 새 원점으로 다시 변환"한다. */
+function setBelt(newEpsg){
+  newEpsg=String(newEpsg);
+  var cur=String(S._srcBelt||'5186');
+  if(cur===newEpsg){ toast('이미 '+_beltName(newEpsg)+'원점이에요','ok'); _syncBeltBtns(); return; }
+  if(!_cadInitProj()) return;
+  if(!(S._allSheets && S._allSheets.contours)){ toast('먼저 지형도를 올려주세요','err'); return; }
+
+  function move(p){
+    try{
+      /* 5186 → WGS84 → (원래 원점) 원본좌표 복원 */
+      var ll1=proj4('EPSG:5186','WGS84',[p.x,p.y]);
+      var orig=proj4('WGS84','EPSG:'+cur, ll1);
+      /* 원본좌표를 새 원점으로 해석 → 5186 */
+      var ll2=proj4('EPSG:'+newEpsg,'WGS84', orig);
+      var c=wgs84toTm5186(ll2[0],ll2[1]);
+      if(c){ p.x=c[0]; p.y=c[1]; }
+    }catch(e){}
+  }
+  var A=S._allSheets;
+  (A.contours||[]).forEach(function(c){ c.pts.forEach(move); });
+  (A.waters||[]).forEach(function(c){ c.pts.forEach(move); });
+  (A.surveys||[]).forEach(move);
+  (A.polys||[]).forEach(function(pl){ pl.pts.forEach(move); });
+
+  S._srcBelt=newEpsg;
+  S.contours=A.contours.slice(); S.surveys=A.surveys.slice();
+  S.waters=(A.waters||[]).slice(); S.allPolys=(A.polys||[]).slice();
+  S._rawTerrain=null; S._workRings=null; S.workDist=0;
+  S.triList=null; S.gridCells=[]; S.avgSlope=null; S.bins=null;
+  _syncBeltBtns(); _syncWorkBtns();
+  computeBounds(); fitView();
+  if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
+  toast('좌표계를 '+_beltName(newEpsg)+'원점으로 변경','ok');
+  render();
+}
+
+function _syncBeltBtns(){
+  var box=document.getElementById('beltBox');
+  if(!box) return;
+  var has=!!(S.contours && S.contours.length);
+  box.style.display = has ? '' : 'none';
+  ['5185','5186','5187','5188'].forEach(function(e){
+    var b=document.getElementById('belt'+e);
+    if(b) b.className='thr'+(String(S._srcBelt||'5186')===e?' on':'');
+  });
+  var inf=document.getElementById('beltInfo');
+  if(inf){
+    var ok=(typeof checkTerrainCoversPermit==='function') ? checkTerrainCoversPermit() : null;
+    if(ok===false){ inf.textContent='⚠ 허가지선과 위치가 안 맞아요 — 원점을 바꿔보세요'; inf.style.color='#f87171'; }
+    else if(ok===true){ inf.textContent='✓ 허가지선 위치와 일치'; inf.style.color='#4ade80'; }
+    else { inf.textContent='허가지선을 만들면 자동으로 맞춰집니다'; inf.style.color='var(--dim)'; }
+  }
 }
 
 /* 도면 전체 좌표를 5186으로 옮긴다 (제자리 변환) */
