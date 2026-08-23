@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v5.5 · 08-22 주소정규화</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v5.6 · 08-23 자동열기</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -263,6 +263,7 @@ canvas.grabbing{cursor:grabbing}
         <button class="btn btn-pri" id="btnNgii" onclick="ngiiStart()">⬇ 수치지형도 받기</button>
         <button class="btn btn-ghost" id="btnNgiiStop" onclick="ngiiStop()" style="display:none;margin-top:5px;color:var(--err);border-color:var(--err)">■ 중지</button>
         <div id="ngiiMsg" style="font-size:10.5px;margin-top:7px;line-height:1.5;color:var(--dim)"></div>
+        <div id="fsaBox" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)"></div>
       </div>
       <div id="extMissing" style="display:none">
         <div style="font-size:11px;color:var(--warn);line-height:1.6;margin-bottom:7px">
@@ -1812,7 +1813,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v5.5 (2026-08-22) 산 중복 수정·시도명 정규화';
+var GDSP_VER = 'TEST v5.6 (2026-08-23) 받은 DXF 자동 열기';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -1935,20 +1936,182 @@ window.addEventListener('message', function(ev){
   }
 });
 
-/* 다운로드 완료 후 파일 열기 안내 (사용자 제스처 필요) */
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 받은 DXF 자동 열기 — File System Access API
+   INNORIX는 브라우저 밖에서 디스크에 쓰므로 웹은 경로를 알 수 없다.
+   대신 '다운로드\지형도' 폴더를 한 번만 허용받아 핸들을 IndexedDB에 보관하고,
+   다운로드가 끝나면 그 폴더에서 가장 최근 DXF를 찾아 자동으로 연다.
+   지원: 크롬·엣지 (HTTPS 필수). 미지원이면 기존 파일선택으로 폴백.
+   ══════════════════════════════════════════════════════════════ */
+var FSA = { dir:null, _inited:false };
+/* 로드 시점에 고정하지 않고 쓸 때 확인 (확장/폴리필이 늦게 붙는 경우 대비) */
+Object.defineProperty(FSA,'supported',{ get:function(){
+  return typeof window.showDirectoryPicker==='function' && typeof indexedDB!=='undefined';
+}});
+
+/* ── IndexedDB에 폴더 핸들 보관 ── */
+function _idb(){
+  return new Promise(function(res,rej){
+    var q=indexedDB.open('gdsp_fsa',1);
+    q.onupgradeneeded=function(){ q.result.createObjectStore('kv'); };
+    q.onsuccess=function(){ res(q.result); };
+    q.onerror=function(){ rej(q.error); };
+  });
+}
+function _idbSet(k,v){
+  return _idb().then(function(db){
+    return new Promise(function(res,rej){
+      var t=db.transaction('kv','readwrite');
+      t.objectStore('kv').put(v,k);
+      t.oncomplete=function(){ res(true); };
+      t.onerror=function(){ rej(t.error); };
+    });
+  });
+}
+function _idbGet(k){
+  return _idb().then(function(db){
+    return new Promise(function(res,rej){
+      var t=db.transaction('kv','readonly');
+      var r=t.objectStore('kv').get(k);
+      r.onsuccess=function(){ res(r.result||null); };
+      r.onerror=function(){ rej(r.error); };
+    });
+  });
+}
+
+/* ── 폴더 한 번 허용 (사용자 클릭 안에서만 호출 가능) ── */
+function fsaPickFolder(){
+  if(!FSA.supported){ _ngiiMsg('이 브라우저는 폴더 자동읽기를 지원하지 않아요 (크롬·엣지 권장)','#fbbf24'); return; }
+  window.showDirectoryPicker({ id:'gdsp_dem', mode:'read', startIn:'downloads' })
+    .then(function(h){
+      FSA.dir=h;
+      _fsaSyncUI('granted');
+      _ngiiMsg('✅ 폴더 연결됨 — 다음부터 받으면 자동으로 열립니다','#4ade80');
+      toast('폴더 연결: '+h.name,'ok');
+      /* 저장은 부가기능 — 실패해도 이번 세션은 그대로 동작한다 */
+      return _idbSet('demDir',h).catch(function(e){
+        console.log('[FSA] 핸들 저장 실패(이번 세션만 유효)', e);
+      });
+    })
+    .catch(function(e){
+      if(e && e.name==='AbortError') return;      /* 사용자가 취소 */
+      console.log('[FSA] 폴더 선택 실패', e);
+      _ngiiMsg('폴더 연결에 실패했어요','#f87171');
+    });
+}
+
+/* ── 저장된 핸들 복구 + 권한 확인 ── */
+function _fsaRestore(){
+  if(!FSA.supported) return Promise.resolve(null);
+  return _idbGet('demDir').then(function(h){
+    if(!h) return null;
+    FSA.dir=h;
+    return h.queryPermission({mode:'read'}).then(function(st){
+      _fsaSyncUI(st);
+      return st==='granted' ? h : null;
+    });
+  }).catch(function(){ return null; });
+}
+/* 권한이 prompt면 클릭 안에서 다시 요청 */
+function _fsaEnsure(){
+  if(!FSA.dir) return Promise.resolve(null);
+  return FSA.dir.queryPermission({mode:'read'}).then(function(st){
+    if(st==='granted') return FSA.dir;
+    return FSA.dir.requestPermission({mode:'read'}).then(function(st2){
+      return st2==='granted' ? FSA.dir : null;
+    });
+  }).catch(function(){ return null; });
+}
+
+/* ── 폴더에서 가장 최근 DXF 찾기 ── */
+function _fsaLatestDXF(dir){
+  var best=null;
+  return (async function(){
+    for await (var ent of dir.values()){
+      if(ent.kind!=='file') continue;
+      if(!/\.dxf$/i.test(ent.name)) continue;
+      var f=await ent.getFile();
+      if(!best || f.lastModified>best.lastModified) best=f;
+    }
+    return best;
+  })();
+}
+
+/* ── 다운로드 완료 후: 자동으로 찾아 열기 ── */
+function fsaAutoOpen(silent){
+  return _fsaEnsure().then(function(dir){
+    if(!dir){ if(!silent) _ngiiMsg('폴더가 연결되지 않았어요 — [폴더 연결]을 눌러주세요','#fbbf24'); return false; }
+    _ngiiMsg('⏳ 받은 파일 찾는 중…','#94a3b8');
+    return _fsaLatestDXF(dir).then(function(f){
+      if(!f){ _ngiiMsg('폴더에 DXF가 없어요','#fbbf24'); return false; }
+      var age=(Date.now()-f.lastModified)/1000;
+      _ngiiMsg('📂 '+f.name+' 여는 중…','#94a3b8');
+      _openTerrainFile(f);
+      if(age>600) toast('가장 최근 DXF를 열었어요 (10분 이상 지난 파일)','ok');
+      return true;
+    });
+  }).catch(function(e){
+    console.log('[FSA] 자동열기 실패', e);
+    if(!silent) _ngiiMsg('자동 열기에 실패했어요 — 직접 선택해주세요','#f87171');
+    return false;
+  });
+}
+
+/* 지형도 DXF를 기존 업로드 경로와 동일하게 처리 */
+function _openTerrainFile(file){
+  /* 업로드 경로와 완전히 동일하게 처리 — loadFile()이 파싱·자동감지까지 담당 */
+  if(typeof loadFile==='function'){ loadFile(file); return; }
+  /* 만약을 위한 폴백: input에 주입해 change 발생 */
+  try{
+    var inp=document.getElementById('fileIn');
+    var dt=new DataTransfer();
+    dt.items.add(file);
+    inp.files=dt.files;
+    inp.dispatchEvent(new Event('change',{bubbles:true}));
+  }catch(e){
+    console.log('[FSA] 파일 열기 실패', e);
+    toast('파일을 열지 못했어요 — 직접 선택해주세요','err');
+  }
+}
+
+/* ── UI 동기화 ── */
+function _fsaSyncUI(state){
+  var box=document.getElementById('fsaBox');
+  if(!box) return;
+  if(!FSA.supported){
+    box.innerHTML='<div style="font-size:10.5px;color:var(--dim);line-height:1.5">이 브라우저는 자동 열기를 지원하지 않아요. 받은 뒤 파일을 직접 선택하세요. (크롬·엣지 권장)</div>';
+    return;
+  }
+  var nm=FSA.dir?FSA.dir.name:null;
+  if(nm && state!=='denied'){
+    box.innerHTML='<div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#4ade80">'
+      +'<span>✅ 자동 열기 켜짐 · <b>'+nm+'</b> 폴더</span></div>'
+      +'<button class="btn btn-ghost" onclick="fsaPickFolder()" style="margin-top:5px;font-size:11px">폴더 바꾸기</button>';
+  } else {
+    box.innerHTML='<div style="font-size:10.5px;color:var(--dim);line-height:1.5;margin-bottom:5px">'
+      +'받은 파일을 자동으로 열려면 <b>다운로드\\지형도</b> 폴더를 한 번만 연결하세요.</div>'
+      +'<button class="btn btn-ghost" onclick="fsaPickFolder()" style="color:#8ecbff;border-color:#2f4d70">📁 폴더 연결 (1회)</button>';
+  }
+}
+
+/* 다운로드 완료 후 — 자동 열기 시도, 안 되면 직접 선택 버튼 */
 function _ngiiOfferOpen(){
   var box=document.getElementById('ngiiMsg');
   if(!box) return;
   var old=document.getElementById('ngiiOpenBtn');
   if(old) old.parentNode.removeChild(old);
-  var b=document.createElement('button');
-  b.id='ngiiOpenBtn';
-  b.className='btn btn-pri';
-  b.style.cssText='margin-top:7px;background:var(--ok)';
-  b.textContent='📂 받은 DXF 열기';
-  b.onclick=function(){ document.getElementById('fileIn').click(); };
-  box.parentNode.insertBefore(b, box.nextSibling);
-  try{ toast('다운로드 완료 — 받은 DXF를 열어주세요','ok'); }catch(e){}
+
+  fsaAutoOpen(true).then(function(ok){
+    if(ok) return;
+    var b=document.createElement('button');
+    b.id='ngiiOpenBtn';
+    b.className='btn btn-pri';
+    b.style.cssText='margin-top:7px;background:var(--ok)';
+    b.textContent='📂 받은 DXF 열기';
+    b.onclick=function(){ document.getElementById('fileIn').click(); };
+    box.parentNode.insertBefore(b, box.nextSibling);
+    try{ toast('다운로드 완료 — 받은 DXF를 열어주세요','ok'); }catch(e){}
+  });
 }
 
 /* 확장 감지: PING 보내고 하트비트(2초) 끊기면 미설치로 판단 */
@@ -2114,6 +2277,7 @@ function _hasPermit(){
 }
 function ngiiSyncGate(){
   if(!document.getElementById('ngiiP1').options.length) _ngiiFillPurpose();
+  if(!FSA._inited){ FSA._inited=true; _fsaSyncUI(); _fsaRestore(); }
   var need=document.getElementById('needPermitBox');
   var sec =document.getElementById('ngiiSec');
   var ok=_hasPermit();
