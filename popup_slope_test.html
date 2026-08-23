@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.1 · 08-23 타일보정</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.2 · 08-23 DXF판별</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -544,13 +544,25 @@ function parseDXF(text){
   }
 
   // ENTITIES 섹션 찾기
-  var inEnt=false;
-  while(i<n-1){
-    var p = next();
-    if(!p) break;
-    if(p.c===2 && p.v.trim()==='ENTITIES'){ inEnt=true; break; }
+  /* ★ 예전엔 next()로 2줄씩 짝지어 읽으며 찾았는데,
+     파일 앞부분에 줄이 하나라도 어긋나면 짝이 밀려 영영 못 찾는다(실측: 파싱 실패).
+     줄을 직접 훑어 '2' 다음 줄이 ENTITIES 인 지점을 찾는다. */
+  var entAt=-1;
+  for(var k=0;k<n-1;k++){
+    if(lines[k].trim()==='2' && lines[k+1].trim().toUpperCase()==='ENTITIES'){ entAt=k+2; break; }
   }
-  if(!inEnt){ throw new Error('ENTITIES 섹션 없음'); }
+  if(entAt<0){
+    /* 폴백: SECTION 없이 엔티티만 있는 파일도 있으므로 첫 LWPOLYLINE/POLYLINE 지점부터 */
+    for(var k2=0;k2<n-1;k2++){
+      var v2=lines[k2+1].trim().toUpperCase();
+      if(lines[k2].trim()==='0' && (v2==='LWPOLYLINE'||v2==='POLYLINE'||v2==='INSERT')){ entAt=k2; break; }
+    }
+  }
+  if(entAt<0){
+    var head=lines.slice(0,6).join(' | ').slice(0,120);
+    throw new Error('DXF 형식이 아니에요 (앞부분: '+head+')');
+  }
+  i=entAt;
 
   var cur=null; // 현재 엔티티
   /* POLYLINE의 현재 VERTEX를 확정 (x,y 유효할 때만) */
@@ -1986,7 +1998,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v6.1 (2026-08-23) 타일 이음새(동해안)·로드 상태표시';
+var GDSP_VER = 'TEST v6.2 (2026-08-23) DXF 판별 강화·ENTITIES 탐색 수정';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2201,18 +2213,53 @@ function _fsaEnsure(){
 /* ── 폴더에서 DXF 찾기 ──
    since를 주면 그 시각 이후에 만들어진 파일만 인정한다.
    (안 그러면 새 파일이 도착하기 전에 '예전에 받아둔 도엽'이 열려버린다 — 실측) */
-function _fsaLatestDXF(dir, since){
-  var best=null;
+function _fsaListDXF(dir, since){
+  var out=[];
   return (async function(){
     for await (var ent of dir.values()){
       if(ent.kind!=='file') continue;
       if(!/\.dxf$/i.test(ent.name)) continue;
       var f=await ent.getFile();
       if(since && f.lastModified < since) continue;
-      if(!best || f.lastModified>best.lastModified) best=f;
+      if(f.size < 20000) continue;             /* 20KB 미만은 지형도가 아님 */
+      out.push(f);
     }
-    return best;
+    out.sort(function(a,b){ return b.lastModified-a.lastModified; });   /* 최신순 */
+    return out;
   })();
+}
+
+/* 앞부분 64KB만 읽어 실제 DXF인지 확인
+   (같은 이름의 HTML 안내파일 2KB 등이 폴더에 섞여 있음) */
+function _sniffDXF(file){
+  /* slice/text 미지원 환경이면 검사 생략하고 통과 (자동열기 자체가 죽으면 안 됨) */
+  if(!file || typeof file.slice!=='function'){ return Promise.resolve(true); }
+  var part;
+  try{ part=file.slice(0, 65536); }catch(e){ return Promise.resolve(true); }
+  if(!part || typeof part.text!=='function'){ return Promise.resolve(true); }
+  return part.text().then(function(head){
+    var h=head.toUpperCase();
+    if(/<HTML|<!DOCTYPE/.test(h)) return false;
+    return h.indexOf('ENTITIES')>=0 || h.indexOf('SECTION')>=0 || h.indexOf('AUTOCAD')>=0;
+  }).catch(function(){ return true; });        /* 못 읽으면 일단 시도 */
+}
+
+/* 후보 중 실제 DXF인 첫 파일 (최신순) */
+function _fsaPickDXF(dir, since){
+  return _fsaListDXF(dir, since).then(function(list){
+    if(!list.length) return null;
+    var idx=0;
+    function step(){
+      if(idx>=list.length) return Promise.resolve(null);
+      var f=list[idx++];
+      return _sniffDXF(f).then(function(ok){
+        if(ok) return f;
+        console.log('[FSA] DXF가 아니라 건너뜀:', f.name);
+        return step();
+      });
+    }
+    return step();
+  });
 }
 
 /* ── 다운로드 완료 후: 새로 받은 파일이 나타날 때까지 기다렸다 열기 ── */
@@ -2224,7 +2271,7 @@ function fsaAutoOpen(silent){
     var deadline = Date.now()+60000;
 
     function tryOnce(){
-      return _fsaLatestDXF(dir, since).then(function(f){
+      return _fsaPickDXF(dir, since).then(function(f){
         if(f){
           _ngiiMsg('📂 '+f.name+' 여는 중…','#94a3b8');
           NGII._openedName=f.name;
