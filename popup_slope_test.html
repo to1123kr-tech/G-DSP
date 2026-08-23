@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v5.8 · 08-23 POLYLINE</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v5.9 · 08-23 가독성</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -289,6 +289,7 @@ canvas.grabbing{cursor:grabbing}
       <div class="det">
         <div class="det-row" id="detCont"><div class="dot"></div><div class="nm">등고선</div><div class="ct">-</div></div>
         <div class="det-row" id="detSurv"><div class="dot"></div><div class="nm">표고점</div><div class="ct">-</div></div>
+        <div class="det-row" id="detWater"><div class="dot"></div><div class="nm">수계·하천</div><div class="ct">-</div></div>
         <div class="det-row" id="detPermit"><div class="dot"></div><div class="nm">허가지선</div><div class="ct">-</div></div>
       </div>
       <button class="btn btn-ghost" id="btnRepick" onclick="startRepick()" style="margin-top:7px;display:none">허가지선 다시 잡기</button>
@@ -500,6 +501,17 @@ function isContourLayer(lay){
   if(/^CONTOUR/i.test(L)) return true;
   return false;
 }
+/* 계곡선(굵은 등고선) 판정
+   레이어 코드(F0017114)가 표준이지만 도엽마다 다를 수 있어,
+   표고가 10m 배수인지로도 판단한다. (주곡선 5m / 계곡선 10m) */
+function _isIndexContour(c){
+  var L=String(c.layer||'').toUpperCase();
+  if(L==='F0017114') return true;
+  var e=c.elev;
+  if(!isFinite(e)) return false;
+  return Math.abs(e/10 - Math.round(e/10)) < 0.02;
+}
+
 /* 수계(하천·수로) 레이어 판정 — E 계열. 재해·우수분석에서 사용 */
 function isWaterLayer(lay){
   var L=String(lay||'').toUpperCase().trim();
@@ -708,6 +720,12 @@ function loadFile(file){
 function applyParsed(name, r){
   S.fileName=name;
   S.contours=r.contours;
+  S.waters=r.waters||[];      /* 수계(E계열) — 재해·우수에서 재사용 */
+  var _dw=document.getElementById('detWater');
+  if(_dw){
+    _dw.className='det-row'+(S.waters.length?' ok':'');
+    _dw.querySelector('.ct').textContent=S.waters.length?(S.waters.length+'개'):'없음';
+  }
   S.surveys=r.surveys;
   S.allPolys=r.polys;
   /* ★ 이미 확정된 허가지선이 있으면 지형도를 열어도 유지한다.
@@ -788,7 +806,10 @@ function computeBounds(){
     var pad=80;
     minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
   } else {
+    /* [TEST] 등고선만 보면 수계·표고점이 화면 밖으로 밀려난다 — 전부 포함 */
     S.contours.forEach(function(c){ c.pts.forEach(eat); });
+    if(S.waters) S.waters.forEach(function(c){ c.pts.forEach(eat); });
+    if(S.surveys) S.surveys.forEach(eat);
   }
   S.bounds={minX:minX,minY:minY,maxX:maxX,maxY:maxY};
 }
@@ -1919,7 +1940,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v5.8 (2026-08-23) POLYLINE 등고선·수계 수집';
+var GDSP_VER = 'TEST v5.9 (2026-08-23) 표고 라벨·등고선 색구분·수계 표시';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2543,12 +2564,42 @@ function render(){
   S.contours.forEach(function(c){ if(c.elev<zmin)zmin=c.elev; if(c.elev>zmax)zmax=c.elev; });
   var zr=(zmax-zmin)||1;
 
+  /* [TEST] 수계·하천(E계열) — 등고선과 헷갈리지 않게 파란 선으로 */
+  if(S.showWater!==false && S.waters && S.waters.length){
+    ctx.save();
+    ctx.strokeStyle='#4aa8ff';
+    ctx.lineWidth=1.6;
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    S.waters.forEach(function(c){
+      if(!c.pts || c.pts.length<2) return;
+      ctx.beginPath();
+      c.pts.forEach(function(p,idx){
+        var sp=w2s(p);
+        if(idx===0)ctx.moveTo(sp.x,sp.y); else ctx.lineTo(sp.x,sp.y);
+      });
+      if(c.closed) ctx.closePath();
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  /* [TEST] 주곡선/계곡선을 색으로 확실히 구분.
+     기존엔 둘 다 회색 계열이라 굵기 차이만 있어 알아보기 어려웠음.
+     계곡선(10m마다) = 밝은 갈색, 주곡선(5m) = 청회색. */
+  var _idxLines=[];
   S.contours.forEach(function(c){
     var t=(c.elev-zmin)/zr;
-    var isIndex=(c.layer||'').toUpperCase()==='F0017114'; // 계곡선=굵게
-    var g=Math.round(70+110*t);
-    ctx.strokeStyle='rgb('+g+','+(g+8)+','+(g+22)+')';
-    ctx.lineWidth=isIndex?1.6:0.8;
+    var isIndex=_isIndexContour(c);
+    if(isIndex){
+      var b=Math.round(150+70*t);
+      ctx.strokeStyle='rgb('+b+','+Math.round(b*0.78)+','+Math.round(b*0.45)+')';  /* 갈색 */
+      ctx.lineWidth=1.9;
+      _idxLines.push(c);
+    } else {
+      var g=Math.round(78+95*t);
+      ctx.strokeStyle='rgb('+g+','+(g+10)+','+(g+26)+')';
+      ctx.lineWidth=0.9;
+    }
     ctx.beginPath();
     c.pts.forEach(function(p,idx){
       var s=w2s(p);
@@ -2558,8 +2609,33 @@ function render(){
     ctx.stroke();
   });
 
+  /* 계곡선 표고 라벨 — 선 위에 값 표시 (겹치면 건너뜀) */
+  if(S.scale>0.35 && _idxLines.length){
+    var _used=[];
+    ctx.font='bold 11px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    _idxLines.forEach(function(c){
+      if(!c.pts.length) return;
+      var mid=c.pts[Math.floor(c.pts.length/2)];
+      var sp=w2s(mid);
+      if(sp.x<24||sp.x>cv.width-24||sp.y<14||sp.y>cv.height-14) return;
+      for(var i=0;i<_used.length;i++){
+        if(Math.abs(_used[i].x-sp.x)<52 && Math.abs(_used[i].y-sp.y)<22) return;
+      }
+      _used.push(sp);
+      var tx=(Math.round(c.elev*10)/10)+'';
+      var wdt=ctx.measureText(tx).width;
+      ctx.fillStyle='rgba(8,12,20,0.82)';
+      ctx.fillRect(sp.x-wdt/2-3, sp.y-8, wdt+6, 16);
+      ctx.fillStyle='#f0b775';
+      ctx.fillText(tx, sp.x, sp.y);
+    });
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  }
+
   // ── 표고점 (✕ + 값)
-  ctx.font='10px sans-serif';
+  /* [TEST] 라벨 임계 1.2 → 0.30 으로 낮춤. 예전엔 많이 확대해야 숫자가 보였음.
+     어두운 배경 박스를 깔아 등고선 위에서도 읽히게 함. */
   S.surveys.forEach(function(s){
     var p=w2s(s);
     if(p.x<-20||p.x>cv.width+20||p.y<-20||p.y>cv.height+20)return;
@@ -2569,9 +2645,15 @@ function render(){
     ctx.moveTo(p.x-4,p.y-4);ctx.lineTo(p.x+4,p.y+4);
     ctx.moveTo(p.x+4,p.y-4);ctx.lineTo(p.x-4,p.y+4);
     ctx.stroke();
-    if(s.val!==null && S.scale>1.2){
-      ctx.fillStyle='#fbbf24';
-      ctx.fillText(s.val.toFixed(1), p.x+6, p.y-5);
+    var val=(s.val!==null && s.val!==undefined) ? s.val : (isFinite(s.z)&&s.z ? s.z : null);
+    if(val!==null && S.scale>0.30){
+      var tx=val.toFixed(1);
+      ctx.font='bold 11px sans-serif';
+      var wdt=ctx.measureText(tx).width;
+      ctx.fillStyle='rgba(8,12,20,0.78)';
+      ctx.fillRect(p.x+5, p.y-15, wdt+5, 14);
+      ctx.fillStyle='#ffd25e';
+      ctx.fillText(tx, p.x+7, p.y-5);
     }
   });
 
