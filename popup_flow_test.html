@@ -130,6 +130,7 @@
     padding:13px 12px;text-align:center;cursor:pointer;transition:.16s}
   .dropzone:hover{border-color:var(--accent);background:rgba(56,189,248,.06)}
   .dropzone.dragover{border-color:var(--accent);background:rgba(56,189,248,.12)}
+  #permitDrop:hover{border-color:var(--accent);background:rgba(56,189,248,.06)}
   .dropzone .dz-ic{font-size:20px;opacity:.85;margin-bottom:3px}
   .dropzone .dz-t{font-size:11px;color:var(--tx3);line-height:1.45}
   .dropzone .dz-t b{color:var(--tx2)}
@@ -274,7 +275,7 @@
   <div class="logo">
     <div class="ic">🌊</div>
     재해·우수분석 <small>수계 · 유역 · 우수</small>
-    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.8 · 08-23 페이지 재구성</span>
+    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.9 · 08-23 완료표시 수정</span>
   </div>
   <div class="steps">
     <div class="bookcrumb" id="bookCrumb">1. 허가지선</div>
@@ -342,12 +343,13 @@
       <!-- 허가지선 DXF 업로드 (업체가 준 도면) -->
       <div id="permitDrop" onclick="document.getElementById('permitFile').click()"
         title="업체가 준 허가지선 DXF · 닫힌 폴리곤 중 면적 최대 사용 · R12 가능"
-        style="margin-top:9px;border:1.5px dashed var(--line);border-radius:8px;padding:9px 10px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:9px">
-        <span style="font-size:17px;line-height:1">📐</span>
-        <span style="flex:1;min-width:0">
-          <span style="display:block;font-size:11px;color:var(--tx2);font-weight:700">허가지선 도면 올리기</span>
-          <span style="display:block;font-size:9.5px;color:var(--tx3);margin-top:1px">허가지선만 있는 DXF (끌어놓기 가능)</span>
-        </span>
+        style="margin-top:11px;border:2px dashed var(--line);border-radius:10px;background:rgba(14,22,38,.4);padding:18px 14px;text-align:center;cursor:pointer;transition:.16s">
+        <div style="font-size:26px;line-height:1.1;opacity:.9">📐</div>
+        <div style="font-size:12px;color:var(--tx2);font-weight:700;margin-top:6px">허가지선 도면 올리기</div>
+        <div style="font-size:10.5px;color:var(--tx3);margin-top:4px;line-height:1.5">
+          업체가 준 <b style="color:var(--tx2)">허가지선만 있는 DXF</b><br>끌어다 놓거나 클릭해서 선택
+        </div>
+        <div style="font-size:9.5px;color:var(--tx3);margin-top:6px;opacity:.8">닫힌 폴리곤 중 면적 최대 · R12 가능</div>
       </div>
       <input type="file" id="permitFile" accept=".dxf" style="display:none">
     </div>
@@ -7832,9 +7834,12 @@ function goToPage(n){
 function updateNav(){
   /* 각 페이지 "완료" 조건 — 검증된 상태값만 사용 */
   var done = {
-    1: !!(S.contours && (S.contours.length>0 || (S.surveys && S.surveys.length>0))),
-    2: !!(S.permit && S.permit.length>0),
-    3: !!S.cropRect,
+    /* [TEST] 페이지 재구성에 맞춤 — 1 허가지선 / 2 지형도 / 3 작업범위·버퍼선.
+       예전엔 1=지형도, 2=허가지선이라 허가지선을 넣으면 지형도가 완료로 표시됐다. */
+    1: !!(typeof _permitPtsFlow==='function' ? _permitPtsFlow()
+         : (S.permit && (S.permit.length>=3 || (S.permit.pts && S.permit.pts.length>=3)))),
+    2: !!(S.contours && (S.contours.length>0 || (S.surveys && S.surveys.length>0))),
+    3: !!(S.cropRect || (S.bufferDist>0)),
     4: !!(S.triList && S.triList.length>0),
     5: !!S.dem,
     6: !!(S.flow || S.watershed),
@@ -9836,7 +9841,7 @@ window.addEventListener('message', function(ev){
 })();
 
 
-var GDSP_FLOW_VER='TEST v1.8 (2026-08-23) 1허가지선 2지형도 3작업범위·버퍼선';
+var GDSP_FLOW_VER='TEST v1.9 (2026-08-23) 완료표시 순서 수정·허가지선 박스 확대';
 console.log('%c[G-DSP 재해] '+GDSP_FLOW_VER,'color:#60a5fa;font-weight:700');
 
 /* ══════════════════════════════════════════════════════════════
