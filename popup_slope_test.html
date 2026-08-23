@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.0 · 08-23 위치검증</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.1 · 08-23 타일보정</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -703,18 +703,44 @@ function detectPermit(polys){
 function loadFile(file){
   if(!/\.dxf$/i.test(file.name)){ toast('DXF 파일만 가능해요','err'); return; }
   document.getElementById('hdrStat').textContent='읽는 중...';
+  var mb=(file.size/1048576).toFixed(1);
+  if(typeof _ngiiMsg==='function') _ngiiMsg('📖 '+file.name+' 읽는 중… ('+mb+'MB)','#94a3b8');
+
   var fr=new FileReader();
+  fr.onerror=function(){
+    toast('파일을 읽지 못했어요','err');
+    document.getElementById('hdrStat').textContent='오류';
+    if(typeof _ngiiMsg==='function') _ngiiMsg('❌ 파일을 읽지 못했어요','#f87171');
+  };
   fr.onload=function(){
     var text;
     try{ text=new TextDecoder('utf-8',{fatal:true}).decode(fr.result); }
     catch(e){ text=new TextDecoder('euc-kr').decode(fr.result); }
-    try{
-      var r=parseDXF(text);
-      applyParsed(file.name, r);
-    }catch(err){
-      toast('파싱 실패: '+err.message,'err');
-      document.getElementById('hdrStat').textContent='오류';
-    }
+
+    /* 큰 파일은 파싱이 수 초 걸린다 — 화면에 상태를 먼저 그린 뒤 처리 */
+    if(typeof _ngiiMsg==='function') _ngiiMsg('⏳ 도면 해석 중… ('+mb+'MB, 잠시만요)','#94a3b8');
+    document.getElementById('hdrStat').textContent='해석 중...';
+    setTimeout(function(){
+      var t0=Date.now();
+      try{
+        var r=parseDXF(text);
+        applyParsed(file.name, r);
+        var sec=((Date.now()-t0)/1000).toFixed(1);
+        if(typeof _ngiiMsg==='function'){
+          if(r.contours && r.contours.length){
+            _ngiiMsg('✅ 등고선 '+r.contours.length+' · 표고점 '+r.surveys.length
+              +(r.waters&&r.waters.length?(' · 수계 '+r.waters.length):'')+' ('+sec+'초)','#4ade80');
+          } else {
+            _ngiiMsg('⚠ 등고선을 못 찾았어요 — 콘솔(F12)의 [DXF] 줄을 확인해주세요','#fbbf24');
+          }
+        }
+      }catch(err){
+        console.log('[DXF] 파싱 실패', err);
+        toast('파싱 실패: '+err.message,'err');
+        document.getElementById('hdrStat').textContent='오류';
+        if(typeof _ngiiMsg==='function') _ngiiMsg('❌ 파싱 실패: '+err.message,'#f87171');
+      }
+    }, 60);
   };
   fr.readAsArrayBuffer(file);
 }
@@ -1488,17 +1514,25 @@ function drawCadBg(){
   ctx.restore();
 }
 function _cadBgBlit(e, img){
-  var tl5=wgs84toTm5186(e.tl[0],e.tl[1]), br5=wgs84toTm5186(e.br[0],e.br[1]);
-  if(!tl5||!br5) return;
-  var a=w2s({x:tl5[0],y:tl5[1]}), b=w2s({x:br5[0],y:br5[1]});
-  var x0=Math.min(a.x,b.x), y0=Math.min(a.y,b.y), x1=Math.max(a.x,b.x), y1=Math.max(a.y,b.y);
-  if((x1-x0)<0.5||(y1-y0)<0.5) return;
-  /* ★ 검은 이음새 제거 (실측 원인)
+  /* ★ 타일 검은 줄(이음새) 제거 — 네 모서리를 모두 변환해 감싸는 사각형에 그린다.
      타일 아래모서리는 (x+1,y+1), 아래 타일 위모서리는 (x,y+1)로 계산되는데
-     EPSG:5186(횡메르카토르)은 같은 위도라도 경도가 다르면 N값이 달라진다.
-     z18 기준 약 0.117m(≈0.25px) 어긋나고, 더 확대하면 1px을 넘어 검은 줄이 된다.
-     → 시작점은 floor, 끝점은 ceil + 여유 1px 오버드로우로 항상 이웃과 겹치게 한다.
-     (뒤에 그려지는 이웃 타일이 겹친 부분을 덮으므로 화질 손상 없음) */
+     EPSG:5186은 횡메르카토르라 같은 위도라도 경도가 다르면 N값이 달라진다.
+     오차는 중앙자오선(127°)에서 멀수록 커진다 — 실측:
+        화성(126.9°) 0.115m ≈ 0.2px  /  강릉(128.9°) 2.43m ≈ 5.1px
+     두 모서리만 쓰고 1px 여유를 주던 방식으론 동해안에서 굵은 검은 띠가 생긴다. */
+  var lng0=e.tl[0], lat0=e.tl[1], lng1=e.br[0], lat1=e.br[1];
+  var c=[ wgs84toTm5186(lng0,lat0), wgs84toTm5186(lng1,lat1),
+          wgs84toTm5186(lng0,lat1), wgs84toTm5186(lng1,lat0) ];
+  var xs=[], ys=[];
+  for(var k=0;k<4;k++){
+    if(!c[k]) return;
+    var sp=w2s({x:c[k][0], y:c[k][1]});
+    xs.push(sp.x); ys.push(sp.y);
+  }
+  var x0=Math.min.apply(null,xs), x1=Math.max.apply(null,xs);
+  var y0=Math.min.apply(null,ys), y1=Math.max.apply(null,ys);
+  if((x1-x0)<0.5||(y1-y0)<0.5) return;
+  /* 시작은 내림, 끝은 올림 + 1px 여유 → 이웃 타일과 항상 겹치게 (겹친 부분은 덮어써짐) */
   var xr=Math.floor(x0), yr=Math.floor(y0);
   var wr=Math.ceil(x1)-xr+1, hr=Math.ceil(y1)-yr+1;
   if(wr<1) wr=1; if(hr<1) hr=1;
@@ -1952,7 +1986,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v6.0 (2026-08-23) 새 파일만 열기·위치검증·지도토글';
+var GDSP_VER = 'TEST v6.1 (2026-08-23) 타일 이음새(동해안)·로드 상태표시';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
