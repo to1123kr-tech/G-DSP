@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v5.9 · 08-23 가독성</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.0 · 08-23 위치검증</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -243,7 +243,8 @@ canvas.grabbing{cursor:grabbing}
       <div class="sec-t">① 수치지형도 받기</div>
       <div id="permitAddrBox" style="background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin-bottom:8px">
         <div style="font-size:10px;color:var(--dim);margin-bottom:3px">허가지선 위치</div>
-        <div id="permitAddrTx" style="font-size:11.5px;color:#facc15;font-weight:700;line-height:1.4">-</div>
+        <div id="permitAddrTx" title="-"
+          style="font-size:11.5px;color:#facc15;font-weight:700;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">-</div>
       </div>
       <div id="extBox">
         <div style="font-size:10px;color:var(--dim);margin-bottom:4px">검색할 지번 (필요하면 고치세요)</div>
@@ -385,6 +386,7 @@ canvas.grabbing{cursor:grabbing}
       <button onclick="zoomBy(1.3)" title="확대">＋</button>
       <button onclick="zoomBy(1/1.3)" title="축소">－</button>
       <button onclick="fitView()" title="화면 맞춤">⛶</button>
+      <button id="cvBgBtn" onclick="toggleCadBg()" title="지도·지적 배경 켜기/끄기">🗺</button>
     </div>
     <div class="legend" id="legend">
       <div class="lg-row"><div class="sw" style="background:#ef4444;height:3px"></div>허가지선</div>
@@ -786,8 +788,11 @@ function applyParsed(name, r){
     name + ' · 등고선 ' + S.contours.length + ' · 표고점 ' + S.surveys.length;
 
   if(!S.permit) toast('허가지선(닫힌 폴리곤)을 못 찾았어요','err');
-  else if(!S.contours.length) toast('등고선(F0017111/F0017114)이 없어요','err');
+  else if(!S.contours.length) toast('등고선을 못 찾았어요 (F0017 계열)','err');
   else toast('자동 감지 완료 — 분석 실행을 눌러주세요');
+
+  /* ★ 열린 지형도가 허가지선 위치를 덮는지 확인 (엉뚱한 도엽 방지) */
+  if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
   render();
 }
 
@@ -1286,6 +1291,13 @@ function toggleCadBg(){
   if(cadBg.on) _cadBgFetch(); else render();
 }
 function _cadBgSyncBtn(){
+  /* 캔버스 위 지도 토글 버튼 — 탭과 무관하게 항상 접근 가능 */
+  var cb=document.getElementById('cvBgBtn');
+  if(cb){
+    cb.textContent = cadBg.on ? '🗺' : '🚫';
+    cb.title = cadBg.on ? '지도 배경 끄기' : '지도 배경 켜기';
+    cb.style.opacity = cadBg.on ? '1' : '0.55';
+  }
   var b=document.getElementById('cadBgBtn'); if(b){ b.classList.toggle('active',cadBg.on); b.textContent=cadBg.on?'🗺 지도 배경 끄기':'🗺 지도·지적 배경'; }
   var sl=document.getElementById('cadBgCtrl'); if(sl) sl.style.display=cadBg.on?'':'none';
 }
@@ -1940,7 +1952,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v5.9 (2026-08-23) 표고 라벨·등고선 색구분·수계 표시';
+var GDSP_VER = 'TEST v6.0 (2026-08-23) 새 파일만 열기·위치검증·지도토글';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2014,6 +2026,8 @@ function ngiiStart(){
   var addr=(document.getElementById('ngiiAddr').value||'').trim();
   if(!addr){ _ngiiMsg('지번을 입력하세요','#f87171'); return; }
   if(!NGII.purpose1 || !NGII.purpose2){ _ngiiMsg('사용 목적을 선택하세요','#f87171'); return; }
+  NGII._startedAt=Date.now();   /* 이 시각 이후 저장된 파일만 '새 파일'로 인정 */
+  NGII._openedName=null;
   _ngiiRunning(true);
   _ngiiMsg('확장에 요청 보냄 — 국토정보플랫폼 탭이 열립니다','#94a3b8');
   _ngiiSend({ type:'START', addr:addr, scale:NGII.scale, purpose1:NGII.purpose1, purpose2:NGII.purpose2 });
@@ -2150,38 +2164,84 @@ function _fsaEnsure(){
   }).catch(function(){ return null; });
 }
 
-/* ── 폴더에서 가장 최근 DXF 찾기 ── */
-function _fsaLatestDXF(dir){
+/* ── 폴더에서 DXF 찾기 ──
+   since를 주면 그 시각 이후에 만들어진 파일만 인정한다.
+   (안 그러면 새 파일이 도착하기 전에 '예전에 받아둔 도엽'이 열려버린다 — 실측) */
+function _fsaLatestDXF(dir, since){
   var best=null;
   return (async function(){
     for await (var ent of dir.values()){
       if(ent.kind!=='file') continue;
       if(!/\.dxf$/i.test(ent.name)) continue;
       var f=await ent.getFile();
+      if(since && f.lastModified < since) continue;
       if(!best || f.lastModified>best.lastModified) best=f;
     }
     return best;
   })();
 }
 
-/* ── 다운로드 완료 후: 자동으로 찾아 열기 ── */
+/* ── 다운로드 완료 후: 새로 받은 파일이 나타날 때까지 기다렸다 열기 ── */
 function fsaAutoOpen(silent){
   return _fsaEnsure().then(function(dir){
     if(!dir){ if(!silent) _ngiiMsg('폴더가 연결되지 않았어요 — [폴더 연결]을 눌러주세요','#fbbf24'); return false; }
-    _ngiiMsg('⏳ 받은 파일 찾는 중…','#94a3b8');
-    return _fsaLatestDXF(dir).then(function(f){
-      if(!f){ _ngiiMsg('폴더에 DXF가 없어요','#fbbf24'); return false; }
-      var age=(Date.now()-f.lastModified)/1000;
-      _ngiiMsg('📂 '+f.name+' 여는 중…','#94a3b8');
-      _openTerrainFile(f);
-      if(age>600) toast('가장 최근 DXF를 열었어요 (10분 이상 지난 파일)','ok');
-      return true;
-    });
+    /* 받기 시작 시각 이후 파일만 인정 (10초 여유) */
+    var since = NGII._startedAt ? (NGII._startedAt-10000) : 0;
+    var deadline = Date.now()+60000;
+
+    function tryOnce(){
+      return _fsaLatestDXF(dir, since).then(function(f){
+        if(f){
+          _ngiiMsg('📂 '+f.name+' 여는 중…','#94a3b8');
+          NGII._openedName=f.name;
+          _openTerrainFile(f);
+          return true;
+        }
+        if(Date.now()>deadline){
+          /* 시간 초과 — 예전 파일을 대신 열지 않는다 */
+          _ngiiMsg('새로 받은 DXF를 못 찾았어요 — [받은 DXF 열기]로 직접 골라주세요','#fbbf24');
+          return false;
+        }
+        _ngiiMsg('⏳ 파일 저장 대기 중…','#94a3b8');
+        return new Promise(function(res){ setTimeout(function(){ res(tryOnce()); },1500); });
+      });
+    }
+    return tryOnce();
   }).catch(function(e){
     console.log('[FSA] 자동열기 실패', e);
     if(!silent) _ngiiMsg('자동 열기에 실패했어요 — 직접 선택해주세요','#f87171');
     return false;
   });
+}
+
+/* ── 열린 지형도가 허가지선 위치를 덮는지 검증 ──
+   엉뚱한 도엽이 열리면 경사도 계산이 통째로 틀어지므로 반드시 확인한다. */
+function checkTerrainCoversPermit(){
+  if(!(S.permit && S.permit.pts && S.permit.pts.length>=3)) return null;
+  if(!(S.contours && S.contours.length)) return null;
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+  S.contours.forEach(function(c){
+    c.pts.forEach(function(p){
+      if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+      if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y;
+    });
+  });
+  var c0=_permitCentroid();
+  if(!c0) return null;
+  /* 여유 500m — 허가지선이 도엽 가장자리에 걸치거나 등고선이 성긴 지역이면
+     중심이 살짝 밖으로 나올 수 있다. 명백히 다른 도엽(수 km)만 걸러내는 것이 목적. */
+  var PAD=500;
+  var inside = (c0.x>=mnx-PAD && c0.x<=mxx+PAD && c0.y>=mny-PAD && c0.y<=mxy+PAD);
+  if(!inside){
+    var dx=Math.max(mnx-c0.x, c0.x-mxx, 0), dy=Math.max(mny-c0.y, c0.y-mxy, 0);
+    var dist=Math.round(Math.hypot(dx,dy));
+    var msg='⚠ 이 지형도는 허가지선 위치가 아니에요 (약 '+dist.toLocaleString()+'m 떨어짐)';
+    _ngiiMsg(msg+' — 다른 파일을 열어주세요','#f87171');
+    try{ toast('엉뚱한 도엽입니다 — '+dist.toLocaleString()+'m 떨어져 있어요','err'); }catch(e){}
+    console.log('[검증] 허가지선 중심', c0, '지형도 범위', {mnx:mnx,mny:mny,mxx:mxx,mxy:mxy});
+    return false;
+  }
+  return true;
 }
 
 /* 지형도 DXF를 기존 업로드 경로와 동일하게 처리 */
@@ -2417,7 +2477,9 @@ function ngiiSyncGate(){
   if(tx){
     var area=_permitTotalArea();
     var nm=(NGII._lastAddr || (CAD.marker&&CAD.marker.label) || (S.permit.layer||'허가지선'));
-    tx.textContent=nm+'  ·  '+area.toFixed(0)+'㎡';
+    var full=nm+'  ·  '+area.toFixed(0)+'㎡';
+    tx.textContent=full;
+    tx.title=full;              /* 잘리면 마우스를 올려 전체 확인 */
   }
   ngiiFillAddrFromPermit();
 }
