@@ -275,7 +275,7 @@
   <div class="logo">
     <div class="ic">🌊</div>
     재해·우수분석 <small>수계 · 유역 · 우수</small>
-    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v2.1 · 08-23 산림청 3개 수신</span>
+    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v2.2 · 08-23 결과 경량화</span>
   </div>
   <div class="steps">
     <div class="bookcrumb" id="bookCrumb">1. 허가지선</div>
@@ -7380,6 +7380,15 @@ function forestStartPolling(sec){
          마지막 자료가 들어온 뒤 8초간 조용하면 끝난 것으로 본다. */
       forestApply(j.results, j.errors);
       until = Date.now() + 8000;                              // 도착할 때마다 시간 연장
+
+      /* ★ 3종이 다 들어왔으면 8초를 더 기다릴 이유가 없다.
+         ⚠ 반드시 세 개 모두(&&) 확인할 것 — 예전에 첫 자료에서 멈춰
+            3건 중 1건만 들어오던 버그가 있었다. */
+      var _ov = DATA8.overlays;
+      if(_ov.forest_sansatae && _ov.forest_imsang && _ov.forest_toyang){
+        clearInterval(_forestPollTimer);
+        _dmsg('forestMsg','✅ 산림청 자료 3건 모두 적용됨','ok');
+      }
     }).catch(function(){});
   }, 1500);
 }
@@ -9983,7 +9992,7 @@ window.addEventListener('message', function(ev){
 })();
 
 
-var GDSP_FLOW_VER='TEST v2.1 (2026-08-23) 산림청 자료 3개 모두 수신(경합 수정)';
+var GDSP_FLOW_VER='TEST v2.2 (2026-08-23) 결과 경량화·3건 모이면 즉시 종료';
 console.log('%c[G-DSP 재해] '+GDSP_FLOW_VER,'color:#60a5fa;font-weight:700');
 
 /* ══════════════════════════════════════════════════════════════

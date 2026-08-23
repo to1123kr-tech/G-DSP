@@ -2427,7 +2427,11 @@ def _fgis_safe(v):
 def _fgis_reproj(geom, T):
     gtype=geom['type']; coords=geom['coordinates']
     def pt(xy):
-        lng,lat=T.transform(xy[0],xy[1]); return [lng,lat]
+        lng,lat=T.transform(xy[0],xy[1])
+        # ★ 소수 6자리로 자른다 (약 11cm) — 지도에 겹쳐 그리는 데는 차고 넘친다.
+        #   반올림 없이 보내면 127.00403092732337 처럼 17자리가 붙어
+        #   임상 202건 + 토양 251건 기준 결과가 2.7MB 까지 커진다(실측).
+        return [round(lng,6), round(lat,6)]
     def ring(r): return [pt(c) for c in r]
     if gtype=='Point': new=pt(coords)
     elif gtype in ('LineString','MultiPoint'): new=ring(coords)
