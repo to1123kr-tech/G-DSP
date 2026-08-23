@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.2 · 08-23 DXF판별</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.3 · 08-23 좌표계자동</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -736,12 +736,20 @@ function loadFile(file){
       var t0=Date.now();
       try{
         var r=parseDXF(text);
+        /* ★ 원점(벨트) 자동 판별 → 캔버스 좌표계(5186)로 변환 */
+        var belt=detectBelt(r);
+        S._srcBelt=belt;
+        if(belt!=='5186'){
+          var cnt=reprojectParsed(r, belt);
+          console.log('[좌표계] EPSG:'+belt+' → 5186 변환:', cnt+'점');
+        }
         applyParsed(file.name, r);
         var sec=((Date.now()-t0)/1000).toFixed(1);
         if(typeof _ngiiMsg==='function'){
           if(r.contours && r.contours.length){
+            var beltTx=(S._srcBelt && S._srcBelt!=='5186') ? (' · 원점 '+_beltName(S._srcBelt)+'→중부 변환') : '';
             _ngiiMsg('✅ 등고선 '+r.contours.length+' · 표고점 '+r.surveys.length
-              +(r.waters&&r.waters.length?(' · 수계 '+r.waters.length):'')+' ('+sec+'초)','#4ade80');
+              +(r.waters&&r.waters.length?(' · 수계 '+r.waters.length):'')+' ('+sec+'초)'+beltTx,'#4ade80');
           } else {
             _ngiiMsg('⚠ 등고선을 못 찾았어요 — 콘솔(F12)의 [DXF] 줄을 확인해주세요','#fbbf24');
           }
@@ -1038,7 +1046,17 @@ S.permitMerge = true;
 function _cadInitProj(){
   if(typeof proj4==='undefined') return false;
   if(!proj4.defs['EPSG:5186']){
-    try{ proj4.defs('EPSG:5186','+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'); }catch(e){ return false; }
+    try{
+      /* 한국 평면직각좌표계 4개 원점 — 수치지형도는 지역에 따라 원점이 다르다.
+         서부 5185(125°) / 중부 5186(127°) / 동부 5187(129°) / 동해 5188(131°)
+         캔버스는 5186 고정이므로, 다른 원점 도면은 읽은 뒤 5186으로 변환해야 한다.
+         (동부 좌표를 중부로 오독하면 약 178km 서쪽으로 밀린다 — 실측) */
+      var _BELTS={ '5185':125, '5186':127, '5187':129, '5188':131 };
+      for(var _e in _BELTS){
+        proj4.defs('EPSG:'+_e, '+proj=tmerc +lat_0=38 +lon_0='+_BELTS[_e]
+          +' +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+      }
+    }catch(e){ return false; }
   }
   return true;
 }
@@ -1998,7 +2016,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v6.2 (2026-08-23) DXF 판별 강화·ENTITIES 탐색 수정';
+var GDSP_VER = 'TEST v6.3 (2026-08-23) 좌표계 원점 자동판별(서부·중부·동부·동해)';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2293,6 +2311,95 @@ function fsaAutoOpen(silent){
     if(!silent) _ngiiMsg('자동 열기에 실패했어요 — 직접 선택해주세요','#f87171');
     return false;
   });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 수치지형도 원점(벨트) 자동 판별 → 캔버스 좌표계(5186)로 변환
+   수치지형도는 지역별로 평면직각좌표계 원점이 다르다.
+     서부 5185(125°) · 중부 5186(127°) · 동부 5187(129°) · 동해 5188(131°)
+   전부 x_0=200000 / y_0=600000 이라 숫자만 봐서는 구분이 안 된다.
+   → 도면 중심을 각 원점으로 해석해 보고, 허가지선 위치와 가장 가까운 것을 채택한다.
+     (허가지선이 없으면 "그 경도가 그 원점 담당 구역 안인지"로 판별)
+   ══════════════════════════════════════════════════════════════ */
+var BELT_LON={ '5185':125, '5186':127, '5187':129, '5188':131 };
+function _beltName(e){ return ({'5185':'서부','5186':'중부','5187':'동부','5188':'동해'})[e]||e; }
+
+function _dxfCenter(r){
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18,n=0;
+  function eat(p){ if(!p)return; n++;
+    if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+    if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y; }
+  (r.contours||[]).forEach(function(c){ c.pts.forEach(eat); });
+  (r.surveys||[]).forEach(eat);
+  (r.waters||[]).forEach(function(c){ c.pts.forEach(eat); });
+  if(!n) return null;
+  return { x:(mnx+mxx)/2, y:(mny+mxy)/2, minX:mnx, minY:mny, maxX:mxx, maxY:mxy };
+}
+
+/* 도면 좌표계를 판별해 EPSG 코드 문자열 반환 (판별 실패 시 '5186') */
+function detectBelt(r){
+  if(!_cadInitProj()) return '5186';
+  var c=_dxfCenter(r);
+  if(!c) return '5186';
+
+  /* 기준 위치(5186) — 좌표만으로는 원점 구분이 불가능하다.
+     네 원점이 정확히 2°씩 떨어져 있어 어느 것으로 읽어도 '한국 안'이 되기 때문.
+     그래서 반드시 '이 도면이 어디인지' 알려주는 기준점이 필요하다. */
+  var target=null, tsrc='';
+  if(S.permit && S.permit.pts && S.permit.pts.length>=3){ target=_permitCentroid(); tsrc='허가지선'; }
+  if(!target && CAD.marker){ target={x:CAD.marker.x, y:CAD.marker.y}; tsrc='검색위치'; }
+  if(!target && S.bounds && isFinite(S.bounds.minX)){
+    target={x:(S.bounds.minX+S.bounds.maxX)/2, y:(S.bounds.minY+S.bounds.maxY)/2};
+    tsrc='지도화면';
+  }
+
+  var best=null;
+  Object.keys(BELT_LON).forEach(function(e){
+    var ll;
+    try{ ll=proj4('EPSG:'+e,'WGS84',[c.x,c.y]); }catch(err){ return; }
+    if(!ll || !isFinite(ll[0]) || !isFinite(ll[1])) return;
+    if(ll[0]<123 || ll[0]>133 || ll[1]<32 || ll[1]>44) return;   /* 한국 밖 */
+    var score;
+    if(target){
+      var t5=wgs84toTm5186(ll[0],ll[1]);
+      if(!t5) return;
+      score=Math.hypot(t5[0]-target.x, t5[1]-target.y);          /* 허가지선과의 거리 */
+    } else {
+      /* 허가지선이 없을 때: 해석된 경도가 그 원점의 담당 구역(±1°) 안이어야 한다.
+         단순히 '중심 경도와 가까운 것'만 보면 엉뚱한 원점이 뽑힌다(실측). */
+      var off=Math.abs(ll[0]-BELT_LON[e]);
+      if(off>1.3) return;                 /* 담당 구역 밖 → 후보 제외 */
+      score=off;
+    }
+    if(!best || score<best.score) best={epsg:e, score:score, lng:ll[0], lat:ll[1]};
+  });
+
+  if(!best){ console.log('[좌표계] 판별 실패 — 5186으로 가정'); return '5186'; }
+  console.log('[좌표계] 판별:', 'EPSG:'+best.epsg,
+              '(중심 '+best.lng.toFixed(4)+','+best.lat.toFixed(4)+
+              (target?(' · '+tsrc+'과 '+Math.round(best.score)+'m'):' · 기준점 없음')+')');
+  if(!target){
+    console.log('[좌표계] ⚠ 기준 위치가 없어 원점을 확신할 수 없습니다. 허가지선을 먼저 만들면 정확해집니다.');
+  }
+  return best.epsg;
+}
+
+/* 도면 전체 좌표를 5186으로 옮긴다 (제자리 변환) */
+function reprojectParsed(r, fromEpsg){
+  if(fromEpsg==='5186') return 0;
+  var n=0;
+  function conv(p){
+    try{
+      var ll=proj4('EPSG:'+fromEpsg,'WGS84',[p.x,p.y]);
+      var c=wgs84toTm5186(ll[0],ll[1]);
+      if(c){ p.x=c[0]; p.y=c[1]; n++; }
+    }catch(e){}
+  }
+  (r.contours||[]).forEach(function(c){ c.pts.forEach(conv); });
+  (r.waters||[]).forEach(function(c){ c.pts.forEach(conv); });
+  (r.surveys||[]).forEach(conv);
+  (r.polys||[]).forEach(function(pl){ pl.pts.forEach(conv); });
+  return n;
 }
 
 /* ── 열린 지형도가 허가지선 위치를 덮는지 검증 ──
