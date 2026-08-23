@@ -273,7 +273,7 @@
   <div class="logo">
     <div class="ic">🌊</div>
     재해·우수분석 <small>수계 · 유역 · 우수</small>
-    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.0 · 08-23 지형도자동</span>
+    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.1 · 08-23 타일·좌표수정</span>
   </div>
   <div class="steps">
     <div class="bookcrumb" id="bookCrumb">1. 지형도 올리기</div>
@@ -7997,9 +7997,19 @@ function cadUseAsPermit(){
   var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display='none';
   document.getElementById('cadDoneBar').style.display='none';
   updateNav && updateNav(); render();
-  if(parcelsPolys.length>1) toast(parcelsPolys.length+'필지 → 허가지선 확정 (면적 합산, 2번에서 확인)','ok');
-  else toast('지적 → 허가지선 확정 (2번에서 확인·편집)','ok');
-  goToPage(2);
+  /* [TEST] 예전엔 바로 2번으로 넘어갔지만, 이제 1번에서 지형도를 받아야 하므로 머문다.
+     (허가지선 위치로 수치지형도를 자동 다운로드 → 여기서 바로 열림) */
+  if(parcelsPolys.length>1) toast(parcelsPolys.length+'필지 → 허가지선 확정 — 아래에서 지형도를 받으세요','ok');
+  else toast('허가지선 확정 — 아래에서 수치지형도를 받으세요','ok');
+  if(!(S.contours && S.contours.length)){
+    /* 지형도가 아직 없으면 1번에 머물며 받기 섹션으로 안내 */
+    setTimeout(function(){
+      var el=document.getElementById('ngiiSec');
+      if(el && el.style.display!=='none') el.scrollIntoView({behavior:'smooth', block:'center'});
+    }, 250);
+  } else {
+    goToPage(2);   /* 이미 지형도가 있으면 예전처럼 2번으로 */
+  }
 }
 /* 허가지선 총 면적 (복수 필지면 합산) — ㎡ */
 function permitTotalArea(){
@@ -8242,16 +8252,27 @@ function drawCadBg(){
   ctx.restore();
 }
 function _cadBgBlit(e, img){
-  var tl5=wgs84toTm5186(e.tl[0],e.tl[1]), br5=wgs84toTm5186(e.br[0],e.br[1]);
-  if(!tl5||!br5) return;
-  var a=w2s({x:tl5[0],y:tl5[1]}), b=w2s({x:br5[0],y:br5[1]});
-  var x0=Math.min(a.x,b.x), y0=Math.min(a.y,b.y), x1=Math.max(a.x,b.x), y1=Math.max(a.y,b.y);
+  /* ★ [TEST] 타일 검은 줄 제거 — 네 모서리를 모두 변환해 감싸는 사각형에 그린다.
+     타일 아래모서리는 (x+1,y+1), 아래 타일 위모서리는 (x,y+1)로 계산되는데
+     EPSG:5186은 횡메르카토르라 같은 위도라도 경도가 다르면 N값이 달라진다.
+     오차는 중앙자오선(127°)에서 멀수록 커진다 — 실측:
+        화성(126.9°) 0.115m ≈ 0.2px  /  강릉(128.9°) 2.43m ≈ 5.1px
+     두 모서리만 쓰고 1px 여유를 주던 방식은 동쪽으로 갈수록 굵은 띠가 생긴다. */
+  var lng0=e.tl[0], lat0=e.tl[1], lng1=e.br[0], lat1=e.br[1];
+  var c=[ wgs84toTm5186(lng0,lat0), wgs84toTm5186(lng1,lat1),
+          wgs84toTm5186(lng0,lat1), wgs84toTm5186(lng1,lat0) ];
+  var xs=[], ys=[];
+  for(var k=0;k<4;k++){
+    if(!c[k]) return;
+    var sp=w2s({x:c[k][0], y:c[k][1]});
+    xs.push(sp.x); ys.push(sp.y);
+  }
+  var x0=Math.min.apply(null,xs), x1=Math.max.apply(null,xs);
+  var y0=Math.min.apply(null,ys), y1=Math.max.apply(null,ys);
   if((x1-x0)<0.5||(y1-y0)<0.5) return;
-  /* 검은 줄 제거: 시작=floor, 끝=다음타일 시작과 맞물리게 floor + 1px 겹침.
-     이렇게 하면 이웃 타일의 좌변이 이 타일의 우변을 덮어 틈이 안 생김 */
   var xr=Math.floor(x0), yr=Math.floor(y0);
-  var xe=Math.floor(x1), ye=Math.floor(y1);
-  var wr=(xe-xr)+1, hr=(ye-yr)+1;   // +1 = 이웃과 1px 겹침
+  var wr=Math.ceil(x1)-xr+1, hr=Math.ceil(y1)-yr+1;
+  if(wr<1) wr=1; if(hr<1) hr=1;
   ctx.drawImage(img, xr, yr, wr, hr);
 }
 /* DXF 없어도 지도 표시 가능하게 — 화면 기본 범위 세팅 */
@@ -9473,7 +9494,7 @@ function detectBelt(r){
   /* 기준 위치(5186) — 좌표만으로는 원점 구분이 불가능하다.
      네 원점이 정확히 2°씩 떨어져 있어 어느 것으로 읽어도 '한국 안'이 되기 때문. */
   var target=null, tsrc='';
-  if(S.permit && S.permit.pts && S.permit.pts.length>=3){ target=_permitCentroid(); tsrc='허가지선'; }
+  if(_permitPtsFlow()){ target=_permitCentroid(); tsrc='허가지선'; }   /* [TEST] 재해 형식 */
   if(!target && CAD.marker){ target={x:CAD.marker.x, y:CAD.marker.y}; tsrc='검색위치'; }
   /* 지도 화면은 '사용자가 실제로 옮긴' 경우에만 기준으로 쓴다.
      기본 화면(화성)을 기준 삼으면 강원 도면이 중부로 오판되어 178km 밀린다(실측). */
@@ -9595,7 +9616,7 @@ function _syncBeltBtns(){
 }
 
 function checkTerrainCoversPermit(){
-  if(!(S.permit && S.permit.pts && S.permit.pts.length>=3)) return null;
+  if(!_permitPtsFlow()) return null;   /* [TEST] 재해는 S.permit이 점 배열 */
   if(!(S.contours && S.contours.length)) return null;
   var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
   S.contours.forEach(function(c){
@@ -9787,7 +9808,7 @@ window.addEventListener('message', function(ev){
 })();
 
 
-var GDSP_FLOW_VER='TEST v1.0 (2026-08-23) 지형도 자동받기·좌표계 자동판별·도엽 합치기';
+var GDSP_FLOW_VER='TEST v1.1 (2026-08-23) 타일 이음새·허가지선 형식·페이지이동 수정';
 console.log('%c[G-DSP 재해] '+GDSP_FLOW_VER,'color:#60a5fa;font-weight:700');
 
 /* ══════════════════════════════════════════════════════════════
