@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.4 · 08-23 폴더권한</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.5 · 08-23 도엽합치기</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -280,9 +280,9 @@ canvas.grabbing{cursor:grabbing}
       <div class="sec-t">② 파일</div>
       <div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
         <div class="big">📂</div>
-        DXF를 끌어다 놓거나<br>클릭해서 선택
+        DXF를 끌어다 놓거나<br>클릭해서 선택<br><span style="font-size:10px;opacity:.7">여러 도엽을 한 번에 선택하면 자동으로 합칩니다</span>
       </div>
-      <input type="file" id="fileIn" accept=".dxf" style="display:none">
+      <input type="file" id="fileIn" accept=".dxf" multiple style="display:none">
     </div>
 
     <div class="sec">
@@ -712,6 +712,66 @@ function detectPermit(polys){
 }
 
 /* ---------------- 파일 로드 ---------------- */
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 여러 DXF 합쳐 열기 — 허가지가 도엽 경계에 걸치면 2~4장이 받아진다.
+   한 장만 열면 나머지 구역의 등고선이 비어 경사도가 틀리게 나온다.
+   각 파일을 따로 파싱·원점변환한 뒤 하나로 합쳐 적용한다.
+   ══════════════════════════════════════════════════════════════ */
+function loadFiles(files){
+  files=Array.prototype.slice.call(files||[]).filter(function(f){ return /\.dxf$/i.test(f.name); });
+  if(!files.length){ toast('DXF 파일이 없어요','err'); return; }
+  if(files.length===1){ loadFile(files[0]); return; }
+
+  var merged={contours:[], surveys:[], polys:[], waters:[], layerStat:{}};
+  var names=[], belts={}, idx=0, t0=Date.now();
+
+  function step(){
+    if(idx>=files.length){ finish(); return; }
+    var f=files[idx++];
+    _ngiiMsg('📖 도엽 '+idx+'/'+files.length+' 읽는 중… ('+f.name.slice(0,28)+')','#94a3b8');
+    var fr=new FileReader();
+    fr.onerror=function(){ console.log('[합치기] 읽기 실패:', f.name); step(); };
+    fr.onload=function(){
+      var text;
+      try{ text=new TextDecoder('utf-8',{fatal:true}).decode(fr.result); }
+      catch(e){ text=new TextDecoder('euc-kr').decode(fr.result); }
+      try{
+        var r=parseDXF(text);
+        var belt=detectBelt(r);
+        if(belt!=='5186') reprojectParsed(r, belt);
+        belts[belt]=(belts[belt]||0)+1;
+        merged.contours=merged.contours.concat(r.contours||[]);
+        merged.surveys =merged.surveys.concat(r.surveys||[]);
+        merged.polys   =merged.polys.concat(r.polys||[]);
+        merged.waters  =merged.waters.concat(r.waters||[]);
+        names.push(f.name);
+        console.log('[합치기] '+f.name+' → 등고선 '+(r.contours||[]).length+' · 표고점 '+(r.surveys||[]).length+' (원점 '+belt+')');
+      }catch(err){
+        console.log('[합치기] 건너뜀 —', f.name, err.message);
+        toast(f.name+' 은(는) 읽지 못했어요','err');
+      }
+      setTimeout(step, 20);
+    };
+    fr.readAsArrayBuffer(f);
+  }
+
+  function finish(){
+    if(!merged.contours.length && !merged.surveys.length){
+      _ngiiMsg('❌ 읽을 수 있는 도엽이 없었어요','#f87171');
+      return;
+    }
+    S._srcBelt=Object.keys(belts).length===1?Object.keys(belts)[0]:'5186';
+    var label=(names.length>1) ? (names.length+'개 도엽 합침') : names[0];
+    applyParsed(label, merged);
+    var sec=((Date.now()-t0)/1000).toFixed(1);
+    _ngiiMsg('✅ '+names.length+'개 도엽 합침 · 등고선 '+merged.contours.length
+      +' · 표고점 '+merged.surveys.length
+      +(merged.waters.length?(' · 수계 '+merged.waters.length):'')+' ('+sec+'초)','#4ade80');
+    toast(names.length+'개 도엽을 합쳤어요','ok');
+  }
+  step();
+}
+
 function loadFile(file){
   if(!/\.dxf$/i.test(file.name)){ toast('DXF 파일만 가능해요','err'); return; }
   document.getElementById('hdrStat').textContent='읽는 중...';
@@ -2016,7 +2076,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v6.4 (2026-08-23) 폴더 권한 재허용 처리';
+var GDSP_VER = 'TEST v6.5 (2026-08-23) 여러 도엽 자동 합치기';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2283,17 +2343,18 @@ function _sniffDXF(file){
   }).catch(function(){ return true; });        /* 못 읽으면 일단 시도 */
 }
 
-/* 후보 중 실제 DXF인 첫 파일 (최신순) */
+/* 후보 중 실제 DXF인 파일들 (최신순).
+   ★ 허가지가 도엽 경계에 걸치면 2~4장이 함께 받아지므로 전부 모은다. */
 function _fsaPickDXF(dir, since){
   return _fsaListDXF(dir, since).then(function(list){
     if(!list.length) return null;
-    var idx=0;
+    var out=[], idx=0;
     function step(){
-      if(idx>=list.length) return Promise.resolve(null);
+      if(idx>=list.length) return Promise.resolve(out.length?out:null);
       var f=list[idx++];
       return _sniffDXF(f).then(function(ok){
-        if(ok) return f;
-        console.log('[FSA] DXF가 아니라 건너뜀:', f.name);
+        if(ok) out.push(f);
+        else console.log('[FSA] DXF가 아니라 건너뜀:', f.name);
         return step();
       });
     }
@@ -2314,11 +2375,17 @@ function fsaAutoOpen(silent){
     var deadline = Date.now()+60000;
 
     function tryOnce(){
-      return _fsaPickDXF(dir, since).then(function(f){
-        if(f){
-          _ngiiMsg('📂 '+f.name+' 여는 중…','#94a3b8');
-          NGII._openedName=f.name;
-          _openTerrainFile(f);
+      return _fsaPickDXF(dir, since).then(function(fl){
+        if(fl && fl.length){
+          NGII._openedName=fl.map(function(x){return x.name;}).join(', ');
+          if(fl.length>1){
+            /* 도엽 경계에 걸쳐 여러 장이 온 경우 — 합쳐서 연다 */
+            _ngiiMsg('📂 도엽 '+fl.length+'장 합치는 중…','#94a3b8');
+            loadFiles(fl);
+          } else {
+            _ngiiMsg('📂 '+fl[0].name+' 여는 중…','#94a3b8');
+            _openTerrainFile(fl[0]);
+          }
           return true;
         }
         if(Date.now()>deadline){
@@ -4232,10 +4299,11 @@ var drop=document.getElementById('drop');
 });
 document.body.addEventListener('drop',function(e){
   e.preventDefault();
-  if(e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+  /* 도엽 경계에 걸치면 2~4장이 오므로 여러 파일을 함께 받는다 */
+  if(e.dataTransfer.files.length) loadFiles(e.dataTransfer.files);
 });
 document.getElementById('fileIn').addEventListener('change',function(){
-  if(this.files.length) loadFile(this.files[0]);
+  if(this.files.length) loadFiles(this.files);
   this.value='';
 });
 
