@@ -8,6 +8,7 @@ G-DSP Flask Server v3.0
 from flask import Flask, request, jsonify, send_file, send_from_directory, make_response
 from flask_cors import CORS
 from flask_caching import Cache
+from flask_compress import Compress
 import requests as req, ezdxf, io, logging, math, json, os, time, re
 import xml.etree.ElementTree as ET
 from ezdxf.enums import TextEntityAlignment
@@ -21,6 +22,19 @@ import numpy as np
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
+# ── 응답 압축 (gzip) ──
+#   서버에서 한국까지 실효 1.5Mbps 밖에 안 나온다(실측).
+#   945KB 짜리 화면 파일 하나 받는 데 5초가 걸려 체감이 크게 나빴다.
+#   HTML/JS/JSON 은 5~8배 줄어들므로 1초 이하로 떨어진다.
+app.config['COMPRESS_MIMETYPES'] = [
+    'text/html', 'text/css', 'text/plain', 'text/xml',
+    'application/json', 'application/javascript', 'application/xml',
+    'image/svg+xml',
+]
+app.config['COMPRESS_LEVEL'] = 6        # 1~9, 6이 속도·압축률 균형
+app.config['COMPRESS_MIN_SIZE'] = 1024  # 1KB 미만은 압축해도 이득 없음
+Compress(app)
+
 cache = Cache(app, config={'CACHE_TYPE': 'simple', 'CACHE_DEFAULT_TIMEOUT': 3600})
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -164,7 +178,7 @@ def soil_depth_proxy():
         r = None; last_err = None
         for _try in range(3):
             try:
-                r = req.get(url, params={'serviceKey': SOIL_KEY, 'PNU_CD': pnu}, timeout=30)
+                r = req.get(url, params={'serviceKey': SOIL_KEY, 'PNU_CD': pnu}, timeout=(5, 25))
                 break
             except Exception as te:
                 last_err = te
@@ -459,7 +473,7 @@ def _fetch_ned_wfs_box(endpoint_name, bbox, size=500):
     }
     headers = {"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}
     try:
-        r = req.get(url, params=params, headers=headers, timeout=30)
+        r = req.get(url, params=params, headers=headers, timeout=(5, 25))
         r.encoding = 'utf-8'
         root = ET.fromstring(r.text)
         ns = {'gml': 'http://www.opengis.net/gml', 'sop': 'https://www.vworld.kr', 'wfs': 'http://www.opengis.net/wfs'}
@@ -866,7 +880,7 @@ def wfs_parcel():
             params["geomFilter"] = f"BOX({float(lng)-f},{float(lat)-f},{float(lng)+f},{float(lat)+f})"
         else:
             return jsonify({"error": "pnu 또는 lng/lat 필요"}), 400
-        r = req.get("https://api.vworld.kr/req/data", params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
+        r = req.get("https://api.vworld.kr/req/data", params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=(5, 25))
         data = r.json()
         result = data.get("response", {}).get("result", {})
         fc = result.get("featureCollection", {})
@@ -887,7 +901,7 @@ def landinfo():
             "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
             "format": "json", "numOfRows": "30", "pageNo": "1", "pnu": pnu
         }
-        r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
+        r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=(5, 25))
         data = r.json()
         # 토지특성은 연도별 이력이 누적됨. numOfRows=1이면 옛 연도가 잡혀 작년 공시지가가 떴음.
         # 최신 기준연도(stdrYear)가 맨 앞에 오도록 정렬 → 프런트가 field[0]에서 올해 값을 읽음.
@@ -913,7 +927,7 @@ def vworld_proxy():
         params['key'] = VWORLD_KEY
         params['domain'] = VWORLD_DOMAIN
         url = f"https://api.vworld.kr/{path}"
-        r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
+        r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=(5, 25))
         try:
             return jsonify(r.json())
         except:
@@ -934,7 +948,7 @@ def vw_diag():
         params['key'] = VWORLD_KEY
         params['domain'] = VWORLD_DOMAIN
         url = f"https://api.vworld.kr/{path}"
-        r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
+        r = req.get(url, params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=(5, 25))
         ct = r.headers.get('Content-Type', '')
         out = {
             "request_url": r.url,
@@ -1036,7 +1050,7 @@ def iros_proxy_list():
     try:
         body = request.get_json(force=True) or {}
         url = 'https://www.iros.go.kr/biz/Pr20ViaRlrgSrchCtrl/retrieveSmplSrchList.do?IS_NMBR_LOGIN__=null'
-        r = req.post(url, json=body, headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'}, timeout=60)
+        r = req.post(url, json=body, headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'}, timeout=(5, 25))
         return jsonify(r.json())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1048,7 +1062,7 @@ def iros_proxy_cont():
     try:
         body = request.get_json(force=True) or {}
         url = 'https://www.iros.go.kr/biz/Pr20ViaRlrgSrchCtrl/retrievePinSrchCont.do?IS_NMBR_LOGIN__=null'
-        r = req.post(url, json=body, headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'}, timeout=60)
+        r = req.post(url, json=body, headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0'}, timeout=(5, 25))
         return jsonify(r.json())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1790,16 +1804,44 @@ def health():
 @app.route('/')
 def index():
     if os.path.exists('/home/ubuntu/gdsp/index.html'):
-        return send_from_directory('/home/ubuntu/gdsp', 'index.html')
+        return serve_html('index.html')   # 압축·캐시를 같이 태우기 위해
     return jsonify({"service": "G-DSP", "version": "3.0", "ok": True, "message": "G-DSP 서버 실행 중"})
+
+
+# 압축이 걸리는 텍스트 계열 — 아래에서 통째로 읽어 보낸다
+_TEXTY = ('.html', '.css', '.js', '.svg')
 
 
 @app.route('/<path:filename>')
 def serve_html(filename):
     # 관내도 등 이미지도 서빙 (같은 출처라 캔버스 오염 없이 캡처 가능)
-    if filename.lower().endswith(('.html', '.css', '.js', '.jpg', '.jpeg', '.png', '.webp', '.svg', '.gif')):
-        return send_from_directory('/home/ubuntu/gdsp', filename)
-    return jsonify({"error": "not found"}), 404
+    if not filename.lower().endswith(
+            ('.html', '.css', '.js', '.jpg', '.jpeg', '.png', '.webp', '.svg', '.gif')):
+        return jsonify({"error": "not found"}), 404
+
+    path = os.path.join('/home/ubuntu/gdsp', filename)
+
+    # ── 텍스트 파일은 통째로 읽어서 보낸다 ──
+    #   send_from_directory 는 파일을 흘려보내는(streaming) 방식이라
+    #   flask-compress 가 손을 못 대 gzip 이 안 걸린다(실측: 946KB 그대로).
+    #   메모리로 한 번 읽어 Response 로 만들면 압축된다 → 946KB → 388KB.
+    if filename.lower().endswith(_TEXTY) and os.path.exists(path):
+        try:
+            with open(path, 'rb') as f:
+                body = f.read()
+            import mimetypes as _mt
+            mime = _mt.guess_type(filename)[0] or 'text/plain'
+            resp = make_response(body)
+            resp.headers['Content-Type'] = mime + ('; charset=utf-8' if mime.startswith('text/') or 'javascript' in mime else '')
+            # 화면 파일은 자주 고치므로 짧게 — 안 바뀌었으면 브라우저가 304 로 넘어간다
+            resp.headers['Cache-Control'] = 'public, max-age=300, must-revalidate'
+            return resp
+        except Exception as e:
+            logger.error(f"[serve] {filename}: {e}")
+
+    resp = send_from_directory('/home/ubuntu/gdsp', filename)
+    resp.headers['Cache-Control'] = 'public, max-age=86400'   # 이미지는 하루
+    return resp
 
 
 @app.route('/info')
@@ -1945,7 +1987,7 @@ def proxy():
         url = request.args.get('url')
         if not url:
             return jsonify({"error": "url 필요"}), 400
-        r = req.get(url, timeout=60)
+        r = req.get(url, timeout=(5, 25))
         return r.content, r.status_code, dict(r.headers)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1979,7 +2021,7 @@ def wfs_area():
             "data": "LP_PA_CBND_BUBUN", "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
             "format": "json", "size": "1", "attrFilter": f"pnu:=:{pnu}"
         }
-        r = req.get("https://api.vworld.kr/req/data", params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=60)
+        r = req.get("https://api.vworld.kr/req/data", params=params, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=(5, 25))
         data = r.json()
         features = data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", [])
         if not features:
@@ -2027,7 +2069,7 @@ def cad_box():
                 "geomFilter": f"BOX({minx},{miny},{maxx},{maxy})"
             }
             r = req.get("https://api.vworld.kr/req/data", params=params,
-                        headers={"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}, timeout=30)
+                        headers={"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}, timeout=(5, 25))
             data = r.json()
             feats = data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", []) or []
             all_features.extend(feats)
@@ -2224,7 +2266,7 @@ def neins_analyze_polygon(polygon_wkt, address):
         "Accept": "application/json, text/javascript, */*; q=0.01"
     }
 
-    r = session.post(analyze_url, params=params, data=form_data, headers=headers, timeout=30)
+    r = session.post(analyze_url, params=params, data=form_data, headers=headers, timeout=(5, 25))
     if r.status_code != 200:
         return None
     return r.json()
@@ -2480,7 +2522,11 @@ def rain_xlsx():
         # 이 파일은 requests 를 req 라는 이름으로 가져다 쓴다
         #   verify=False : WAMIS 인증서 문제로 검증을 끈다
         #   Referer      : 이 헤더가 없으면 파일 대신 오류 페이지를 준다
-        r = req.get(WAMIS_RAIN_URL, timeout=60, verify=False,
+        # ★ 타임아웃을 짧게 (실측 사고)
+        #   60초로 두었더니 WAMIS 가 죽어 있을 때 워커 하나가 60초간 묶였다.
+        #   워커가 2개뿐이라 두 번 누르면 서버 전체가 멈춰 지질도·화면까지 느려졌다.
+        #   (연결 5초 / 읽기 25초)
+        r = req.get(WAMIS_RAIN_URL, timeout=(5, 25), verify=False,
                     headers={'User-Agent': 'Mozilla/5.0',
                              'Referer': 'https://www.wamis.go.kr/wsc/wsc_frequency.do'})
         ct = (r.headers.get('Content-Type') or '').lower()
@@ -2505,7 +2551,38 @@ def rain_xlsx():
 # ── 산림청 자동 전달용 보관함 ──
 #   확장이 산림청에서 받은 zip 을 여기로 바로 올리고, 앱 화면이 확인해 가져간다.
 #   (확장 안에서 큰 파일을 주고받으면 용량·서비스워커 종료 등 변수가 많다)
-_forest_inbox = {"seq": 0, "results": [], "errors": [], "at": 0}
+#
+#   ★ 파일로 보관하는 이유 (실측)
+#   gunicorn 워커가 2개라 파이썬 변수에 담으면 워커마다 보관함이 따로 생긴다.
+#   확장이 올린 3건이 워커 A·B에 나뉘어 들어가고, 화면이 확인할 때도 한쪽만 보게 되어
+#   "3개 중 1~2개만 뜬다". 디스크에 두면 모든 워커가 같은 것을 본다.
+import tempfile as _tf, fcntl as _fcntl
+_FOREST_BOX = os.path.join(_tf.gettempdir(), 'gdsp_forest_inbox.json')
+
+
+def _forest_box_rw(mutate=None):
+    """보관함 읽기(또는 잠그고 고치기). mutate(box) 를 주면 그 안에서 수정한다."""
+    empty = {"seq": 0, "results": [], "errors": [], "at": 0}
+    mode = 'r+' if os.path.exists(_FOREST_BOX) else 'w+'
+    try:
+        with open(_FOREST_BOX, mode, encoding='utf-8') as f:
+            _fcntl.flock(f, _fcntl.LOCK_EX)      # 워커끼리 겹치지 않게
+            try:
+                f.seek(0)
+                txt = f.read()
+                box = json.loads(txt) if txt.strip() else dict(empty)
+            except Exception:
+                box = dict(empty)
+            if mutate is not None:
+                mutate(box)
+                f.seek(0); f.truncate()
+                json.dump(box, f, ensure_ascii=False)
+                f.flush(); os.fsync(f.fileno())
+            _fcntl.flock(f, _fcntl.LOCK_UN)
+            return box
+    except Exception as e:
+        logger.error(f"[forest] 보관함 접근 실패: {e}")
+        return dict(empty)
 
 
 @app.route('/api/forest-latest')
@@ -2517,28 +2594,44 @@ def forest_latest():
     같이 지워져 화면에 안 뜬다(실측: 3개 중 1개만 표시).
     """
     take = request.args.get('take') in ('1', 'true', 'yes')
-    results = list(_forest_inbox["results"])
-    errors  = list(_forest_inbox["errors"])
-    if take and results:
-        # 방금 꺼낸 만큼만 지운다 (그 뒤에 들어온 것은 남긴다)
-        del _forest_inbox["results"][:len(results)]
-        del _forest_inbox["errors"][:len(errors)]
-        logger.info(f"[forest] {len(results)}건 전달하고 비움 (남은 {len(_forest_inbox['results'])}건)")
+    grabbed = {}
+
+    def _take(box):
+        grabbed['results'] = list(box["results"])
+        grabbed['errors'] = list(box["errors"])
+        grabbed['seq'] = box["seq"]
+        grabbed['at'] = box["at"]
+        if grabbed['results'] or grabbed['errors']:
+            # 방금 꺼낸 만큼만 지운다 (그 뒤에 들어온 것은 남긴다)
+            del box["results"][:len(grabbed['results'])]
+            del box["errors"][:len(grabbed['errors'])]
+            logger.info(f"[forest] {len(grabbed['results'])}건 전달하고 비움 "
+                        f"(남은 {len(box['results'])}건)")
+
+    if take:
+        _forest_box_rw(_take)
+    else:
+        box = _forest_box_rw()
+        grabbed = {"results": box["results"], "errors": box["errors"],
+                   "seq": box["seq"], "at": box["at"]}
+
     return jsonify({
         "ok": True,
-        "seq": _forest_inbox["seq"],
-        "at": _forest_inbox["at"],
-        "results": results,
-        "errors": errors,
+        "seq": grabbed.get("seq", 0),
+        "at": grabbed.get("at", 0),
+        "results": grabbed.get("results", []),
+        "errors": grabbed.get("errors", []),
     })
 
 
 @app.route('/api/forest-clear', methods=['POST'])
 def forest_clear():
-    """앱이 가져간 뒤 비운다."""
-    _forest_inbox["results"] = []
-    _forest_inbox["errors"] = []
-    return jsonify({"ok": True, "seq": _forest_inbox["seq"]})
+    """앱이 가져간 뒤 비운다. (take=1 을 쓰면 필요 없지만 호환을 위해 남김)"""
+    def _clear(box):
+        box["results"] = []
+        box["errors"] = []
+    box = _forest_box_rw(_clear)
+    return jsonify({"ok": True, "seq": box["seq"]})
 
 
 @app.route('/api/forest-parse', methods=['POST','OPTIONS'])
@@ -2582,13 +2675,19 @@ def forest_parse():
     # 보관함에 쌓아 둔다 (앱이 가져갈 때까지)
     #   확장이 산림청에서 받은 zip 을 바로 올리면 여기 쌓이고,
     #   화면이 /api/forest-latest 로 확인해 가져간다.
+    #   덮어쓰기(=)가 아니라 누적(extend)이어야 여러 건이 안 사라진다.
     if results:
         import time as _t
-        _forest_inbox["results"].extend(results)
-        _forest_inbox["errors"].extend(errors or [])
-        _forest_inbox["seq"] += 1
-        _forest_inbox["at"] = int(_t.time())
-        logger.info(f"[forest] 보관함에 {len(results)}건 추가 (seq={_forest_inbox['seq']})")
+
+        def _add(box):
+            box["results"].extend(results)
+            box["errors"].extend(errors or [])
+            box["seq"] += 1
+            box["at"] = int(_t.time())
+            logger.info(f"[forest] 보관함에 {len(results)}건 추가 "
+                        f"(seq={box['seq']}, 총 {len(box['results'])}건)")
+
+        _forest_box_rw(_add)
 
     return jsonify({'ok':len(results)>0,'results':results,'errors':errors})
 
