@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.6 · 08-23 도엽대기</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.8 · 08-23 누적업로드</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -179,7 +179,12 @@ canvas.grabbing{cursor:grabbing}
         <button class="btn btn-pri" id="cadSelBtn" onclick="toggleCadSelect()">📍 지적 선택</button>
         <div id="cadSelBar" style="display:none;margin-top:7px">
           <div id="cadSelInfo" style="font-size:10.5px;color:var(--dim);line-height:1.5;margin-bottom:6px">필지를 클릭하세요 (여러 개 가능 · 다시 클릭=해제)</div>
+          <!-- 선택 중에도 목록·개별삭제·전체해제가 가능해야 한다.
+               (실수로 찍었을 때 그 필지를 다시 찾아가지 않고 여기서 바로 뺄 수 있게) -->
+          <div id="cadSelList" style="margin-bottom:6px"></div>
           <button class="btn btn-pri" id="cadDoneBtn" onclick="cadFinishSelect()" disabled style="background:var(--ok)">✓ 선택 완료 →</button>
+          <button class="btn btn-ghost" id="cadUndoBtn" onclick="cadUndoLast()" style="margin-top:5px;display:none">↩ 마지막 선택 취소</button>
+          <button class="btn btn-ghost" onclick="cadClearSel()" style="margin-top:5px;color:var(--err);border-color:var(--err)">✕ 전체 해제</button>
         </div>
         <div id="cadDoneBar" style="display:none;margin-top:7px">
           <div id="cadParcelList" style="margin-bottom:7px"></div>
@@ -280,9 +285,41 @@ canvas.grabbing{cursor:grabbing}
       <div class="sec-t">② 파일</div>
       <div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
         <div class="big">📂</div>
-        DXF를 끌어다 놓거나<br>클릭해서 선택<br><span style="font-size:10px;opacity:.7">여러 도엽을 한 번에 선택하면 자동으로 합칩니다</span>
+        DXF를 끌어다 놓거나<br>클릭해서 선택<br><span style="font-size:10px;opacity:.7">여러 도엽을 한 번에 선택하거나<br>나눠서 올려도 계속 누적됩니다</span>
       </div>
       <input type="file" id="fileIn" accept=".dxf" multiple style="display:none">
+      <div style="display:flex;align-items:center;gap:6px;margin-top:7px">
+        <div id="sheetInfo" style="flex:1;font-size:10.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">올라간 도엽 없음</div>
+        <button class="thr" onclick="clearTerrain()" style="flex:0 0 auto;color:#f87171;border-color:#5b2b2b">🗑 비우기</button>
+      </div>
+      <div id="sheetBox" style="display:none;margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:10.5px;color:#4ade80" id="sheetCnt">-</span>
+          <button class="thr" onclick="clearSheets()" style="flex:0 0 auto;padding:3px 8px;font-size:10px;color:var(--err);border-color:var(--err)">비우기</button>
+        </div>
+        <div id="sheetList" style="max-height:96px;overflow-y:auto"></div>
+        <div style="font-size:10px;color:var(--dim);margin-top:5px;line-height:1.5">더 올리면 계속 <b>누적</b>됩니다. 도엽이 여러 장이면 한 번에 골라도 돼요.</div>
+      </div>
+    </div>
+
+    <!-- 작업범위 — 허가지선 버퍼로 계산 구역 한정 -->
+    <div class="sec">
+      <div class="sec-t">④ 작업범위</div>
+      <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:6px">
+        도엽 전체는 허가지보다 훨씬 넓어요.<br>필요한 범위만 남기면 분석이 정확·빨라집니다.
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:5px">
+        <button class="thr on" id="wr0" onclick="setWorkRange(0)">전체</button>
+        <button class="thr" id="wr100" onclick="setWorkRange(100)">100m</button>
+        <button class="thr" id="wr200" onclick="setWorkRange(200)">200m</button>
+        <button class="thr" id="wr300" onclick="setWorkRange(300)">300m</button>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <input id="wrCustom" type="number" min="10" max="2000" step="10" placeholder="직접 입력(m)"
+          style="flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:11.5px">
+        <button class="thr" onclick="setWorkRange(document.getElementById('wrCustom').value)">적용</button>
+      </div>
+      <div id="workInfo" style="font-size:10.5px;color:var(--dim);margin-top:6px">전체 도면 사용</div>
     </div>
 
     <div class="sec">
@@ -720,9 +757,20 @@ function detectPermit(polys){
 function loadFiles(files){
   files=Array.prototype.slice.call(files||[]).filter(function(f){ return /\.dxf$/i.test(f.name); });
   if(!files.length){ toast('DXF 파일이 없어요','err'); return; }
-  if(files.length===1){ loadFile(files[0]); return; }
+  /* 한 장이어도 누적 처리를 태운다 (기존 도면에 더하기) */
 
-  var merged={contours:[], surveys:[], polys:[], waters:[], layerStat:{}};
+  /* ★ 누적 모드 — 도엽을 여러 번 나눠 올릴 수 있게 기존 것에 더한다.
+     기준은 항상 S._allSheets(원본 누적본) 하나. S.contours는 작업범위로 잘린
+     상태일 수 있으므로 절대 기준으로 쓰면 안 된다(중복 누적됨). */
+  if(!S._allSheets) S._allSheets={contours:[], surveys:[], polys:[], waters:[]};
+  var keep = S._allSheets.contours.length>0 || S._allSheets.surveys.length>0;
+  var merged={
+    contours: S._allSheets.contours.slice(),
+    surveys:  S._allSheets.surveys.slice(),
+    polys:    S._allSheets.polys.slice(),
+    waters:   S._allSheets.waters.slice(),
+    layerStat:{}
+  };
   var names=[], belts={}, idx=0, t0=Date.now();
 
   function step(){
@@ -761,13 +809,23 @@ function loadFiles(files){
       return;
     }
     S._srcBelt=Object.keys(belts).length===1?Object.keys(belts)[0]:'5186';
-    var label=(names.length>1) ? (names.length+'개 도엽 합침') : names[0];
+    /* 원본 누적본 갱신 — 다음 업로드의 기준이 된다 */
+    S._allSheets={contours:merged.contours.slice(), surveys:merged.surveys.slice(),
+                  polys:merged.polys.slice(), waters:merged.waters.slice()};
+    /* 도엽 이름은 중복 제거 — 같은 파일을 다시 올려도 장수가 늘지 않게 */
+    var prevNames=(S._sheetNames||[]).slice();
+    names.forEach(function(nm){ if(prevNames.indexOf(nm)<0) prevNames.push(nm); });
+    S._sheetNames=prevNames;
+    var totalSheets=prevNames.length;
+    var label=(totalSheets>1) ? (totalSheets+'개 도엽 합침') : prevNames[0];
     applyParsed(label, merged);
+    _syncSheetInfo();
     var sec=((Date.now()-t0)/1000).toFixed(1);
-    _ngiiMsg('✅ '+names.length+'개 도엽 합침 · 등고선 '+merged.contours.length
+    _ngiiMsg('✅ '+(keep?('+'+names.length+'장 추가 → 총 '+totalSheets+'장'):(names.length+'개 도엽 합침'))
+      +' · 등고선 '+merged.contours.length
       +' · 표고점 '+merged.surveys.length
       +(merged.waters.length?(' · 수계 '+merged.waters.length):'')+' ('+sec+'초)','#4ade80');
-    toast(names.length+'개 도엽을 합쳤어요','ok');
+    toast(keep? (names.length+'장 추가 (총 '+totalSheets+'장)') : (names.length+'개 도엽을 합쳤어요'),'ok');
   }
   step();
 }
@@ -803,7 +861,12 @@ function loadFile(file){
           var cnt=reprojectParsed(r, belt);
           console.log('[좌표계] EPSG:'+belt+' → 5186 변환:', cnt+'점');
         }
-        applyParsed(file.name, r);
+        /* ★ 이미 지형도가 있으면 덧붙인다 (도엽을 한 장씩 올리는 경우) */
+        var _app = !!(S.contours && S.contours.length) && !S._replaceOnce;
+        S._replaceOnce=false;
+        applyParsed(file.name, r, _app);
+        S._sheetNames=(S._sheetNames||[]); S._sheetNames.push(file.name);
+        _syncSheetList();
         var sec=((Date.now()-t0)/1000).toFixed(1);
         if(typeof _ngiiMsg==='function'){
           if(r.contours && r.contours.length){
@@ -825,9 +888,10 @@ function loadFile(file){
   fr.readAsArrayBuffer(file);
 }
 
-function applyParsed(name, r){
-  S.fileName=name;
+function applyParsed(name, r, append){
+    S.fileName=name;
   S.contours=r.contours;
+  S._rawTerrain=null; S._workRings=null; S.workDist=0;   /* 새 도면 → 작업범위 초기화 */
   S.waters=r.waters||[];      /* 수계(E계열) — 재해·우수에서 재사용 */
   var _dw=document.getElementById('detWater');
   if(_dw){
@@ -899,6 +963,7 @@ function applyParsed(name, r){
 
   /* ★ 열린 지형도가 허가지선 위치를 덮는지 확인 (엉뚱한 도엽 방지) */
   if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
+  if(typeof _syncSheetInfo==='function') _syncSheetInfo();
   render();
 }
 
@@ -1332,6 +1397,34 @@ function _cadUpdateBar(){
   var n=CAD.parcels.length;
   var el=document.getElementById('cadSelInfo'); if(el) el.textContent=n?(n+'개 필지 선택됨 · 다시 클릭=해제'):'필지를 클릭하세요 (여러 개 가능 · 다시 클릭=해제)';
   var done=document.getElementById('cadDoneBtn'); if(done){ done.disabled=!n; done.textContent=n?('✓ 선택 완료 → ('+n+'필지)'):'✓ 선택 완료 →'; }
+  /* 선택 중 목록·되돌리기 — 실수로 찍은 필지를 여기서 바로 뺄 수 있게 */
+  var undo=document.getElementById('cadUndoBtn');
+  if(undo) undo.style.display = n ? '' : 'none';
+  _cadRenderSelList();
+}
+
+/* 선택 중 필지 목록 (확정 전) */
+function _cadRenderSelList(){
+  var box=document.getElementById('cadSelList'); if(!box) return;
+  box.innerHTML='';
+  if(!CAD.parcels.length) return;
+  CAD.parcels.forEach(function(sp, i){
+    var row=document.createElement('div'); row.className='cadPRow';
+    var nm=sp.jibun||('필지 '+(i+1));
+    row.innerHTML='<span class="cadPName">'+(i+1)+'. '+nm+'</span><button class="cadPDel" title="빼기">✕</button>';
+    row.querySelector('.cadPDel').onclick=function(){ _cadRemoveParcel(i); };
+    box.appendChild(row);
+  });
+}
+
+/* 마지막에 고른 필지 하나 취소 */
+function cadUndoLast(){
+  if(!CAD.parcels.length) return;
+  var sp=CAD.parcels.pop();
+  _cadUpdateBar();
+  if(typeof _cadRenderParcelList==='function') _cadRenderParcelList();
+  toast('취소: '+(sp.jibun||'필지'),'ok');
+  render();
 }
 
 
@@ -2076,7 +2169,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v6.6 (2026-08-23) 도엽 전부 도착 대기 후 합치기';
+var GDSP_VER = 'TEST v6.8 (2026-08-23) 도엽 누적 업로드';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2162,6 +2255,7 @@ function ngiiStart(){
     }catch(e){}
   }
   NGII._startedAt=Date.now();   /* 이 시각 이후 저장된 파일만 '새 파일'로 인정 */
+  S._replaceOnce=true;          /* 새로 받는 것이므로 기존 지형도를 대체 */
   NGII._openedName=null;
   _ngiiRunning(true);
   _ngiiMsg('확장에 요청 보냄 — 국토정보플랫폼 탭이 열립니다','#94a3b8');
@@ -2418,6 +2512,238 @@ function fsaAutoOpen(silent){
     if(!silent) _ngiiMsg('자동 열기에 실패했어요 — 직접 선택해주세요','#f87171');
     return false;
   });
+}
+
+/* ══ 올린 도엽 목록 / 비우기 ══ */
+function _syncSheetList(){
+  var box=document.getElementById('sheetBox'), list=document.getElementById('sheetList'),
+      cnt=document.getElementById('sheetCnt');
+  if(!box||!list) return;
+  var ns=S._sheetNames||[];
+  if(!ns.length){ box.style.display='none'; return; }
+  box.style.display='';
+  if(cnt) cnt.textContent='✅ 올린 도엽 '+ns.length+'장';
+  list.innerHTML=ns.map(function(n,i){
+    var short=n.length>34 ? (n.slice(0,16)+'…'+n.slice(-14)) : n;
+    return '<div style="font-size:10px;color:var(--dim);padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+n+'">'
+      +(i+1)+'. '+short+'</div>';
+  }).join('');
+}
+
+/* 지형도 전부 비우기 (허가지선은 유지) */
+function clearSheets(){
+  S.contours=[]; S.surveys=[]; S.waters=[]; S.allPolys=[];
+  S._sheetNames=[]; S._rawTerrain=null; S._workRings=null; S.workDist=0;
+  S.triList=null; S.gridCells=[]; S.avgSlope=null; S.bins=null;
+  S.fileName=null;
+  setDet('detCont', false, '-');
+  setDet('detSurv', false, '-');
+  var dw=document.getElementById('detWater');
+  if(dw){ dw.className='det-row'; dw.querySelector('.ct').textContent='-'; }
+  _syncSheetList();
+  if(typeof _syncWorkBtns==='function') _syncWorkBtns();
+  var hs=document.getElementById('hdrStat');
+  if(hs) hs.textContent='DXF 파일을 올려주세요';
+  if(typeof _updateRunBtn==='function') _updateRunBtn();
+  if(typeof _ngiiMsg==='function') _ngiiMsg('지형도를 비웠어요 — 다시 올려주세요','#fbbf24');
+  /* 허가지선이 있으면 그 주변으로, 없으면 지도 뷰 유지 */
+  if(S.permit && S.permit.pts && S.permit.pts.length>=3){ computeBounds(); fitView(); }
+  toast('지형도를 비웠어요 (허가지선은 유지)','ok');
+  render();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 작업범위 — 허가지선 버퍼로 계산 구역 한정
+   수치지형도 한 도엽은 허가지보다 훨씬 넓어(4장이면 더더욱)
+   전 구간 등고선을 다 계산할 필요가 없다. 허가지선에서 N m 이격한
+   버퍼 안쪽만 남기면 화면도 정리되고 분석도 가벼워진다.
+   버퍼 생성은 재해위험성(popup_flow)에서 검증된 마칭스퀘어 방식을 그대로 사용.
+   ══════════════════════════════════════════════════════════════ */
+function bufferRings(polys, d){
+  var minX=1e18,minY=1e18,maxX=-1e18,maxY=-1e18;
+  polys.forEach(function(r){ r.forEach(function(p){ if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y; if(p.x>maxX)maxX=p.x; if(p.y>maxY)maxY=p.y; }); });
+  var diag=Math.hypot(maxX-minX,maxY-minY)||1;
+  var cell=Math.max(d/7, diag/500);           /* 셀=매끄러움 vs 격자수 균형(상한 ~500/축) */
+  var pad=d+cell*3;
+  minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
+  var nx=Math.ceil((maxX-minX)/cell)+1, ny=Math.ceil((maxY-minY)/cell)+1;
+  var edges=[]; polys.forEach(function(r){ var m=r.length; for(var i=0,j=m-1;i<m;j=i++) edges.push([r[j].x,r[j].y,r[i].x,r[i].y]); });
+  function dseg(px,py,ax,ay,bx,by){ var dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy; if(l2<1e-12) return Math.hypot(px-ax,py-ay); var t=((px-ax)*dx+(py-ay)*dy)/l2; if(t<0)t=0; else if(t>1)t=1; return Math.hypot(px-(ax+t*dx),py-(ay+t*dy)); }
+  function pin(px,py,r){ var ins=false,m=r.length; for(var i=0,j=m-1;i<m;j=i++){ var xi=r[i].x,yi=r[i].y,xj=r[j].x,yj=r[j].y; if(((yi>py)!==(yj>py)) && (px<(xj-xi)*(py-yi)/(yj-yi)+xi)) ins=!ins; } return ins; }
+  var g=new Float64Array(nx*ny);
+  for(var gy=0;gy<ny;gy++){ for(var gx=0;gx<nx;gx++){
+    var X=minX+gx*cell, Y=minY+gy*cell, dm=1e18;
+    for(var e=0;e<edges.length;e++){ var q=dseg(X,Y,edges[e][0],edges[e][1],edges[e][2],edges[e][3]); if(q<dm)dm=q; }
+    var insG=false; for(var pi=0;pi<polys.length;pi++){ if(pin(X,Y,polys[pi])){ insG=true; break; } }
+    g[gy*nx+gx]=(insG?-dm:dm)-d;              /* 부호거리 - 이격거리: <0=버퍼 내부 */
+  }}
+  var pts={}, adj={};
+  function cr(x0,y0,v0,x1,y1,v1){ var t=v0/(v0-v1); return {x:x0+t*(x1-x0), y:y0+t*(y1-y0)}; }
+  function lk(a,b){ (adj[a]||(adj[a]=[])).push(b); (adj[b]||(adj[b]=[])).push(a); }
+  function pH(gx,gy){ var k='H'+gx+'_'+gy; if(!pts[k]){ var i0=gy*nx+gx,i1=gy*nx+(gx+1); pts[k]=cr(minX+gx*cell,minY+gy*cell,g[i0],minX+(gx+1)*cell,minY+gy*cell,g[i1]); } return k; }
+  function pV(gx,gy){ var k='V'+gx+'_'+gy; if(!pts[k]){ var i0=gy*nx+gx,i1=(gy+1)*nx+gx; pts[k]=cr(minX+gx*cell,minY+gy*cell,g[i0],minX+gx*cell,minY+(gy+1)*cell,g[i1]); } return k; }
+  for(var gy=0;gy<ny-1;gy++){ for(var gx=0;gx<nx-1;gx++){
+    var i00=gy*nx+gx,i10=gy*nx+(gx+1),i11=(gy+1)*nx+(gx+1),i01=(gy+1)*nx+gx;
+    var c=(g[i00]<0?1:0)+(g[i10]<0?2:0)+(g[i11]<0?4:0)+(g[i01]<0?8:0);
+    if(c===0||c===15) continue;
+    var B=pH(gx,gy), T=pH(gx,gy+1), L=pV(gx,gy), R=pV(gx+1,gy);
+    switch(c){
+      case 1: lk(L,B); break; case 2: lk(B,R); break; case 3: lk(L,R); break; case 4: lk(R,T); break;
+      case 6: lk(B,T); break; case 7: lk(L,T); break; case 8: lk(T,L); break; case 9: lk(T,B); break;
+      case 11: lk(T,R); break; case 12: lk(R,L); break; case 13: lk(B,R); break; case 14: lk(L,B); break;
+      case 5: { var ct=(g[i00]+g[i10]+g[i11]+g[i01])/4; if(ct<0){ lk(L,T); lk(R,B); } else { lk(L,B); lk(R,T); } } break;
+      case 10:{ var ct=(g[i00]+g[i10]+g[i11]+g[i01])/4; if(ct<0){ lk(T,R); lk(B,L); } else { lk(T,L); lk(B,R); } } break;
+    }
+  }}
+  var rings=[], used={};
+  for(var sk in adj){
+    if(used[sk] || !adj[sk].length) continue;
+    var ring=[], cur=sk, prev=null, gd=0;
+    while(cur && !used[cur] && gd++<2000000){
+      used[cur]=1; ring.push(pts[cur]);
+      var nb=adj[cur], nxt=null;
+      for(var t=0;t<nb.length;t++){ if(nb[t]!==prev && !used[nb[t]]){ nxt=nb[t]; break; } }
+      prev=cur; cur=nxt;
+    }
+    if(ring.length>=3) rings.push(ring);
+  }
+  return rings;
+}
+
+/* ── 지형도 비우기 (누적된 도엽 전부 제거) ── */
+function clearTerrain(){
+  S.contours=[]; S.surveys=[]; S.waters=[]; S.allPolys=[];
+  S._rawTerrain=null; S._workRings=null; S.workDist=0; S._sheetNames=[]; S._allSheets=null;
+  S.triList=null; S.gridCells=[]; S.avgSlope=null; S.bins=null;
+  S.fileName=null;
+  setDet('detCont', false, '-');
+  setDet('detSurv', false, '-');
+  var dw=document.getElementById('detWater');
+  if(dw){ dw.className='det-row'; dw.querySelector('.ct').textContent='-'; }
+  var hs=document.getElementById('hdrStat');
+  if(hs) hs.textContent='DXF 파일을 올려주세요';
+  _syncWorkBtns();
+  _syncSheetInfo();
+  _updateRunBtn();
+  if(typeof _ngiiMsg==='function') _ngiiMsg('지형도를 비웠어요','#fbbf24');
+  /* 허가지선이 있으면 거기로, 없으면 기본 화면 */
+  if(S.permit && S.permit.pts && S.permit.pts.length>=3){ _fitToPermit(); }
+  toast('지형도 비움','ok');
+  render();
+}
+/* 올라간 도엽 수 표시 */
+function _syncSheetInfo(){
+  var el=document.getElementById('sheetInfo');
+  if(!el) return;
+  var n=(S._sheetNames||[]).length;
+  if(!n){ el.textContent='올라간 도엽 없음'; el.style.color='var(--dim)'; }
+  else{
+    el.textContent='도엽 '+n+'장 · 등고선 '+(S.contours?S.contours.length:0);
+    el.style.color='#4ade80';
+    el.title=(S._sheetNames||[]).join('\n');
+  }
+}
+
+/* 작업범위 상태 */
+S.workDist = 0;          /* 0 = 끄기(전체) */
+S._workRings = null;     /* 버퍼 링들 */
+S._rawTerrain = null;    /* 자르기 전 원본 (거리 바꿀 때 되살리려고) */
+
+function setWorkRange(d){
+  d = +d || 0;
+  if(!(S.permit && S.permit.pts && S.permit.pts.length>=3)){
+    toast('허가지선을 먼저 만들어주세요','err'); return;
+  }
+  S.workDist = d;
+  _syncWorkBtns();
+
+  /* 원본 보관 (최초 1회) */
+  if(!S._rawTerrain){
+    S._rawTerrain = { contours:S.contours||[], surveys:S.surveys||[], waters:S.waters||[] };
+  }
+  var raw = S._rawTerrain;
+
+  if(!d){                                  /* 끄기 → 전체 복원 */
+    S._workRings=null;
+    S.contours=raw.contours; S.surveys=raw.surveys; S.waters=raw.waters;
+    _afterWorkRange('작업범위 해제 — 전체 표시');
+    return;
+  }
+
+  /* 버퍼 링 생성 (허가지선 기준) */
+  var polys=[];
+  if(S.permitParcels && S.permitParcels.length){
+    S.permitParcels.forEach(function(pp){ if(pp.ring&&pp.ring.length>=3) polys.push(pp.ring); });
+  }
+  if(!polys.length) polys=[S.permit.pts];
+
+  try{
+    S._workRings = bufferRings(polys, d);
+  }catch(e){
+    console.log('[작업범위] 버퍼 생성 실패', e);
+    toast('작업범위를 만들지 못했어요','err');
+    return;
+  }
+  if(!S._workRings || !S._workRings.length){ toast('작업범위를 만들지 못했어요','err'); return; }
+
+  /* 버퍼 바깥 요소 제거 — 선은 '한 점이라도 안에 있으면' 남긴다(경계 잘림 방지) */
+  var bb=_ringsBBox(S._workRings);
+  function keepLine(c){
+    for(var i=0;i<c.pts.length;i++){ if(_inWork(c.pts[i], bb)) return true; }
+    return false;
+  }
+  S.contours = raw.contours.filter(keepLine);
+  S.waters   = raw.waters.filter(keepLine);
+  S.surveys  = raw.surveys.filter(function(sv){ return _inWork(sv, bb); });
+
+  _afterWorkRange('작업범위 '+d+'m — 등고선 '+S.contours.length+' · 표고점 '+S.surveys.length);
+}
+
+function _ringsBBox(rings){
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+  rings.forEach(function(r){ r.forEach(function(p){
+    if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+    if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y; }); });
+  return {mnx:mnx,mny:mny,mxx:mxx,mxy:mxy};
+}
+/* 점이 작업범위 안인가 (bbox로 먼저 거르고 링 판정) */
+function _inWork(p, bb){
+  if(!S._workRings) return true;
+  if(p.x<bb.mnx||p.x>bb.mxx||p.y<bb.mny||p.y>bb.mxy) return false;
+  for(var i=0;i<S._workRings.length;i++){
+    if(_pointInRing(p, S._workRings[i])) return true;
+  }
+  return false;
+}
+function _pointInRing(p, r){
+  var ins=false, m=r.length;
+  for(var i=0,j=m-1;i<m;j=i++){
+    var xi=r[i].x, yi=r[i].y, xj=r[j].x, yj=r[j].y;
+    if(((yi>p.y)!==(yj>p.y)) && (p.x < (xj-xi)*(p.y-yi)/(yj-yi)+xi)) ins=!ins;
+  }
+  return ins;
+}
+function _afterWorkRange(msg){
+  setDet('detCont', S.contours.length>0, S.contours.length? (S.contours.length+'개'):'없음');
+  setDet('detSurv', S.surveys.length>0, S.surveys.length? (S.surveys.length+'개'):'없음');
+  var dw=document.getElementById('detWater');
+  if(dw){ dw.className='det-row'+(S.waters.length?' ok':''); dw.querySelector('.ct').textContent=S.waters.length?(S.waters.length+'개'):'없음'; }
+  /* 분석 결과는 무효 — 다시 실행해야 함 */
+  S.triList=null; S.gridCells=[]; S.avgSlope=null; S.bins=null;
+  computeBounds(); fitView();
+  toast(msg,'ok');
+  render();
+}
+function _syncWorkBtns(){
+  ['0','100','200','300'].forEach(function(v){
+    var b=document.getElementById('wr'+v);
+    if(b) b.className='thr'+(String(S.workDist)===v?' on':'');
+  });
+  var info=document.getElementById('workInfo');
+  if(info){
+    info.textContent = S.workDist ? ('허가지선에서 '+S.workDist+'m 이격') : '전체 도면 사용';
+    info.style.color = S.workDist ? '#4ade80' : 'var(--dim)';
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -3014,6 +3340,21 @@ function render(){
       ctx.fillText(tx, p.x+7, p.y-5);
     }
   });
+
+  /* [TEST] 작업범위 경계 (파란 점선) */
+  if(S._workRings && S._workRings.length){
+    ctx.save();
+    ctx.strokeStyle='rgba(96,165,250,0.85)';
+    ctx.lineWidth=1.6; ctx.setLineDash([8,5]);
+    S._workRings.forEach(function(r){
+      if(!r || r.length<3) return;
+      ctx.beginPath();
+      r.forEach(function(p,i){ var sp=w2s(p); i===0?ctx.moveTo(sp.x,sp.y):ctx.lineTo(sp.x,sp.y); });
+      ctx.closePath(); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
 
   // ── [TEST] 선택된 지적 필지 (청록 강조) — 허가지선 바로 아래
   if(typeof drawCadastral==='function') drawCadastral();
