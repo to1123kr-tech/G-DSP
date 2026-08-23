@@ -125,12 +125,13 @@
   .cadPDel{background:none;border:1px solid rgba(248,113,113,.3);color:#f87171;border-radius:5px;
     width:22px;height:22px;font-size:11px;cursor:pointer;flex-shrink:0;line-height:1;transition:.12s}
   .cadPDel:hover{background:rgba(248,113,113,.15);border-color:#f87171}
-  .dropzone{margin-top:11px;border:2px dashed var(--line);border-radius:12px;background:rgba(14,22,38,.4);
-    padding:26px 14px;text-align:center;cursor:pointer;transition:.16s}
+  /* [TEST] 1번 페이지가 길어져 스크롤이 생기므로 드롭존을 줄임 */
+  .dropzone{margin-top:9px;border:2px dashed var(--line);border-radius:10px;background:rgba(14,22,38,.4);
+    padding:13px 12px;text-align:center;cursor:pointer;transition:.16s}
   .dropzone:hover{border-color:var(--accent);background:rgba(56,189,248,.06)}
   .dropzone.dragover{border-color:var(--accent);background:rgba(56,189,248,.12)}
-  .dropzone .dz-ic{font-size:34px;opacity:.85;margin-bottom:8px}
-  .dropzone .dz-t{font-size:12px;color:var(--tx3);line-height:1.5}
+  .dropzone .dz-ic{font-size:20px;opacity:.85;margin-bottom:3px}
+  .dropzone .dz-t{font-size:11px;color:var(--tx3);line-height:1.45}
   .dropzone .dz-t b{color:var(--tx2)}
 
   .statusbar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:18px;
@@ -273,7 +274,7 @@
   <div class="logo">
     <div class="ic">🌊</div>
     재해·우수분석 <small>수계 · 유역 · 우수</small>
-    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.3 · 08-23 여러장·누적 수정</span>
+    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.6 · 08-23 허가지선 업로드</span>
   </div>
   <div class="steps">
     <div class="bookcrumb" id="bookCrumb">1. 지형도 올리기</div>
@@ -313,7 +314,7 @@
       <!-- 🗺 지적(VWorld) — 서버에서 열 때만 동작 -->
       <div style="border:1px solid var(--line);border-radius:10px;margin-top:10px;padding:11px">
         <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:3px">🗺 지적 선택 <span style="font-size:9.5px;color:var(--tx3);font-weight:400">(서버 전용)</span></div>
-        <div style="font-size:10px;color:var(--tx3);line-height:1.5;margin-bottom:9px"><b style="color:var(--tx2)">「지적 선택」</b> 누르면 지도가 자동으로 뜨고, 필지 클릭 → 선택 완료 → 허가지선/DXF. 지형도(실좌표 5186)가 있으면 제자리에 얹혀요.</div>
+        <div style="font-size:9.5px;color:var(--tx3);line-height:1.45;margin-bottom:7px">지도에서 필지 클릭 → 선택 완료 → 허가지선</div>
         <button class="btn btn-primary" id="cadSelBtn" onclick="toggleCadSelect()">📍 지적 선택</button>
 
         <!-- 1단계: 선택 중 (필지 클릭) -->
@@ -335,6 +336,24 @@
             <button class="btn btn-ghost" id="cadDxfBtn" onclick="cadDownloadDxf()" style="margin-bottom:6px">📐 DXF 다운로드</button>
           </div>
           <div style="font-size:9px;color:var(--tx3);margin-top:8px;line-height:1.5">🎯 허가지선: 이 도구에서 바로 분석<br>📐 DXF: CAD로 빼서 편집(좌표 깨진 도면 대비)</div>
+        </div>
+      </div>
+
+      <!-- ★ [TEST] 허가지선 DXF 업로드 — 업체가 준 도면(허가지선만) -->
+      <div style="margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px">
+        <div style="font-size:11.5px;font-weight:700;color:var(--tx2);margin-bottom:6px">📐 허가지선 도면 올리기</div>
+        <div style="font-size:10px;color:var(--tx3);line-height:1.55;margin-bottom:8px">
+          업체가 준 <b>허가지선만 있는 DXF</b>를 여기에 올리세요.<br>
+          (아래 지형도 칸은 등고선이 있어야 열립니다)
+        </div>
+        <div id="permitDrop" onclick="document.getElementById('permitFile').click()"
+          style="border:1.5px dashed var(--line);border-radius:8px;padding:14px 8px;text-align:center;cursor:pointer;transition:.15s">
+          <div style="font-size:20px;line-height:1.2">📐</div>
+          <div style="font-size:11px;color:var(--tx2);margin-top:4px">허가지선 DXF 끌어다 놓거나<br>클릭해서 선택</div>
+        </div>
+        <input type="file" id="permitFile" accept=".dxf" style="display:none">
+        <div style="font-size:9.5px;color:var(--tx3);margin-top:6px;line-height:1.5">
+          닫힌 폴리곤 중 <b>면적이 가장 큰 것</b>을 허가지선으로 씁니다. R12 도면도 읽어요.
         </div>
       </div>
 
@@ -414,19 +433,14 @@
       <!-- ② 점선 드롭박스 (클릭 = 파일 선택) -->
       <div class="dropzone" id="dropzone" onclick="document.getElementById('file').click()">
         <div class="dz-ic">📁</div>
-        <div class="dz-t">DXF를 <b>끌어다 놓거나</b><br>클릭해서 선택</div>
-      </div>
+        <div class="dz-t">수치지형도 DXF <b>끌어놓기</b> / 클릭 <span style="font-size:9px;opacity:.75">(여러 장 가능)</span></div>
+        </div>
       <input type="file" id="file" accept=".dxf" style="display:none">
 
-      <!-- ③ 열기 버튼 (유지) -->
-      <button class="btn btn-primary" onclick="document.getElementById('file').click()" style="margin-top:9px">
+      <!-- ③ 열기 버튼 -->
+      <button class="btn btn-primary" onclick="document.getElementById('file').click()" style="margin-top:7px">
         ⬆ 수치지형도 DXF 열기
       </button>
-
-      <!-- ④ 안내 정리 -->
-      <div style="font-size:10.5px;color:var(--tx3);margin-top:8px;line-height:1.55">
-        변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식
-      </div>
     </div>
 
     <div class="sec pgsec" data-page="2">
@@ -1576,13 +1590,17 @@ function loadDXFFile(f){
       var text=_decodeDxf(buf);   // 인코딩 자동감지(UTF-8/EUC-KR)
       var r=parseDXF(text);
       if(!r.contours.length && !r.surveys.length){
-        toast('등고선·표고점을 못 찾았어요. _분석용.dxf 인지 확인하세요','err'); return;
+        toast('등고선·표고점이 없어요 — 허가지선 도면이면 위쪽 [허가지선 도면 올리기]에 넣어주세요','err');
+        if(typeof _ngiiMsg==='function') _ngiiMsg('이 도면엔 등고선이 없어요. 허가지선이라면 위쪽 전용 칸을 쓰세요','#fbbf24');
+        return;
       }
       /* ★ [TEST] 원점(벨트) 자동 판별 → 캔버스 좌표계(5186)로 변환.
          한 장 올리는 이 경로에도 반드시 필요하다.
          (예전엔 여러 장 올릴 때만 처리돼 셀프 업로드가 동해로 밀렸음) */
       try{
-        var _belt=detectBelt(r);
+        /* 이미 올린 도엽이 있으면 그때 정한 원점을 그대로 쓴다 (도엽별 오판 방지) */
+        var _has=!!(S._allSheets && S._allSheets.contours && S._allSheets.contours.length);
+        var _belt=(_has && S._srcBelt) ? String(S._srcBelt) : detectBelt(r);
         S._srcBelt=_belt;
         if(_belt!=='5186'){
           var _n=reprojectParsed(r, _belt);
@@ -1723,6 +1741,14 @@ document.getElementById('file').addEventListener('change',function(e){
     /* 문서 안에서 요소 간 이동은 무시 (하이라이트/오버레이 유지) */
   });
   window.addEventListener('drop',     function(e){
+    /* [TEST] 허가지선 전용 박스 위에 놓은 경우 — 지형도로 새지 않게 먼저 가로챈다 */
+    var _pd=e.target; while(_pd){ if(_pd.id==='permitDrop') break; _pd=_pd.parentNode; }
+    if(_pd){
+      e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);
+      var _f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+      if(_f && typeof loadPermitDXF==='function') loadPermitDXF(_f);
+      return;
+    }
     var cd=_whichCardDrop(e);
     if(cd){
       e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);  // 하이라이트 해제
@@ -9556,9 +9582,11 @@ function detectBelt(r){
       if(!t5) return;
       score=Math.hypot(t5[0]-target.x, t5[1]-target.y);
     } else {
-      var off=Math.abs(ll[0]-BELT_LON[e]);
-      if(off>1.3) return;
-      score=off;
+      /* ★ 기준 위치가 없으면 원리적으로 판별 불가.
+         네 원점이 정확히 2°씩 떨어져 있어 '구역 중심과의 거리'가 모두 같아진다.
+         (실측: 126.8625↔124.8625 둘 다 0.14° → 무승부 → 도엽마다 다르게 뽑힘)
+         → 추측하지 말고 가장 흔한 중부(5186)로 고정하고 사용자에게 알린다. */
+      score=(e==='5186')?0:1;
     }
     if(!best || score<best.score) best={epsg:e, score:score, lng:ll[0], lat:ll[1]};
   });
@@ -9567,7 +9595,12 @@ function detectBelt(r){
   console.log('[좌표계] 판별:', 'EPSG:'+best.epsg,
               '(중심 '+best.lng.toFixed(4)+','+best.lat.toFixed(4)+
               (target?(' · '+tsrc+'과 '+Math.round(best.score)+'m'):' · 기준점 없음')+')');
-  if(!target) console.log('[좌표계] ⚠ 기준 위치가 없어 원점을 확신할 수 없습니다.');
+  if(!target){
+    console.log('[좌표계] ⚠ 기준 위치(허가지선/검색위치)가 없어 중부(5186)로 가정했습니다.');
+    try{
+      _ngiiMsg('⚠ 허가지선이 없어 좌표계를 중부로 가정했어요 — 위치가 엉뚱하면 아래에서 원점을 바꾸세요','#fbbf24');
+    }catch(e){}
+  }
   return best.epsg;
 }
 
@@ -9653,7 +9686,11 @@ function _syncBeltBtns(){
     var ok=(typeof checkTerrainCoversPermit==='function') ? checkTerrainCoversPermit() : null;
     if(ok===false){ inf.textContent='⚠ 허가지선과 위치가 안 맞아요 — 원점을 바꿔보세요'; inf.style.color='#f87171'; }
     else if(ok===true){ inf.textContent='✓ 허가지선 위치와 일치'; inf.style.color='#4ade80'; }
-    else { inf.textContent='허가지선을 만들면 자동으로 맞춰집니다'; inf.style.color='var(--dim)'; }
+    else {
+      /* 허가지선이 없으면 자동 판별이 불가능하므로 반드시 눈에 띄게 안내 */
+      inf.textContent='⚠ 허가지선이 없어 중부로 가정했어요 — 위치가 다르면 직접 고르세요';
+      inf.style.color='#fbbf24';
+    }
   }
 }
 
@@ -9685,81 +9722,7 @@ function checkTerrainCoversPermit(){
   return true;
 }
 
-function loadFiles(files){
-  files=Array.prototype.slice.call(files||[]).filter(function(f){ return /\.dxf$/i.test(f.name); });
-  if(!files.length){ toast('DXF 파일이 없어요','err'); return; }
-  /* 한 장이어도 누적 처리를 태운다 (기존 도면에 더하기) */
-
-  /* ★ 누적 모드 — 도엽을 여러 번 나눠 올릴 수 있게 기존 것에 더한다.
-     기준은 항상 S._allSheets(원본 누적본) 하나. S.contours는 작업범위로 잘린
-     상태일 수 있으므로 절대 기준으로 쓰면 안 된다(중복 누적됨). */
-  if(!S._allSheets) S._allSheets={contours:[], surveys:[], polys:[], waters:[]};
-  var keep = S._allSheets.contours.length>0 || S._allSheets.surveys.length>0;
-  var merged={
-    contours: S._allSheets.contours.slice(),
-    surveys:  S._allSheets.surveys.slice(),
-    polys:    S._allSheets.polys.slice(),
-    waters:   S._allSheets.waters.slice(),
-    layerStat:{}
-  };
-  var names=[], belts={}, idx=0, t0=Date.now();
-
-  function step(){
-    if(idx>=files.length){ finish(); return; }
-    var f=files[idx++];
-    _ngiiMsg('📖 도엽 '+idx+'/'+files.length+' 읽는 중… ('+f.name.slice(0,28)+')','#94a3b8');
-    var fr=new FileReader();
-    fr.onerror=function(){ console.log('[합치기] 읽기 실패:', f.name); step(); };
-    fr.onload=function(){
-      var text;
-      try{ text=new TextDecoder('utf-8',{fatal:true}).decode(fr.result); }
-      catch(e){ text=new TextDecoder('euc-kr').decode(fr.result); }
-      try{
-        var r=parseDXF(text);
-        var belt=detectBelt(r);
-        if(belt!=='5186') reprojectParsed(r, belt);
-        belts[belt]=(belts[belt]||0)+1;
-        merged.contours=merged.contours.concat(r.contours||[]);
-        merged.surveys =merged.surveys.concat(r.surveys||[]);
-        merged.polys   =merged.polys.concat(r.polys||[]);
-        merged.waters  =merged.waters.concat(r.waters||[]);
-        names.push(f.name);
-        console.log('[합치기] '+f.name+' → 등고선 '+(r.contours||[]).length+' · 표고점 '+(r.surveys||[]).length+' (원점 '+belt+')');
-      }catch(err){
-        console.log('[합치기] 건너뜀 —', f.name, err.message);
-        toast(f.name+' 은(는) 읽지 못했어요','err');
-      }
-      setTimeout(step, 20);
-    };
-    fr.readAsArrayBuffer(f);
-  }
-
-  function finish(){
-    if(!merged.contours.length && !merged.surveys.length){
-      _ngiiMsg('❌ 읽을 수 있는 도엽이 없었어요','#f87171');
-      return;
-    }
-    S._srcBelt=Object.keys(belts).length===1?Object.keys(belts)[0]:'5186';
-    /* 원본 누적본 갱신 — 다음 업로드의 기준이 된다 */
-    S._allSheets={contours:merged.contours.slice(), surveys:merged.surveys.slice(),
-                  polys:merged.polys.slice(), waters:merged.waters.slice()};
-    /* 도엽 이름은 중복 제거 — 같은 파일을 다시 올려도 장수가 늘지 않게 */
-    var prevNames=(S._sheetNames||[]).slice();
-    names.forEach(function(nm){ if(prevNames.indexOf(nm)<0) prevNames.push(nm); });
-    S._sheetNames=prevNames;
-    var totalSheets=prevNames.length;
-    var label=(totalSheets>1) ? (totalSheets+'개 도엽 합침') : prevNames[0];
-    applyParsed(label, merged);
-    _syncSheetList();
-    var sec=((Date.now()-t0)/1000).toFixed(1);
-    _ngiiMsg('✅ '+(keep?('+'+names.length+'장 추가 → 총 '+totalSheets+'장'):(names.length+'개 도엽 합침'))
-      +' · 등고선 '+merged.contours.length
-      +' · 표고점 '+merged.surveys.length
-      +(merged.waters.length?(' · 수계 '+merged.waters.length):'')+' ('+sec+'초)','#4ade80');
-    toast(keep? (names.length+'장 추가 (총 '+totalSheets+'장)') : (names.length+'개 도엽을 합쳤어요'),'ok');
-  }
-  step();
-}
+/* (경사도판 loadFiles 제거 — 아래 재해 어댑터의 loadFiles 사용) */
 
 function clearSheets(){
   S.contours=[]; S.surveys=[]; S.waters=[]; S.allPolys=[];
@@ -9851,7 +9814,7 @@ window.addEventListener('message', function(ev){
 })();
 
 
-var GDSP_FLOW_VER='TEST v1.3 (2026-08-23) 여러 장 동시선택·누적 업로드 수정';
+var GDSP_FLOW_VER='TEST v1.6 (2026-08-23) 허가지선 DXF 업로드 추가';
 console.log('%c[G-DSP 재해] '+GDSP_FLOW_VER,'color:#60a5fa;font-weight:700');
 
 /* ══════════════════════════════════════════════════════════════
@@ -9923,6 +9886,10 @@ function loadFiles(files){
     bgLines:(S._allSheets.bgLines||[]).slice(), bgTexts:(S._allSheets.bgTexts||[]).slice()
   };
   var names=[], belts={}, idx=0, t0=Date.now();
+  /* ★ 원점은 도엽마다 따로 판별하면 안 된다. 같이 받은 도엽은 같은 지역이라
+     원점이 동일한데, 허가지선에서 먼 옆 도엽은 기준점이 멀어 오판이 난다
+     (실측: 3장 중 1장만 178km 서쪽 바다로). 첫 도엽에서 정한 원점을 전부에 적용. */
+  var _fixedBelt = (keep && S._srcBelt) ? String(S._srcBelt) : null;
   function step(){
     if(idx>=files.length){ finish(); return; }
     var f=files[idx++];
@@ -9933,7 +9900,7 @@ function loadFiles(files){
       try{
         var text=_decodeDxf(fr.result);
         var r=parseDXF(text);
-        var belt=detectBelt(r);
+        var belt = _fixedBelt || (_fixedBelt = detectBelt(r));
         if(belt!=='5186') reprojectParsed(r, belt);
         belts[belt]=(belts[belt]||0)+1;
         merged.contours=merged.contours.concat(r.contours||[]);
@@ -9955,7 +9922,7 @@ function loadFiles(files){
     if(!merged.contours.length && !merged.surveys.length){
       _ngiiMsg('❌ 읽을 수 있는 도엽이 없었어요','#f87171'); return;
     }
-    S._srcBelt=Object.keys(belts).length===1?Object.keys(belts)[0]:'5186';
+    S._srcBelt=_fixedBelt||'5186';
     S._allSheets={contours:merged.contours.slice(), surveys:merged.surveys.slice(),
                   polys:merged.polys.slice(), bgLines:merged.bgLines.slice(), bgTexts:merged.bgTexts.slice()};
     var prevNames=(S._sheetNames||[]).slice();
@@ -10054,6 +10021,129 @@ window.addEventListener('load', function(){
     try{ ngiiSyncGate(); _syncSheetList(); if(typeof _syncBeltBtns==='function') _syncBeltBtns(); }catch(e){}
   }, 400);
 });
+
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 허가지선 DXF 업로드 — 업체가 준 도면(허가지선만) 받기
+   지형도 드롭박스는 등고선이 없으면 거부하므로 별도 입구가 필요하다.
+   R12(POLYLINE/VERTEX)도 읽는다.
+   ══════════════════════════════════════════════════════════════ */
+function parsePolylineR12(text){
+  var L=text.split(/\r\n|\r|\n/);
+  var out=[], i=0, cur=null, vtx=null;
+  function pushVtx(){ if(cur && vtx && isFinite(vtx.x) && isFinite(vtx.y)) cur.pts.push(vtx); vtx=null; }
+  function flush(){
+    if(cur && cur.pts.length>=3){
+      var pts=cur.pts.slice();
+      var a=pts[0], b=pts[pts.length-1];
+      if(Math.abs(a.x-b.x)<1e-6 && Math.abs(a.y-b.y)<1e-6) pts.pop();
+      if(pts.length>=3) out.push({ layer:cur.layer||'0', pts:pts, closed:!!(cur.flag&1) });
+    }
+    cur=null; vtx=null;
+  }
+  while(i<L.length-1){
+    var code=L[i].trim(), val=L[i+1];
+    if(code==='0'){
+      var t=(val||'').trim().toUpperCase();
+      if(t==='POLYLINE'){ flush(); cur={layer:'0', flag:0, pts:[]}; }
+      else if(t==='VERTEX'){ pushVtx(); if(cur) vtx={x:NaN,y:NaN}; }
+      else { pushVtx(); flush(); }
+    } else if(cur){
+      var v=(val||'').trim();
+      if(!vtx){
+        if(code==='8') cur.layer=v;
+        else if(code==='70') cur.flag=parseInt(v,10)||0;
+      } else {
+        if(code==='10') vtx.x=parseFloat(v);
+        else if(code==='20') vtx.y=parseFloat(v);
+      }
+    }
+    i+=2;
+  }
+  pushVtx(); flush();
+  return out;
+}
+
+function loadPermitDXF(file){
+  if(!file) return;
+  if(!/\.dxf$/i.test(file.name)){ toast('DXF 파일만 올려주세요','err'); return; }
+  var rd=new FileReader();
+  rd.onerror=function(){ toast('파일을 읽지 못했어요','err'); };
+  rd.onload=function(){
+    var text;
+    try{ text=_decodeDxf(rd.result); }catch(e){ toast('파일 인코딩 오류','err'); return; }
+
+    var cands=[];
+    /* 1) 일반 파서의 폐합 폴리곤 */
+    try{
+      var r=parseDXF(text);
+      cands=(r.polys||[]).filter(function(p){ return p.pts && p.pts.length>=3; });
+    }catch(e){}
+    /* 2) 없으면 R12(POLYLINE/VERTEX)로 다시 */
+    if(!cands.length){
+      try{ cands=parsePolylineR12(text); }catch(e){ cands=[]; }
+      if(cands.length) console.log('[허가지선] R12 폴리라인으로 읽음:', cands.length+'개');
+    }
+    if(!cands.length){ toast('닫힌 폴리곤(허가지선)을 찾지 못했어요','err'); return; }
+
+    /* 면적이 가장 큰 폴리곤을 허가지선으로 */
+    function ar(pts){ return Math.abs(polyArea(pts)); }
+    var best=cands[0], ba=ar(best.pts);
+    for(var i=1;i<cands.length;i++){ var a=ar(cands[i].pts); if(a>ba){ best=cands[i]; ba=a; } }
+
+    /* 재해는 S.permit 이 점 배열 */
+    S.permit=best.pts.map(function(p){ return {x:p.x, y:p.y}; });
+    S.permitParcels=null;
+    S._permitSrc=null; S._permitPnus=[];
+    NGII._lastAddr=null; NGII.autoFilled=false;
+    if(typeof CAD!=='undefined') CAD.marker=null;
+
+    /* 지형도가 아직 없으면 허가지선 기준으로 화면 잡기 */
+    if(!(S.contours && S.contours.length)) _fitToPermitFlow();
+
+    if(typeof updateNav==='function') updateNav();
+    if(typeof ngiiSyncGate==='function') ngiiSyncGate();
+    toast('허가지선 불러옴 — '+Math.round(ba).toLocaleString()+'㎡ ('+cands.length+'개 중 최대)','ok');
+    render();
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+/* 허가지선만 있을 때 화면 맞춤 */
+function _fitToPermitFlow(){
+  var pts=_permitPtsFlow(); if(!pts) return;
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+  pts.forEach(function(p){
+    if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+    if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y;
+  });
+  var pad=Math.max((mxx-mnx),(mxy-mny))*0.8+50;
+  S.bounds={minX:mnx-pad, minY:mny-pad, maxX:mxx+pad, maxY:mxy+pad};
+  S._viewFromUser=true;
+  if(typeof fitView==='function') fitView();
+}
+
+/* 허가지선 업로드 입력 연결 */
+(function _bindPermitUpload(){
+  function bind(){
+    var inp=document.getElementById('permitFile');
+    var drop=document.getElementById('permitDrop');
+    if(!inp||!drop){ setTimeout(bind,300); return; }
+    inp.addEventListener('change', function(){
+      if(this.files && this.files[0]) loadPermitDXF(this.files[0]);
+      this.value='';
+    });
+    ['dragenter','dragover'].forEach(function(t){
+      drop.addEventListener(t, function(e){ e.preventDefault(); e.stopPropagation(); drop.style.borderColor='#38bdf8'; });
+    });
+    ['dragleave','drop'].forEach(function(t){
+      drop.addEventListener(t, function(e){ e.preventDefault(); e.stopPropagation(); drop.style.borderColor=''; });
+    });
+    /* drop 처리는 전역 리스너가 담당 (중복 방지) */
+  }
+  if(document.readyState==='complete') bind();
+  else window.addEventListener('load', bind);
+})();
 
 </script>
 </body>
