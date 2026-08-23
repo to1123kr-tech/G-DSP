@@ -275,7 +275,7 @@
   <div class="logo">
     <div class="ic">🌊</div>
     재해·우수분석 <small>수계 · 유역 · 우수</small>
-    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.9 · 08-23 완료표시 수정</span>
+    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v2.0 · 08-23 산림청·강우 자동</span>
   </div>
   <div class="steps">
     <div class="bookcrumb" id="bookCrumb">1. 허가지선</div>
@@ -894,7 +894,8 @@
           <span class="st">산사태·임상·토양</span>
         </div>
         <div class="dcard-bd" id="dcb_forest">
-          <div class="ddrop" id="forestDrop" onclick="document.getElementById('forestFile').click()">
+          <!-- [TEST] 확장이 자동으로 올려주므로 기본 숨김. [직접 올리기]로 열 수 있다 -->
+          <div class="ddrop" id="forestDrop" style="display:none" onclick="document.getElementById('forestFile').click()">
             📂 산림청 zip을 여기 놓거나 클릭<br><span style="font-size:9.5px">산사태·임상·토양 zip 한 번에 (여러 개 가능)</span>
           </div>
           <input type="file" id="forestFile" accept=".zip" multiple style="display:none" onchange="forestUpload(this.files)">
@@ -903,7 +904,12 @@
    style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;text-decoration:none">🔗 산림공간정보서비스</a>
 <a id="forestInstallBtn" class="dbtn" style="display:none;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;text-decoration:none;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;font-weight:700;border-color:transparent"></a>
 <div id="forestExtMsg" style="font-size:10px;line-height:1.5;margin-bottom:6px;color:var(--tx3)"></div>
-          <a href="#" onclick="openForestGuide();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법</a>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <a href="#" onclick="openForestGuide();return false;" class="dbtn"
+               style="flex:1;display:flex;justify-content:center;font-size:10px;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법</a>
+            <a href="#" onclick="forestShowManual();return false;" class="dbtn"
+               style="flex:1;display:flex;justify-content:center;font-size:10px;text-decoration:none">📂 직접 올리기</a>
+          </div>
           <div id="forestLayers" style="margin-top:8px;display:none"></div>
           <div id="forestMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
@@ -964,11 +970,13 @@
           <span class="st">WAMIS 확률강우량</span>
         </div>
         <div class="dcard-bd" id="dcb_rain">
-          <div class="ddrop" id="rainDrop" onclick="document.getElementById('rainXlsx').click()">
+          <!-- [TEST] 자동 받기가 기본. 수동 상자는 실패했을 때만 나타난다 -->
+          <div class="ddrop" id="rainDrop" style="display:none" onclick="document.getElementById('rainXlsx').click()">
             📂 받은 엑셀을 여기 놓거나 클릭<br><span style="font-size:9.5px">확률강우량_지역빈도해석_.xlsx</span>
           </div>
           <input type="file" id="rainXlsx" accept=".xlsx,.xls" style="display:none" onchange="rainUpload(this.files)">
-          <button class="dbtn pri" onclick="rainOpenWamis()" style="width:100%;margin-top:6px;margin-bottom:6px">🔗 확률강우량 다운로드</button>
+          <button class="dbtn pri" onclick="rainAutoFetch()" style="width:100%;margin-top:6px;margin-bottom:6px;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;font-weight:700;border-color:transparent">🌧️ 확률강우량 자동으로 받기</button>
+          <a href="#" onclick="rainOpenWamis();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;font-size:10px;text-decoration:none">🔗 WAMIS 직접 열기</a>
           <a href="#" onclick="openRainGuide();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법</a>
           <div id="rainStation" style="font-size:10.5px;color:var(--tx2);margin-top:8px;display:none"></div>
           <div id="rainResult" style="display:none;margin-top:6px"></div>
@@ -7292,6 +7300,127 @@ function groundCapture(files){
 /* ---------- 산림청 카드: zip 업로드 → /api/forest-parse ---------- */
 /* (드롭 처리는 전역 카드 드롭 핸들러가 통합 관리 — 개별 핸들러 제거해 오버레이·일관성 확보) */
 
+
+var _forestAutoQueue = [], _forestAutoTimer = null;
+var _forestPollTimer = null, _forestSeq = -1;
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 산림청 자동전달 · 강우 자동받기 — USB판(0.7.2 흐름)에서 이식
+   · 산림청: 확장이 받은 zip 을 서버(/api/forest-parse)로 바로 올리고,
+            화면은 /api/forest-latest 를 확인해 오는 대로 얹는다.
+            (자료 3개가 몇 초 간격으로 순차 도착하므로 계속 확인)
+   · 강우  : 서버가 WAMIS 에서 대신 받아 넘겨준다(CORS 우회).
+            메모리에서 파싱하므로 디스크에 파일이 안 생긴다.
+   ══════════════════════════════════════════════════════════════ */
+function _b64ToFile(b64, name){
+  var bin = atob(b64), n = bin.length, u8 = new Uint8Array(n);
+  for (var i=0; i<n; i++) u8[i] = bin.charCodeAt(i);
+  return new File([u8], name, {type:'application/zip'});
+}
+
+function forestAutoReceive(name, b64){
+  if(!b64){
+    _dmsg('forestMsg','📥 '+name+' 받음 — 자동 읽기 실패, 위 상자에 직접 놓아주세요','err');
+    return;
+  }
+  try { _forestAutoQueue.push(_b64ToFile(b64, name)); }
+  catch(e){ _dmsg('forestMsg','📥 '+name+' 처리 실패 — 직접 올려주세요','err'); return; }
+
+  _dmsg('forestMsg','📥 '+_forestAutoQueue.length+'개 받음 — 잠시 후 자동으로 올립니다…','');
+  clearTimeout(_forestAutoTimer);
+  _forestAutoTimer = setTimeout(function(){       // 마지막 파일 후 2초 → 한 번에 처리
+    var fs = _forestAutoQueue.slice();
+    _forestAutoQueue = [];
+    if(fs.length) forestUpload(fs);
+  }, 2000);
+}
+
+function forestShowManual(){
+  var d=document.getElementById('forestDrop'); if(!d) return;
+  d.style.display = (d.style.display==='none') ? '' : 'none';
+}
+
+function forestRevealManual(){
+  var d=document.getElementById('forestDrop'); if(d) d.style.display='';
+}
+
+function forestStartPolling(sec){
+  clearInterval(_forestPollTimer);
+  var until = Date.now() + (sec || 240) * 1000;   // 아래에서 도착할 때마다 연장됨
+  _dmsg('forestMsg','⏳ 산림청 자료를 기다리는 중…','');
+  _forestPollTimer = setInterval(function(){
+    if(Date.now() > until){
+      clearInterval(_forestPollTimer);
+      var ov=DATA8.overlays;
+      var got=(ov.forest_sansatae?1:0)+(ov.forest_imsang?1:0)+(ov.forest_toyang?1:0);
+      if(got<3){
+        _dmsg('forestMsg','⚠ 자동 받기가 끝나지 않았습니다 ('+got+'/3) — 아래 상자에 직접 올려주세요','err');
+        forestRevealManual();
+      }
+      return;
+    }
+    fetch('/api/forest-latest').then(function(r){ return r.json(); }).then(function(j){
+      if(!j || !j.ok) return;
+      if(_forestSeq < 0){ _forestSeq = j.seq; return; }      // 첫 확인은 기준만 잡음
+      if(j.seq === _forestSeq) return;                        // 변화 없음
+      _forestSeq = j.seq;
+      if(!j.results || !j.results.length) return;
+
+      /* ★ 세 파일(산사태·임상·토양)이 몇 초 간격으로 순차 도착한다.
+         첫 것만 집고 멈추면 나머지를 놓친다 → 계속 확인하면서 오는 대로 얹는다.
+         마지막 자료가 들어온 뒤 8초간 조용하면 끝난 것으로 본다. */
+      forestApply(j.results, j.errors);
+      fetch('/api/forest-clear',{method:'POST'}).catch(function(){});
+      until = Date.now() + 8000;                              // 도착할 때마다 시간 연장
+    }).catch(function(){});
+  }, 1500);
+}
+
+function rainAutoFetch(){
+  /* 관측소부터 정해둔다 — 작업 위치가 있어야 한다 */
+  if(!DATA8.rain.station){
+    var loc=_d8GetLoc();
+    if(!loc){ _dmsg('rainMsg','먼저 위 「작업 위치」를 검색하거나 허가지선을 만드세요','err'); return; }
+    _rainFindAt(loc.lng, loc.lat);
+    if(!DATA8.rain.station){ _dmsg('rainMsg','관측소를 찾지 못했어요','err'); return; }
+  }
+  _dmsg('rainMsg','⏳ 확률강우량 엑셀을 받는 중… (조금 걸립니다)','');
+  fetch('/api/rain-xlsx')
+    .then(function(r){
+      if(!r.ok) return r.json().then(function(j){ throw new Error(j && j.msg || ('응답 '+r.status)); });
+      return r.arrayBuffer();
+    })
+    .then(function(buf){
+      _dmsg('rainMsg','⏳ 엑셀 분석 중…','');
+      _ensureXLSX(function(ok){
+        if(!ok){ _dmsg('rainMsg','엑셀 라이브러리 로드 실패','err'); return; }
+        try{
+          var wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+          rainParseWorkbook(wb);
+        }catch(err){
+          _dmsg('rainMsg','엑셀 분석 오류: '+err+' — 아래에 직접 올려주세요','err');
+          _rainRevealManual();
+        }
+      });
+    })
+    .catch(function(e){
+      _dmsg('rainMsg','❌ 자동 받기 실패: '+e.message+' — WAMIS 에서 직접 받아 아래에 올려주세요','err');
+      _rainRevealManual();
+    });
+}
+
+function _rainRevealManual(){
+  var d=document.getElementById('rainDrop'); if(d) d.style.display='';
+}
+
+/* 앱이 켜질 때 현재 seq 를 기준으로 잡아둔다 (기존 자료를 새 것으로 오인하지 않게) */
+window.addEventListener('load', function(){
+  try{
+    fetch('/api/forest-latest').then(function(r){ return r.json(); })
+      .then(function(j){ if(j && j.ok) _forestSeq = j.seq; }).catch(function(){});
+  }catch(e){}
+});
+
 function forestUpload(files){
   if(!files || !files.length) return;
   _dmsg('forestMsg','⏳ 업로드·분석 중… (산사태·임상·토양 자동판별)','');
@@ -9016,7 +9145,9 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
     }
     if (d.type === 'PROGRESS') { var m = document.getElementById('forestExtMsg'); if (m && d.msg) m.textContent = '⏳ ' + d.msg; return; }
     if (d.type === 'DONE') {
-      t(d.ok ? '산림청 다운로드 완료 — 받은 zip을 위 칸에 올리세요' : ('중단: ' + (d.msg || '')), d.ok ? 'ok' : 'err');
+      t(d.ok ? '산림청 다운로드 완료 — 자동으로 불러오는 중…' : ('중단: ' + (d.msg || '')), d.ok ? 'ok' : 'err');
+      /* 완료 신호 뒤에도 파일이 조금 늦게 도착할 수 있어 한 번 더 지켜본다 */
+      if (d.ok && typeof forestStartPolling === 'function') forestStartPolling(60);
       ui();
     }
   }, false);
@@ -9083,6 +9214,9 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
         reason: reason
       }, location.origin);
       t('산림청 자동신청 시작 (' + (label || '작업위치') + ') — ' + addr, 'ok');
+      /* [TEST] 확장이 받는 대로 서버로 올리므로, 여기서부터 보관함을 지켜본다.
+         자료 3개(산사태·임상·토양)가 순차로 오면 오는 대로 화면에 얹힌다. */
+      if (typeof forestStartPolling === 'function') forestStartPolling(300);
     });
     return false;
   };
@@ -9841,7 +9975,7 @@ window.addEventListener('message', function(ev){
 })();
 
 
-var GDSP_FLOW_VER='TEST v1.9 (2026-08-23) 완료표시 순서 수정·허가지선 박스 확대';
+var GDSP_FLOW_VER='TEST v2.0 (2026-08-23) 산림청 자동전달·강우 자동받기';
 console.log('%c[G-DSP 재해] '+GDSP_FLOW_VER,'color:#60a5fa;font-weight:700');
 
 /* ══════════════════════════════════════════════════════════════

@@ -2466,6 +2466,68 @@ def _fgis_parse_shp(shp_path):
     return {'kind':kind,'geojson':{'type':'FeatureCollection','features':feats},
             'count':len(feats),'fields':fns,'crs':crs_used}
 
+# ── WAMIS 확률강우량 엑셀 대신 받아오기 ──
+#   브라우저에서 직접 받으면 다른 집 서버라 막힌다(CORS).
+#   서버가 대신 받아 그대로 넘겨주면 사용자는 버튼 한 번으로 끝난다.
+WAMIS_RAIN_URL = ('https://www.wamis.go.kr/wscFile/wsc_frequency_download/download.do'
+                  '?fileName=확률강우량(지역빈도해석).xlsx')
+
+
+@app.route('/api/rain-xlsx')
+def rain_xlsx():
+    """확률강우량 엑셀을 WAMIS 에서 받아 그대로 전달."""
+    try:
+        # 이 파일은 requests 를 req 라는 이름으로 가져다 쓴다
+        #   verify=False : WAMIS 인증서 문제로 검증을 끈다
+        #   Referer      : 이 헤더가 없으면 파일 대신 오류 페이지를 준다
+        r = req.get(WAMIS_RAIN_URL, timeout=60, verify=False,
+                    headers={'User-Agent': 'Mozilla/5.0',
+                             'Referer': 'https://www.wamis.go.kr/wsc/wsc_frequency.do'})
+        ct = (r.headers.get('Content-Type') or '').lower()
+        if r.status_code != 200 or len(r.content) < 1000:
+            logger.warning(f"[rain] 실패 {r.status_code} {ct} {len(r.content)}bytes")
+            return jsonify({'ok': False, 'msg': f'WAMIS 응답 {r.status_code}'}), 502
+        # 엑셀이 아니라 오류 페이지가 온 경우
+        if 'html' in ct:
+            logger.warning("[rain] 엑셀이 아니라 HTML 이 왔습니다")
+            return jsonify({'ok': False, 'msg': 'WAMIS 가 파일 대신 페이지를 반환했습니다'}), 502
+        logger.info(f"[rain] 받음 {len(r.content)//1024}KB")
+        resp = make_response(r.content)
+        resp.headers['Content-Type'] = ('application/vnd.openxmlformats-officedocument'
+                                        '.spreadsheetml.sheet')
+        resp.headers['Content-Disposition'] = 'inline; filename="rain.xlsx"'
+        return resp
+    except Exception as e:
+        logger.error(f"[rain] {e}")
+        return jsonify({'ok': False, 'msg': str(e)}), 502
+
+
+# ── 산림청 자동 전달용 보관함 ──
+#   확장이 산림청에서 받은 zip 을 여기로 바로 올리고, 앱 화면이 확인해 가져간다.
+#   (확장 안에서 큰 파일을 주고받으면 용량·서비스워커 종료 등 변수가 많다)
+_forest_inbox = {"seq": 0, "results": [], "errors": [], "at": 0}
+
+
+@app.route('/api/forest-latest')
+def forest_latest():
+    """앱이 확인하는 곳. seq 가 바뀌면 새 자료가 들어온 것."""
+    return jsonify({
+        "ok": True,
+        "seq": _forest_inbox["seq"],
+        "at": _forest_inbox["at"],
+        "results": _forest_inbox["results"],
+        "errors": _forest_inbox["errors"],
+    })
+
+
+@app.route('/api/forest-clear', methods=['POST'])
+def forest_clear():
+    """앱이 가져간 뒤 비운다."""
+    _forest_inbox["results"] = []
+    _forest_inbox["errors"] = []
+    return jsonify({"ok": True, "seq": _forest_inbox["seq"]})
+
+
 @app.route('/api/forest-parse', methods=['POST','OPTIONS'])
 def forest_parse():
     """산림청 FGIS zip 업로드 → 종류 자동판별 → 지도용 데이터(JSON)."""
@@ -2504,6 +2566,17 @@ def forest_parse():
                 errors.append(f'{fname}: 산사태(tif)/임상·토양(shp) 아님 — {names[:3]}')
         except Exception as e:
             errors.append(f'{fname}: {e}')
+    # 보관함에 쌓아 둔다 (앱이 가져갈 때까지)
+    #   확장이 산림청에서 받은 zip 을 바로 올리면 여기 쌓이고,
+    #   화면이 /api/forest-latest 로 확인해 가져간다.
+    if results:
+        import time as _t
+        _forest_inbox["results"].extend(results)
+        _forest_inbox["errors"].extend(errors or [])
+        _forest_inbox["seq"] += 1
+        _forest_inbox["at"] = int(_t.time())
+        logger.info(f"[forest] 보관함에 {len(results)}건 추가 (seq={_forest_inbox['seq']})")
+
     return jsonify({'ok':len(results)>0,'results':results,'errors':errors})
 
 
