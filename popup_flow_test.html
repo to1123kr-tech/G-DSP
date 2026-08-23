@@ -273,7 +273,7 @@
   <div class="logo">
     <div class="ic">🌊</div>
     재해·우수분석 <small>수계 · 유역 · 우수</small>
-    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.2 · 08-23 셀프업로드 좌표계</span>
+    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v1.3 · 08-23 여러장·누적 수정</span>
   </div>
   <div class="steps">
     <div class="bookcrumb" id="bookCrumb">1. 지형도 올리기</div>
@@ -1591,13 +1591,24 @@ function loadDXFFile(f){
         }
       }catch(e){ console.log('[좌표계] 판별 실패', e); }
 
-      /* 누적 기준본 갱신 (여러 장 합치기와 같은 기준을 쓰도록) */
-      S._allSheets={contours:(r.contours||[]).slice(), surveys:(r.surveys||[]).slice(),
-                    polys:(r.polys||[]).slice(),
-                    bgLines:(r.bgLines||[]).slice(), bgTexts:(r.bgTexts||[]).slice()};
-      S._sheetNames=[f.name];
+      /* ★ 누적 — 한 장씩 올려도 앞서 올린 도엽이 유지되게 한다.
+         (기준은 항상 S._allSheets 하나. 여러 장 합치기와 같은 방식) */
+      if(!S._allSheets) S._allSheets={contours:[], surveys:[], polys:[], bgLines:[], bgTexts:[]};
+      var _m={
+        contours: S._allSheets.contours.concat(r.contours||[]),
+        surveys : S._allSheets.surveys.concat(r.surveys||[]),
+        polys   : S._allSheets.polys.concat(r.polys||[]),
+        bgLines : (S._allSheets.bgLines||[]).concat(r.bgLines||[]),
+        bgTexts : (S._allSheets.bgTexts||[]).concat(r.bgTexts||[])
+      };
+      S._allSheets={contours:_m.contours.slice(), surveys:_m.surveys.slice(),
+                    polys:_m.polys.slice(), bgLines:_m.bgLines.slice(), bgTexts:_m.bgTexts.slice()};
+      var _ns=(S._sheetNames||[]).slice();
+      if(_ns.indexOf(f.name)<0) _ns.push(f.name);
+      S._sheetNames=_ns;
+      S.name=(_ns.length>1)?(_ns.length+'개 도엽 합침'):f.name;
 
-      applyParsed(r);
+      applyParsed(_m);
       if(typeof _syncSheetList==='function') _syncSheetList();
       if(typeof _syncBeltBtns==='function') _syncBeltBtns();
       if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
@@ -1623,7 +1634,13 @@ function _decodeDxf(buf){
   }catch(e){}
   return utf8||'';   // 둘 다 안되면 UTF-8 그대로
 }
-document.getElementById('file').addEventListener('change',function(e){ loadDXFFile(e.target.files[0]); e.target.value=''; });
+/* [TEST] 여러 도엽을 한 번에 고를 수 있게 — 2장 이상이면 합쳐서 연다 */
+document.getElementById('file').addEventListener('change',function(e){
+  var fl=e.target.files;
+  if(fl && fl.length>1 && typeof loadFiles==='function') loadFiles(fl);
+  else if(fl && fl.length) loadDXFFile(fl[0]);
+  e.target.value='';
+});
 
 /* 드래그앤드롭 (창 어디에 놓아도 불러옴) */
 (function(){
@@ -1721,7 +1738,9 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
     /* 8번 페이지 나머지 = DXF 안 받음 */
     if(_overForestDrop(e)){ e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null); return; }
     e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);
-    var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) loadDXFFile(f); });
+    var fl=e.dataTransfer&&e.dataTransfer.files;
+    if(fl && fl.length>1 && typeof loadFiles==='function') loadFiles(fl);
+    else if(fl && fl.length) loadDXFFile(fl[0]); });
   /* 드래그 지점이 산림청 zip 드롭존(또는 그 안)인지, 또는 8번 페이지 활성 중인지 */
   function _overForestDrop(e){
     /* 8번(자료 겹치기) 페이지에서는 DXF 안 받음 — 카드 드롭 전용 */
@@ -9832,7 +9851,7 @@ window.addEventListener('message', function(ev){
 })();
 
 
-var GDSP_FLOW_VER='TEST v1.2 (2026-08-23) 셀프 업로드도 좌표계 자동판별';
+var GDSP_FLOW_VER='TEST v1.3 (2026-08-23) 여러 장 동시선택·누적 업로드 수정';
 console.log('%c[G-DSP 재해] '+GDSP_FLOW_VER,'color:#60a5fa;font-weight:700');
 
 /* ══════════════════════════════════════════════════════════════
@@ -10018,19 +10037,17 @@ function ngiiSyncGate(){
   wrap();
 })();
 
-/* 파일 입력 — 여러 장 동시 선택 */
+/* 파일 입력 — multiple 속성만 켠다 (change 처리는 위 리스너가 담당) */
 (function _multiFile(){
   function bind(){
     var inp=document.getElementById('file');
     if(!inp){ setTimeout(bind,300); return; }
     inp.setAttribute('multiple','');
-    inp.addEventListener('change', function(){
-      if(this.files && this.files.length>1){ loadFiles(this.files); this.value=''; }
-    }, true);
   }
   if(document.readyState==='complete') bind();
   else window.addEventListener('load', bind);
 })();
+
 
 window.addEventListener('load', function(){
   setTimeout(function(){
