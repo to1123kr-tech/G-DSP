@@ -275,7 +275,7 @@
   <div class="logo">
     <div class="ic">🌊</div>
     재해·우수분석 <small>수계 · 유역 · 우수</small>
-    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v2.0 · 08-23 산림청·강우 자동</span>
+    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v2.1 · 08-23 산림청 3개 수신</span>
   </div>
   <div class="steps">
     <div class="bookcrumb" id="bookCrumb">1. 허가지선</div>
@@ -1634,6 +1634,13 @@ function loadDXFFile(f){
       S.name=(_ns.length>1)?(_ns.length+'개 도엽 합침'):f.name;
 
       applyParsed(_m);
+      /* [TEST] 완료 알림 — 예전엔 '여는 중…'이 그대로 남아 끝났는지 알 수 없었다 */
+      if(typeof _ngiiMsg==='function'){
+        var _bt=(S._srcBelt && S._srcBelt!=='5186' && typeof _beltName==='function')
+                ? (' · 원점 '+_beltName(S._srcBelt)+'→중부 변환') : '';
+        _ngiiMsg('✅ 등고선 '+(_m.contours||[]).length+' · 표고점 '+(_m.surveys||[]).length
+                 +(_ns.length>1?(' · 도엽 '+_ns.length+'장'):'')+_bt, '#4ade80');
+      }
       if(typeof _syncSheetList==='function') _syncSheetList();
       if(typeof _syncBeltBtns==='function') _syncBeltBtns();
       if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
@@ -7359,18 +7366,19 @@ function forestStartPolling(sec){
       }
       return;
     }
-    fetch('/api/forest-latest').then(function(r){ return r.json(); }).then(function(j){
+    /* ★ take=1 — 가져가면서 서버에서 바로 비운다.
+       확인(GET)과 비우기(POST)를 따로 하면 그 사이에 도착한 자료까지 지워진다.
+       (실측: 3개가 1초 안에 몰려 들어와 1개만 화면에 떴음)
+       또한 seq 만 보고 건너뛰면 안 된다 — 남아있는 자료를 못 가져간다. */
+    fetch('/api/forest-latest?take=1').then(function(r){ return r.json(); }).then(function(j){
       if(!j || !j.ok) return;
-      if(_forestSeq < 0){ _forestSeq = j.seq; return; }      // 첫 확인은 기준만 잡음
-      if(j.seq === _forestSeq) return;                        // 변화 없음
       _forestSeq = j.seq;
-      if(!j.results || !j.results.length) return;
+      if(!j.results || !j.results.length) return;   // 새 자료 없음
 
-      /* ★ 세 파일(산사태·임상·토양)이 몇 초 간격으로 순차 도착한다.
-         첫 것만 집고 멈추면 나머지를 놓친다 → 계속 확인하면서 오는 대로 얹는다.
+      /* 세 파일(산사태·임상·토양)이 몇 초 간격으로 순차 도착한다.
+         첫 것만 집고 멈추면 나머지를 놓치므로 계속 확인하며 오는 대로 얹는다.
          마지막 자료가 들어온 뒤 8초간 조용하면 끝난 것으로 본다. */
       forestApply(j.results, j.errors);
-      fetch('/api/forest-clear',{method:'POST'}).catch(function(){});
       until = Date.now() + 8000;                              // 도착할 때마다 시간 연장
     }).catch(function(){});
   }, 1500);
@@ -9975,7 +9983,7 @@ window.addEventListener('message', function(ev){
 })();
 
 
-var GDSP_FLOW_VER='TEST v2.0 (2026-08-23) 산림청 자동전달·강우 자동받기';
+var GDSP_FLOW_VER='TEST v2.1 (2026-08-23) 산림청 자료 3개 모두 수신(경합 수정)';
 console.log('%c[G-DSP 재해] '+GDSP_FLOW_VER,'color:#60a5fa;font-weight:700');
 
 /* ══════════════════════════════════════════════════════════════

@@ -2510,13 +2510,26 @@ _forest_inbox = {"seq": 0, "results": [], "errors": [], "at": 0}
 
 @app.route('/api/forest-latest')
 def forest_latest():
-    """앱이 확인하는 곳. seq 가 바뀌면 새 자료가 들어온 것."""
+    """앱이 확인하는 곳. seq 가 바뀌면 새 자료가 들어온 것.
+
+    ?take=1 이면 가져가면서 동시에 비운다.
+    확인(GET)과 비우기(POST)를 따로 하면, 그 사이에 도착한 자료까지
+    같이 지워져 화면에 안 뜬다(실측: 3개 중 1개만 표시).
+    """
+    take = request.args.get('take') in ('1', 'true', 'yes')
+    results = list(_forest_inbox["results"])
+    errors  = list(_forest_inbox["errors"])
+    if take and results:
+        # 방금 꺼낸 만큼만 지운다 (그 뒤에 들어온 것은 남긴다)
+        del _forest_inbox["results"][:len(results)]
+        del _forest_inbox["errors"][:len(errors)]
+        logger.info(f"[forest] {len(results)}건 전달하고 비움 (남은 {len(_forest_inbox['results'])}건)")
     return jsonify({
         "ok": True,
         "seq": _forest_inbox["seq"],
         "at": _forest_inbox["at"],
-        "results": _forest_inbox["results"],
-        "errors": _forest_inbox["errors"],
+        "results": results,
+        "errors": errors,
     })
 
 
