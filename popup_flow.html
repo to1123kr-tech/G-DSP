@@ -125,12 +125,14 @@
   .cadPDel{background:none;border:1px solid rgba(248,113,113,.3);color:#f87171;border-radius:5px;
     width:22px;height:22px;font-size:11px;cursor:pointer;flex-shrink:0;line-height:1;transition:.12s}
   .cadPDel:hover{background:rgba(248,113,113,.15);border-color:#f87171}
-  .dropzone{margin-top:11px;border:2px dashed var(--line);border-radius:12px;background:rgba(14,22,38,.4);
-    padding:26px 14px;text-align:center;cursor:pointer;transition:.16s}
+  /* [TEST] 1번 페이지가 길어져 스크롤이 생기므로 드롭존을 줄임 */
+  .dropzone{margin-top:9px;border:2px dashed var(--line);border-radius:10px;background:rgba(14,22,38,.4);
+    padding:13px 12px;text-align:center;cursor:pointer;transition:.16s}
   .dropzone:hover{border-color:var(--accent);background:rgba(56,189,248,.06)}
   .dropzone.dragover{border-color:var(--accent);background:rgba(56,189,248,.12)}
-  .dropzone .dz-ic{font-size:34px;opacity:.85;margin-bottom:8px}
-  .dropzone .dz-t{font-size:12px;color:var(--tx3);line-height:1.5}
+  #permitDrop:hover{border-color:var(--accent);background:rgba(56,189,248,.06)}
+  .dropzone .dz-ic{font-size:20px;opacity:.85;margin-bottom:3px}
+  .dropzone .dz-t{font-size:11px;color:var(--tx3);line-height:1.45}
   .dropzone .dz-t b{color:var(--tx2)}
 
   .statusbar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:18px;
@@ -273,9 +275,10 @@
   <div class="logo">
     <div class="ic">🌊</div>
     재해·우수분석 <small>수계 · 유역 · 우수</small>
+    <span id="verBadge" style="font-size:10px;color:#60a5fa;font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:6px">TEST v2.0 · 08-23 산림청·강우 자동</span>
   </div>
   <div class="steps">
-    <div class="bookcrumb" id="bookCrumb">1. 지형도 올리기</div>
+    <div class="bookcrumb" id="bookCrumb">1. 허가지선</div>
   </div>
 </header>
 
@@ -283,9 +286,9 @@
   <!-- ══ 책 목차 네비 (목차+체크+점프) ══ -->
   <nav class="booknav" id="booknav">
     <div class="bn-title">📖 작업 순서</div>
-    <button class="navitem" data-go="1" onclick="goToPage(1)"><span class="bn-no">1</span><span class="bn-nm">지형도 올리기</span><span class="bn-st"></span></button>
-    <button class="navitem" data-go="2" onclick="goToPage(2)"><span class="bn-no">2</span><span class="bn-nm">허가지선·버퍼선</span><span class="bn-st"></span></button>
-    <button class="navitem" data-go="3" onclick="goToPage(3)"><span class="bn-no">3</span><span class="bn-nm">작업범위</span><span class="bn-st"></span></button>
+    <button class="navitem" data-go="1" onclick="goToPage(1)"><span class="bn-no">1</span><span class="bn-nm">허가지선</span><span class="bn-st"></span></button>
+    <button class="navitem" data-go="2" onclick="goToPage(2)"><span class="bn-no">2</span><span class="bn-nm">지형도</span><span class="bn-st"></span></button>
+    <button class="navitem" data-go="3" onclick="goToPage(3)"><span class="bn-no">3</span><span class="bn-nm">작업범위·버퍼선</span><span class="bn-st"></span></button>
     <button class="navitem" data-go="4" onclick="goToPage(4)"><span class="bn-no">4</span><span class="bn-nm">삼각망 생성</span><span class="bn-st"></span></button>
     <button class="navitem" data-go="5" onclick="goToPage(5)"><span class="bn-no">5</span><span class="bn-nm">음영기복 (DEM)</span><span class="bn-st"></span></button>
     <button class="navitem" data-go="6" onclick="goToPage(6)"><span class="bn-no">6</span><span class="bn-nm">수계·단면</span><span class="bn-st"></span></button>
@@ -297,7 +300,7 @@
   <!-- 좌측 패널 -->
   <aside>
     <div class="sec pgsec" data-page="1">
-      <h3>지형 자료</h3>
+      <h3>허가지선 만들기</h3>
 
       <!-- ① 통합 검색 (지번·도로명·명칭) -->
       <div class="jibunWrap">
@@ -312,7 +315,7 @@
       <!-- 🗺 지적(VWorld) — 서버에서 열 때만 동작 -->
       <div style="border:1px solid var(--line);border-radius:10px;margin-top:10px;padding:11px">
         <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:3px">🗺 지적 선택 <span style="font-size:9.5px;color:var(--tx3);font-weight:400">(서버 전용)</span></div>
-        <div style="font-size:10px;color:var(--tx3);line-height:1.5;margin-bottom:9px"><b style="color:var(--tx2)">「지적 선택」</b> 누르면 지도가 자동으로 뜨고, 필지 클릭 → 선택 완료 → 허가지선/DXF. 지형도(실좌표 5186)가 있으면 제자리에 얹혀요.</div>
+        <div style="font-size:9.5px;color:var(--tx3);line-height:1.45;margin-bottom:7px">지도에서 필지 클릭 → 선택 완료 → 허가지선</div>
         <button class="btn btn-primary" id="cadSelBtn" onclick="toggleCadSelect()">📍 지적 선택</button>
 
         <!-- 1단계: 선택 중 (필지 클릭) -->
@@ -337,25 +340,109 @@
         </div>
       </div>
 
-      <!-- ② 점선 드롭박스 (클릭 = 파일 선택) -->
-      <div class="dropzone" id="dropzone" onclick="document.getElementById('file').click()">
-        <div class="dz-ic">📁</div>
-        <div class="dz-t">DXF를 <b>끌어다 놓거나</b><br>클릭해서 선택</div>
+      <!-- 허가지선 DXF 업로드 (업체가 준 도면) -->
+      <div id="permitDrop" onclick="document.getElementById('permitFile').click()"
+        title="업체가 준 허가지선 DXF · 닫힌 폴리곤 중 면적 최대 사용 · R12 가능"
+        style="margin-top:11px;border:2px dashed var(--line);border-radius:10px;background:rgba(14,22,38,.4);padding:18px 14px;text-align:center;cursor:pointer;transition:.16s">
+        <div style="font-size:26px;line-height:1.1;opacity:.9">📐</div>
+        <div style="font-size:12px;color:var(--tx2);font-weight:700;margin-top:6px">허가지선 도면 올리기</div>
+        <div style="font-size:10.5px;color:var(--tx3);margin-top:4px;line-height:1.5">
+          업체가 준 <b style="color:var(--tx2)">허가지선만 있는 DXF</b><br>끌어다 놓거나 클릭해서 선택
+        </div>
+        <div style="font-size:9.5px;color:var(--tx3);margin-top:6px;opacity:.8">닫힌 폴리곤 중 면적 최대 · R12 가능</div>
       </div>
-      <input type="file" id="file" accept=".dxf" style="display:none">
-
-      <!-- ③ 열기 버튼 (유지) -->
-      <button class="btn btn-primary" onclick="document.getElementById('file').click()" style="margin-top:9px">
-        ⬆ 수치지형도 DXF 열기
-      </button>
-
-      <!-- ④ 안내 정리 -->
-      <div style="font-size:10.5px;color:var(--tx3);margin-top:8px;line-height:1.55">
-        변환 거친 <b style="color:var(--tx2)">_분석용.dxf</b> 권장 · 등고선·표고점 자동 인식
-      </div>
+      <input type="file" id="permitFile" accept=".dxf" style="display:none">
     </div>
 
     <div class="sec pgsec" data-page="2">
+      <h3>수치지형도</h3>
+      <!-- ★ [TEST] 수치지형도 자동 받기 (크롬 확장 연동) — 경사도에서 이식 -->
+      <div id="needPermitBox" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px">
+        <div style="font-size:11.5px;color:var(--warn);line-height:1.7;margin-bottom:9px">
+          먼저 <b>허가지선</b>을 만들어주세요.<br>그 위치로 수치지형도를 받아옵니다.
+        </div>
+        <div style="font-size:10px;color:var(--tx3);line-height:1.6">
+          위에서 지적을 선택해 「🎯 허가지선으로 만들기」를 누르면 여기가 열립니다.
+        </div>
+      </div>
+
+      <div id="ngiiSec" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px">
+        <div style="font-size:11.5px;font-weight:700;color:var(--tx2);margin-bottom:8px">⬇ 수치지형도 자동 받기</div>
+
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 9px;margin-bottom:8px">
+          <div style="font-size:9.5px;color:var(--tx3);margin-bottom:3px">허가지선 위치</div>
+          <div id="permitAddrTx" title="-" style="font-size:11.5px;color:#facc15;font-weight:700;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">-</div>
+        </div>
+
+        <div id="extBox">
+          <div style="font-size:9.5px;color:var(--tx3);margin-bottom:4px">검색할 지번 (필요하면 고치세요)</div>
+          <input id="ngiiAddr" placeholder="지번 (예: 화성시 봉담읍 수기리 1)"
+            oninput="NGII.autoFilled=false"
+            onkeydown="if(event.key==='Enter')ngiiStart()"
+            style="width:100%;box-sizing:border-box;background:var(--panel);border:1px solid var(--line);color:var(--tx1);border-radius:6px;padding:7px 8px;font-size:12px;margin-bottom:7px">
+          <div style="display:flex;gap:5px;margin-bottom:8px">
+            <button class="thr on" id="scl5000" onclick="setNgiiScale('5000')" style="flex:1">1:5000</button>
+            <button class="thr" id="scl1000" onclick="setNgiiScale('1000')" style="flex:1">1:1000</button>
+          </div>
+          <div style="font-size:9.5px;color:var(--tx3);margin-bottom:4px">사용 목적 (국토정보플랫폼 신청서)</div>
+          <select id="ngiiP1" onchange="onNgiiP1()"
+            style="width:100%;box-sizing:border-box;background:var(--panel);border:1px solid var(--line);color:var(--tx1);border-radius:6px;padding:6px 8px;font-size:11.5px;margin-bottom:5px"></select>
+          <select id="ngiiP2" onchange="NGII.purpose2=this.value"
+            style="width:100%;box-sizing:border-box;background:var(--panel);border:1px solid var(--line);color:var(--tx1);border-radius:6px;padding:6px 8px;font-size:11.5px;margin-bottom:9px"></select>
+
+          <button class="btn btn-primary" id="btnNgii" onclick="ngiiStart()">⬇ 수치지형도 받기</button>
+          <button class="btn btn-ghost" id="btnNgiiStop" onclick="ngiiStop()" style="display:none;margin-top:6px;color:var(--err);border-color:var(--err)">■ 중지</button>
+          <div id="ngiiMsg" style="font-size:10.5px;margin-top:8px;line-height:1.5;color:var(--tx3)"></div>
+          <div id="fsaBox" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)"></div>
+        </div>
+
+        <div id="extMissing" style="display:none">
+          <div style="font-size:11px;color:var(--warn);line-height:1.6;margin-bottom:7px">
+            크롬 확장이 설치되어 있지 않아요.<br>설치하면 지번만 넣고 자동으로 받을 수 있어요.
+          </div>
+          <div style="font-size:10px;color:var(--tx3);line-height:1.5">설치 후에도 안 뜨면 이 페이지를 새로고침하세요.</div>
+        </div>
+      </div>
+
+      <!-- 좌표계(원점) — 자동 판별이 틀렸을 때 직접 고침 -->
+      <div class="sec" id="beltBox" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px">
+        <div style="font-size:11.5px;font-weight:700;color:var(--tx2);margin-bottom:6px">좌표계 원점</div>
+        <div style="font-size:10px;color:var(--tx3);line-height:1.5;margin-bottom:7px">
+          수치지형도는 지역마다 원점이 달라요.<br>위치가 엉뚱하면 여기서 바꾸세요.
+        </div>
+        <div style="display:flex;gap:4px">
+          <button class="thr" id="belt5185" onclick="setBelt('5185')" style="flex:1">서부</button>
+          <button class="thr on" id="belt5186" onclick="setBelt('5186')" style="flex:1">중부</button>
+          <button class="thr" id="belt5187" onclick="setBelt('5187')" style="flex:1">동부</button>
+          <button class="thr" id="belt5188" onclick="setBelt('5188')" style="flex:1">동해</button>
+        </div>
+        <div id="beltInfo" style="font-size:10.5px;color:var(--tx3);margin-top:7px"></div>
+      </div>
+
+      <!-- 올린 도엽 목록 -->
+      <div id="sheetBox" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 11px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-size:10.5px;color:#4ade80" id="sheetCnt">-</span>
+          <button class="thr" onclick="clearSheets()" style="flex:0 0 auto;padding:3px 8px;font-size:10px;color:var(--err);border-color:var(--err)">비우기</button>
+        </div>
+        <div id="sheetList" style="max-height:96px;overflow-y:auto"></div>
+        <div style="font-size:9.5px;color:var(--tx3);margin-top:5px;line-height:1.5">더 올리면 계속 <b>누적</b>됩니다. 도엽이 여러 장이면 한 번에 골라도 돼요.</div>
+      </div>
+
+      <!-- ② 점선 드롭박스 (클릭 = 파일 선택) -->
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('file').click()">
+        <div class="dz-ic">📁</div>
+        <div class="dz-t">수치지형도 DXF <b>끌어놓기</b> / 클릭 <span style="font-size:9px;opacity:.75">(여러 장 가능)</span></div>
+        </div>
+      <input type="file" id="file" accept=".dxf" style="display:none">
+
+      <!-- ③ 열기 버튼 -->
+      <button class="btn btn-primary" onclick="document.getElementById('file').click()" style="margin-top:7px">
+        ⬆ 수치지형도 DXF 열기
+      </button>
+    </div>
+
+    <div class="sec pgsec" data-page="1">
       <h3>허가지선 (산지전용예정지)</h3>
       <div id="polyLayerPicker" style="margin-bottom:8px"></div>
       <!-- 허가지선 선택 (DXF 폐합선 클릭) -->
@@ -407,7 +494,7 @@
     </div>
 
     <!-- 버퍼선 (허가지선 다음) -->
-    <div class="sec pgsec" data-page="2">
+    <div class="sec pgsec" data-page="3">
       <h3>🔲 버퍼선</h3>
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
         <button class="thr on" id="buf0" onclick="setBuffer(0)">끄기</button>
@@ -435,7 +522,7 @@
       <h3>📦 작업구역 (범위 자르기)</h3>
       <div style="font-size:10.5px;color:var(--tx3);line-height:1.6;margin-bottom:8px">
         원본 지형도가 넓을 때 사각형으로 분석 범위를 한정합니다.<br>
-        <b style="color:#fbbf24">허가지선·버퍼선을 모두 확인한 뒤</b> 마지막에 잡으세요.
+        <b style="color:#fbbf24">허가지선을 확인한 뒤</b> 버퍼선과 함께 잡으세요.
       </div>
       <button class="btn btn-ghost" id="btnCrop" onclick="toggleCrop()" style="font-size:12px">✂️ 작업구역 그리기</button>
       <div id="cropInfo" style="display:none;margin-top:6px">
@@ -454,7 +541,7 @@
       </div>
     </div>
 
-    <div class="sec pgsec" data-page="1" id="secRecog">
+    <div class="sec pgsec" data-page="2" id="secRecog">
       <h3>인식 결과</h3>
       <div class="info-grid">
         <div class="stat"><div class="v" id="nCont">–</div><div class="k">등고선</div></div>
@@ -807,7 +894,8 @@
           <span class="st">산사태·임상·토양</span>
         </div>
         <div class="dcard-bd" id="dcb_forest">
-          <div class="ddrop" id="forestDrop" onclick="document.getElementById('forestFile').click()">
+          <!-- [TEST] 확장이 자동으로 올려주므로 기본 숨김. [직접 올리기]로 열 수 있다 -->
+          <div class="ddrop" id="forestDrop" style="display:none" onclick="document.getElementById('forestFile').click()">
             📂 산림청 zip을 여기 놓거나 클릭<br><span style="font-size:9.5px">산사태·임상·토양 zip 한 번에 (여러 개 가능)</span>
           </div>
           <input type="file" id="forestFile" accept=".zip" multiple style="display:none" onchange="forestUpload(this.files)">
@@ -816,7 +904,12 @@
    style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;text-decoration:none">🔗 산림공간정보서비스</a>
 <a id="forestInstallBtn" class="dbtn" style="display:none;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;text-decoration:none;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;font-weight:700;border-color:transparent"></a>
 <div id="forestExtMsg" style="font-size:10px;line-height:1.5;margin-bottom:6px;color:var(--tx3)"></div>
-          <a href="#" onclick="openForestGuide();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법</a>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <a href="#" onclick="openForestGuide();return false;" class="dbtn"
+               style="flex:1;display:flex;justify-content:center;font-size:10px;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법</a>
+            <a href="#" onclick="forestShowManual();return false;" class="dbtn"
+               style="flex:1;display:flex;justify-content:center;font-size:10px;text-decoration:none">📂 직접 올리기</a>
+          </div>
           <div id="forestLayers" style="margin-top:8px;display:none"></div>
           <div id="forestMsg" style="font-size:10px;margin-top:6px"></div>
         </div>
@@ -877,11 +970,13 @@
           <span class="st">WAMIS 확률강우량</span>
         </div>
         <div class="dcard-bd" id="dcb_rain">
-          <div class="ddrop" id="rainDrop" onclick="document.getElementById('rainXlsx').click()">
+          <!-- [TEST] 자동 받기가 기본. 수동 상자는 실패했을 때만 나타난다 -->
+          <div class="ddrop" id="rainDrop" style="display:none" onclick="document.getElementById('rainXlsx').click()">
             📂 받은 엑셀을 여기 놓거나 클릭<br><span style="font-size:9.5px">확률강우량_지역빈도해석_.xlsx</span>
           </div>
           <input type="file" id="rainXlsx" accept=".xlsx,.xls" style="display:none" onchange="rainUpload(this.files)">
-          <button class="dbtn pri" onclick="rainOpenWamis()" style="width:100%;margin-top:6px;margin-bottom:6px">🔗 확률강우량 다운로드</button>
+          <button class="dbtn pri" onclick="rainAutoFetch()" style="width:100%;margin-top:6px;margin-bottom:6px;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff;font-weight:700;border-color:transparent">🌧️ 확률강우량 자동으로 받기</button>
+          <a href="#" onclick="rainOpenWamis();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;margin-bottom:6px;font-size:10px;text-decoration:none">🔗 WAMIS 직접 열기</a>
           <a href="#" onclick="openRainGuide();return false;" class="dbtn" style="display:flex;width:100%;box-sizing:border-box;justify-content:center;background:#fbbf24;color:#1a1400;font-weight:700;border-color:transparent;text-decoration:none">📖 다운로드 방법</a>
           <div id="rainStation" style="font-size:10.5px;color:var(--tx2);margin-top:8px;display:none"></div>
           <div id="rainResult" style="display:none;margin-top:6px"></div>
@@ -1502,9 +1597,46 @@ function loadDXFFile(f){
       var text=_decodeDxf(buf);   // 인코딩 자동감지(UTF-8/EUC-KR)
       var r=parseDXF(text);
       if(!r.contours.length && !r.surveys.length){
-        toast('등고선·표고점을 못 찾았어요. _분석용.dxf 인지 확인하세요','err'); return;
+        toast('등고선·표고점이 없어요 — 허가지선 도면이면 위쪽 [허가지선 도면 올리기]에 넣어주세요','err');
+        if(typeof _ngiiMsg==='function') _ngiiMsg('이 도면엔 등고선이 없어요. 허가지선이라면 위쪽 전용 칸을 쓰세요','#fbbf24');
+        return;
       }
-      applyParsed(r);
+      /* ★ [TEST] 원점(벨트) 자동 판별 → 캔버스 좌표계(5186)로 변환.
+         한 장 올리는 이 경로에도 반드시 필요하다.
+         (예전엔 여러 장 올릴 때만 처리돼 셀프 업로드가 동해로 밀렸음) */
+      try{
+        /* 이미 올린 도엽이 있으면 그때 정한 원점을 그대로 쓴다 (도엽별 오판 방지) */
+        var _has=!!(S._allSheets && S._allSheets.contours && S._allSheets.contours.length);
+        var _belt=(_has && S._srcBelt) ? String(S._srcBelt) : detectBelt(r);
+        S._srcBelt=_belt;
+        if(_belt!=='5186'){
+          var _n=reprojectParsed(r, _belt);
+          console.log('[좌표계] EPSG:'+_belt+' → 5186 변환:', _n+'점');
+          toast('좌표계 '+_beltName(_belt)+'원점 → 중부 변환','ok');
+        }
+      }catch(e){ console.log('[좌표계] 판별 실패', e); }
+
+      /* ★ 누적 — 한 장씩 올려도 앞서 올린 도엽이 유지되게 한다.
+         (기준은 항상 S._allSheets 하나. 여러 장 합치기와 같은 방식) */
+      if(!S._allSheets) S._allSheets={contours:[], surveys:[], polys:[], bgLines:[], bgTexts:[]};
+      var _m={
+        contours: S._allSheets.contours.concat(r.contours||[]),
+        surveys : S._allSheets.surveys.concat(r.surveys||[]),
+        polys   : S._allSheets.polys.concat(r.polys||[]),
+        bgLines : (S._allSheets.bgLines||[]).concat(r.bgLines||[]),
+        bgTexts : (S._allSheets.bgTexts||[]).concat(r.bgTexts||[])
+      };
+      S._allSheets={contours:_m.contours.slice(), surveys:_m.surveys.slice(),
+                    polys:_m.polys.slice(), bgLines:_m.bgLines.slice(), bgTexts:_m.bgTexts.slice()};
+      var _ns=(S._sheetNames||[]).slice();
+      if(_ns.indexOf(f.name)<0) _ns.push(f.name);
+      S._sheetNames=_ns;
+      S.name=(_ns.length>1)?(_ns.length+'개 도엽 합침'):f.name;
+
+      applyParsed(_m);
+      if(typeof _syncSheetList==='function') _syncSheetList();
+      if(typeof _syncBeltBtns==='function') _syncBeltBtns();
+      if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
     }catch(err){ toast(err.message||'DXF 분석 실패','err'); }
   };
   rd.onerror=function(){ toast('파일을 읽지 못했어요','err'); };
@@ -1527,7 +1659,13 @@ function _decodeDxf(buf){
   }catch(e){}
   return utf8||'';   // 둘 다 안되면 UTF-8 그대로
 }
-document.getElementById('file').addEventListener('change',function(e){ loadDXFFile(e.target.files[0]); e.target.value=''; });
+/* [TEST] 여러 도엽을 한 번에 고를 수 있게 — 2장 이상이면 합쳐서 연다 */
+document.getElementById('file').addEventListener('change',function(e){
+  var fl=e.target.files;
+  if(fl && fl.length>1 && typeof loadFiles==='function') loadFiles(fl);
+  else if(fl && fl.length) loadDXFFile(fl[0]);
+  e.target.value='';
+});
 
 /* 드래그앤드롭 (창 어디에 놓아도 불러옴) */
 (function(){
@@ -1553,6 +1691,28 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
     }
   }
   /* 드래그가 어느 카드 드롭존 위인지 (없으면 null) */
+  /* [TEST] 허가지선 전용 드롭 박스 위인가 — 전체화면 오버레이를 띄우지 않기 위함 */
+  function _overPermitDrop(e){
+    var t=e.target;
+    while(t){ if(t.id==='permitDrop') return true; t=t.parentNode; }
+    return false;
+  }
+  /* 지형도 드롭존 위인가 */
+  function _overZone(e){
+    var t=e.target;
+    while(t){ if(t.id==='dropzone') return true; t=t.parentNode; }
+    return false;
+  }
+  function _hiZone(on){
+    var el=document.getElementById('dropzone');
+    if(el) el.classList.toggle('dragover', !!on);
+  }
+  function _hiPermit(on){
+    var el=document.getElementById('permitDrop');
+    if(!el) return;
+    el.style.borderColor = on ? '#38bdf8' : '';
+    el.style.background  = on ? 'rgba(56,189,248,.10)' : '';
+  }
   function _whichCardDrop(e){
     var t=e.target;
     while(t){
@@ -1583,8 +1743,13 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
     if(!hasFile(e))return;
     var cd=_whichCardDrop(e);
     if(cd){ e.preventDefault(); _hiCard(cd); lay._card=cd; return; }   // 카드별 하이라이트 (전체 오버레이 X)
-    if(_overForestDrop(e)){ _hiCard(null); return; }  // 8번 페이지 나머지 = 아무 것도 안 함
-    e.preventDefault(); depth++; _setLayText(null); lay._card=null; lay.classList.add('on');  // 다른 페이지 = DXF 전체 오버레이
+    /* [TEST] 전체화면 오버레이 폐기 — 상자 위에서만 하이라이트.
+       예전엔 화면 어디든 놓으면 지형도로 들어가서 허가지선을 넣을 수가 없었다. */
+    if(_overPermitDrop(e)){ e.preventDefault(); _hiPermit(true); _hiZone(false); return; }
+    _hiPermit(false);
+    if(_overZone(e)){ e.preventDefault(); _hiZone(true); return; }
+    _hiZone(false);
+    _hiCard(null);
   });
   window.addEventListener('dragover', function(e){
     if(!hasFile(e))return;
@@ -1595,21 +1760,32 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
       if(lay._card!==cd){ _hiCard(cd); lay._card=cd; }
       return;
     }
-    if(_overForestDrop(e)){ _hiCard(null); lay._card=null; return; }  // 8번서 카드 밖 = 하이라이트 해제
-    e.preventDefault();
-    if(!lay.classList.contains('on')){ _setLayText(null); lay.classList.add('on'); }
+    if(_overPermitDrop(e)){ e.preventDefault(); _hiPermit(true); _hiZone(false); return; }
+    _hiPermit(false);
+    if(_overZone(e)){ e.preventDefault(); _hiZone(true); return; }
+    _hiZone(false);
+    _hiCard(null); lay._card=null;
   });
   window.addEventListener('dragleave',function(e){
     e.preventDefault();
     /* relatedTarget = 커서가 이동해 들어간 요소. null이면 창(문서) 밖으로 나간 것 = 진짜 종료 */
     var to = e.relatedTarget;
     if(to===null || to===undefined){
-      depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);  // 카드 하이라이트도 해제
+      depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null); _hiPermit(false);  // 카드·허가지선 하이라이트 해제
       return;
     }
     /* 문서 안에서 요소 간 이동은 무시 (하이라이트/오버레이 유지) */
   });
   window.addEventListener('drop',     function(e){
+    /* [TEST] 허가지선 전용 박스 위에 놓은 경우 — 지형도로 새지 않게 먼저 가로챈다 */
+    var _pd=e.target; while(_pd){ if(_pd.id==='permitDrop') break; _pd=_pd.parentNode; }
+    if(_pd){
+      e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null); _hiPermit(false);
+      var _f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+      if(_f && typeof loadPermitDXF==='function') loadPermitDXF(_f);
+      return;
+    }
+    _hiZone(false);
     var cd=_whichCardDrop(e);
     if(cd){
       e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);  // 하이라이트 해제
@@ -1624,8 +1800,14 @@ document.getElementById('file').addEventListener('change',function(e){ loadDXFFi
     }
     /* 8번 페이지 나머지 = DXF 안 받음 */
     if(_overForestDrop(e)){ e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null); return; }
-    e.preventDefault(); depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null);
-    var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) loadDXFFile(f); });
+    /* [TEST] 지형도는 드롭존 위에 놓았을 때만 받는다.
+       예전엔 화면 어디든 놓으면 들어가서 허가지선 칸을 쓸 수가 없었다. */
+    depth=0; lay.classList.remove('on'); lay._card=null; _hiCard(null); _hiZone(false);
+    if(!_overZone(e)) return;                 /* 상자 밖 = 무시 */
+    e.preventDefault();
+    var fl=e.dataTransfer&&e.dataTransfer.files;
+    if(fl && fl.length>1 && typeof loadFiles==='function') loadFiles(fl);
+    else if(fl && fl.length) loadDXFFile(fl[0]); });
   /* 드래그 지점이 산림청 zip 드롭존(또는 그 안)인지, 또는 8번 페이지 활성 중인지 */
   function _overForestDrop(e){
     /* 8번(자료 겹치기) 페이지에서는 DXF 안 받음 — 카드 드롭 전용 */
@@ -6732,7 +6914,7 @@ function toast(msg,type){
 var BOOK = {
   page: 1,
   total: 10,
-  titles: ['지형도 올리기','허가지선·버퍼선','작업범위','삼각망 생성','음영기복 (DEM)',
+  titles: ['허가지선','지형도','작업범위·버퍼선','삼각망 생성','음영기복 (DEM)',
            '수계·단면','경사도','자료 겹치기','과거항공','결과 보고서']
 };
 
@@ -7117,6 +7299,127 @@ function groundCapture(files){
 
 /* ---------- 산림청 카드: zip 업로드 → /api/forest-parse ---------- */
 /* (드롭 처리는 전역 카드 드롭 핸들러가 통합 관리 — 개별 핸들러 제거해 오버레이·일관성 확보) */
+
+
+var _forestAutoQueue = [], _forestAutoTimer = null;
+var _forestPollTimer = null, _forestSeq = -1;
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 산림청 자동전달 · 강우 자동받기 — USB판(0.7.2 흐름)에서 이식
+   · 산림청: 확장이 받은 zip 을 서버(/api/forest-parse)로 바로 올리고,
+            화면은 /api/forest-latest 를 확인해 오는 대로 얹는다.
+            (자료 3개가 몇 초 간격으로 순차 도착하므로 계속 확인)
+   · 강우  : 서버가 WAMIS 에서 대신 받아 넘겨준다(CORS 우회).
+            메모리에서 파싱하므로 디스크에 파일이 안 생긴다.
+   ══════════════════════════════════════════════════════════════ */
+function _b64ToFile(b64, name){
+  var bin = atob(b64), n = bin.length, u8 = new Uint8Array(n);
+  for (var i=0; i<n; i++) u8[i] = bin.charCodeAt(i);
+  return new File([u8], name, {type:'application/zip'});
+}
+
+function forestAutoReceive(name, b64){
+  if(!b64){
+    _dmsg('forestMsg','📥 '+name+' 받음 — 자동 읽기 실패, 위 상자에 직접 놓아주세요','err');
+    return;
+  }
+  try { _forestAutoQueue.push(_b64ToFile(b64, name)); }
+  catch(e){ _dmsg('forestMsg','📥 '+name+' 처리 실패 — 직접 올려주세요','err'); return; }
+
+  _dmsg('forestMsg','📥 '+_forestAutoQueue.length+'개 받음 — 잠시 후 자동으로 올립니다…','');
+  clearTimeout(_forestAutoTimer);
+  _forestAutoTimer = setTimeout(function(){       // 마지막 파일 후 2초 → 한 번에 처리
+    var fs = _forestAutoQueue.slice();
+    _forestAutoQueue = [];
+    if(fs.length) forestUpload(fs);
+  }, 2000);
+}
+
+function forestShowManual(){
+  var d=document.getElementById('forestDrop'); if(!d) return;
+  d.style.display = (d.style.display==='none') ? '' : 'none';
+}
+
+function forestRevealManual(){
+  var d=document.getElementById('forestDrop'); if(d) d.style.display='';
+}
+
+function forestStartPolling(sec){
+  clearInterval(_forestPollTimer);
+  var until = Date.now() + (sec || 240) * 1000;   // 아래에서 도착할 때마다 연장됨
+  _dmsg('forestMsg','⏳ 산림청 자료를 기다리는 중…','');
+  _forestPollTimer = setInterval(function(){
+    if(Date.now() > until){
+      clearInterval(_forestPollTimer);
+      var ov=DATA8.overlays;
+      var got=(ov.forest_sansatae?1:0)+(ov.forest_imsang?1:0)+(ov.forest_toyang?1:0);
+      if(got<3){
+        _dmsg('forestMsg','⚠ 자동 받기가 끝나지 않았습니다 ('+got+'/3) — 아래 상자에 직접 올려주세요','err');
+        forestRevealManual();
+      }
+      return;
+    }
+    fetch('/api/forest-latest').then(function(r){ return r.json(); }).then(function(j){
+      if(!j || !j.ok) return;
+      if(_forestSeq < 0){ _forestSeq = j.seq; return; }      // 첫 확인은 기준만 잡음
+      if(j.seq === _forestSeq) return;                        // 변화 없음
+      _forestSeq = j.seq;
+      if(!j.results || !j.results.length) return;
+
+      /* ★ 세 파일(산사태·임상·토양)이 몇 초 간격으로 순차 도착한다.
+         첫 것만 집고 멈추면 나머지를 놓친다 → 계속 확인하면서 오는 대로 얹는다.
+         마지막 자료가 들어온 뒤 8초간 조용하면 끝난 것으로 본다. */
+      forestApply(j.results, j.errors);
+      fetch('/api/forest-clear',{method:'POST'}).catch(function(){});
+      until = Date.now() + 8000;                              // 도착할 때마다 시간 연장
+    }).catch(function(){});
+  }, 1500);
+}
+
+function rainAutoFetch(){
+  /* 관측소부터 정해둔다 — 작업 위치가 있어야 한다 */
+  if(!DATA8.rain.station){
+    var loc=_d8GetLoc();
+    if(!loc){ _dmsg('rainMsg','먼저 위 「작업 위치」를 검색하거나 허가지선을 만드세요','err'); return; }
+    _rainFindAt(loc.lng, loc.lat);
+    if(!DATA8.rain.station){ _dmsg('rainMsg','관측소를 찾지 못했어요','err'); return; }
+  }
+  _dmsg('rainMsg','⏳ 확률강우량 엑셀을 받는 중… (조금 걸립니다)','');
+  fetch('/api/rain-xlsx')
+    .then(function(r){
+      if(!r.ok) return r.json().then(function(j){ throw new Error(j && j.msg || ('응답 '+r.status)); });
+      return r.arrayBuffer();
+    })
+    .then(function(buf){
+      _dmsg('rainMsg','⏳ 엑셀 분석 중…','');
+      _ensureXLSX(function(ok){
+        if(!ok){ _dmsg('rainMsg','엑셀 라이브러리 로드 실패','err'); return; }
+        try{
+          var wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+          rainParseWorkbook(wb);
+        }catch(err){
+          _dmsg('rainMsg','엑셀 분석 오류: '+err+' — 아래에 직접 올려주세요','err');
+          _rainRevealManual();
+        }
+      });
+    })
+    .catch(function(e){
+      _dmsg('rainMsg','❌ 자동 받기 실패: '+e.message+' — WAMIS 에서 직접 받아 아래에 올려주세요','err');
+      _rainRevealManual();
+    });
+}
+
+function _rainRevealManual(){
+  var d=document.getElementById('rainDrop'); if(d) d.style.display='';
+}
+
+/* 앱이 켜질 때 현재 seq 를 기준으로 잡아둔다 (기존 자료를 새 것으로 오인하지 않게) */
+window.addEventListener('load', function(){
+  try{
+    fetch('/api/forest-latest').then(function(r){ return r.json(); })
+      .then(function(j){ if(j && j.ok) _forestSeq = j.seq; }).catch(function(){});
+  }catch(e){}
+});
 
 function forestUpload(files){
   if(!files || !files.length) return;
@@ -7660,9 +7963,12 @@ function goToPage(n){
 function updateNav(){
   /* 각 페이지 "완료" 조건 — 검증된 상태값만 사용 */
   var done = {
-    1: !!(S.contours && (S.contours.length>0 || (S.surveys && S.surveys.length>0))),
-    2: !!(S.permit && S.permit.length>0),
-    3: !!S.cropRect,
+    /* [TEST] 페이지 재구성에 맞춤 — 1 허가지선 / 2 지형도 / 3 작업범위·버퍼선.
+       예전엔 1=지형도, 2=허가지선이라 허가지선을 넣으면 지형도가 완료로 표시됐다. */
+    1: !!(typeof _permitPtsFlow==='function' ? _permitPtsFlow()
+         : (S.permit && (S.permit.length>=3 || (S.permit.pts && S.permit.pts.length>=3)))),
+    2: !!(S.contours && (S.contours.length>0 || (S.surveys && S.surveys.length>0))),
+    3: !!(S.cropRect || (S.bufferDist>0)),
     4: !!(S.triList && S.triList.length>0),
     5: !!S.dem,
     6: !!(S.flow || S.watershed),
@@ -7698,7 +8004,17 @@ var CAD = { selMode:false, parcels:[], geocoder:null, ready:false, bgOn:false, b
 function _cadInitProj(){
   if(typeof proj4==='undefined') return false;
   if(!proj4.defs['EPSG:5186']){
-    try{ proj4.defs('EPSG:5186','+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'); }catch(e){ return false; }
+    try{
+      /* [TEST] 한국 평면직각좌표계 4개 원점 — 수치지형도는 지역마다 원점이 다르다.
+         서부 5185(125°) / 중부 5186(127°) / 동부 5187(129°) / 동해 5188(131°)
+         캔버스는 5186 고정이므로 다른 원점 도면은 읽은 뒤 변환한다.
+         (동부 좌표를 중부로 오독하면 약 178km 서쪽으로 밀린다 — 실측) */
+      var _B={ '5185':125, '5186':127, '5187':129, '5188':131 };
+      for(var _e in _B){
+        proj4.defs('EPSG:'+_e, '+proj=tmerc +lat_0=38 +lon_0='+_B[_e]
+          +' +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+      }
+    }catch(e){ return false; }
   }
   return true;
 }
@@ -7913,8 +8229,9 @@ function cadUseAsPermit(){
   var sb=document.getElementById('cadSelBar'); if(sb) sb.style.display='none';
   document.getElementById('cadDoneBar').style.display='none';
   updateNav && updateNav(); render();
-  if(parcelsPolys.length>1) toast(parcelsPolys.length+'필지 → 허가지선 확정 (면적 합산, 2번에서 확인)','ok');
-  else toast('지적 → 허가지선 확정 (2번에서 확인·편집)','ok');
+  /* [TEST] 1 허가지선 → 2 지형도 순서. 확정하면 지형도 받으러 2번으로 넘어간다. */
+  if(parcelsPolys.length>1) toast(parcelsPolys.length+'필지 → 허가지선 확정 — 2번에서 지형도를 받으세요','ok');
+  else toast('허가지선 확정 — 2번에서 수치지형도를 받으세요','ok');
   goToPage(2);
 }
 /* 허가지선 총 면적 (복수 필지면 합산) — ㎡ */
@@ -8158,16 +8475,27 @@ function drawCadBg(){
   ctx.restore();
 }
 function _cadBgBlit(e, img){
-  var tl5=wgs84toTm5186(e.tl[0],e.tl[1]), br5=wgs84toTm5186(e.br[0],e.br[1]);
-  if(!tl5||!br5) return;
-  var a=w2s({x:tl5[0],y:tl5[1]}), b=w2s({x:br5[0],y:br5[1]});
-  var x0=Math.min(a.x,b.x), y0=Math.min(a.y,b.y), x1=Math.max(a.x,b.x), y1=Math.max(a.y,b.y);
+  /* ★ [TEST] 타일 검은 줄 제거 — 네 모서리를 모두 변환해 감싸는 사각형에 그린다.
+     타일 아래모서리는 (x+1,y+1), 아래 타일 위모서리는 (x,y+1)로 계산되는데
+     EPSG:5186은 횡메르카토르라 같은 위도라도 경도가 다르면 N값이 달라진다.
+     오차는 중앙자오선(127°)에서 멀수록 커진다 — 실측:
+        화성(126.9°) 0.115m ≈ 0.2px  /  강릉(128.9°) 2.43m ≈ 5.1px
+     두 모서리만 쓰고 1px 여유를 주던 방식은 동쪽으로 갈수록 굵은 띠가 생긴다. */
+  var lng0=e.tl[0], lat0=e.tl[1], lng1=e.br[0], lat1=e.br[1];
+  var c=[ wgs84toTm5186(lng0,lat0), wgs84toTm5186(lng1,lat1),
+          wgs84toTm5186(lng0,lat1), wgs84toTm5186(lng1,lat0) ];
+  var xs=[], ys=[];
+  for(var k=0;k<4;k++){
+    if(!c[k]) return;
+    var sp=w2s({x:c[k][0], y:c[k][1]});
+    xs.push(sp.x); ys.push(sp.y);
+  }
+  var x0=Math.min.apply(null,xs), x1=Math.max.apply(null,xs);
+  var y0=Math.min.apply(null,ys), y1=Math.max.apply(null,ys);
   if((x1-x0)<0.5||(y1-y0)<0.5) return;
-  /* 검은 줄 제거: 시작=floor, 끝=다음타일 시작과 맞물리게 floor + 1px 겹침.
-     이렇게 하면 이웃 타일의 좌변이 이 타일의 우변을 덮어 틈이 안 생김 */
   var xr=Math.floor(x0), yr=Math.floor(y0);
-  var xe=Math.floor(x1), ye=Math.floor(y1);
-  var wr=(xe-xr)+1, hr=(ye-yr)+1;   // +1 = 이웃과 1px 겹침
+  var wr=Math.ceil(x1)-xr+1, hr=Math.ceil(y1)-yr+1;
+  if(wr<1) wr=1; if(hr<1) hr=1;
   ctx.drawImage(img, xr, yr, wr, hr);
 }
 /* DXF 없어도 지도 표시 가능하게 — 화면 기본 범위 세팅 */
@@ -8817,7 +9145,9 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
     }
     if (d.type === 'PROGRESS') { var m = document.getElementById('forestExtMsg'); if (m && d.msg) m.textContent = '⏳ ' + d.msg; return; }
     if (d.type === 'DONE') {
-      t(d.ok ? '산림청 다운로드 완료 — 받은 zip을 위 칸에 올리세요' : ('중단: ' + (d.msg || '')), d.ok ? 'ok' : 'err');
+      t(d.ok ? '산림청 다운로드 완료 — 자동으로 불러오는 중…' : ('중단: ' + (d.msg || '')), d.ok ? 'ok' : 'err');
+      /* 완료 신호 뒤에도 파일이 조금 늦게 도착할 수 있어 한 번 더 지켜본다 */
+      if (d.ok && typeof forestStartPolling === 'function') forestStartPolling(60);
       ui();
     }
   }, false);
@@ -8884,6 +9214,9 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
         reason: reason
       }, location.origin);
       t('산림청 자동신청 시작 (' + (label || '작업위치') + ') — ' + addr, 'ok');
+      /* [TEST] 확장이 받는 대로 서버로 올리므로, 여기서부터 보관함을 지켜본다.
+         자료 3개(산사태·임상·토양)가 순차로 오면 오는 대로 화면에 얹힌다. */
+      if (typeof forestStartPolling === 'function') forestStartPolling(300);
     });
     return false;
   };
@@ -8893,5 +9226,1080 @@ document.addEventListener('click',function(e){ if(e.target && e.target.id==='rai
 })();
 </script>
 
+
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 수치지형도 자동 받기 — 경사도(popup_slope)에서 이식
+   · 크롬 확장(gdsp-ext) 연동 다운로드
+   · 받은 파일 자동 열기 (File System Access, 폴더 1회 허용)
+   · 여러 도엽 합치기 / 누적 업로드
+   · 좌표계 원점 자동판별 (서부·중부·동부·동해)
+   ※ 산림청 확장 브릿지(GDSP_PAGE_FOREST)와 이름공간이 다르므로 안 섞임
+   ══════════════════════════════════════════════════════════════ */
+var NGII_PURPOSE = {
+  '행위허가': ['지형·지물 등의 위치확인','상권·대지·환경 등 공간분석','교육시설 사전 조사'],
+  '도시계획': ['토목·건축·하천 등 설계','국토·도시·지역 등 계획 수립·평가','도로 및 교통 활용','설계 및 공사 활용'],
+  '제작 및 활용': ['응·복합 등을 통한 주제도 제작','내비·인터넷 등 지도서비스','응용시스템 및 플랫폼 구축','공간정보 분석 활용','측량 및 지도 제작','교육, 학술, 연구','콘텐츠 제작'],
+  '행정 및 소송': ['민원 및 소송','행정업무']
+};
+var NGII = { scale:'5000', extAlive:false, lastSeen:0, running:false,
+             purpose1:'도시계획', purpose2:'토목·건축·하천 등 설계',
+             autoFilled:false, _lastAddr:null };
+var FSA = { dir:null, _inited:false };
+Object.defineProperty(FSA,'supported',{ get:function(){
+  return typeof window.showDirectoryPicker==='function' && typeof indexedDB!=='undefined';
+}});
+var BELT_LON={ '5185':125, '5186':127, '5187':129, '5188':131 };
+
+function _ngiiMsg(t,c){
+  var el=document.getElementById('ngiiMsg');
+  if(el){ el.textContent=t||''; el.style.color=c||'var(--dim)'; }
+}
+
+function setNgiiScale(v){
+  NGII.scale=v;
+  var a=document.getElementById('scl5000'), b=document.getElementById('scl1000');
+  if(a) a.className='thr'+(v==='5000'?' on':'');
+  if(b) b.className='thr'+(v==='1000'?' on':'');
+}
+
+function _ngiiSend(msg){
+  msg.source='GDSP_PAGE';
+  try{ window.postMessage(msg, window.location.origin); }catch(e){}
+}
+
+function _ngiiSyncExtUI(){
+  var box=document.getElementById('extBox'), miss=document.getElementById('extMissing');
+  if(!box||!miss) return;
+  box.style.display  = NGII.extAlive ? '' : 'none';
+  miss.style.display = NGII.extAlive ? 'none' : '';
+}
+
+function _ngiiRunning(on){
+  NGII.running=!!on;
+  var b=document.getElementById('btnNgii'), st=document.getElementById('btnNgiiStop');
+  if(b){ b.disabled=!!on; b.textContent = on ? '⏳ 받는 중…' : '⬇ 수치지형도 받기'; }
+  if(st) st.style.display = on ? '' : 'none';
+}
+
+function ngiiStart(){
+  if(!NGII.extAlive){ _ngiiMsg('확장이 설치되어 있지 않아요','#f87171'); return; }
+  var addr=(document.getElementById('ngiiAddr').value||'').trim();
+  if(!addr){ _ngiiMsg('지번을 입력하세요','#f87171'); return; }
+  if(!NGII.purpose1 || !NGII.purpose2){ _ngiiMsg('사용 목적을 선택하세요','#f87171'); return; }
+  /* ★ 이 클릭 안에서 폴더 권한을 미리 확보한다.
+     다운로드가 끝난 시점은 '사용자 제스처'가 아니라 권한 요청이 거부된다(실측). */
+  if(FSA.dir && FSA.supported){
+    try{
+      FSA.dir.queryPermission({mode:'read'}).then(function(st){
+        if(st!=='granted'){
+          FSA.dir.requestPermission({mode:'read'}).then(function(st2){ _fsaSyncUI(st2); });
+        }
+      });
+    }catch(e){}
+  }
+  NGII._startedAt=Date.now();   /* 이 시각 이후 저장된 파일만 '새 파일'로 인정 */
+  S._replaceOnce=true;          /* 새로 받는 것이므로 기존 지형도를 대체 */
+  NGII._openedName=null;
+  _ngiiRunning(true);
+  _ngiiMsg('확장에 요청 보냄 — 국토정보플랫폼 탭이 열립니다','#94a3b8');
+  _ngiiSend({ type:'START', addr:addr, scale:NGII.scale, purpose1:NGII.purpose1, purpose2:NGII.purpose2 });
+}
+
+function ngiiStop(){
+  _ngiiSend({ type:'STOP' });
+  _ngiiRunning(false);
+  _ngiiMsg('중지했어요','#fbbf24');
+}
+
+function _ngiiOfferOpen(){
+  var box=document.getElementById('ngiiMsg');
+  if(!box) return;
+  var old=document.getElementById('ngiiOpenBtn');
+  if(old) old.parentNode.removeChild(old);
+
+  fsaAutoOpen(true).then(function(ok){
+    if(ok) return;
+    var b=document.createElement('button');
+    b.id='ngiiOpenBtn';
+    b.className='btn btn-pri';
+    b.style.cssText='margin-top:7px;background:var(--ok)';
+    b.textContent='📂 받은 DXF 열기';
+    b.onclick=function(){ document.getElementById('fileIn').click(); };
+    box.parentNode.insertBefore(b, box.nextSibling);
+    try{ toast('다운로드 완료 — 받은 DXF를 열어주세요','ok'); }catch(e){}
+  });
+}
+
+function ngiiFillAddrFromPermit(force){
+  var el=document.getElementById('ngiiAddr');
+  if(!el) return;
+  /* 사용자가 직접 고친 값은 덮지 않음 */
+  if(el.value.trim() && !NGII.autoFilled && !force) return;
+
+  /* ★★ 1순위: 검색으로 고른 정확한 주소 문자열 (재해 pickAddr와 동일 원칙)
+     좌표→주소 역변환은 부번(-61)이 깎여 본번(산131)으로 바뀌는 일이 있다(방4 실측).
+     그래서 사람이 고른 주소가 있으면 무조건 그걸 먼저 쓴다. */
+  var lb=(CAD.marker && CAD.marker.label ? String(CAD.marker.label) : '').trim();
+  var lastTok=lb.split(/\s+/).pop()||'';
+  if(lb && /\d/.test(lastTok) && !/허가지선/.test(lb)){
+    lb=_normalizeJibunAddr(lb);
+    el.value=lb; NGII.autoFilled=true; NGII._lastAddr=lb;
+    _ngiiMsg('✓ '+lb,'#4ade80');
+    return;
+  }
+  if(NGII._lastAddr){ el.value=NGII._lastAddr; NGII.autoFilled=true; return; }
+
+  /* 2순위: 허가지선 중심좌표 → 역지오코딩 (부번 깎임 주의) */
+  var c=_permitCentroid();
+  if(!c) return;
+  if(!_cadInitProj()) return;
+  var ll=tm5186toWgs84(c.x,c.y);
+  if(!ll) return;
+
+  _ngiiMsg('주소 확인 중…','#94a3b8');
+  _cadKakaoReady(function(ok){
+    if(!ok){ _fallbackJibun(el); return; }
+    try{
+      CAD.geocoder.coord2Address(ll[0], ll[1], function(res, st){
+        if(st===kakao.maps.services.Status.OK && res.length && res[0].address){
+          var full=res[0].address.address_name;
+          /* ★ 지적에서 받은 지번(본번-부번)과 대조 — 부번이 깎였으면 보정 */
+          full=_mergeJibunTail(full);
+          NGII._lastAddr=full;
+          el.value=full; NGII.autoFilled=true;
+          _ngiiMsg('✓ '+full+'  (틀리면 직접 고치세요)','#4ade80');
+        } else {
+          _fallbackJibun(el);
+        }
+      });
+    }catch(e){ _fallbackJibun(el); }
+  });
+}
+
+function _permitCentroid(){
+  var pts=(S.permit&&S.permit.pts)||null;
+  if(!pts||pts.length<3) return null;
+  var a=0,cx=0,cy=0;
+  for(var i=0;i<pts.length;i++){
+    var p=pts[i], q=pts[(i+1)%pts.length];
+    var f=p.x*q.y-q.x*p.y;
+    a+=f; cx+=(p.x+q.x)*f; cy+=(p.y+q.y)*f;
+  }
+  if(Math.abs(a)<1e-9){   /* 면적 0이면 단순 평균 */
+    var sx=0,sy=0; pts.forEach(function(p){sx+=p.x;sy+=p.y;});
+    return {x:sx/pts.length, y:sy/pts.length};
+  }
+  a*=0.5;
+  return {x:cx/(6*a), y:cy/(6*a)};
+}
+
+function _mergeJibunTail(full){
+  var src=(S._permitSrc && S._permitSrc.length)?S._permitSrc[0]:null;
+  var jb=src && src.jibun ? String(src.jibun).trim() : '';
+  if(!jb) return _normalizeJibunAddr(full);
+  /* 지목 한 글자 제거: "산131-61임" → "산131-61" */
+  jb=jb.replace(/\s*[가-힣]$/,'').trim();
+  if(!/\d/.test(jb)) return _normalizeJibunAddr(full);
+
+  var parts=String(full).trim().split(/\s+/);
+  if(parts.length<2) return full;
+
+  /* ★ 끝에서부터 지번 조각을 모두 걷어낸다.
+     카카오가 "… 남양리 산 139-93" 처럼 '산'을 띄어서 주는 경우가 있어,
+     마지막 토큰만 바꾸면 "산 산139-93" 처럼 산이 중복된다(실측). */
+  while(parts.length>1){
+    var t=parts[parts.length-1];
+    if(/^산$/.test(t) || /^산?\d+(-\d+)?$/.test(t)){ parts.pop(); continue; }
+    break;
+  }
+  parts.push(jb);
+  return _normalizeJibunAddr(parts.join(' '));
+}
+
+function _normalizeJibunAddr(a){
+  if(!a) return a;
+  var t=String(a).trim().replace(/\s+/g,' ');
+  t=t.replace(/\s산\s+(\d)/g,' 산$1');          /* 산 139-93 → 산139-93 */
+  var SIDO={ '서울':'서울특별시','부산':'부산광역시','대구':'대구광역시','인천':'인천광역시',
+             '광주':'광주광역시','대전':'대전광역시','울산':'울산광역시','세종':'세종특별자치시',
+             '경기':'경기도','강원':'강원특별자치도','충북':'충청북도','충남':'충청남도',
+             '전북':'전북특별자치도','전남':'전라남도','경북':'경상북도','경남':'경상남도',
+             '제주':'제주특별자치도' };
+  var p=t.split(' ');
+  if(p.length>1 && SIDO[p[0]]){ p[0]=SIDO[p[0]]; t=p.join(' '); }
+  return t;
+}
+
+function _fallbackJibun(el){
+  var src=(S._permitSrc&&S._permitSrc.length)?S._permitSrc[0]:null;
+  var jb=src&&src.jibun?String(src.jibun).replace(/\s*[가-힣]$/,'').trim():'';
+  if(jb){ el.value=jb; NGII.autoFilled=true; }
+  _ngiiMsg('⚠ 시·군·읍면까지 직접 넣어주세요 (예: 화성시 팔탄면 덕우리 '+(jb||'000')+')','#fbbf24');
+}
+
+function _ngiiFillPurpose(){
+  var s1=document.getElementById('ngiiP1'), s2=document.getElementById('ngiiP2');
+  if(!s1||!s2) return;
+  s1.innerHTML=Object.keys(NGII_PURPOSE).map(function(k){
+    return '<option value="'+k+'"'+(k===NGII.purpose1?' selected':'')+'>'+k+'</option>';
+  }).join('');
+  _ngiiFillP2(NGII.purpose1, NGII.purpose2);
+}
+
+function _ngiiFillP2(cat, pick){
+  var s2=document.getElementById('ngiiP2');
+  if(!s2) return;
+  var list=NGII_PURPOSE[cat]||[];
+  s2.innerHTML=list.map(function(v){
+    return '<option value="'+v+'"'+(v===pick?' selected':'')+'>'+v+'</option>';
+  }).join('');
+  NGII.purpose2 = (list.indexOf(pick)>=0) ? pick : (list[0]||'');
+  s2.value=NGII.purpose2;
+}
+
+function onNgiiP1(){
+  var s1=document.getElementById('ngiiP1');
+  NGII.purpose1=s1.value;
+  _ngiiFillP2(NGII.purpose1, null);
+}
+
+function ngiiSyncGate(){
+  if(!document.getElementById('ngiiP1').options.length) _ngiiFillPurpose();
+  if(!FSA._inited){ FSA._inited=true; _fsaSyncUI(); _fsaRestore(); }
+  var need=document.getElementById('needPermitBox');
+  var sec =document.getElementById('ngiiSec');
+  var ok=_hasPermit();
+  if(need) need.style.display = ok ? 'none' : '';
+  if(sec)  sec.style.display  = ok ? '' : 'none';
+  if(!ok) return;
+
+  /* 허가지선 요약 표시 */
+  var tx=document.getElementById('permitAddrTx');
+  if(tx){
+    var area=_permitTotalArea();
+    var nm=(NGII._lastAddr || (CAD.marker&&CAD.marker.label) || (S.permit.layer||'허가지선'));
+    var full=nm+'  ·  '+area.toFixed(0)+'㎡';
+    tx.textContent=full;
+    tx.title=full;              /* 잘리면 마우스를 올려 전체 확인 */
+  }
+  ngiiFillAddrFromPermit();
+}
+
+function _hasPermit(){
+  return !!(S.permit && S.permit.pts && S.permit.pts.length>=3);
+}
+
+function _idb(){
+  return new Promise(function(res,rej){
+    var q=indexedDB.open('gdsp_fsa',1);
+    q.onupgradeneeded=function(){ q.result.createObjectStore('kv'); };
+    q.onsuccess=function(){ res(q.result); };
+    q.onerror=function(){ rej(q.error); };
+  });
+}
+
+function _idbSet(k,v){
+  return _idb().then(function(db){
+    return new Promise(function(res,rej){
+      var t=db.transaction('kv','readwrite');
+      t.objectStore('kv').put(v,k);
+      t.oncomplete=function(){ res(true); };
+      t.onerror=function(){ rej(t.error); };
+    });
+  });
+}
+
+function _idbGet(k){
+  return _idb().then(function(db){
+    return new Promise(function(res,rej){
+      var t=db.transaction('kv','readonly');
+      var r=t.objectStore('kv').get(k);
+      r.onsuccess=function(){ res(r.result||null); };
+      r.onerror=function(){ rej(r.error); };
+    });
+  });
+}
+
+function fsaPickFolder(){
+  if(!FSA.supported){ _ngiiMsg('이 브라우저는 폴더 자동읽기를 지원하지 않아요 (크롬·엣지 권장)','#fbbf24'); return; }
+  window.showDirectoryPicker({ id:'gdsp_dem', mode:'read', startIn:'downloads' })
+    .then(function(h){
+      FSA.dir=h;
+      _fsaSyncUI('granted');
+      _ngiiMsg('✅ 폴더 연결됨 — 다음부터 받으면 자동으로 열립니다','#4ade80');
+      toast('폴더 연결: '+h.name,'ok');
+      /* 저장은 부가기능 — 실패해도 이번 세션은 그대로 동작한다 */
+      return _idbSet('demDir',h).catch(function(e){
+        console.log('[FSA] 핸들 저장 실패(이번 세션만 유효)', e);
+      });
+    })
+    .catch(function(e){
+      if(e && e.name==='AbortError') return;      /* 사용자가 취소 */
+      console.log('[FSA] 폴더 선택 실패', e);
+      _ngiiMsg('폴더 연결에 실패했어요','#f87171');
+    });
+}
+
+function fsaGrantNow(){
+  if(!FSA.dir){ fsaPickFolder(); return; }
+  FSA.dir.requestPermission({mode:'read'}).then(function(st){
+    _fsaSyncUI(st);
+    if(st==='granted'){ _ngiiMsg('✅ 폴더 권한 확인됨 — 자동 열기 준비 완료','#4ade80'); }
+    else { _ngiiMsg('권한이 거부됐어요 — [폴더 연결]로 다시 골라주세요','#f87171'); }
+  }).catch(function(){ fsaPickFolder(); });
+}
+
+function _fsaRestore(){
+  if(!FSA.supported) return Promise.resolve(null);
+  return _idbGet('demDir').then(function(h){
+    if(!h) return null;
+    FSA.dir=h;
+    return h.queryPermission({mode:'read'}).then(function(st){
+      _fsaSyncUI(st);
+      return st==='granted' ? h : null;
+    });
+  }).catch(function(){ return null; });
+}
+
+function _fsaEnsure(){
+  if(!FSA.dir) return Promise.resolve(null);
+  return FSA.dir.queryPermission({mode:'read'}).then(function(st){
+    if(st==='granted') return FSA.dir;
+    return FSA.dir.requestPermission({mode:'read'}).then(function(st2){
+      return st2==='granted' ? FSA.dir : null;
+    });
+  }).catch(function(){ return null; });
+}
+
+function _fsaListDXF(dir, since){
+  var out=[];
+  return (async function(){
+    for await (var ent of dir.values()){
+      if(ent.kind!=='file') continue;
+      if(!/\.dxf$/i.test(ent.name)) continue;
+      var f=await ent.getFile();
+      if(since && f.lastModified < since) continue;
+      if(f.size < 20000) continue;             /* 20KB 미만은 지형도가 아님 */
+      out.push(f);
+    }
+    out.sort(function(a,b){ return b.lastModified-a.lastModified; });   /* 최신순 */
+    return out;
+  })();
+}
+
+function _sniffDXF(file){
+  /* slice/text 미지원 환경이면 검사 생략하고 통과 (자동열기 자체가 죽으면 안 됨) */
+  if(!file || typeof file.slice!=='function'){ return Promise.resolve(true); }
+  var part;
+  try{ part=file.slice(0, 65536); }catch(e){ return Promise.resolve(true); }
+  if(!part || typeof part.text!=='function'){ return Promise.resolve(true); }
+  return part.text().then(function(head){
+    var h=head.toUpperCase();
+    if(/<HTML|<!DOCTYPE/.test(h)) return false;
+    return h.indexOf('ENTITIES')>=0 || h.indexOf('SECTION')>=0 || h.indexOf('AUTOCAD')>=0;
+  }).catch(function(){ return true; });        /* 못 읽으면 일단 시도 */
+}
+
+function _fsaPickDXF(dir, since){
+  return _fsaListDXF(dir, since).then(function(list){
+    if(!list.length) return null;
+    var out=[], idx=0;
+    function step(){
+      if(idx>=list.length) return Promise.resolve(out.length?out:null);
+      var f=list[idx++];
+      return _sniffDXF(f).then(function(ok){
+        if(ok) out.push(f);
+        else console.log('[FSA] DXF가 아니라 건너뜀:', f.name);
+        return step();
+      });
+    }
+    return step();
+  });
+}
+
+function fsaAutoOpen(silent){
+  return _fsaEnsure().then(function(dir){
+    if(!dir){
+      if(FSA.dir) _ngiiMsg('폴더 권한이 풀렸어요 — 아래 [폴더 권한 허용]을 눌러주세요','#fbbf24');
+      else if(!silent) _ngiiMsg('폴더가 연결되지 않았어요 — [폴더 연결]을 눌러주세요','#fbbf24');
+      return false;
+    }
+    var since = NGII._startedAt ? (NGII._startedAt-10000) : 0;
+    var deadline = Date.now()+120000;   /* 최대 2분 */
+    var lastN=0, stable=0;
+    var STABLE_NEED=4;                  /* 1.5초 × 4회 = 6초간 변화 없으면 완료로 봄 */
+
+    function tryOnce(){
+      return _fsaPickDXF(dir, since).then(function(fl){
+        var n = fl ? fl.length : 0;
+
+        if(n>0){
+          if(n===lastN){ stable++; } else { stable=0; lastN=n; }
+          if(stable>=STABLE_NEED){
+            NGII._openedName=fl.map(function(x){return x.name;}).join(', ');
+            if(fl.length>1){
+              _ngiiMsg('📂 도엽 '+fl.length+'장 합치는 중…','#94a3b8');
+              loadFiles(fl);
+            } else {
+              _ngiiMsg('📂 '+fl[0].name+' 여는 중…','#94a3b8');
+              _openTerrainFile(fl[0]);
+            }
+            return true;
+          }
+          _ngiiMsg('⏳ 도엽 '+n+'장 확인됨 — 더 오는지 확인 중…','#94a3b8');
+        } else {
+          _ngiiMsg('⏳ 파일 저장 대기 중…','#94a3b8');
+        }
+
+        if(Date.now()>deadline){
+          if(n>0){   /* 시간 초과라도 받은 건 연다 */
+            NGII._openedName=fl.map(function(x){return x.name;}).join(', ');
+            if(fl.length>1) loadFiles(fl); else _openTerrainFile(fl[0]);
+            return true;
+          }
+          _ngiiMsg('새로 받은 DXF를 못 찾았어요 — [받은 DXF 열기]로 직접 골라주세요','#fbbf24');
+          return false;
+        }
+        return new Promise(function(res){ setTimeout(function(){ res(tryOnce()); },1500); });
+      });
+    }
+    return tryOnce();
+  }).catch(function(e){
+    console.log('[FSA] 자동열기 실패', e);
+    if(!silent) _ngiiMsg('자동 열기에 실패했어요 — 직접 선택해주세요','#f87171');
+    return false;
+  });
+}
+
+function _openTerrainFile(file){
+  /* 업로드 경로와 완전히 동일하게 처리 — loadFile()이 파싱·자동감지까지 담당 */
+  if(typeof loadFile==='function'){ loadFile(file); return; }
+  /* 만약을 위한 폴백: input에 주입해 change 발생 */
+  try{
+    var inp=document.getElementById('fileIn');
+    var dt=new DataTransfer();
+    dt.items.add(file);
+    inp.files=dt.files;
+    inp.dispatchEvent(new Event('change',{bubbles:true}));
+  }catch(e){
+    console.log('[FSA] 파일 열기 실패', e);
+    toast('파일을 열지 못했어요 — 직접 선택해주세요','err');
+  }
+}
+
+function _fsaSyncUI(state){
+  var box=document.getElementById('fsaBox');
+  if(!box) return;
+  if(!FSA.supported){
+    box.innerHTML='<div style="font-size:10.5px;color:var(--dim);line-height:1.5">이 브라우저는 자동 열기를 지원하지 않아요. 받은 뒤 파일을 직접 선택하세요. (크롬·엣지 권장)</div>';
+    return;
+  }
+  var nm=FSA.dir?FSA.dir.name:null;
+  if(nm && state==='prompt'){
+    /* 크롬은 페이지를 새로 열면 폴더 권한을 prompt로 되돌린다.
+       이때 재허용은 '사용자 클릭 안에서만' 가능하다. */
+    box.innerHTML='<div style="font-size:10.5px;color:#fbbf24;line-height:1.5">'
+      +'⚠ <b>'+nm+'</b> 폴더 — 권한 확인이 필요해요</div>'
+      +'<button class="btn btn-ghost" onclick="fsaGrantNow()" style="margin-top:5px;color:#8ecbff;border-color:#2f4d70">🔓 폴더 권한 허용</button>';
+  } else if(nm && state!=='denied'){
+    box.innerHTML='<div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#4ade80">'
+      +'<span>✅ 자동 열기 켜짐 · <b>'+nm+'</b> 폴더</span></div>'
+      +'<button class="btn btn-ghost" onclick="fsaPickFolder()" style="margin-top:5px;font-size:11px">폴더 바꾸기</button>';
+  } else {
+    box.innerHTML='<div style="font-size:10.5px;color:var(--dim);line-height:1.5;margin-bottom:5px">'
+      +'받은 파일을 자동으로 열려면 <b>다운로드\\지형도</b> 폴더를 한 번만 연결하세요.</div>'
+      +'<button class="btn btn-ghost" onclick="fsaPickFolder()" style="color:#8ecbff;border-color:#2f4d70">📁 폴더 연결 (1회)</button>';
+  }
+}
+
+function detectBelt(r){
+  if(!_cadInitProj()) return '5186';
+  var c=_dxfCenter(r);
+  if(!c) return '5186';
+
+  /* 기준 위치(5186) — 좌표만으로는 원점 구분이 불가능하다.
+     네 원점이 정확히 2°씩 떨어져 있어 어느 것으로 읽어도 '한국 안'이 되기 때문. */
+  var target=null, tsrc='';
+  if(_permitPtsFlow()){ target=_permitCentroid(); tsrc='허가지선'; }   /* [TEST] 재해 형식 */
+  if(!target && CAD.marker){ target={x:CAD.marker.x, y:CAD.marker.y}; tsrc='검색위치'; }
+  /* 지도 화면은 '사용자가 실제로 옮긴' 경우에만 기준으로 쓴다.
+     기본 화면(화성)을 기준 삼으면 강원 도면이 중부로 오판되어 178km 밀린다(실측). */
+  if(!target && S._viewFromUser && S.bounds && isFinite(S.bounds.minX)){
+    target={x:(S.bounds.minX+S.bounds.maxX)/2, y:(S.bounds.minY+S.bounds.maxY)/2};
+    tsrc='지도화면';
+  }
+
+  var best=null;
+  Object.keys(BELT_LON).forEach(function(e){
+    var ll;
+    try{ ll=proj4('EPSG:'+e,'WGS84',[c.x,c.y]); }catch(err){ return; }
+    if(!ll || !isFinite(ll[0]) || !isFinite(ll[1])) return;
+    if(ll[0]<123 || ll[0]>133 || ll[1]<32 || ll[1]>44) return;   /* 한국 밖 */
+    var score;
+    if(target){
+      var t5=wgs84toTm5186(ll[0],ll[1]);
+      if(!t5) return;
+      score=Math.hypot(t5[0]-target.x, t5[1]-target.y);
+    } else {
+      /* ★ 기준 위치가 없으면 원리적으로 판별 불가.
+         네 원점이 정확히 2°씩 떨어져 있어 '구역 중심과의 거리'가 모두 같아진다.
+         (실측: 126.8625↔124.8625 둘 다 0.14° → 무승부 → 도엽마다 다르게 뽑힘)
+         → 추측하지 말고 가장 흔한 중부(5186)로 고정하고 사용자에게 알린다. */
+      score=(e==='5186')?0:1;
+    }
+    if(!best || score<best.score) best={epsg:e, score:score, lng:ll[0], lat:ll[1]};
+  });
+
+  if(!best){ console.log('[좌표계] 판별 실패 — 5186으로 가정'); return '5186'; }
+  console.log('[좌표계] 판별:', 'EPSG:'+best.epsg,
+              '(중심 '+best.lng.toFixed(4)+','+best.lat.toFixed(4)+
+              (target?(' · '+tsrc+'과 '+Math.round(best.score)+'m'):' · 기준점 없음')+')');
+  if(!target){
+    console.log('[좌표계] ⚠ 기준 위치(허가지선/검색위치)가 없어 중부(5186)로 가정했습니다.');
+    try{
+      _ngiiMsg('⚠ 허가지선이 없어 좌표계를 중부로 가정했어요 — 위치가 엉뚱하면 아래에서 원점을 바꾸세요','#fbbf24');
+    }catch(e){}
+  }
+  return best.epsg;
+}
+
+function reprojectParsed(r, fromEpsg){
+  if(fromEpsg==='5186') return 0;
+  var n=0;
+  function conv(p){
+    try{
+      var ll=proj4('EPSG:'+fromEpsg,'WGS84',[p.x,p.y]);
+      var cc=wgs84toTm5186(ll[0],ll[1]);
+      if(cc){ p.x=cc[0]; p.y=cc[1]; n++; }
+    }catch(e){}
+  }
+  (r.contours||[]).forEach(function(c){ c.pts.forEach(conv); });
+  (r.waters||[]).forEach(function(c){ c.pts.forEach(conv); });
+  (r.surveys||[]).forEach(conv);
+  (r.polys||[]).forEach(function(pl){ pl.pts.forEach(conv); });
+  return n;
+}
+
+function _dxfCenter(r){
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18,n=0;
+  function eat(p){ if(!p)return; n++;
+    if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+    if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y; }
+  (r.contours||[]).forEach(function(c){ c.pts.forEach(eat); });
+  (r.surveys||[]).forEach(eat);
+  (r.waters||[]).forEach(function(c){ c.pts.forEach(eat); });
+  if(!n) return null;
+  return { x:(mnx+mxx)/2, y:(mny+mxy)/2, minX:mnx, minY:mny, maxX:mxx, maxY:mxy };
+}
+
+function _beltName(e){ return ({'5185':'서부','5186':'중부','5187':'동부','5188':'동해'})[e]||e; }
+
+function setBelt(newEpsg){
+  newEpsg=String(newEpsg);
+  var cur=String(S._srcBelt||'5186');
+  if(cur===newEpsg){ toast('이미 '+_beltName(newEpsg)+'원점이에요','ok'); _syncBeltBtns(); return; }
+  if(!_cadInitProj()) return;
+  if(!(S._allSheets && S._allSheets.contours)){ toast('먼저 지형도를 올려주세요','err'); return; }
+
+  function move(p){
+    try{
+      /* 5186 → WGS84 → (원래 원점) 원본좌표 복원 */
+      var ll1=proj4('EPSG:5186','WGS84',[p.x,p.y]);
+      var orig=proj4('WGS84','EPSG:'+cur, ll1);
+      /* 원본좌표를 새 원점으로 해석 → 5186 */
+      var ll2=proj4('EPSG:'+newEpsg,'WGS84', orig);
+      var c=wgs84toTm5186(ll2[0],ll2[1]);
+      if(c){ p.x=c[0]; p.y=c[1]; }
+    }catch(e){}
+  }
+  var A=S._allSheets;
+  (A.contours||[]).forEach(function(c){ c.pts.forEach(move); });
+  (A.waters||[]).forEach(function(c){ c.pts.forEach(move); });
+  (A.surveys||[]).forEach(move);
+  (A.polys||[]).forEach(function(pl){ pl.pts.forEach(move); });
+
+  S._srcBelt=newEpsg;
+  S.contours=A.contours.slice(); S.surveys=A.surveys.slice();
+  S.waters=(A.waters||[]).slice(); S.allPolys=(A.polys||[]).slice();
+  S._rawTerrain=null; S._workRings=null; S.workDist=0;
+  S.triList=[]; S.gridCells=[]; S.avgSlope=null; S.bins=null;   /* [TEST] 재해 render는 length를 보므로 null 금지 */
+  S.tri=null; S.showTIN=false;
+  _syncBeltBtns(); _syncWorkBtns();
+  computeBounds(); fitView();
+  if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
+  toast('좌표계를 '+_beltName(newEpsg)+'원점으로 변경','ok');
+  render();
+}
+
+function _syncBeltBtns(){
+  var box=document.getElementById('beltBox');
+  if(!box) return;
+  var has=!!(S.contours && S.contours.length);
+  box.style.display = has ? '' : 'none';
+  ['5185','5186','5187','5188'].forEach(function(e){
+    var b=document.getElementById('belt'+e);
+    if(b) b.className='thr'+(String(S._srcBelt||'5186')===e?' on':'');
+  });
+  var inf=document.getElementById('beltInfo');
+  if(inf){
+    var ok=(typeof checkTerrainCoversPermit==='function') ? checkTerrainCoversPermit() : null;
+    if(ok===false){ inf.textContent='⚠ 허가지선과 위치가 안 맞아요 — 원점을 바꿔보세요'; inf.style.color='#f87171'; }
+    else if(ok===true){ inf.textContent='✓ 허가지선 위치와 일치'; inf.style.color='#4ade80'; }
+    else {
+      /* 허가지선이 없으면 자동 판별이 불가능하므로 반드시 눈에 띄게 안내 */
+      inf.textContent='⚠ 허가지선이 없어 중부로 가정했어요 — 위치가 다르면 직접 고르세요';
+      inf.style.color='#fbbf24';
+    }
+  }
+}
+
+function checkTerrainCoversPermit(){
+  if(!_permitPtsFlow()) return null;   /* [TEST] 재해는 S.permit이 점 배열 */
+  if(!(S.contours && S.contours.length)) return null;
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+  S.contours.forEach(function(c){
+    c.pts.forEach(function(p){
+      if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+      if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y;
+    });
+  });
+  var c0=_permitCentroid();
+  if(!c0) return null;
+  /* 여유 500m — 허가지선이 도엽 가장자리에 걸치거나 등고선이 성긴 지역이면
+     중심이 살짝 밖으로 나올 수 있다. 명백히 다른 도엽(수 km)만 걸러내는 것이 목적. */
+  var PAD=500;
+  var inside = (c0.x>=mnx-PAD && c0.x<=mxx+PAD && c0.y>=mny-PAD && c0.y<=mxy+PAD);
+  if(!inside){
+    var dx=Math.max(mnx-c0.x, c0.x-mxx, 0), dy=Math.max(mny-c0.y, c0.y-mxy, 0);
+    var dist=Math.round(Math.hypot(dx,dy));
+    var msg='⚠ 이 지형도는 허가지선 위치가 아니에요 (약 '+dist.toLocaleString()+'m 떨어짐)';
+    _ngiiMsg(msg+' — 다른 파일을 열어주세요','#f87171');
+    try{ toast('엉뚱한 도엽입니다 — '+dist.toLocaleString()+'m 떨어져 있어요','err'); }catch(e){}
+    console.log('[검증] 허가지선 중심', c0, '지형도 범위', {mnx:mnx,mny:mny,mxx:mxx,mxy:mxy});
+    return false;
+  }
+  return true;
+}
+
+/* (경사도판 loadFiles 제거 — 아래 재해 어댑터의 loadFiles 사용) */
+
+function clearSheets(){
+  S.contours=[]; S.surveys=[]; S.waters=[]; S.allPolys=[];
+  S._sheetNames=[]; S._rawTerrain=null; S._workRings=null; S.workDist=0; S._allSheets=null;
+  S.showTIN=false;
+  S.triList=[]; S.gridCells=[]; S.avgSlope=null; S.bins=null;   /* [TEST] 재해 render는 length를 보므로 null 금지 */
+  S.tri=null; S.showTIN=false;
+  S.fileName=null;
+  setDet('detCont', false, '-');
+  setDet('detSurv', false, '-');
+  var dw=document.getElementById('detWater');
+  if(dw){ dw.className='det-row'; dw.querySelector('.ct').textContent='-'; }
+  _syncSheetList();
+  if(typeof _syncWorkBtns==='function') _syncWorkBtns();
+  var hs=document.getElementById('hdrStat');
+  if(hs) hs.textContent='DXF 파일을 올려주세요';
+  if(typeof _updateRunBtn==='function') _updateRunBtn();
+  if(typeof _ngiiMsg==='function') _ngiiMsg('지형도를 비웠어요 — 다시 올려주세요','#fbbf24');
+  /* 허가지선이 있으면 그 주변으로, 없으면 지도 뷰 유지 */
+  if(S.permit && S.permit.pts && S.permit.pts.length>=3){ computeBounds(); fitView(); }
+  toast('지형도를 비웠어요 (허가지선은 유지)','ok');
+  render();
+}
+
+function _syncSheetList(){
+  var box=document.getElementById('sheetBox'), list=document.getElementById('sheetList'),
+      cnt=document.getElementById('sheetCnt');
+  if(!box||!list) return;
+  var ns=S._sheetNames||[];
+  if(!ns.length){ box.style.display='none'; list.innerHTML=''; if(cnt) cnt.textContent='-'; return; }
+  box.style.display='';
+  if(cnt) cnt.textContent='✅ 올린 도엽 '+ns.length+'장';
+  list.innerHTML=ns.map(function(n,i){
+    var short=n.length>34 ? (n.slice(0,16)+'…'+n.slice(-14)) : n;
+    return '<div style="font-size:10px;color:var(--dim);padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+n+'">'
+      +(i+1)+'. '+short+'</div>';
+  }).join('');
+}
+
+/* 확장 → 페이지 수신 */
+window.addEventListener('message', function(ev){
+  /* ★ ev.source 대신 origin으로 검사.
+     content script는 isolated world라 source가 window와 일치한다는 보장이 없음 */
+  if(ev.origin && ev.origin!==window.location.origin) return;
+  var d=ev.data;
+  if(!d || d.source!=='GDSP_EXT') return;
+
+  if(d.type==='READY'){
+    NGII.lastSeen=Date.now();
+    if(!NGII.extAlive){ NGII.extAlive=true; _ngiiSyncExtUI(); }
+    return;
+  }
+  if(d.type==='DEAD'){
+    NGII.extAlive=false; _ngiiSyncExtUI(); _ngiiRunning(false);
+    _ngiiMsg('확장 연결이 끊겼어요 — 새로고침 해보세요','#f87171');
+    return;
+  }
+  if(d.type==='START_ACK'){
+    if(d.ok) _ngiiMsg('진행 중… 국토정보플랫폼 탭에서 [허용]을 눌러주세요','#94a3b8');
+    else { _ngiiRunning(false); _ngiiMsg('시작 실패: '+(d.err||'알 수 없음'),'#f87171'); }
+    return;
+  }
+  if(d.type==='PROGRESS'){
+    if(d.step) _ngiiMsg('⏳ '+d.step,'#94a3b8');
+    return;
+  }
+  if(d.type==='DONE'){
+    _ngiiRunning(false);
+    if(d.ok){
+      _ngiiMsg('✅ 다운로드 완료 — 받은 DXF를 선택하면 바로 열립니다','#4ade80');
+      _ngiiOfferOpen();
+    } else {
+      _ngiiMsg('❌ 중단됨'+(d.err?(' — '+d.err):''),'#f87171');
+    }
+    return;
+  }
+});
+
+/* 확장 감지: PING 보내고 하트비트(2초) 끊기면 미설치로 판단 */
+(function _ngiiWatch(){
+  function tick(){
+    _ngiiSend({ type:'PING' });
+    if(NGII.extAlive && Date.now()-NGII.lastSeen>6000){
+      NGII.extAlive=false; _ngiiSyncExtUI();
+    }
+  }
+  if(document.readyState==='complete') setTimeout(function(){ tick(); setInterval(tick,3000); },300);
+  else window.addEventListener('load', function(){ setTimeout(function(){ tick(); setInterval(tick,3000); },300); });
+})();
+
+
+var GDSP_FLOW_VER='TEST v2.0 (2026-08-23) 산림청 자동전달·강우 자동받기';
+console.log('%c[G-DSP 재해] '+GDSP_FLOW_VER,'color:#60a5fa;font-weight:700');
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 재해(popup_flow) 어댑터 — 경사도에서 가져온 부품을
+   이 파일 구조에 맞춘다. (S.permit 형식·applyParsed 인자·파일열기 이름이 다름)
+   ══════════════════════════════════════════════════════════════ */
+function _permitPtsFlow(){
+  var p=S.permit;
+  if(!p) return null;
+  if(Array.isArray(p)) return p.length>=3 ? p : null;
+  if(p.pts && p.pts.length>=3) return p.pts;
+  return null;
+}
+function _hasPermit(){ return !!_permitPtsFlow(); }
+function _permitCentroid(){
+  var pts=_permitPtsFlow();
+  if(!pts) return null;
+  var a=0,cx=0,cy=0;
+  for(var i=0;i<pts.length;i++){
+    var q=pts[i], r=pts[(i+1)%pts.length];
+    var f=q.x*r.y-r.x*q.y;
+    a+=f; cx+=(q.x+r.x)*f; cy+=(q.y+r.y)*f;
+  }
+  if(Math.abs(a)<1e-9){
+    var sx=0,sy=0; pts.forEach(function(q){sx+=q.x;sy+=q.y;});
+    return {x:sx/pts.length, y:sy/pts.length};
+  }
+  a*=0.5;
+  return {x:cx/(6*a), y:cy/(6*a)};
+}
+function _permitTotalArea(){
+  var pts=_permitPtsFlow();
+  if(!pts) return 0;
+  if(S.permitParcels && S.permitParcels.length){
+    var sum=0; S.permitParcels.forEach(function(x){ if(x.ring) sum+=Math.abs(polyArea(x.ring)); });
+    if(sum>0) return sum;
+  }
+  return Math.abs(polyArea(pts));
+}
+function setDet(){}
+function _updateRunBtn(){}
+function getBounds(pts){
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+  pts.forEach(function(p){ if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x; if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y; });
+  return {minX:mnx,minY:mny,maxX:mxx,maxY:mxy};
+}
+function _syncWorkBtns(){}
+function _syncTinBtn(){}
+function _tinInRange(){ return S.triList||[]; }
+function _ringsBBox(rings){
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+  rings.forEach(function(r){ r.forEach(function(p){
+    if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+    if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y; }); });
+  return {mnx:mnx,mny:mny,mxx:mxx,mxy:mxy};
+}
+function _inWork(){ return true; }
+function _openTerrainFile(file){ loadDXFFile(file); }
+
+/* 여러 도엽 합쳐 열기 (재해판) */
+function loadFiles(files){
+  files=Array.prototype.slice.call(files||[]).filter(function(f){ return /\.dxf$/i.test(f.name); });
+  if(!files.length){ toast('DXF 파일이 없어요','err'); return; }
+  if(!S._allSheets) S._allSheets={contours:[], surveys:[], polys:[], bgLines:[], bgTexts:[]};
+  var keep = S._allSheets.contours.length>0 || S._allSheets.surveys.length>0;
+  var merged={
+    contours:S._allSheets.contours.slice(), surveys:S._allSheets.surveys.slice(),
+    polys:S._allSheets.polys.slice(),
+    bgLines:(S._allSheets.bgLines||[]).slice(), bgTexts:(S._allSheets.bgTexts||[]).slice()
+  };
+  var names=[], belts={}, idx=0, t0=Date.now();
+  /* ★ 원점은 도엽마다 따로 판별하면 안 된다. 같이 받은 도엽은 같은 지역이라
+     원점이 동일한데, 허가지선에서 먼 옆 도엽은 기준점이 멀어 오판이 난다
+     (실측: 3장 중 1장만 178km 서쪽 바다로). 첫 도엽에서 정한 원점을 전부에 적용. */
+  var _fixedBelt = (keep && S._srcBelt) ? String(S._srcBelt) : null;
+  function step(){
+    if(idx>=files.length){ finish(); return; }
+    var f=files[idx++];
+    _ngiiMsg('📖 도엽 '+idx+'/'+files.length+' 읽는 중… ('+f.name.slice(0,26)+')','#94a3b8');
+    var fr=new FileReader();
+    fr.onerror=function(){ console.log('[합치기] 읽기 실패:', f.name); step(); };
+    fr.onload=function(){
+      try{
+        var text=_decodeDxf(fr.result);
+        var r=parseDXF(text);
+        var belt = _fixedBelt || (_fixedBelt = detectBelt(r));
+        if(belt!=='5186') reprojectParsed(r, belt);
+        belts[belt]=(belts[belt]||0)+1;
+        merged.contours=merged.contours.concat(r.contours||[]);
+        merged.surveys =merged.surveys.concat(r.surveys||[]);
+        merged.polys   =merged.polys.concat(r.polys||[]);
+        merged.bgLines =merged.bgLines.concat(r.bgLines||[]);
+        merged.bgTexts =merged.bgTexts.concat(r.bgTexts||[]);
+        names.push(f.name);
+        console.log('[합치기] '+f.name+' → 등고선 '+(r.contours||[]).length+' · 표고점 '+(r.surveys||[]).length+' (원점 '+belt+')');
+      }catch(err){
+        console.log('[합치기] 건너뜀 —', f.name, err.message);
+        toast(f.name+' 은(는) 읽지 못했어요','err');
+      }
+      setTimeout(step, 20);
+    };
+    fr.readAsArrayBuffer(f);
+  }
+  function finish(){
+    if(!merged.contours.length && !merged.surveys.length){
+      _ngiiMsg('❌ 읽을 수 있는 도엽이 없었어요','#f87171'); return;
+    }
+    S._srcBelt=_fixedBelt||'5186';
+    S._allSheets={contours:merged.contours.slice(), surveys:merged.surveys.slice(),
+                  polys:merged.polys.slice(), bgLines:merged.bgLines.slice(), bgTexts:merged.bgTexts.slice()};
+    var prevNames=(S._sheetNames||[]).slice();
+    names.forEach(function(nm){ if(prevNames.indexOf(nm)<0) prevNames.push(nm); });
+    S._sheetNames=prevNames;
+    var total=prevNames.length;
+    S.name=(total>1)?(total+'개 도엽 합침'):prevNames[0];
+    applyParsed(merged);
+    _syncSheetList();
+    if(typeof _syncBeltBtns==='function') _syncBeltBtns();
+    if(typeof checkTerrainCoversPermit==='function') checkTerrainCoversPermit();
+    var sec=((Date.now()-t0)/1000).toFixed(1);
+    _ngiiMsg('✅ '+(keep?('+'+names.length+'장 추가 → 총 '+total+'장'):(names.length+'개 도엽'))
+      +' · 등고선 '+merged.contours.length+' · 표고점 '+merged.surveys.length+' ('+sec+'초)','#4ade80');
+    toast(keep? (names.length+'장 추가 (총 '+total+'장)') : (names.length+'개 도엽을 열었어요'),'ok');
+  }
+  step();
+}
+
+function _syncSheetList(){
+  var box=document.getElementById('sheetBox'), list=document.getElementById('sheetList'),
+      cnt=document.getElementById('sheetCnt');
+  if(!box||!list) return;
+  var ns=S._sheetNames||[];
+  if(!ns.length){ box.style.display='none'; list.innerHTML=''; if(cnt) cnt.textContent='-'; return; }
+  box.style.display='';
+  if(cnt) cnt.textContent='✅ 올린 도엽 '+ns.length+'장';
+  list.innerHTML=ns.map(function(n,i){
+    var short=n.length>34 ? (n.slice(0,16)+'…'+n.slice(-14)) : n;
+    return '<div style="font-size:10px;color:var(--tx3);padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+n+'">'
+      +(i+1)+'. '+short+'</div>';
+  }).join('');
+}
+function clearSheets(){
+  S.contours=[]; S.surveys=[]; S.polys=[]; S.bgLines=[]; S.bgTexts=[];
+  S.origContours=[]; S.origSurveys=[]; S.origPolys=[];
+  S._sheetNames=[]; S._allSheets=null; S.name=null;
+  S.dem=null; S.demRaw=null; S.demSmooth=null; S.demHill=null; S.hillCanvas=null;
+  S.tri=null; S.triList=[];   /* render가 length를 보므로 null 대신 빈 배열 */
+  S.showTIN=false;
+  _syncSheetList();
+  if(typeof _syncBeltBtns==='function') _syncBeltBtns();
+  if(typeof _ngiiMsg==='function') _ngiiMsg('지형도를 비웠어요','#fbbf24');
+  toast('지형도 비움','ok');
+  render();
+}
+
+function ngiiSyncGate(){
+  var need=document.getElementById('needPermitBox');
+  var sec =document.getElementById('ngiiSec');
+  var ok=_hasPermit();
+  if(need) need.style.display = ok ? 'none' : '';
+  if(sec)  sec.style.display  = ok ? '' : 'none';
+  if(!ok) return;
+  var p1=document.getElementById('ngiiP1');
+  if(p1 && !p1.options.length) _ngiiFillPurpose();
+  if(!FSA._inited){ FSA._inited=true; _fsaSyncUI(); _fsaRestore(); }
+  var tx=document.getElementById('permitAddrTx');
+  if(tx){
+    var area=_permitTotalArea();
+    var nm=(NGII._lastAddr || (typeof CAD!=='undefined' && CAD.marker && CAD.marker.label) || '허가지선');
+    var full=nm+'  ·  '+area.toFixed(0)+'㎡';
+    tx.textContent=full; tx.title=full;
+  }
+  ngiiFillAddrFromPermit();
+}
+
+/* 허가지선이 만들어지면 게이트 열기 */
+(function _hookPermit(){
+  function wrap(){
+    if(typeof cadUseAsPermit!=='function'){ setTimeout(wrap,300); return; }
+    var _orig=cadUseAsPermit;
+    window.cadUseAsPermit=function(){
+      var r=_orig.apply(this, arguments);
+      try{ NGII._lastAddr=null; NGII.autoFilled=false; ngiiSyncGate(); }catch(e){}
+      return r;
+    };
+  }
+  wrap();
+})();
+
+/* 파일 입력 — multiple 속성만 켠다 (change 처리는 위 리스너가 담당) */
+(function _multiFile(){
+  function bind(){
+    var inp=document.getElementById('file');
+    if(!inp){ setTimeout(bind,300); return; }
+    inp.setAttribute('multiple','');
+  }
+  if(document.readyState==='complete') bind();
+  else window.addEventListener('load', bind);
+})();
+
+
+window.addEventListener('load', function(){
+  setTimeout(function(){
+    try{ ngiiSyncGate(); _syncSheetList(); if(typeof _syncBeltBtns==='function') _syncBeltBtns(); }catch(e){}
+  }, 400);
+});
+
+
+/* ══════════════════════════════════════════════════════════════
+   [TEST] 허가지선 DXF 업로드 — 업체가 준 도면(허가지선만) 받기
+   지형도 드롭박스는 등고선이 없으면 거부하므로 별도 입구가 필요하다.
+   R12(POLYLINE/VERTEX)도 읽는다.
+   ══════════════════════════════════════════════════════════════ */
+function parsePolylineR12(text){
+  var L=text.split(/\r\n|\r|\n/);
+  var out=[], i=0, cur=null, vtx=null;
+  function pushVtx(){ if(cur && vtx && isFinite(vtx.x) && isFinite(vtx.y)) cur.pts.push(vtx); vtx=null; }
+  function flush(){
+    if(cur && cur.pts.length>=3){
+      var pts=cur.pts.slice();
+      var a=pts[0], b=pts[pts.length-1];
+      if(Math.abs(a.x-b.x)<1e-6 && Math.abs(a.y-b.y)<1e-6) pts.pop();
+      if(pts.length>=3) out.push({ layer:cur.layer||'0', pts:pts, closed:!!(cur.flag&1) });
+    }
+    cur=null; vtx=null;
+  }
+  while(i<L.length-1){
+    var code=L[i].trim(), val=L[i+1];
+    if(code==='0'){
+      var t=(val||'').trim().toUpperCase();
+      if(t==='POLYLINE'){ flush(); cur={layer:'0', flag:0, pts:[]}; }
+      else if(t==='VERTEX'){ pushVtx(); if(cur) vtx={x:NaN,y:NaN}; }
+      else { pushVtx(); flush(); }
+    } else if(cur){
+      var v=(val||'').trim();
+      if(!vtx){
+        if(code==='8') cur.layer=v;
+        else if(code==='70') cur.flag=parseInt(v,10)||0;
+      } else {
+        if(code==='10') vtx.x=parseFloat(v);
+        else if(code==='20') vtx.y=parseFloat(v);
+      }
+    }
+    i+=2;
+  }
+  pushVtx(); flush();
+  return out;
+}
+
+function loadPermitDXF(file){
+  if(!file) return;
+  if(!/\.dxf$/i.test(file.name)){ toast('DXF 파일만 올려주세요','err'); return; }
+  var rd=new FileReader();
+  rd.onerror=function(){ toast('파일을 읽지 못했어요','err'); };
+  rd.onload=function(){
+    var text;
+    try{ text=_decodeDxf(rd.result); }catch(e){ toast('파일 인코딩 오류','err'); return; }
+
+    var cands=[];
+    /* 1) 일반 파서의 폐합 폴리곤 */
+    try{
+      var r=parseDXF(text);
+      cands=(r.polys||[]).filter(function(p){ return p.pts && p.pts.length>=3; });
+    }catch(e){}
+    /* 2) 없으면 R12(POLYLINE/VERTEX)로 다시 */
+    if(!cands.length){
+      try{ cands=parsePolylineR12(text); }catch(e){ cands=[]; }
+      if(cands.length) console.log('[허가지선] R12 폴리라인으로 읽음:', cands.length+'개');
+    }
+    if(!cands.length){ toast('닫힌 폴리곤(허가지선)을 찾지 못했어요','err'); return; }
+
+    /* 면적이 가장 큰 폴리곤을 허가지선으로 */
+    function ar(pts){ return Math.abs(polyArea(pts)); }
+    var best=cands[0], ba=ar(best.pts);
+    for(var i=1;i<cands.length;i++){ var a=ar(cands[i].pts); if(a>ba){ best=cands[i]; ba=a; } }
+
+    /* 재해는 S.permit 이 점 배열 */
+    S.permit=best.pts.map(function(p){ return {x:p.x, y:p.y}; });
+    S.permitParcels=null;
+    S._permitSrc=null; S._permitPnus=[];
+    NGII._lastAddr=null; NGII.autoFilled=false;
+    if(typeof CAD!=='undefined') CAD.marker=null;
+
+    /* 지형도가 아직 없으면 허가지선 기준으로 화면 잡기 */
+    if(!(S.contours && S.contours.length)) _fitToPermitFlow();
+
+    if(typeof updateNav==='function') updateNav();
+    if(typeof ngiiSyncGate==='function') ngiiSyncGate();
+    toast('허가지선 불러옴 — '+Math.round(ba).toLocaleString()+'㎡ ('+cands.length+'개 중 최대)','ok');
+    render();
+  };
+  rd.readAsArrayBuffer(file);
+}
+
+/* 허가지선만 있을 때 화면 맞춤 */
+function _fitToPermitFlow(){
+  var pts=_permitPtsFlow(); if(!pts) return;
+  var mnx=1e18,mny=1e18,mxx=-1e18,mxy=-1e18;
+  pts.forEach(function(p){
+    if(p.x<mnx)mnx=p.x; if(p.x>mxx)mxx=p.x;
+    if(p.y<mny)mny=p.y; if(p.y>mxy)mxy=p.y;
+  });
+  var pad=Math.max((mxx-mnx),(mxy-mny))*0.8+50;
+  S.bounds={minX:mnx-pad, minY:mny-pad, maxX:mxx+pad, maxY:mxy+pad};
+  S._viewFromUser=true;
+  if(typeof fitView==='function') fitView();
+}
+
+/* 허가지선 업로드 입력 연결 */
+(function _bindPermitUpload(){
+  function bind(){
+    var inp=document.getElementById('permitFile');
+    var drop=document.getElementById('permitDrop');
+    if(!inp||!drop){ setTimeout(bind,300); return; }
+    inp.addEventListener('change', function(){
+      if(this.files && this.files[0]) loadPermitDXF(this.files[0]);
+      this.value='';
+    });
+    /* 드래그 하이라이트·drop 처리는 전역 리스너가 담당 (중복 방지) */
+  }
+  if(document.readyState==='complete') bind();
+  else window.addEventListener('load', bind);
+})();
+
+</script>
 </body>
 </html>
