@@ -130,7 +130,7 @@ canvas.grabbing{cursor:grabbing}
 <div class="hdr">
   <span class="logo">G-DSP</span>
   <span class="ttl">경사도 검토</span>
-  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.3 · 08-23 좌표계자동</span>
+  <span style="font-size:10px;color:var(--pri);font-weight:700;background:rgba(59,130,246,.12);padding:2px 8px;border-radius:10px;margin-left:4px" id="verBadge">TEST v6.4 · 08-23 폴더권한</span>
   <span class="sp"></span>
   <span class="stat" id="hdrStat">DXF 파일을 올려주세요</span>
 </div>
@@ -2016,7 +2016,7 @@ function _updateRunBtn(){
       (INNORIX가 브라우저 밖에서 디스크에 쓰므로 웹이 경로를 알 수 없음)
    ══════════════════════════════════════════════════════════════ */
 /* ══ 배포 확인용 버전 ══ 바뀔 때마다 올릴 것 */
-var GDSP_VER = 'TEST v6.3 (2026-08-23) 좌표계 원점 자동판별(서부·중부·동부·동해)';
+var GDSP_VER = 'TEST v6.4 (2026-08-23) 폴더 권한 재허용 처리';
 console.log('%c[G-DSP] '+GDSP_VER, 'color:#60a5fa;font-weight:700');
 
 /* 국토정보플랫폼 신청서의 실제 목적 목록 (확장 popup.js와 동일)
@@ -2090,6 +2090,17 @@ function ngiiStart(){
   var addr=(document.getElementById('ngiiAddr').value||'').trim();
   if(!addr){ _ngiiMsg('지번을 입력하세요','#f87171'); return; }
   if(!NGII.purpose1 || !NGII.purpose2){ _ngiiMsg('사용 목적을 선택하세요','#f87171'); return; }
+  /* ★ 이 클릭 안에서 폴더 권한을 미리 확보한다.
+     다운로드가 끝난 시점은 '사용자 제스처'가 아니라 권한 요청이 거부된다(실측). */
+  if(FSA.dir && FSA.supported){
+    try{
+      FSA.dir.queryPermission({mode:'read'}).then(function(st){
+        if(st!=='granted'){
+          FSA.dir.requestPermission({mode:'read'}).then(function(st2){ _fsaSyncUI(st2); });
+        }
+      });
+    }catch(e){}
+  }
   NGII._startedAt=Date.now();   /* 이 시각 이후 저장된 파일만 '새 파일'로 인정 */
   NGII._openedName=null;
   _ngiiRunning(true);
@@ -2205,6 +2216,16 @@ function fsaPickFolder(){
     });
 }
 
+/* 사용자 클릭 안에서 권한 재요청 (버튼용) */
+function fsaGrantNow(){
+  if(!FSA.dir){ fsaPickFolder(); return; }
+  FSA.dir.requestPermission({mode:'read'}).then(function(st){
+    _fsaSyncUI(st);
+    if(st==='granted'){ _ngiiMsg('✅ 폴더 권한 확인됨 — 자동 열기 준비 완료','#4ade80'); }
+    else { _ngiiMsg('권한이 거부됐어요 — [폴더 연결]로 다시 골라주세요','#f87171'); }
+  }).catch(function(){ fsaPickFolder(); });
+}
+
 /* ── 저장된 핸들 복구 + 권한 확인 ── */
 function _fsaRestore(){
   if(!FSA.supported) return Promise.resolve(null);
@@ -2283,7 +2304,11 @@ function _fsaPickDXF(dir, since){
 /* ── 다운로드 완료 후: 새로 받은 파일이 나타날 때까지 기다렸다 열기 ── */
 function fsaAutoOpen(silent){
   return _fsaEnsure().then(function(dir){
-    if(!dir){ if(!silent) _ngiiMsg('폴더가 연결되지 않았어요 — [폴더 연결]을 눌러주세요','#fbbf24'); return false; }
+    if(!dir){
+      if(FSA.dir) _ngiiMsg('폴더 권한이 풀렸어요 — 아래 [폴더 권한 허용]을 눌러주세요','#fbbf24');
+      else if(!silent) _ngiiMsg('폴더가 연결되지 않았어요 — [폴더 연결]을 눌러주세요','#fbbf24');
+      return false;
+    }
     /* 받기 시작 시각 이후 파일만 인정 (10초 여유) */
     var since = NGII._startedAt ? (NGII._startedAt-10000) : 0;
     var deadline = Date.now()+60000;
@@ -2458,7 +2483,13 @@ function _fsaSyncUI(state){
     return;
   }
   var nm=FSA.dir?FSA.dir.name:null;
-  if(nm && state!=='denied'){
+  if(nm && state==='prompt'){
+    /* 크롬은 페이지를 새로 열면 폴더 권한을 prompt로 되돌린다.
+       이때 재허용은 '사용자 클릭 안에서만' 가능하다. */
+    box.innerHTML='<div style="font-size:10.5px;color:#fbbf24;line-height:1.5">'
+      +'⚠ <b>'+nm+'</b> 폴더 — 권한 확인이 필요해요</div>'
+      +'<button class="btn btn-ghost" onclick="fsaGrantNow()" style="margin-top:5px;color:#8ecbff;border-color:#2f4d70">🔓 폴더 권한 허용</button>';
+  } else if(nm && state!=='denied'){
     box.innerHTML='<div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#4ade80">'
       +'<span>✅ 자동 열기 켜짐 · <b>'+nm+'</b> 폴더</span></div>'
       +'<button class="btn btn-ghost" onclick="fsaPickFolder()" style="margin-top:5px;font-size:11px">폴더 바꾸기</button>';
