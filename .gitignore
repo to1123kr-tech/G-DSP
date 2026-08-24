@@ -1,0 +1,24 @@
+# ── 서버에서만 만들어지는 파일 (깃에 올리지 않음) ──
+gdsp_admin_pw.txt      # 관리자 비밀번호
+gdsp_inq.json          # 문의 게시판 데이터
+gdsp_inq.json.tmp
+gdsp_visits.json       # 방문 통계
+gdsp_visits.json.tmp
+
+# ── 파이썬 ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ── 로그 · 임시 ──
+*.log
+nohup.out
+log.txt
+*.bak
+*.tmp
+
+# ── OS ──
+.DS_Store
+Thumbs.db

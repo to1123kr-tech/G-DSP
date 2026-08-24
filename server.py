@@ -2850,5 +2850,15 @@ def kigam_moam():
     })
 
 
+# ==================== 문의 게시판 ====================
+#   gdsp_inquiry.py 가 server.py 와 같은 폴더에 있어야 합니다.
+#   관리자 비밀번호는 gdsp_admin_pw.txt 또는 환경변수 GDSP_ADMIN_PW 에서 읽습니다.
+try:
+    from gdsp_inquiry import register_inquiry
+    register_inquiry(app)
+except Exception as _e:
+    logger.error(f"[INQ] 문의 게시판을 불러오지 못했습니다: {_e}")
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050)
