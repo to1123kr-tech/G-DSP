@@ -2923,7 +2923,9 @@
   <!-- LOGIN -->
 
   <!-- ══ 시작 팝업: All_work + devlog ══ -->
-  <div id="loginScreen">
+  <!-- ⚠ 로그인 기능 임시 비활성화 (2026-08-24)
+       복구 방법: 아래 style="display:none" 삭제 + 스크립트의 LOGIN_ENABLED = true 로 변경 -->
+  <div id="loginScreen" style="display:none">
     <div class="login-wrap">
 
       <!-- SVG 원형 로고 -->
@@ -3027,7 +3029,8 @@
         <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙 다크</button>
         <button class="theme-toggle" onclick="toggleCardView()" id="cardBtn">⊞ 카드형</button>
         <button class="hbtn" onclick="openPopup('popup_settings.html')">설정</button>
-        <button class="hbtn" onclick="doLogout()">로그아웃</button>
+        <!-- ⚠ 로그인 비활성화로 숨김 - 복구 시 style="display:none" 삭제 -->
+        <button class="hbtn" id="btnLogout" style="display:none" onclick="doLogout()">로그아웃</button>
         <div class="hbtn-user" id="tbUser">유영대</div>
       </div>
     </div>
@@ -6159,6 +6162,15 @@
       if (kakaoMarker) kakaoMarker.setMap(null);
       setText('mapD', '지번 검색 후 자동 연동');
     }
+    /* ══════════════════════════════════════════════════════════════
+       로그인 기능 ON/OFF 스위치  (2026-08-24 임시 비활성화)
+       true  → 로그인 화면 정상 동작 (원래 상태로 복구)
+       false → 로그인 화면 건너뛰고 바로 앱 진입
+       ※ 복구 시 아래 값을 true 로 바꾸고,
+         #loginScreen 과 #btnLogout 의 style="display:none" 도 삭제할 것
+       ══════════════════════════════════════════════════════════════ */
+    var LOGIN_ENABLED = false;
+
     function doLogin() {
       var id = (document.getElementById('loginId').value || '').trim();
       var loginScreen = document.getElementById('loginScreen');
@@ -6194,8 +6206,25 @@
         reg.dataset.bound = '1';
       }
     }
-    function doLogout() { if (!confirm('로그아웃 하시겠습니까?')) return; document.getElementById('app').classList.remove('show'); document.getElementById('app').style.display = 'none'; document.getElementById('loginScreen').style.display = 'flex'; document.getElementById('loginScreen').style.pointerEvents = 'auto'; document.getElementById('loginId').value = ''; document.getElementById('loginPw').value = ''; }
+    function doLogout() { if (!LOGIN_ENABLED) return; if (!confirm('로그아웃 하시겠습니까?')) return; document.getElementById('app').classList.remove('show'); document.getElementById('app').style.display = 'none'; document.getElementById('loginScreen').style.display = 'flex'; document.getElementById('loginScreen').style.pointerEvents = 'auto'; document.getElementById('loginId').value = ''; document.getElementById('loginPw').value = ''; }
     document.getElementById('loginPw').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+
+    /* ══ 로그인 비활성화 시 자동 진입 (LOGIN_ENABLED = true 면 이 블록은 동작 안 함) ══ */
+    (function () {
+      if (LOGIN_ENABLED) return;
+      function _bypassLogin() {
+        var ls = document.getElementById('loginScreen');
+        if (ls) { ls.style.display = 'none'; ls.style.pointerEvents = 'none'; }
+        var lo = document.getElementById('btnLogout');
+        if (lo) lo.style.display = 'none';
+        try { doLogin(); } catch (e) { console.error('auto-enter 실패', e); }
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _bypassLogin);
+      } else {
+        _bypassLogin();
+      }
+    })();
     // mainSearch 엔터는 hdrSearch()로 통합 (위에서 처리)
     function toggleCat(el, catId) { var isOn = el.classList.contains('on'); el.classList.toggle('on', !isOn); var sub = document.getElementById(catId); if (sub) sub.classList.toggle('on', !isOn); }
     function showView(name, el) { document.querySelectorAll('.nav-item').forEach(function (i) { i.classList.remove('on') }); if (el) el.classList.add('on'); document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('on') }); var v = document.getElementById('view-' + name); if (v) v.classList.add('on'); if (name === 'geo') { setTimeout(initKakaoOnGeoView, 80); setTimeout(function(){ try{ if(ndMap&&ndMap.updateSize) ndMap.updateSize(); }catch(e){} }, 300); } if (name === 'con') renderCon(''); if (name === 'jideok') setTimeout(initJdCanvas, 100); if (name === 'rcp') renderRcp(); if (name === 'hist') renderHist(); }
