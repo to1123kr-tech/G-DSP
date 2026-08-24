@@ -103,6 +103,13 @@ body.is-admin .chip.admin-only{display:inline-block}
 .reply-lbl{font-size:10px;font-weight:700;color:var(--green);margin-bottom:4px}
 .reply-txt{font-size:12px;color:var(--txt2);line-height:1.7;white-space:pre-wrap;word-break:break-word}
 .reply-date{font-size:10px;color:var(--txt3);margin-top:5px}
+.abtn.key{color:var(--amber);border-color:rgba(217,119,6,.3)}
+.abtn.key:hover{background:rgba(217,119,6,.08)}
+.pw-box{display:flex;gap:6px;margin-top:8px;align-items:center}
+.pw-box input{flex:1;max-width:200px;height:28px;padding:0 10px;background:var(--bg2);
+  border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none}
+.pw-box input:focus{border-color:var(--amber)}
+.edit-mark{font-size:10px;color:var(--txt3);margin-top:6px;font-style:italic}
 .reply-edit{margin-top:10px}
 .reply-edit textarea{width:100%;height:74px;padding:9px 11px;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;color:var(--txt);font-size:12px;outline:none;resize:vertical}
 .reply-edit textarea:focus{border-color:var(--green)}
@@ -153,6 +160,8 @@ body.is-admin .chip.admin-only{display:inline-block}
           <button class="vis-btn" id="vis-1" onclick="setVis(true)">🔒 비공개</button>
         </div>
         <div class="vis-hint" id="visHint">누구나 내용을 볼 수 있습니다.</div>
+        <input class="mf" id="inqPw" type="password" maxlength="40"
+               placeholder="글 비밀번호 (수정·삭제 시 필요)">
         <textarea class="mf" id="inqContent" maxlength="3000" placeholder="문의 내용을 입력하세요..." oninput="cc()"></textarea>
         <div class="cc" id="ccLbl">0 / 3000</div>
         <button class="submit-btn" id="subBtn" onclick="submitInquiry()">✉ 문의 등록</button>
@@ -218,6 +227,8 @@ var K_UID='gdsp_uid', K_THEME='gdsp_theme', K_TOKEN='gdsp_inq_token';
 
 var items=[], selType='기능 건의', selSecret=false, curFilter='all',
     isAdmin=false, token='', uid='', busy=false, _tt;
+// 이번 세션에서 비밀번호로 연 글 (새로고침하면 다시 잠김)
+var opened={}, pwmap={};
 
 /* ── 유틸 ── */
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
@@ -263,23 +274,32 @@ function setType(i,t){ selType=t;
 function setVis(s){ selSecret=s;
   document.getElementById('vis-0').classList.toggle('on',!s);
   document.getElementById('vis-1').classList.toggle('on',s);
+  var pw=document.getElementById('inqPw');
+  pw.placeholder = s ? '글 비밀번호 (필수 · 4자 이상)' : '글 비밀번호 (수정·삭제 시 필요)';
   document.getElementById('visHint').textContent = s
-    ? '관리자와 작성자 본인만 볼 수 있습니다. 내용이 다른 사람에게 전달되지 않습니다.'
+    ? '비밀번호를 넣어야 내용을 볼 수 있습니다. 관리자는 언제든 확인할 수 있습니다.'
     : '누구나 내용을 볼 수 있습니다.'; }
 
 function submitInquiry(){
   if(busy) return;
   var content=document.getElementById('inqContent').value.trim();
+  var pw=document.getElementById('inqPw').value;
   if(!content){ toast('내용을 입력하세요','err'); return; }
+  if(selSecret && pw.length<4){ toast('비공개 문의는 비밀번호가 필요합니다 (4자 이상)','err');
+    document.getElementById('inqPw').focus(); return; }
+  if(pw && pw.length<4){ toast('비밀번호는 4자 이상이어야 합니다','err'); return; }
   busy=true; document.getElementById('subBtn').disabled=true;
   api('/api/inq/add',{method:'POST',body:{
     uid:uid, name:document.getElementById('inqName').value.trim(),
-    type:selType, content:content, secret:selSecret }})
+    type:selType, content:content, secret:selSecret, pw:pw }})
   .then(function(j){
     busy=false; document.getElementById('subBtn').disabled=false;
     if(!j.ok){ toast(j.msg||'등록하지 못했습니다','err'); return; }
-    document.getElementById('inqContent').value=''; cc();
-    loadList(); toast('문의를 등록했습니다','ok');
+    document.getElementById('inqContent').value='';
+    document.getElementById('inqPw').value=''; cc();
+    if(pw) toast('등록했습니다. 비밀번호를 잘 기억해 주세요','ok');
+    else toast('문의를 등록했습니다','ok');
+    loadList();
   });
 }
 
@@ -298,7 +318,8 @@ function render(){
     if(curFilter==='secret'){ if(!q.secret) return false; }
     else if(curFilter==='noreply'){ if(q.answered) return false; }
     else if(curFilter!=='all'){ if(q.type!==curFilter) return false; }
-    if(kw && (q.name+' '+q.type+' '+(q.content||'')).toLowerCase().indexOf(kw)<0) return false;
+    var _c=(opened[q.id]||q).content||'';
+    if(kw && (q.name+' '+q.type+' '+_c).toLowerCase().indexOf(kw)<0) return false;
     return true;
   });
 
@@ -326,25 +347,45 @@ function render(){
       +   '<span class="inq-date">'+esc(fmt(q.ts))+'</span>'
       + '</div>';
 
-    h += q.locked
-      ? '<div class="inq-masked">🔒 비공개 문의입니다. 관리자와 작성자만 볼 수 있습니다.</div>'
-      : '<div class="inq-content">'+esc(q.content)+'</div>';
+    var op = opened[q.id];
+    if(op){ q = op; }
 
-    if(q.reply){
+    h += q.locked
+      ? '<div class="inq-masked">🔒 비공개 문의입니다. 비밀번호를 입력하면 볼 수 있습니다.</div>'
+      : '<div class="inq-content">'+esc(q.content)+'</div>';
+    if(q.edited) h += '<div class="edit-mark">✎ '+esc(fmt(q.edited))+' 수정됨</div>';
+
+    if(q.reply && !q.locked){
       h += '<div class="reply"><div class="reply-lbl">↳ 관리자 답변</div>'
         +  '<div class="reply-txt">'+esc(q.reply.content)+'</div>'
         +  '<div class="reply-date">'+esc(fmt(q.reply.ts))+'</div></div>';
     }
 
-    if(canDel||isAdmin){
-      h += '<div class="inq-acts">';
-      if(isAdmin) h += '<button class="abtn rep" onclick="openReply(\''+q.id+'\')">'
-                    + (q.reply?'✎ 답변 수정':'✍ 답변 달기')+'</button>'
-                    + '<button class="abtn" onclick="flipSecret(\''+q.id+'\','+(!q.secret)+')">'
-                    + (q.secret?'🌐 공개로 전환':'🔒 비공개로 전환')+'</button>';
-      if(canDel) h += '<button class="abtn del" onclick="delInq(\''+q.id+'\')">🗑 삭제</button>';
-      h += '</div>';
+    h += '<div class="inq-acts">';
+    if(q.locked){
+      h += '<button class="abtn key" onclick="askPw(\''+q.id+'\')">🔓 비밀번호 입력</button>';
+    }else{
+      if(q.haspw||q.mine||isAdmin)
+        h += '<button class="abtn" onclick="startEdit(\''+q.id+'\')">✎ 수정</button>'
+          +  '<button class="abtn del" onclick="delInq(\''+q.id+'\')">🗑 삭제</button>';
     }
+    if(isAdmin) h += '<button class="abtn rep" onclick="openReply(\''+q.id+'\')">'
+                  + (q.reply?'✎ 답변 수정':'✍ 답변 달기')+'</button>'
+                  + '<button class="abtn" onclick="flipSecret(\''+q.id+'\','+(!q.secret)+')">'
+                  + (q.secret?'🌐 공개로 전환':'🔒 비공개로 전환')+'</button>';
+    h += '</div>';
+
+    h += '<div class="pw-box" id="pb-'+q.id+'" style="display:none">'
+      +  '<input type="password" id="pi-'+q.id+'" placeholder="글 비밀번호" '
+      +  'onkeydown="if(event.key===\'Enter\')doUnlock(\''+q.id+'\')">'
+      +  '<button class="abtn key" onclick="doUnlock(\''+q.id+'\')">확인</button>'
+      +  '<button class="abtn" onclick="hidePw(\''+q.id+'\')">취소</button></div>';
+
+    h += '<div class="reply-edit" id="ee-'+q.id+'" style="display:none">'
+      +  '<textarea id="et-'+q.id+'" maxlength="3000">'+esc(q.content||'')+'</textarea>'
+      +  '<div class="inq-acts">'
+      +  '<button class="abtn key" onclick="saveEdit(\''+q.id+'\')">저장</button>'
+      +  '<button class="abtn" onclick="closeEdit(\''+q.id+'\')">취소</button></div></div>';
     if(isAdmin){
       h += '<div class="reply-edit" id="re-'+q.id+'" style="display:none">'
         +  '<textarea id="rt-'+q.id+'" maxlength="3000" placeholder="답변 내용을 입력하세요...">'
@@ -359,10 +400,41 @@ function render(){
 }
 
 /* ── 동작 ── */
+function askPw(id){
+  var b=document.getElementById('pb-'+id); if(!b) return;
+  b.style.display='flex'; document.getElementById('pi-'+id).focus();
+}
+function hidePw(id){ var b=document.getElementById('pb-'+id); if(b) b.style.display='none'; }
+function doUnlock(id){
+  var el=document.getElementById('pi-'+id); if(!el) return;
+  var pw=el.value;
+  if(!pw){ toast('비밀번호를 입력하세요','err'); return; }
+  api('/api/inq/unlock',{method:'POST',body:{id:id,pw:pw,uid:uid}}).then(function(j){
+    if(!j.ok){ toast(j.msg||'열지 못했습니다','err'); el.value=''; el.focus(); return; }
+    opened[id]=j.item; pwmap[id]=pw;
+    render(); toast('문의를 열었습니다','ok');
+  });
+}
+function startEdit(id){
+  var e=document.getElementById('ee-'+id);
+  if(e){ e.style.display='block'; document.getElementById('et-'+id).focus(); }
+}
+function closeEdit(id){ var e=document.getElementById('ee-'+id); if(e) e.style.display='none'; }
+function saveEdit(id){
+  var v=document.getElementById('et-'+id).value.trim();
+  if(!v){ toast('내용을 입력하세요','err'); return; }
+  api('/api/inq/edit',{method:'POST',body:{id:id,uid:uid,pw:pwmap[id]||'',content:v}})
+  .then(function(j){
+    if(!j.ok){ toast(j.msg||'수정하지 못했습니다','err'); return; }
+    if(opened[id]){ opened[id].content=v; opened[id].edited=Date.now(); }
+    closeEdit(id); loadList(); toast('문의를 수정했습니다','ok');
+  });
+}
 function delInq(id){
   if(!confirm('이 문의를 삭제할까요? 되돌릴 수 없습니다.')) return;
-  api('/api/inq/del',{method:'POST',body:{id:id,uid:uid}}).then(function(j){
+  api('/api/inq/del',{method:'POST',body:{id:id,uid:uid,pw:pwmap[id]||''}}).then(function(j){
     if(!j.ok){ toast(j.msg||'삭제하지 못했습니다','err'); return; }
+    delete opened[id]; delete pwmap[id];
     loadList(); toast('문의를 삭제했습니다','ok'); });
 }
 function flipSecret(id,to){
@@ -423,7 +495,7 @@ function setAdmin(on,expired){
   b.textContent = on?'🚪 로그아웃':'🔒 관리자 로그인';
   b.classList.toggle('admin-on',on);
   if(!on){
-    token=''; try{ sessionStorage.removeItem(K_TOKEN); }catch(e){}
+    token=''; opened={}; pwmap={}; try{ sessionStorage.removeItem(K_TOKEN); }catch(e){}
     if(expired){ toast('로그인이 만료되었습니다. 다시 로그인해 주세요','err'); loadList(); }
     if(curFilter==='secret'||curFilter==='noreply'){
       var f=document.querySelector('#filters .chip'); if(f){ setFilter(f); return; } }
