@@ -4969,43 +4969,7 @@
         </div>
       </div>
 
-      <!-- 문의 게시판 -->
-      <div class="view" id="view-inquiry">
-        <div class="panel-hdr">
-          <svg style="width:14px;height:14px;color:var(--purple)" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2">
-            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-          </svg>
-          <span class="panel-hdr-title">문의 게시판</span>
-        </div>
-        <div style="flex:1;overflow-y:auto;padding:16px 18px">
-          <div
-            style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px">
-            <div
-              style="font-size:11px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
-              문의 작성</div>
-            <input id="inqName"
-              style="width:100%;height:34px;padding:0 12px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;margin-bottom:6px"
-              placeholder="이름 (선택)">
-            <select id="inqType"
-              style="width:100%;height:34px;padding:0 10px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;margin-bottom:6px">
-              <option>기능 건의</option>
-              <option>오류 신고</option>
-              <option>사용법 문의</option>
-              <option>기타</option>
-            </select>
-            <textarea id="inqContent"
-              style="width:100%;height:100px;padding:10px 12px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--txt);font-size:12px;outline:none;resize:vertical;margin-bottom:8px"
-              placeholder="문의 내용을 입력하세요..."></textarea>
-            <button onclick="submitInquiry()"
-              style="width:100%;height:36px;border-radius:8px;background:linear-gradient(135deg,var(--blue3),var(--blue));border:none;color:#fff;font-weight:700;font-size:12px;cursor:pointer">문의
-              등록</button>
-          </div>
-          <div id="inqList" style="display:flex;flex-direction:column;gap:6px"></div>
-          <div id="inqEmpty" style="text-align:center;color:var(--txt3);font-size:12px;padding:20px 0">등록된 문의가 없습니다
-          </div>
-        </div>
-      </div>
+      <!-- 문의 게시판: popup_inquiry.html 로 분리됨 -->
 
       <!-- ⑩ API 설정 -->
       <div class="view" id="view-api">
@@ -5709,12 +5673,14 @@
       { name: '담당자 연락처', cat: '업무관리', color: '#00f0ff', bg: 'rgba(0,240,255,.10)', view: 'con', svg: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>' },
       { name: '작업 이력', cat: '업무관리', color: '#00f0ff', bg: 'rgba(0,240,255,.10)', view: 'hist', svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>' },
       { name: 'API 키 설정', cat: '설정', color: '#94a3b8', bg: 'rgba(148,163,184,.12)', view: 'api', svg: '<circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/>' },
-      { name: '문의 게시판', cat: '설정', color: '#94a3b8', bg: 'rgba(148,163,184,.12)', view: 'inquiry', svg: '<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>' },
+      { name: '문의 게시판', cat: '설정', color: '#94a3b8', bg: 'rgba(148,163,184,.12)', view: 'inquiry', popup: 'popup_inquiry.html', svg: '<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>' },
     ];
     function renderCardGrid() {
       var g = document.getElementById('cardGrid'); if (!g) return;
       g.innerHTML = CARD_MENUS.map(function (m) {
-        return '<div class="menu-card" onclick="showView(\'' + m.view + '\');toggleCardView(false)">'
+        var _fn = m.popup ? 'openPopup' : 'showView';
+        var _ar = m.popup ? m.popup : m.view;
+        return '<div class="menu-card" onclick="' + _fn + '(\'' + _ar + '\');toggleCardView(false)">'
           + '<div class="menu-card-ico" style="background:' + m.bg + '"><svg viewBox="0 0 24 24" fill="none" stroke="' + m.color + '" stroke-width="2">' + m.svg + '</svg></div>'
           + '<div><div class="menu-card-name">' + m.name + '</div><div class="menu-card-cat">' + m.cat + '</div></div>'
           + '</div>';
@@ -6805,33 +6771,7 @@
     function closeLegal() { document.getElementById('legalModal').classList.remove('open'); }
     function chkAgree() { var c1 = document.getElementById('chk1'), c2 = document.getElementById('chk2'); var b = document.getElementById('agreeBtn'); if (b) b.classList.toggle('active', c1 && c2 && c1.checked && c2.checked); }
     function goSplit() { closeLegal(); toast('분할 모드: 개발 진행 중입니다'); addHistItem('분할 모드 진입'); }
-    var inqItems = JSON.parse(localStorage.getItem('gdsp_inq') || '[]');
-    window.addEventListener('load', function () { renderInq(); }); function submitInquiry() {
-      var name = document.getElementById('inqName').value.trim();
-      var type = document.getElementById('inqType').value;
-      var content = document.getElementById('inqContent').value.trim();
-      if (!content) { toast('내용을 입력하세요', 'err'); return; }
-      inqItems.unshift({ name: name || '익명', type: type, content: content, date: new Date().toLocaleDateString(), time: new Date().toLocaleTimeString() });
-      localStorage.setItem('gdsp_inq', JSON.stringify(inqItems));
-      document.getElementById('inqContent').value = '';
-      renderInq(); toast('문의가 등록되었습니다', 'ok');
-    }
-    function renderInq() {
-      var list = document.getElementById('inqList'), empty = document.getElementById('inqEmpty');
-      if (!list) return;
-      if (!inqItems.length) { if (empty) empty.style.display = 'block'; return; }
-      if (empty) empty.style.display = 'none';
-      list.innerHTML = inqItems.map(function (q, i) {
-        return '<div style="background:var(--card);border:1px solid var(--line);border-radius:9px;padding:12px;margin-bottom:6px">'
-          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-          + '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);color:var(--purple)">' + q.type + '</span>'
-          + '<span style="font-weight:700;font-size:12px;color:var(--txt)">' + q.name + '</span>'
-          + '<span style="font-size:10px;color:var(--txt3);margin-left:auto">' + q.date + '</span>'
-          + '</div>'
-          + '<div style="font-size:12px;color:var(--txt2);line-height:1.6">' + q.content + '</div>'
-          + '</div>';
-      }).join('');
-    }
+    // 문의 게시판은 popup_inquiry.html 로 분리되었습니다 (서버 저장 방식)
     var _tt;
     function toast(msg, type) { var t = document.getElementById('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.style.cssText = 'position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;z-index:99999;opacity:0;transition:.25s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,.4)'; document.body.appendChild(t); } t.textContent = msg; t.style.opacity = '1'; t.style.transform = 'translateX(-50%) translateY(0)'; t.style.background = type === 'err' ? '#991b1b' : type === 'ok' ? '#0f766e' : '#1e293b'; clearTimeout(_tt); _tt = setTimeout(function () { t.style.opacity = '0'; t.style.transform = 'translateX(-50%) translateY(20px)'; }, 2400); }
     try {
