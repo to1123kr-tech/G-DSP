@@ -196,7 +196,7 @@ function updateScaleBtns(){
         <div style="flex:1;position:relative;min-height:0">
           <div id="kakaoMap" style="width:100%;height:100%"></div>
           <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:8px;width:calc(100% - 20px);max-width:440px">
-            <input id="dtmAddr" type="text" placeholder="지번 또는 도로명 검색… (예: 화성시 서신면 광평리 448)" onkeydown="if(event.key==='Enter')dtmSearch()"
+            <input id="dtmAddr" type="text" placeholder="지번 또는 도로명 검색" onkeydown="if(event.key==='Enter')dtmSearch()"
               style="flex:1;height:46px;padding:0 16px;background:#fff;border:1px solid var(--line2);border-radius:10px;font-size:14px;outline:none;box-shadow:0 3px 12px rgba(0,0,0,.18)">
             <button onclick="dtmSearch()" style="height:46px;padding:0 22px;border-radius:10px;background:var(--blue);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.18)">검색</button>
           </div>
@@ -310,7 +310,7 @@ function updateScaleBtns(){
         <div style="flex:1;position:relative;min-height:0">
           <div id="vmap2" style="width:100%;height:100%;background:#e8eef4"></div>
           <div style="position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:8px;width:calc(100% - 20px);max-width:440px">
-            <input id="jdAddr" type="text" placeholder="지번 또는 도로명 검색… (예: 화성시 서신면 광평리 448)" onkeydown="if(event.key==='Enter')jdSearch()"
+            <input id="jdAddr" type="text" placeholder="지번 또는 도로명 검색" onkeydown="if(event.key==='Enter')jdSearch()"
               style="flex:1;height:46px;padding:0 16px;background:#fff;border:1px solid var(--line2);border-radius:10px;font-size:14px;outline:none;box-shadow:0 3px 12px rgba(0,0,0,.18)">
             <button onclick="jdSearch()" style="height:46px;padding:0 22px;border-radius:10px;background:var(--blue);color:#fff;font-size:14px;font-weight:700;border:none;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.18)">검색</button>
           </div>
@@ -470,7 +470,7 @@ function updateScaleBtns(){
   <div class="tab-view" id="view-bld">
     <div class="body">
       <div style="display:flex;gap:6px;margin-bottom:14px">
-        <input class="inp" id="bldJibunInput" placeholder="지번 입력 (예: 남양읍 한가울길 70)" onkeydown="if(event.key==='Enter')callBldApi()">
+        <input class="inp" id="bldJibunInput" placeholder="지번 입력" onkeydown="if(event.key==='Enter')callBldApi()">
         <button class="btn-primary" onclick="callBldApi()">조회</button>
         <a class="btn-outline" href="https://www.eais.go.kr/" target="_blank">건축물대장 사이트</a>
       </div>
@@ -530,7 +530,7 @@ function updateScaleBtns(){
           지번 / 고유번호 조회
         </div>
         <div style="display:flex;gap:7px;margin-bottom:12px">
-          <input class="inp" id="regJibun" placeholder="지번 입력 (예: 남양읍 남양리 123)">
+          <input class="inp" id="regJibun" placeholder="지번 입력">
           <button class="btn-primary" onclick="searchReg()">조회</button>
         </div>
         <div class="info-row"><span class="info-k">고유번호</span><span class="info-v blue" id="regUniq">—</span></div>
@@ -2152,9 +2152,64 @@ function reloadBldPreview(){
 function searchReg(){
   var jibun = document.getElementById('regJibun').value.trim();
   if(!jibun){ toast('지번을 입력하세요','err'); return; }
-  toast('인터넷등기소 연동 필요');
-  document.getElementById('regUniq').textContent='인터넷등기소에서 확인';
-  document.getElementById('regOwner').textContent='—';
+  var uq = document.getElementById('regUniq');
+  var ow = document.getElementById('regOwner');
+  uq.textContent = '조회 중…'; ow.textContent = '—';
+  toast('인터넷등기소 조회 중...');
+
+  // 서버 프록시(/api/iros/list) 경유 — CORS 우회
+  fetch(CRAWL_SERVER + '/api/iros/list', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ srchWrd: jibun, pageIndex: 1, pageUnit: 20 })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(d && d.error) throw new Error(d.error);
+    // 응답 구조가 확정되지 않아 재귀 탐색으로 목록을 찾는다
+    var rows = _irosFindRows(d);
+    if(!rows || !rows.length){
+      uq.textContent = '결과 없음';
+      toast('조회 결과가 없습니다 — 지번을 정확히 입력하세요','err');
+      _irosDump = d;   // 콘솔에서 window._irosDump 로 원본 확인 가능
+      console.warn('[등기] 목록 파싱 실패, 원본:', d);
+      return;
+    }
+    var r0 = rows[0];
+    var pin = r0.pinNo || r0.PIN_NO || r0.pin || r0.uniqNo || '';
+    var addr = r0.rprsAddr || r0.addr || r0.ADDR || '';
+    uq.textContent = pin || '(고유번호 없음)';
+    ow.textContent = addr || '—';
+    _irosRows = rows;
+    toast('조회 완료 — ' + rows.length + '건','ok');
+    console.log('[등기] 결과', rows);
+  })
+  .catch(function(e){
+    uq.textContent = '조회 실패';
+    toast('등기소 조회 실패: ' + e.message,'err');
+    console.error('[등기]', e);
+  });
+}
+
+var _irosRows = [], _irosDump = null;
+
+// 응답 JSON 안에서 목록(배열)을 찾아낸다 (구조 변동 대비)
+function _irosFindRows(o, depth){
+  depth = depth || 0;
+  if(!o || depth > 6) return null;
+  if(Array.isArray(o)){
+    if(o.length && typeof o[0] === 'object') return o;
+    return null;
+  }
+  if(typeof o !== 'object') return null;
+  var keys = ['resultList','list','rows','data','dsList','items'];
+  for(var i=0;i<keys.length;i++){
+    if(Array.isArray(o[keys[i]]) && o[keys[i]].length) return o[keys[i]];
+  }
+  for(var k in o){
+    var r = _irosFindRows(o[k], depth+1);
+    if(r) return r;
+  }
+  return null;
 }
 function addRegToList(){
   var jibun = document.getElementById('regJibun').value.trim();
@@ -2171,7 +2226,19 @@ function renderRegList(){
       +'<button onclick="regItems.splice('+i+',1);renderRegList()" style="height:24px;padding:0 8px;border-radius:5px;border:1px solid var(--line);color:var(--txt3);font-size:10px;cursor:pointer;background:transparent">삭제</button></div>';
   }).join('');
 }
-function makeRegExcel(){ if(!regItems.length){ toast('목록에 지번을 먼저 추가하세요','err'); return; } toast('SheetJS 연동 예정'); }
+function makeRegExcel(){
+  if(!regItems.length){ toast('목록에 지번을 먼저 추가하세요','err'); return; }
+  // 엑셀에서 바로 열리는 CSV (BOM 포함 → 한글 깨짐 방지)
+  var csv = '\uFEFF번호,지번,고유번호,비고\n';
+  regItems.forEach(function(j,i){ csv += (i+1)+',"'+j+'",,\n'; });
+  var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '등기신청목록_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast(regItems.length + '건 CSV 저장됨','ok');
+}
 
 /* ===================== 첫실행 안내 토글 ===================== */
 function toggleProgramGuide(hide){
