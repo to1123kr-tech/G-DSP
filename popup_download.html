@@ -2158,7 +2158,7 @@ function searchReg(){
   toast('인터넷등기소 조회 중...');
 
   // 서버 프록시(/api/iros/list) 경유 — CORS 우회
-  fetch(CRAWL_SERVER + '/api/iros/list', {
+  fetch('/api/iros/list', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ srchWrd: jibun, pageIndex: 1, pageUnit: 20 })
   })
