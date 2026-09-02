@@ -2154,37 +2154,60 @@ function searchReg(){
   if(!jibun){ toast('지번을 입력하세요','err'); return; }
   var uq = document.getElementById('regUniq');
   var ow = document.getElementById('regOwner');
-  uq.textContent = '조회 중…'; ow.textContent = '—';
+  uq.textContent = '조회 중…'; ow.textContent = '조회 중…';
   toast('인터넷등기소 조회 중...');
 
-  // 서버 프록시(/api/iros/list) 경유 — CORS 우회
+  // 1단계: 주소로 토지/건물 wk_pin 검색 (index.html 검증된 파라미터 구조)
   fetch('/api/iros/list', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ srchWrd: jibun, pageIndex: 1, pageUnit: 20 })
+    body: JSON.stringify({ websquare_param: {
+      swrd: jibun, addr_cls: '3', kind_cls: 'all',
+      rgs_rec_stat: '현행', admin_regn1: 'all', pageUnit: 10, extend_srch: 'N'
+    }})
   })
   .then(function(r){ return r.json(); })
   .then(function(d){
-    if(d && d.error) throw new Error(d.error);
-    // 응답 구조가 확정되지 않아 재귀 탐색으로 목록을 찾는다
-    var rows = _irosFindRows(d);
-    if(!rows || !rows.length){
-      uq.textContent = '결과 없음';
-      toast('조회 결과가 없습니다 — 지번을 정확히 입력하세요','err');
-      _irosDump = d;   // 콘솔에서 window._irosDump 로 원본 확인 가능
-      console.warn('[등기] 목록 파싱 실패, 원본:', d);
+    _irosDump = d;
+    var list = d.dataList || [];
+    if(!list.length){
+      uq.textContent = '결과 없음'; ow.textContent = '—';
+      toast('조회 결과 없음 — 지번을 정확히 입력하세요','err');
+      console.warn('[등기] 응답', d);
       return;
     }
-    var r0 = rows[0];
-    var pin = r0.pinNo || r0.PIN_NO || r0.pin || r0.uniqNo || '';
-    var addr = r0.rprsAddr || r0.addr || r0.ADDR || '';
-    uq.textContent = pin || '(고유번호 없음)';
-    ow.textContent = addr || '—';
-    _irosRows = rows;
-    toast('조회 완료 — ' + rows.length + '건','ok');
-    console.log('[등기] 결과', rows);
+    _irosRows = list;
+    // 토지 우선, 없으면 첫 항목
+    var item = list.find(function(x){ return _irosCls(x)==='토지'; }) || list[0];
+    uq.textContent = item.wk_pin || item.real_pin || '(고유번호 없음)';
+    ow.textContent = '소유자 조회 중…';
+
+    // 2단계: wk_pin 으로 소유자 조회
+    return fetch('/api/iros/cont', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ realPinList: [{
+        wk_pin: item.wk_pin, real_cls_cd: _irosCls(item),
+        rd_addr: item.rd_addr || '',
+        rd_addr_prt: item.real_indi_cont,
+        real_indi_cont: item.real_indi_cont,
+        real_indi_cont_detail: item.real_indi_cont_detail || '',
+        rd_addr_detail: item.rd_addr_detail || '',
+        addItem: item.addItem || '',
+        use_cls_cd: '현행',
+        chk_sel: '1', rnum: 1, chk_all: '', rowStatus: 'C'
+      }]})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d2){
+      var o = d2.dataList && d2.dataList[0];
+      if(!o){ ow.textContent = '—'; toast('소유자 정보 없음','err'); return; }
+      ow.textContent = o.nomprs_name || '—';
+      if(o.real_pin) uq.textContent = o.real_pin;
+      toast('조회 완료 (' + list.length + '건 중 ' + _irosCls(item) + ')','ok');
+      console.log('[등기] 소유자', o);
+    });
   })
   .catch(function(e){
-    uq.textContent = '조회 실패';
+    uq.textContent = '조회 실패'; ow.textContent = '—';
     toast('등기소 조회 실패: ' + e.message,'err');
     console.error('[등기]', e);
   });
@@ -2192,24 +2215,17 @@ function searchReg(){
 
 var _irosRows = [], _irosDump = null;
 
-// 응답 JSON 안에서 목록(배열)을 찾아낸다 (구조 변동 대비)
-function _irosFindRows(o, depth){
-  depth = depth || 0;
-  if(!o || depth > 6) return null;
-  if(Array.isArray(o)){
-    if(o.length && typeof o[0] === 'object') return o;
-    return null;
-  }
-  if(typeof o !== 'object') return null;
-  var keys = ['resultList','list','rows','data','dsList','items'];
-  for(var i=0;i<keys.length;i++){
-    if(Array.isArray(o[keys[i]]) && o[keys[i]].length) return o[keys[i]];
-  }
-  for(var k in o){
-    var r = _irosFindRows(o[k], depth+1);
-    if(r) return r;
-  }
-  return null;
+/* IROS 응답 두 형식 모두 처리 (index.html 로직 이식)
+   - list API: real_cls_cd = "토지"/"건물" (문자열)
+   - cont API: real_cls_cd = 숫자코드, real_cls_name = "토지" */
+function _irosCls(x){
+  var nm = (x.real_cls_name || '').trim();
+  if (nm === '토지' || nm === '건물') return nm;
+  var cd = (x.real_cls_cd || '').trim();
+  if (cd === '토지' || cd === '건물') return cd;
+  if (/^1334|^1335|^1336/.test(cd)) return '건물';
+  if (/^133|^152|^131/.test(cd)) return '토지';
+  return '토지';
 }
 function addRegToList(){
   var jibun = document.getElementById('regJibun').value.trim();
