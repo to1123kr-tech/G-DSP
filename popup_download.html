@@ -524,26 +524,49 @@ function updateScaleBtns(){
   <!-- 등기부등본 -->
   <div class="tab-view" id="view-reg">
     <div class="body">
-      <div class="sec">
+      <!-- 상단: 조회 (가로 전체) -->
+      <div class="sec" style="margin-bottom:12px">
         <div class="sec-t">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>
           지번 / 고유번호 조회
         </div>
-        <div style="display:flex;gap:7px;margin-bottom:12px">
-          <input class="inp" id="regJibun" placeholder="지번 입력">
-          <button class="btn-primary" onclick="searchReg()">조회</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input class="inp" id="regJibun" placeholder="지번 입력 후 Enter  (조회 → 자동으로 목록 추가)"
+                 style="flex:1;min-width:280px;height:46px;font-size:15px"
+                 onkeydown="if(event.key==='Enter')searchReg(true)">
+          <button class="btn-primary" style="height:46px;padding:0 26px;font-size:14px;font-weight:800" onclick="searchReg(true)">조회 + 추가</button>
+          <button class="btn-outline" style="height:46px;padding:0 18px;font-size:13px" onclick="searchReg(false)">조회만</button>
         </div>
-        <div class="info-row"><span class="info-k">고유번호</span><span class="info-v blue" id="regUniq">—</span></div>
-        <div class="info-row"><span class="info-k">소유자</span><span class="info-v" id="regOwner">—</span></div>
-        <div style="display:flex;gap:6px;margin-top:12px">
-          <button class="btn-green" style="flex:1" onclick="addRegToList()">목록에 추가</button>
-          <button class="btn-outline" style="flex:1" onclick="makeRegExcel()">엑셀 양식 생성</button>
-          <a class="btn-outline" href="https://www.iros.go.kr/" target="_blank" style="flex:1">등기소 바로가기</a>
+        <div style="display:flex;gap:22px;align-items:center;margin-top:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--txt3)">고유번호</span>
+            <span class="info-v blue" id="regUniq" style="font-size:15px;font-weight:800">—</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--txt3)">소유자</span>
+            <span class="info-v" id="regOwner" style="font-size:15px;font-weight:700">—</span>
+          </div>
         </div>
       </div>
-      <div class="sec">
-        <div class="sec-t">지번 목록</div>
-        <div id="regList"><div style="text-align:center;color:var(--txt3);font-size:12px;padding:14px 0">추가된 지번이 없습니다</div>
+
+      <!-- 하단: 목록 (가로 전체, 크게) -->
+      <div class="sec" style="margin-bottom:0">
+        <div class="sec-t" style="display:flex;justify-content:space-between;align-items:center">
+          <span>지번 목록 <span id="regCount" style="font-size:11px;color:var(--txt3);font-weight:600">(0건 / 최대 30건)</span></span>
+          <div style="display:flex;gap:6px">
+            <button class="btn-green" style="height:32px;padding:0 16px;font-size:12px;font-weight:700" onclick="makeRegExcel()">⬇ 등기소 양식 저장</button>
+            <a class="btn-outline" href="https://www.iros.go.kr/" target="_blank"
+               style="height:32px;padding:0 16px;font-size:12px;display:flex;align-items:center;text-decoration:none">등기소 바로가기</a>
+            <button class="btn-outline" style="height:32px;padding:0 14px;font-size:12px" onclick="if(regItems.length&&confirm('목록을 모두 비울까요?')){regItems=[];renderRegList();}">전체삭제</button>
+          </div>
+        </div>
+        <div id="regList" style="min-height:420px;max-height:56vh;overflow-y:auto">
+          <div style="text-align:center;color:var(--txt3);font-size:12px;padding:40px 0">추가된 지번이 없습니다</div>
+        </div>
+        <div style="font-size:10.5px;color:var(--txt3);margin-top:8px;line-height:1.6">
+          ※ 등기소 「부동산 일괄 열람·발급 등록양식」 형식(부동산고유번호 14자리)으로 저장됩니다. 최대 30건.<br>
+          ※ 토지/건물 버튼으로 고유번호를 전환할 수 있습니다. 건물이 없는 필지는 「건물」이 비활성화됩니다.
+        </div>
       </div>
     </div>
   </div>
@@ -2149,7 +2172,7 @@ function reloadBldPreview(){
 }
 
 /* ===================== 등기부등본 ===================== */
-function searchReg(){
+function searchReg(autoAdd){
   var jibun = document.getElementById('regJibun').value.trim();
   if(!jibun){ toast('지번을 입력하세요','err'); return; }
   var uq = document.getElementById('regUniq');
@@ -2204,6 +2227,7 @@ function searchReg(){
       if(o.real_pin) uq.textContent = o.real_pin;
       toast('조회 완료 (' + list.length + '건 중 ' + _irosCls(item) + ')','ok');
       console.log('[등기] 소유자', o);
+      if(autoAdd){ addRegToList(); document.getElementById('regJibun').select(); }
     });
   })
   .catch(function(e){
@@ -2252,21 +2276,25 @@ function setRegCls(i, cls){
 
 function renderRegList(){
   var list = document.getElementById('regList');
-  if(!regItems.length){ list.innerHTML='<div style="text-align:center;color:var(--txt3);font-size:12px;padding:14px 0">추가된 지번이 없습니다</div>'; return; }
+  var cnt = document.getElementById('regCount');
+  if(cnt) cnt.textContent = '(' + regItems.length + '건 / 최대 30건)'
+    + (regItems.length>30 ? ' ⚠ 30건 초과분은 저장 제외' : '');
+  if(!regItems.length){ list.innerHTML='<div style="text-align:center;color:var(--txt3);font-size:12px;padding:40px 0">추가된 지번이 없습니다</div>'; return; }
   list.innerHTML = regItems.map(function(it,i){
     var landOn = it.cls==='토지', bldOn = it.cls==='건물';
     var btn = function(c,on,dis){
       return '<button onclick="setRegCls('+i+',\''+c+'\')" '+(dis?'disabled ':'')
-        +'style="height:22px;padding:0 8px;border-radius:4px;font-size:10px;cursor:'+(dis?'not-allowed':'pointer')
+        +'style="height:28px;padding:0 14px;border-radius:5px;font-size:12px;font-weight:700;cursor:'+(dis?'not-allowed':'pointer')
         +';border:1px solid '+(on?'var(--blue)':'var(--line)')+';background:'+(on?'var(--blue)':'transparent')
         +';color:'+(on?'#fff':(dis?'var(--txt3)':'var(--txt2)'))+';opacity:'+(dis?'.4':'1')+'">'+c+'</button>';
     };
-    return '<div class="reg-list-item" style="align-items:center">'
-      +'<span style="flex:1;color:var(--blue2);font-weight:700">'+it.jibun+'</span>'
-      +'<span style="font-size:10px;color:'+(it.pin?'var(--txt2)':'var(--txt3)')+';margin-right:6px">'
+    return '<div class="reg-list-item" style="align-items:center;padding:11px 12px;font-size:13px">'
+      +'<span style="width:26px;color:var(--txt3);font-size:11px">'+(i+1)+'</span>'
+      +'<span style="flex:1;color:var(--blue2);font-weight:700;font-size:13.5px">'+it.jibun+'</span>'
+      +'<span style="font-size:12px;font-weight:700;color:'+(it.pin?'var(--txt2)':'var(--txt3)')+';margin-right:10px;letter-spacing:.3px">'
       +(it.pin||'고유번호 없음')+'</span>'
       +btn('토지',landOn,false)+' '+btn('건물',bldOn,!it.hasBld)+' '
-      +'<button onclick="regItems.splice('+i+',1);renderRegList()" style="height:22px;padding:0 8px;border-radius:4px;border:1px solid var(--line);color:var(--txt3);font-size:10px;cursor:pointer;background:transparent;margin-left:6px">삭제</button>'
+      +'<button onclick="regItems.splice('+i+',1);renderRegList()" style="height:28px;padding:0 12px;border-radius:5px;border:1px solid var(--line);color:var(--txt3);font-size:11px;cursor:pointer;background:transparent;margin-left:10px">삭제</button>'
       +'</div>';
   }).join('');
 }
@@ -2281,7 +2309,8 @@ function makeRegExcel(){
   var rows = withPin.slice(0,30);
 
   var csv = '\uFEFF부동산고유번호(14자리)\n';
-  rows.forEach(function(x){ csv += '"' + String(x.pin).replace(/"/g,'""') + '"\n'; });
+  // 엑셀이 14자리를 지수(1.35E+13)로 바꾸지 않도록 ="..." 텍스트 강제
+  rows.forEach(function(x){ csv += '="' + String(x.pin).replace(/"/g,'') + '"\n'; });
 
   var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   var a = document.createElement('a');
