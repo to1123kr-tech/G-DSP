@@ -182,7 +182,7 @@ function updateScaleBtns(){
     <button class="tab" id="tab-reg" onclick="switchTab('reg')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg>등기부등본
     </button>
-    <button class="tab" id="tab-issue" onclick="switchTab('issue')">
+    <button class="tab" id="tab-issue" onclick="switchTab('issue')" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>민원 발급
     </button>
   </div>
@@ -574,7 +574,7 @@ function updateScaleBtns(){
   </div>
 
   <!-- 민원 발급 -->
-  <div class="tab-view" id="view-issue">
+  <div class="tab-view" id="view-issue" style="display:none">
     <div class="body">
       <div class="sec">
         <div class="sec-t">
