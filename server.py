@@ -386,10 +386,12 @@ VWORLD_LAYERS = {
         'cad_name': '지적선', 'color': 1,  # 호환성
     },
     'building': {
-        'endpoint': 'ned_wfs', 'data_name': 'getBuildingUseWFS',
+        # 외곽선 = 연속수치지도(LT_C_SPBD), 용도명 = 건축물대장(dt_d198) 공간조인
+        'endpoint': 'data', 'data_name': 'LT_C_SPBD',
+        'use_source': 'getBuildingUseWFS',
         'line_layer': '건물외곽', 'line_color': 3,
         'text_layer': '건물용도', 'text_color': 6,
-        'text_fields': ['main_prpos_code_nm', 'ground_floor_co'],
+        'text_fields': ['main_prpos_code_nm'],
         'cad_name': '건물', 'color': 3,
     },
     # 연속수치지도 기반 건물 (지형도와 모양 일치 목적) - LT_C_SPBD
@@ -397,8 +399,8 @@ VWORLD_LAYERS = {
         'endpoint': 'data', 'data_name': 'LT_C_SPBD',
         'line_layer': '건물외곽', 'line_color': 3,
         'text_layer': '건물용도', 'text_color': 6,
-        'text_fields': ['buld_nm', 'gro_flo_co'],
-        'cad_name': '건물(수치지도)', 'color': 3,
+        'text_fields': ['buld_nm'],
+        'cad_name': '건물(수치지도·용도없음)', 'color': 3,
     },
     'road': {
         'endpoint': 'data', 'data_name': 'LT_C_UPISUQ151',  # 도시계획도로
@@ -550,6 +552,56 @@ def _fetch_ned_wfs_box(endpoint_name, bbox, size=500):
     return all_features
 
 
+_USE_GRID = 0.001   # 격자 0.001deg ≒ 100m
+
+
+def _attach_use_labels(base_features, use_features):
+    """건물 외곽선(LT_C_SPBD)에 건축물대장(dt_d198) 용도명을 공간조인으로 붙인다.
+    - 외곽선 중심점이 대장 폴리곤 안에 들어가면 매칭 (층수는 넣지 않음)
+    - STRtree 미사용(shapely 버전 호환) → 자체 격자 인덱스, 2000x2000 기준 0.2초
+    """
+    if not use_features:
+        return base_features, 0
+
+    buckets = {}
+    for uf in use_features:
+        try:
+            g = shapely_shape(uf.get('geometry'))
+            if g.is_empty:
+                continue
+        except Exception:
+            continue
+        props = uf.get('properties') or {}
+        name = (props.get('main_prpos_code_nm')
+                or props.get('mainPrposCodeNm')
+                or props.get('prpos_nm') or '').strip()
+        if not name:
+            continue
+        minx, miny, maxx, maxy = g.bounds
+        for gx in range(int(minx / _USE_GRID), int(maxx / _USE_GRID) + 1):
+            for gy in range(int(miny / _USE_GRID), int(maxy / _USE_GRID) + 1):
+                buckets.setdefault((gx, gy), []).append((g, name))
+
+    matched = 0
+    for f in base_features:
+        try:
+            c = shapely_shape(f.get('geometry')).centroid
+        except Exception:
+            continue
+        cand = buckets.get((int(c.x / _USE_GRID), int(c.y / _USE_GRID)))
+        if not cand:
+            continue
+        for g, name in cand:
+            try:
+                if g.contains(c):
+                    f['properties']['main_prpos_code_nm'] = name
+                    matched += 1
+                    break
+            except Exception:
+                pass
+    return base_features, matched
+
+
 def _fetch_layer_all(layer_key, bbox):
     """레이어별 데이터 가져오기 (4분할 병렬)"""
     info = VWORLD_LAYERS[layer_key]
@@ -574,7 +626,24 @@ def _fetch_layer_all(layer_key, bbox):
                     combined[fid] = f
             except Exception as e:
                 logger.error(f"[{layer_key}] 분할 실패: {e}")
-    return list(combined.values())
+
+    feats = list(combined.values())
+
+    # 용도명 공간조인 (건물: 수치지도 외곽선 + 대장 용도)
+    use_src = info.get('use_source')
+    if use_src and feats:
+        use_feats = []
+        with ThreadPoolExecutor(max_workers=4) as ex2:
+            ufs = [ex2.submit(_fetch_ned_wfs_box, use_src, sb, 500) for sb in sub_bboxes]
+            for fut in concurrent.futures.as_completed(ufs):
+                try:
+                    use_feats.extend(fut.result() or [])
+                except Exception as e:
+                    logger.error(f"[{layer_key}] 용도조회 실패: {e}")
+        feats, matched = _attach_use_labels(feats, use_feats)
+        logger.info(f"[{layer_key}] 용도 매칭 {matched}/{len(feats)} (대장 {len(use_feats)}건)")
+
+    return feats
 
 
 # ==================== DXF 그리기 ====================
