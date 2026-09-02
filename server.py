@@ -403,18 +403,57 @@ VWORLD_LAYERS = {
         'cad_name': '건물(수치지도·용도없음)', 'color': 3,
     },
     'road': {
-        'endpoint': 'data', 'data_name': 'LT_C_UPISUQ151',  # 도시계획도로
-        'line_layer': '도로경계', 'line_color': 5,
-        'text_layer': None, 'text_color': None,
-        'text_fields': [],
-        'cad_name': '도로경계', 'color': 5,
+        # 도시계획시설 '도로'(계획선) — 소로1류·중로2류 등. 현황도로 아님
+        'endpoint': 'data', 'data_name': 'LT_C_UPISUQ151',
+        'line_layer': '도시계획도로', 'line_color': 5,
+        'text_layer': '도시계획도로명', 'text_color': 5,
+        'text_fields': ['dgm_nm'],
+        'cad_name': '도시계획도로', 'color': 5,
     },
     'road_center': {
+        # 새주소(도로명주소) 도로 — 수치지도 중심선 아님
         'endpoint': 'data', 'data_name': 'LT_L_SPRD',
-        'line_layer': '도로중심선', 'line_color': 8,
+        'line_layer': '도로명주소도로', 'line_color': 8,
         'text_layer': None, 'text_color': None,
         'text_fields': [],
-        'cad_name': '도로중심선', 'color': 8,
+        'cad_name': '도로명주소 도로', 'color': 8,
+    },
+    'road_link': {
+        # 실제 도로망 중심선(교통 링크) — 도로명·차로·제한속도 포함
+        'endpoint': 'data', 'data_name': 'LT_L_MOCTLINK',
+        'line_layer': '도로망중심선', 'line_color': 6,
+        'text_layer': '도로명', 'text_color': 6,
+        'text_fields': ['road_name'],
+        'cad_name': '도로망(중심선)', 'color': 6,
+    },
+    'park': {
+        'endpoint': 'data', 'data_name': 'LT_C_UPISUQ153',
+        'line_layer': '공원녹지', 'line_color': 82,
+        'text_layer': '공원녹지명', 'text_color': 82,
+        'text_fields': ['dgm_nm'],
+        'cad_name': '공원·녹지', 'color': 82,
+    },
+    'school': {
+        'endpoint': 'data', 'data_name': 'LT_C_UPISUQ155',
+        'line_layer': '학교문화시설', 'line_color': 44,
+        'text_layer': '학교문화시설명', 'text_color': 44,
+        'text_fields': ['dgm_nm'],
+        'cad_name': '학교·문화시설', 'color': 44,
+    },
+    'parking': {
+        'endpoint': 'data', 'data_name': 'LT_C_UPISUQ152',
+        'line_layer': '주차장', 'line_color': 52,
+        'text_layer': '주차장명', 'text_color': 52,
+        'text_fields': ['dgm_nm'],
+        'cad_name': '주차장', 'color': 52,
+    },
+    'zone_district': {
+        # 구역 (지구단위계획구역·토지거래허가구역 등)
+        'endpoint': 'data', 'data_name': 'LT_C_UQ141',
+        'line_layer': '구역', 'line_color': 210,
+        'text_layer': '구역명', 'text_color': 210,
+        'text_fields': ['uname'],
+        'cad_name': '구역', 'color': 210,
     },
     'zone_use': {
         'endpoint': 'data', 'data_name': 'LT_C_UQ111',
@@ -424,10 +463,11 @@ VWORLD_LAYERS = {
         'cad_name': '용도지역', 'color': 4,
     },
     'district_plan': {
-        'endpoint': 'data', 'data_name': 'LT_C_UQ121',
+        # 지구단위계획 블록 (실측: blocktype=보행자전용도로 등, zonename=구역명)
+        'endpoint': 'data', 'data_name': 'LT_C_LHBLPN',
         'line_layer': '지구단위계획', 'line_color': 30,
         'text_layer': '지구단위명', 'text_color': 30,
-        'text_fields': ['uname'],
+        'text_fields': ['blocktype'],
         'cad_name': '지구단위계획', 'color': 30,
     },
     # 옛날 호환
