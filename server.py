@@ -427,11 +427,12 @@ VWORLD_LAYERS = {
         'cad_name': '도로망(중심선)', 'color': 6,
     },
     'park': {
-        'endpoint': 'data', 'data_name': 'LT_C_UPISUQ153',
+        # 공원·녹지·광장 (완충녹지·경관녹지·어린이공원·근린공원·공공공지·교통광장)
+        'endpoint': 'data', 'data_name': 'LT_C_UQ162',
         'line_layer': '공원녹지', 'line_color': 82,
         'text_layer': '공원녹지명', 'text_color': 82,
-        'text_fields': ['dgm_nm'],
-        'cad_name': '공원·녹지', 'color': 82,
+        'text_fields': ['uname'],
+        'cad_name': '공원·녹지·광장', 'color': 82,
     },
     'school': {
         'endpoint': 'data', 'data_name': 'LT_C_UPISUQ155',
@@ -454,6 +455,46 @@ VWORLD_LAYERS = {
         'text_layer': '구역명', 'text_color': 210,
         'text_fields': ['uname'],
         'cad_name': '구역', 'color': 210,
+    },
+    'river': {
+        # 하천구역 (하천명 riv_nm) — 무봉천 등
+        'endpoint': 'data', 'data_name': 'LT_C_WKMSTRM',
+        'line_layer': '하천구역', 'line_color': 141,
+        'text_layer': '하천명', 'text_color': 141,
+        'text_fields': ['riv_nm'],
+        'cad_name': '하천구역', 'color': 141,
+    },
+    'water_facility': {
+        # 도시계획시설 하천·방재 — 소하천·저류시설·유수시설·기타하천시설
+        'endpoint': 'data', 'data_name': 'LT_C_UPISUQ156',
+        'line_layer': '하천방재시설', 'line_color': 150,
+        'text_layer': '하천방재시설명', 'text_color': 150,
+        'text_fields': ['dgm_nm'],
+        'cad_name': '하천·방재시설', 'color': 150,
+    },
+    'edu_zone': {
+        # 교육환경보호구역 (절대/상대보호구역)
+        'endpoint': 'data', 'data_name': 'LT_C_UO101',
+        'line_layer': '교육환경보호구역', 'line_color': 200,
+        'text_layer': '교육환경보호구역명', 'text_color': 200,
+        'text_fields': ['uname'],
+        'cad_name': '교육환경보호구역', 'color': 200,
+    },
+    'settlement': {
+        # 취락지구 (집단취락·자연취락)
+        'endpoint': 'data', 'data_name': 'LT_C_UQ128',
+        'line_layer': '취락지구', 'line_color': 40,
+        'text_layer': '취락지구명', 'text_color': 40,
+        'text_fields': ['uname'],
+        'cad_name': '취락지구', 'color': 40,
+    },
+    'medical_etc': {
+        # 도시계획시설 의료·장사시설
+        'endpoint': 'data', 'data_name': 'LT_C_UPISUQ157',
+        'line_layer': '의료장사시설', 'line_color': 21,
+        'text_layer': '의료장사시설명', 'text_color': 21,
+        'text_fields': ['dgm_nm'],
+        'cad_name': '의료·장사시설', 'color': 21,
     },
     'zone_use': {
         'endpoint': 'data', 'data_name': 'LT_C_UQ111',
