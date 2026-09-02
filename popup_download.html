@@ -2292,15 +2292,21 @@ function renderRegList(){
       +'<span style="width:26px;color:var(--txt3);font-size:11px">'+(i+1)+'</span>'
       +'<span style="flex:1;color:var(--blue2);font-weight:700;font-size:13.5px">'+it.jibun+'</span>'
       +'<span style="font-size:12px;font-weight:700;color:'+(it.pin?'var(--txt2)':'var(--txt3)')+';margin-right:10px;letter-spacing:.3px">'
-      +(it.pin||'고유번호 없음')+'</span>'
+      +(it.pin?_pinFmt(it.pin):'고유번호 없음')+'</span>'
       +btn('토지',landOn,false)+' '+btn('건물',bldOn,!it.hasBld)+' '
       +'<button onclick="regItems.splice('+i+',1);renderRegList()" style="height:28px;padding:0 12px;border-radius:5px;border:1px solid var(--line);color:var(--txt3);font-size:11px;cursor:pointer;background:transparent;margin-left:10px">삭제</button>'
       +'</div>';
   }).join('');
 }
 
-// 등기소 「부동산 일괄 열람발급 등록양식」 형식으로 내보내기
-// 공식 양식: A열 = 부동산고유번호(14자리), 최대 30건
+// 등기소 「부동산 일괄 열람·발급 등록양식」 형식으로 내보내기
+// 공식 양식(.xls): A1='부동산고유번호(14자리)', A2부터 0000-0000-000000 (4-4-6 하이픈), 최대 30건
+function _pinFmt(pin){
+  var d = String(pin||'').replace(/\D/g,'');       // 숫자만
+  if(d.length !== 14) return d;                     // 14자리 아니면 원본
+  return d.slice(0,4)+'-'+d.slice(4,8)+'-'+d.slice(8);
+}
+
 function makeRegExcel(){
   if(!regItems.length){ toast('목록에 지번을 먼저 추가하세요','err'); return; }
   var withPin = regItems.filter(function(x){ return x.pin; });
@@ -2308,18 +2314,37 @@ function makeRegExcel(){
   if(withPin.length > 30) toast('등기소 양식은 최대 30건 — 앞의 30건만 저장합니다','err');
   var rows = withPin.slice(0,30);
 
-  var csv = '\uFEFF부동산고유번호(14자리)\n';
-  // 엑셀이 14자리를 지수(1.35E+13)로 바꾸지 않도록 ="..." 텍스트 강제
-  rows.forEach(function(x){ csv += '="' + String(x.pin).replace(/"/g,'') + '"\n'; });
+  // 엑셀이 여는 SpreadsheetML(.xls) 생성 — 모든 셀 String 타입이라 지수표기·자릿수 손실 없음
+  var esc = function(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var cells = rows.map(function(x){
+    return '<Row><Cell ss:StyleID="s1"><Data ss:Type="String">' + esc(_pinFmt(x.pin)) + '</Data></Cell></Row>';
+  }).join('');
 
-  var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  var xml =
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<?mso-application progid="Excel.Sheet"?>\n' +
+    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' +
+    ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
+    '<Styles>' +
+      '<Style ss:ID="s0"><Font ss:Bold="1"/></Style>' +
+      '<Style ss:ID="s1"><NumberFormat ss:Format="@"/></Style>' +
+    '</Styles>' +
+    '<Worksheet ss:Name="등록양식"><Table>' +
+      '<Column ss:Width="140"/><Column ss:Width="200"/>' +
+      '<Row>' +
+        '<Cell ss:StyleID="s0"><Data ss:Type="String">부동산고유번호(14자리)</Data></Cell>' +
+        '<Cell ss:StyleID="s0"><Data ss:Type="String">* 최대 30건까지 등록가능합니다.</Data></Cell>' +
+      '</Row>' + cells +
+    '</Table></Worksheet></Workbook>';
+
+  var blob = new Blob([xml], {type:'application/vnd.ms-excel'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '부동산_일괄열람발급_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.download = '부동산_일괄열람발급_' + new Date().toISOString().slice(0,10) + '.xls';
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   var skip = regItems.length - withPin.length;
-  toast(rows.length + '건 저장' + (skip? ' (고유번호 없는 '+skip+'건 제외)':''),'ok');
+  toast(rows.length + '건 저장 (.xls)' + (skip? ' — 고유번호 없는 '+skip+'건 제외':''),'ok');
 }
 
 /* ===================== 첫실행 안내 토글 ===================== */
