@@ -392,6 +392,14 @@ VWORLD_LAYERS = {
         'text_fields': ['main_prpos_code_nm', 'ground_floor_co'],
         'cad_name': '건물', 'color': 3,
     },
+    # 연속수치지도 기반 건물 (지형도와 모양 일치 목적) - LT_C_SPBD
+    'building_map': {
+        'endpoint': 'data', 'data_name': 'LT_C_SPBD',
+        'line_layer': '건물외곽', 'line_color': 3,
+        'text_layer': '건물용도', 'text_color': 6,
+        'text_fields': ['buld_nm', 'gro_flo_co'],
+        'cad_name': '건물(수치지도)', 'color': 3,
+    },
     'road': {
         'endpoint': 'data', 'data_name': 'LT_C_UPISUQ151',  # 도시계획도로
         'line_layer': '도로경계', 'line_color': 5,
@@ -460,24 +468,34 @@ def _fetch_vworld_box(vworld_data, bbox, size=1000):
 
 
 def _fetch_ned_wfs_box(endpoint_name, bbox, size=500):
-    """NED WFS GML 응답 파싱 (건물용)"""
+    """NED WFS GML 응답 파싱 (건물용) — 페이징 추가(500개 제한으로 잘리던 문제 해결)"""
     url = f"https://api.vworld.kr/ned/wfs/{endpoint_name}"
     bbox_str = f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}"
-    params = {
-        "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
-        "typename": "dt_d198",
-        "srsname": "EPSG:4326",
-        "output": "GML2",
-        "maxFeatures": str(size),
-        "bbox": bbox_str
-    }
     headers = {"Referer": f"https://{VWORLD_DOMAIN}", "User-Agent": "Mozilla/5.0"}
-    try:
-        r = req.get(url, params=params, headers=headers, timeout=(5, 25))
-        r.encoding = 'utf-8'
-        root = ET.fromstring(r.text)
-        ns = {'gml': 'http://www.opengis.net/gml', 'sop': 'https://www.vworld.kr', 'wfs': 'http://www.opengis.net/wfs'}
-        features = []
+    ns = {'gml': 'http://www.opengis.net/gml', 'sop': 'https://www.vworld.kr',
+          'wfs': 'http://www.opengis.net/wfs'}
+
+    all_features = []
+    start_index = 0
+    for _ in range(10):                      # 안전장치: 500 x 10 = 5000개
+        params = {
+            "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
+            "typename": "dt_d198",
+            "srsname": "EPSG:4326",
+            "output": "GML2",
+            "maxFeatures": str(size),
+            "startIndex": str(start_index),
+            "bbox": bbox_str
+        }
+        try:
+            r = req.get(url, params=params, headers=headers, timeout=(5, 25))
+            r.encoding = 'utf-8'
+            root = ET.fromstring(r.text)
+        except Exception as e:
+            logger.error(f"NED WFS {endpoint_name} 에러: {e}")
+            break
+
+        page_features = []
         for member in root.findall('.//gml:featureMember', ns):
             ag_geom = member.find('.//sop:ag_geom', ns)
             if ag_geom is None:
@@ -491,7 +509,8 @@ def _fetch_ned_wfs_box(endpoint_name, bbox, size=500):
                         coords_elem = ring.find('gml:coordinates', ns)
                         if coords_elem is not None and coords_elem.text:
                             try:
-                                points = [[float(x) for x in pair.split(',')] for pair in coords_elem.text.strip().split()]
+                                points = [[float(x) for x in pair.split(',')]
+                                          for pair in coords_elem.text.strip().split()]
                                 if len(points) >= 3:
                                     polygons_coords.append(points)
                             except:
@@ -502,7 +521,8 @@ def _fetch_ned_wfs_box(endpoint_name, bbox, size=500):
                     coords_elem = ring.find('gml:coordinates', ns)
                     if coords_elem is not None and coords_elem.text:
                         try:
-                            points = [[float(x) for x in pair.split(',')] for pair in coords_elem.text.strip().split()]
+                            points = [[float(x) for x in pair.split(',')]
+                                      for pair in coords_elem.text.strip().split()]
                             if len(points) >= 3:
                                 polygons_coords.append(points)
                         except:
@@ -516,13 +536,18 @@ def _fetch_ned_wfs_box(endpoint_name, bbox, size=500):
                     if key not in ('ag_geom',):
                         props[key] = child.text.strip()
             if len(polygons_coords) > 1:
-                features.append({'geometry': {'type': 'MultiPolygon', 'coordinates': [[ring] for ring in polygons_coords]}, 'properties': props})
+                page_features.append({'geometry': {'type': 'MultiPolygon',
+                    'coordinates': [[rg] for rg in polygons_coords]}, 'properties': props})
             else:
-                features.append({'geometry': {'type': 'Polygon', 'coordinates': [polygons_coords[0]]}, 'properties': props})
-        return features
-    except Exception as e:
-        logger.error(f"NED WFS {endpoint_name} 에러: {e}")
-        return []
+                page_features.append({'geometry': {'type': 'Polygon',
+                    'coordinates': [polygons_coords[0]]}, 'properties': props})
+
+        all_features.extend(page_features)
+        if len(page_features) < size:
+            break
+        start_index += size
+
+    return all_features
 
 
 def _fetch_layer_all(layer_key, bbox):
@@ -543,7 +568,9 @@ def _fetch_layer_all(layer_key, bbox):
             try:
                 items = fut.result() or []
                 for f in items:
-                    fid = f.get("id") or f.get("properties", {}).get("pnu") or f.get("properties", {}).get("gis_idntfc_no") or str(f.get("geometry"))[:80]
+                    _p = f.get("properties", {}) or {}
+                    fid = (f.get("id") or _p.get("pnu") or _p.get("gis_idntfc_no")
+                           or _p.get("bd_mgt_sn") or str(f.get("geometry"))[:200])
                     combined[fid] = f
             except Exception as e:
                 logger.error(f"[{layer_key}] 분할 실패: {e}")
