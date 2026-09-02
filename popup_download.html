@@ -2230,30 +2230,67 @@ function _irosCls(x){
 function addRegToList(){
   var jibun = document.getElementById('regJibun').value.trim();
   if(!jibun){ toast('지번을 입력하세요','err'); return; }
-  if(regItems.indexOf(jibun)>=0){ toast('이미 추가됨'); return; }
-  regItems.push(jibun); renderRegList();
-  toast(jibun+' 추가됨','ok');
+  var pin = (document.getElementById('regUniq').textContent||'').trim();
+  if(/조회|없음|실패|^—$/.test(pin)) pin = '';
+  if(regItems.some(function(x){ return x.jibun===jibun; })){ toast('이미 추가됨'); return; }
+  // 조회된 목록에 건물이 있으면 건물 선택 가능하게 표시
+  var hasBld = (_irosRows||[]).some(function(x){ return _irosCls(x)==='건물'; });
+  regItems.push({ jibun: jibun, pin: pin, cls: '토지', hasBld: hasBld,
+                  rows: (_irosRows||[]).slice() });
+  renderRegList();
+  toast(jibun + ' 추가됨' + (pin?' (고유번호 '+pin+')':' — 고유번호 없음'),'ok');
 }
+
+// 목록에서 토지/건물 전환 → 해당 고유번호로 교체
+function setRegCls(i, cls){
+  var it = regItems[i]; if(!it) return;
+  it.cls = cls;
+  var row = (it.rows||[]).find(function(x){ return _irosCls(x)===cls; });
+  if(row) it.pin = row.wk_pin || row.real_pin || it.pin;
+  renderRegList();
+}
+
 function renderRegList(){
   var list = document.getElementById('regList');
   if(!regItems.length){ list.innerHTML='<div style="text-align:center;color:var(--txt3);font-size:12px;padding:14px 0">추가된 지번이 없습니다</div>'; return; }
-  list.innerHTML = regItems.map(function(j,i){
-    return '<div class="reg-list-item"><span style="flex:1;color:var(--blue2);font-weight:700">'+j+'</span>'
-      +'<button onclick="regItems.splice('+i+',1);renderRegList()" style="height:24px;padding:0 8px;border-radius:5px;border:1px solid var(--line);color:var(--txt3);font-size:10px;cursor:pointer;background:transparent">삭제</button></div>';
+  list.innerHTML = regItems.map(function(it,i){
+    var landOn = it.cls==='토지', bldOn = it.cls==='건물';
+    var btn = function(c,on,dis){
+      return '<button onclick="setRegCls('+i+',\''+c+'\')" '+(dis?'disabled ':'')
+        +'style="height:22px;padding:0 8px;border-radius:4px;font-size:10px;cursor:'+(dis?'not-allowed':'pointer')
+        +';border:1px solid '+(on?'var(--blue)':'var(--line)')+';background:'+(on?'var(--blue)':'transparent')
+        +';color:'+(on?'#fff':(dis?'var(--txt3)':'var(--txt2)'))+';opacity:'+(dis?'.4':'1')+'">'+c+'</button>';
+    };
+    return '<div class="reg-list-item" style="align-items:center">'
+      +'<span style="flex:1;color:var(--blue2);font-weight:700">'+it.jibun+'</span>'
+      +'<span style="font-size:10px;color:'+(it.pin?'var(--txt2)':'var(--txt3)')+';margin-right:6px">'
+      +(it.pin||'고유번호 없음')+'</span>'
+      +btn('토지',landOn,false)+' '+btn('건물',bldOn,!it.hasBld)+' '
+      +'<button onclick="regItems.splice('+i+',1);renderRegList()" style="height:22px;padding:0 8px;border-radius:4px;border:1px solid var(--line);color:var(--txt3);font-size:10px;cursor:pointer;background:transparent;margin-left:6px">삭제</button>'
+      +'</div>';
   }).join('');
 }
+
+// 등기소 「부동산 일괄 열람발급 등록양식」 형식으로 내보내기
+// 공식 양식: A열 = 부동산고유번호(14자리), 최대 30건
 function makeRegExcel(){
   if(!regItems.length){ toast('목록에 지번을 먼저 추가하세요','err'); return; }
-  // 엑셀에서 바로 열리는 CSV (BOM 포함 → 한글 깨짐 방지)
-  var csv = '\uFEFF번호,지번,고유번호,비고\n';
-  regItems.forEach(function(j,i){ csv += (i+1)+',"'+j+'",,\n'; });
+  var withPin = regItems.filter(function(x){ return x.pin; });
+  if(!withPin.length){ toast('고유번호가 없습니다 — 먼저 [조회]로 고유번호를 받으세요','err'); return; }
+  if(withPin.length > 30) toast('등기소 양식은 최대 30건 — 앞의 30건만 저장합니다','err');
+  var rows = withPin.slice(0,30);
+
+  var csv = '\uFEFF부동산고유번호(14자리)\n';
+  rows.forEach(function(x){ csv += '"' + String(x.pin).replace(/"/g,'""') + '"\n'; });
+
   var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '등기신청목록_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.download = '부동산_일괄열람발급_' + new Date().toISOString().slice(0,10) + '.csv';
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  toast(regItems.length + '건 CSV 저장됨','ok');
+  var skip = regItems.length - withPin.length;
+  toast(rows.length + '건 저장' + (skip? ' (고유번호 없는 '+skip+'건 제외)':''),'ok');
 }
 
 /* ===================== 첫실행 안내 토글 ===================== */
