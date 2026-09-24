@@ -4,6 +4,9 @@ gdsp_inq.json          # 문의 게시판 데이터
 gdsp_inq.json.tmp
 gdsp_visits.json       # 방문 통계
 gdsp_visits.json.tmp
+gdsp_licenses.json     # 발급한 락키 목록  ← 고객 정보
+gdsp_licenses.json.tmp
+gdsp_lic_secret.txt    # 락키 응답 서명용 비밀값
 
 # ── 파이썬 ──
 __pycache__/

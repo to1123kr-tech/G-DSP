@@ -3037,5 +3037,16 @@ except Exception as _e:
     logger.error(f"[INQ] 문의 게시판을 불러오지 못했습니다: {_e}")
 
 
+# ==================== 락키 (판매판) ====================
+#   gdsp_license.py 가 server.py 와 같은 폴더에 있어야 합니다.
+#   관리자 비밀번호는 문의 게시판과 같은 것을 씁니다.
+#   발급 목록(gdsp_licenses.json)과 비밀값은 서버에만 있고 깃에 안 올라갑니다.
+try:
+    from gdsp_license import register_license
+    register_license(app)
+except Exception as _e:
+    logger.error(f"[LIC] 락키 창구를 불러오지 못했습니다: {_e}")
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5050)
