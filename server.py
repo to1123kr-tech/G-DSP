@@ -39,7 +39,42 @@ cache = Cache(app, config={'CACHE_TYPE': 'simple', 'CACHE_DEFAULT_TIMEOUT': 3600
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-VWORLD_KEY = "16B90D39-90BB-3197-987A-54983A46F250"
+def _vworld_key():
+    """VWorld 인증키 — 코드에 넣지 않고 서버에서 읽는다.
+
+    왜  ★
+        · 이 저장소는 공개다. 코드에 박아 두면 키가 그대로 공개된다.
+        · 키는 6개월마다 바뀐다. 코드에 박혀 있으면 바꿀 때마다
+          여러 파일을 고치고 다시 올려야 한다.
+
+    실제로 한 번 사고가 났다 (2026-09-24 발견)
+        키를 재발급받고 index.html 만 고쳤는데, 브라우저는 index.html 값이
+        아니라 서버가 주는 값(/api/vworld/key)을 먼저 쓴다.
+        서버는 옛 키를 그대로 들고 있어서 **지도가 안 나오고 있었다.**
+        키가 한 군데만 있으면 이런 일이 생기지 않는다.
+
+    찾는 순서
+        1) gdsp_vworld_key.txt   ← 서버에만 둔다 (.gitignore)
+        2) 환경변수 VWORLD_KEY
+    """
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        'gdsp_vworld_key.txt')
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            v = f.read().strip()
+        if v:
+            return v
+    except Exception:
+        pass
+    v = (os.environ.get('VWORLD_KEY') or '').strip()
+    if v:
+        return v
+    logger.error('[VWORLD] 인증키가 없습니다. '
+                 'gdsp_vworld_key.txt 를 만들어 주세요. 지도가 안 나옵니다.')
+    return ''
+
+
+VWORLD_KEY = _vworld_key()
 VWORLD_DOMAIN = "168-107-15-68.nip.io"
 KAKAO_APP_KEY = "c670e0bc85874ef6267220f09882b379"  # REST API 키 (JS키 0f432d...와 다름!)
 
