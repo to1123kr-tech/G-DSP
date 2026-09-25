@@ -618,7 +618,7 @@ function updateScaleBtns(){
 <script>
 /* ===================== 공통 ===================== */
 var regItems = [], _tt;
-var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '16B90D39-90BB-3197-987A-54983A46F250';
+var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';   // 비워둬야 서버(/api/vworld/key)에서 받아온다
 var _vwKey = VWORLD_KEY;
 if(localStorage.getItem('gdsp_kakao')==='0f432d6e8470eed32f947e3c7db146b9'){localStorage.setItem('gdsp_kakao','c670e0bc85874ef6267220f09882b379');}
 var _kakaoKey = (window.opener && window.opener.KAKAO_APP_KEY) || localStorage.getItem('gdsp_kakao') || localStorage.getItem('gdsp_kakao_key') || 'c670e0bc85874ef6267220f09882b379';

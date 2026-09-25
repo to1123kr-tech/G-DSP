@@ -624,7 +624,7 @@ var KAKAO_KEY = localStorage.getItem('gdsp_kakao') || 'c670e0bc85874ef6267220f09
       if(d.key){ KAKAO_KEY = d.key; localStorage.setItem('gdsp_kakao', d.key); }
     }).catch(function(){});
 })();
-var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '16B90D39-90BB-3197-987A-54983A46F250';
+var VWORLD_KEY = localStorage.getItem('gdsp_vworld') || localStorage.getItem('gdsp_vworld_key') || '';   // 비워둬야 서버(/api/vworld/key)에서 받아온다
 var BLDG_KEY = localStorage.getItem('gdsp_building') || '';
 
 // ★ 오라클 서버에서 VWorld 키 자동 로드

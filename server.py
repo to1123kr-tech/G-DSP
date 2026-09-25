@@ -1045,19 +1045,36 @@ def list_layers():
 
 
 @app.route('/api/vw-tile/<map_type>/<int:z>/<int:x>/<int:y>.<ext>')
-@cache.cached(timeout=86400, query_string=True)
 def vw_tile_proxy(map_type, z, x, y, ext):
     """OpenLayers는 z/x/y로 호출, VWorld는 z/y/x로 받음.
-    ext: 위성=jpeg / 일반지도=png (둘 다 지원해야 배경지도 캡처가 됨)."""
+    ext: 위성=jpeg / 일반지도=png (둘 다 지원해야 배경지도 캡처가 됨).
+
+    ★ 캐시는 **성공한 것만** 저장한다. (2026-09-25)
+      예전에는 @cache.cached 를 걸어 404 까지 24시간 저장했다.
+      한 번 삐끗한 타일이 하루 동안 구멍으로 남았다 — 실제로 그런 칸을 찾았다.
+      (이웃 9칸 중 8칸은 멀쩡하고 한 칸만 404. 브이월드에 직접 물으면 잘 나옴)
+    """
     e = 'png' if str(ext).lower() == 'png' else 'jpeg'
+    ctype = 'image/png' if e == 'png' else 'image/jpeg'
+    ck = 'vwtile:%s/%d/%d/%d.%s' % (map_type, z, x, y, e)
+    try:
+        hit = cache.get(ck)
+    except Exception:
+        hit = None
+    if hit:
+        return hit, 200, {'Content-Type': ctype}
     try:
         url = f"https://api.vworld.kr/req/wmts/1.0.0/{VWORLD_KEY}/{map_type}/{z}/{y}/{x}.{e}"
         r = req.get(url, headers={"Referer": f"https://{VWORLD_DOMAIN}"}, timeout=10)
         if r.status_code != 200 or not r.content:
-            return b'', 404
-        return r.content, 200, {'Content-Type': 'image/png' if e == 'png' else 'image/jpeg'}
+            return b'', 404          # 저장하지 않는다 — 다음에 다시 물어본다
+        try:
+            cache.set(ck, r.content, timeout=86400)
+        except Exception:
+            pass
+        return r.content, 200, {'Content-Type': ctype}
     except Exception:
-        return b'', 404
+        return b'', 404              # 저장하지 않는다
 
 
 @app.route('/api/vw-wms')

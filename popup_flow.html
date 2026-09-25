@@ -8365,7 +8365,11 @@ function cadClearSel(){ CAD.parcels=[]; _cadUpdateBar(); if(typeof _cadRenderPar
    위성/일반=WMTS(z/y/x, 웹메르카토르), 지적=WMS 타일. 각 타일을 5186 캔버스에 얹음.
    VWorld는 단일 WMS(5186)를 안 주므로 타일 방식(map.html 검증본)을 씀. */
 var cadBg = { on:false, alpha:1.0, layers:'sat', cache:{}, tiles:[], loadingN:0, showBase:true, showCad:true, vecParcels:[], vecTooWide:false };
-var VWORLD_KEY_BOOK = '16B90D39-90BB-3197-987A-54983A46F250';
+/* 배경 타일은 서버 프록시(/api/vw-tile)로 받는다.
+   ① 키가 브라우저로 안 나간다 (공개 저장소·소스보기에 안 남는다)
+   ② 같은 출처라 캔버스가 오염되지 않는다 (그림 내보내기가 된다)
+   프록시는 z/x/y 로 받아 브이월드의 z/y/x 로 바꿔 부른다. */
+var VWORLD_KEY_BOOK = '';
 var CAD_BG_DOMAIN = (location.hostname && location.hostname.indexOf('nip.io')>=0) ? location.hostname : '168-107-15-68.nip.io';
 var _MERC_R = 20037508.342789244;
 
@@ -8429,7 +8433,7 @@ function _cadBgFetch(){
          → _cadBgRenderSoon()으로 한 프레임에 1번만 그린다. */
       bimg.onload=function(){ ent.base=bimg; _cadBgRenderSoon(); };
       bimg.onerror=function(){ ent.baseErr=true; };
-      bimg.src='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY_BOOK+'/'+baseName+'/'+t.z+'/'+t.y+'/'+t.x+'.'+baseExt;
+      bimg.src='/api/vw-tile/'+baseName+'/'+t.z+'/'+t.x+'/'+t.y+'.'+baseExt;
     });
   }
   if(cadBg.showCad) _cadVecFetch();     // 지적선 = 벡터(빠름)

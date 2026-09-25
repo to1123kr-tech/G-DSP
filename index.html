@@ -7743,7 +7743,7 @@
       if (ndVwKey) { cb(ndVwKey); return; }
       var saved = localStorage.getItem('gdsp_vworld');
       if (saved) { ndVwKey = saved; cb(ndVwKey); return; }
-      var VW_FALLBACK = '16B90D39-90BB-3197-987A-54983A46F250';
+      var VW_FALLBACK = '';   // 키를 파일에 박지 않는다 (서버에서 받는다)
       fetch('/api/vworld/key')
         .then(function(r){ return r.json(); })
         .then(function(d){ ndVwKey = d.key || VW_FALLBACK; cb(ndVwKey); })
