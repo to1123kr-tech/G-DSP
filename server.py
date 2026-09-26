@@ -3152,15 +3152,27 @@ except Exception as _e:
     logger.error(f"[INQ] 문의 게시판을 불러오지 못했습니다: {_e}")
 
 
-# ==================== 락키 (판매판) ====================
-#   gdsp_license.py 가 server.py 와 같은 폴더에 있어야 합니다.
-#   관리자 비밀번호는 문의 게시판과 같은 것을 씁니다.
-#   발급 목록(gdsp_licenses.json)과 비밀값은 서버에만 있고 깃에 안 올라갑니다.
-try:
-    from gdsp_license import register_license
-    register_license(app)
-except Exception as _e:
-    logger.error(f"[LIC] 락키 창구를 불러오지 못했습니다: {_e}")
+# ==================== 락키 (판매판) — 여기 없습니다 ====================
+#
+#   2026-09-26 에 **따로 뺐습니다.** 여기에 다시 붙이지 마세요.
+#
+#   어디로 갔나
+#       비공개 저장소 to1123kr-tech/gdsp-exe  →  server/gdsp_license.py
+#       서버에서는 /home/ubuntu/gdsp-exe 에서 5053 포트로 혼자 돕니다
+#       (서비스 이름 gdsp-lic)
+#
+#   고객이 부르는 주소는 안 바뀌었습니다
+#       https://gdsp.kr/api/lic/check
+#       대문(caddy)에서 /api/lic/* 만 5053 으로 갈라 보냅니다.
+#
+#   왜 뺐나
+#       1) 이 저장소는 공개입니다. 락의 속이 그대로 보였습니다
+#          (유예 며칠·몇 일마다 확인·관리자 주소까지)
+#       2) 홈페이지를 고치다 실수하면 고객 락까지 같이 죽었습니다
+#       3) 팔린 키 목록이 홈페이지 파일들 사이에 섞여 있었습니다
+#
+#   ★ 여기에 되살리면 자료가 두 곳으로 갈라집니다. 발급은 이쪽에 쓰이고
+#     고객 확인은 저쪽을 읽어, 팔았는데 안 열리는 일이 생깁니다.
 
 
 if __name__ == '__main__':

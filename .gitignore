@@ -27,3 +27,8 @@ log.txt
 # ── OS ──
 .DS_Store
 Thumbs.db
+
+# 락키는 비공개 저장소(gdsp-exe)로 옮겼습니다. 2026-09-26
+# 여기로 되돌아오면 공개됩니다.
+gdsp_license.py
+
