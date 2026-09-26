@@ -152,14 +152,24 @@ def _clip(s, n=MAX_TEXT_LEN):
     return (str(s or '')).strip()[:n]
 
 
-def _stamp(device, expire, features):
+def _stamp(device, expire, features, today):
     """고객 프로그램이 들고 있을 답에 도장을 찍는다.
 
     인터넷이 끊겨도 며칠은 이 답을 그대로 쓴다. 도장이 있어야 그 사이에
     손으로 고쳐 기간을 늘리는 것을 막는다.
     (완벽하지는 않다 — 진짜 방어선은 '첫 실행 때 서버 확인' 이다)
+
+    ★ today 가 왜 들어가나  `[2026-09-26 시험에서 찾음]`
+        예전에는 device|expire|features 만 찍었다. '언제 확인했나' 는
+        고객 PC 가 스스로 적었고 도장이 없었다. 그래서 **메모장으로
+        그 날짜만 1년 뒤로 고치면** 프로그램이 "아직 물어볼 때가 아니네"
+        하고 서버에 영영 안 물어봤다. 환불해도 남은 기간을 그대로 썼다.
+        실제로 재현해서 뚫었다.
+
+        이제 **서버 날짜**를 같이 찍는다. 날짜를 고치면 도장이 깨지고,
+        도장이 깨지면 서버에 물어봐야만 열린다.
     """
-    msg = '%s|%s|%s' % (device, expire, ','.join(sorted(features)))
+    msg = '%s|%s|%s|%s' % (device, expire, ','.join(sorted(features)), today)
     return hmac.new(_secret().encode('utf-8'),
                     msg.encode('utf-8'), hashlib.sha256).hexdigest()
 
@@ -213,10 +223,12 @@ def register_license(app):
             _save(d)
 
         features = list(row.get('features') or [])
+        # 확인한 날짜는 **서버가 정한다.** 고객 PC 가 적으면 고칠 수 있다.
+        today = _today()
         return jsonify(ok=True, features=features, expire=expire,
                        buyer=row.get('buyer', ''),
-                       stamp=_stamp(device, expire, features),
-                       today=_today())
+                       stamp=_stamp(device, expire, features, today),
+                       today=today)
 
     # ── 관리자 ────────────────────────────────────────────
     @app.route('/api/lic/issue', methods=['POST'])
