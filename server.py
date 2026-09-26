@@ -5,7 +5,8 @@ G-DSP Flask Server v3.0
 - 도로경계: LT_C_UPISUQ151 (도시계획도로)
 - 토지이용 + 등기부 + 통계 + 크롤링 등 기존 라우트 모두 유지
 """
-from flask import Flask, request, jsonify, send_file, send_from_directory, make_response
+from flask import (Flask, request, jsonify, send_file, send_from_directory,
+                   make_response, redirect)
 from flask_cors import CORS
 from flask_caching import Cache
 from flask_compress import Compress
@@ -74,16 +75,50 @@ def _vworld_key():
     return ''
 
 
+def _keys():
+    """나머지 인증키 — `gdsp_keys.json` 한 곳에서 읽는다. (2026-09-25)
+
+    _vworld_key() 와 같은 이유다. **이 저장소는 공개다.**
+    예전에는 카카오·흙토람·건축물대장·국토지리원·지질도 키가 코드에 박혀 있었다.
+
+    파일 (서버에만 둔다 · .gitignore · chmod 600)
+        {"kakao_rest":"", "kakao_js":"", "ecvam":"",
+         "kigam":"", "soil":"", "building":"", "ngii":""}
+
+    못 찾으면 환경변수로 대신한다: GDSP_KAKAO_REST 처럼 이름 앞에 GDSP_ 를 붙인다.
+    """
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        'gdsp_keys.json')
+    data = {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f) or {}
+    except Exception:
+        logger.warning('[KEYS] gdsp_keys.json 을 못 읽었습니다. '
+                       '해당 기능이 동작하지 않습니다.')
+
+    def get(name):
+        v = (data.get(name) or '').strip()
+        if v:
+            return v
+        return (os.environ.get('GDSP_' + name.upper()) or '').strip()
+    return get
+
+
+_K = _keys()
+
 VWORLD_KEY = _vworld_key()
 VWORLD_DOMAIN = "168-107-15-68.nip.io"
-KAKAO_APP_KEY = "c670e0bc85874ef6267220f09882b379"  # REST API 키 (JS키 0f432d...와 다름!)
+KAKAO_APP_KEY = _K('kakao_rest')   # REST API 키 (JS키와 다름!)
+KAKAO_JS_KEY = _K('kakao_js')      # 화면에서 지도 SDK 부를 때
+ECVAM_KEY = _K('ecvam')            # 국토환경성평가 보기 SDK
 
 # ── KIGAM 수치지질도 ──────────────────────────────────────────────
-KIGAM_KEY = "mzt5lyC51EuMLE1FlKz1Xvk7inmlKd"
+KIGAM_KEY = _K('kigam')
 
 # ── 흙토람(농진청) 토양특성 = 토심 ────────────────────────────────
 # ★ http 전용(https는 Forbidden). PNU_CD 19자리로 조회. 유효토심 Vldsoildep_Cd(01~04)
-SOIL_KEY = "09b819905e0a70316749fb91c03a216633ad3e75196a6aa25e6a9f273d9116f8"
+SOIL_KEY = _K('soil')
 # 유효토심코드 → 한글(흙토람 4등급과 동일)
 SOIL_DEPTH_NAME = {'01':'매우얕음(0~25cm)','02':'얕음(25~50cm)','03':'보통(50~100cm)','04':'깊음(100cm이상)'}
 
@@ -406,7 +441,7 @@ def classify_moam(code, rock=''):
     return {'score':0,'name':'퇴적암(이암·석회암·사암 등)'}
 
 
-BUILDING_KEY = "09b819905e0a70316749fb91c03a216633ad3e75196a6aa25e6a9f273d9116f8"  # 국토부 건축물대장
+BUILDING_KEY = _K('building')   # 국토부 건축물대장 (gdsp_keys.json)
 _WGS84_TO_TM5186 = Transformer.from_crs("EPSG:4326", "EPSG:5186", always_xy=True)
 _TM5186_TO_WGS84 = Transformer.from_crs("EPSG:5186", "EPSG:4326", always_xy=True)
 
@@ -2337,6 +2372,34 @@ def vworld_key_endpoint():
 def kakao_key_endpoint():
     return jsonify({"key": KAKAO_APP_KEY})
 
+
+# ── 화면이 키 없이 SDK 를 부르게 하는 창구 (2026-09-25) ──────────────
+#
+#   <script src="https://dapi.kakao.com/...?appkey=키"> 처럼 태그에 키를 박으면
+#   공개 저장소와 소스보기에 그대로 남는다.
+#   대신 <script src="/api/kakao/sdk.js"> 로 부르면 여기서 진짜 주소로 돌려보낸다.
+#   브라우저가 따라가면서 Referer 는 우리 도메인 그대로라 카카오 도메인 검사도 통과한다.
+
+@app.route('/api/kakao/sdk.js')
+def kakao_sdk_redirect():
+    if not KAKAO_JS_KEY:
+        return "console.error('카카오 JS 키가 없습니다 (gdsp_keys.json)');", 200, \
+               {'Content-Type': 'application/javascript; charset=utf-8'}
+    q = 'appkey=%s&libraries=%s' % (
+        KAKAO_JS_KEY, request.args.get('libraries', 'services'))
+    if request.args.get('autoload'):          # 화면에서 직접 초기화하는 경우
+        q += '&autoload=' + request.args.get('autoload')
+    return redirect('https://dapi.kakao.com/v2/maps/sdk.js?' + q, code=302)
+
+
+@app.route('/api/ecvam/sdk.js')
+def ecvam_sdk_redirect():
+    if not ECVAM_KEY:
+        return "console.error('EcVAM 키가 없습니다 (gdsp_keys.json)');", 200, \
+               {'Content-Type': 'application/javascript; charset=utf-8'}
+    return redirect('https://ecvam.neins.go.kr/apiConfirm.do?APIKEY=%s' % ECVAM_KEY,
+                    code=302)
+
 @app.route('/api/building/key')
 def building_key_endpoint():
     return jsonify({"key": BUILDING_KEY})
@@ -2933,7 +2996,7 @@ def forest_parse():
 #   TileMatrixSet=NGIS_AIR (EPSG:5179, origin -200000/4000000), 레이어 mapprime:air_{연도}
 #   연도: 2011~2024 (전국 공통)
 # ============================================================
-NGII_KEY = "1FF267EF92D38E0F472E32DB6DB7A1A5B92F185F1D"
+NGII_KEY = _K('ngii')   # 국토지리정보원 (gdsp_keys.json)
 NGII_AIR_WMTS = "https://map.ngii.go.kr/airmapprime/map/wmts"
 NGII_YEAR_API = "https://map.ngii.go.kr/openapi/AirPhotoYearList.do"
 

@@ -15,7 +15,7 @@
        → map.html과 동일한 래스터 방식만 사용 → 로컬(file://)에서도 지도 정상 표시. -->
 
   <script type="text/javascript"
-    src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
+    src="/api/kakao/sdk.js?libraries=services"></script>
   <link
     href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Orbitron:wght@700;900&display=swap"
     rel="stylesheet">
@@ -7751,8 +7751,8 @@
     }
 
     // ⭐ 카카오 REST API 키 서버에서 자동 로드 (모든 PC에서 설정 없이 작동)
-    if(localStorage.getItem('gdsp_kakao')==='0f432d6e8470eed32f947e3c7db146b9'){localStorage.setItem('gdsp_kakao','c670e0bc85874ef6267220f09882b379');}
-    var KAKAO_FALLBACK_KEY = 'c670e0bc85874ef6267220f09882b379'; // REST 키
+    /* 예전에 잘못 저장된 값이 있을 수 있어 저장분을 쓰지 않는다 */
+    var KAKAO_FALLBACK_KEY = '';   // 키를 파일에 두지 않는다 // REST 키
     function ndGetKakaoKey(cb) {
       var saved = localStorage.getItem('gdsp_kakao');
       if (saved) { cb(saved); return; }

@@ -8,6 +8,7 @@ gdsp_licenses.json     # 발급한 락키 목록  ← 고객 정보
 gdsp_licenses.json.tmp
 gdsp_lic_secret.txt    # 락키 응답 서명용 비밀값
 gdsp_vworld_key.txt    # VWorld 인증키 (6개월마다 바뀜 · 여기 한 곳만 고치면 됨)
+gdsp_keys.json         # 나머지 인증키 모음 (카카오·EcVAM·흙토람·건축물대장·국토지리원·지질도)
 
 # ── 파이썬 ──
 __pycache__/

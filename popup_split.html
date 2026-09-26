@@ -250,7 +250,7 @@
 </style>
 <!-- 지적 기능용: proj4(좌표변환) + 카카오(주소↔좌표). 서버에서 열 때만 동작 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
+<script src="/api/kakao/sdk.js?libraries=services"></script>
 </head>
 <body>
 
@@ -435,7 +435,9 @@
         <div class="tool-ic" id="spBtnDraw" onclick="splitStartDraw()" title="점 찍어 자유롭게 분할선 그리기 (Shift=수직/수평)"><span class="ti-emo">✏️</span><span class="ti-nm">선 그리기</span></div>
         <div class="tool-ic" id="spBtnEdge" onclick="splitStartEdge()" title="경계선에서 일정 거리 평행선 (도로폭)"><span class="ti-emo">📏</span><span class="ti-nm">거리·오프셋</span></div>
         <div class="tool-ic" id="spBtnTarget" onclick="splitStartTarget()" title="목표 면적이 되도록 선을 자동 이동"><span class="ti-emo">🎯</span><span class="ti-nm">면적 맞춤</span></div>
-        <div class="tool-ic warn" id="spBtnCorner" onclick="splitStartCorner()" title="모서리에 삼각형 가각 절취"><span class="ti-emo">📐</span><span class="ti-nm">가각 따기</span></div>
+        <div class="tool-ic warn" id="spBtnCorner" onclick="splitStartCorner()" title="꺾인 꼭짓점을 대각선으로 절취 (면적은 조각에 포함)"><span class="ti-emo">📐</span><span class="ti-nm">가각 따기</span></div>
+        <div class="tool-ic" id="spBtnMove" onclick="splitStartMove()" title="고른 선을 상하좌우로 조금씩 밀면서 면적 맞추기"><span class="ti-emo">✥</span><span class="ti-nm">분할 모드</span></div>
+        <div class="tool-ic" id="spBtnRotate" onclick="splitStartRotate()" title="한쪽 꼭짓점을 기준으로 선을 돌리면서 면적 맞추기"><span class="ti-emo">🔄</span><span class="ti-nm">회전 모드</span></div>
         <div class="tool-ic" id="spBtnText" onclick="splitStartText()" title="도로 등 글자 표기"><span class="ti-emo">🔤</span><span class="ti-nm">글자 쓰기</span></div>
         <div class="tool-ic" id="spBtnMeasure" onclick="splitStartMeasure()" title="두 점 사이 거리 재기"><span class="ti-emo">📊</span><span class="ti-nm">거리 재기</span></div>
       </div>
@@ -460,6 +462,16 @@
         </span>
       </div>
 
+      <!-- 화살표로 선 밀기 — 선을 고르고 ←→↑↓ 누르면 그만큼 움직인다.
+           반 자르기·면적 맞추기를 눈으로 보면서 하기 위한 것. -->
+      <div style="display:flex;gap:7px;align-items:center;margin:8px 0 2px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--tx2);white-space:nowrap">화살표 이동</span>
+        <input type="number" id="spNudge" value="0.5" min="0.01" step="0.1"
+               style="width:60px" title="←→↑↓ 한 번에 움직일 거리">
+        <span style="font-size:11px;color:var(--tx2)">m</span>
+        <span style="font-size:10px;color:var(--tx3)">선을 고르고 ← → ↑ ↓ (Shift = 10배)</span>
+      </div>
+
       <!-- B: 오프셋 패널 -->
       <div id="spEdgePanel" style="display:none;margin:4px 0 10px;padding:9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px">
         <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;line-height:1.5">① 기준 <b>필지 경계선</b>을 클릭 (<b id="spEdgeCnt" style="color:#38bdf8">0</b>개 · 여러 개=같은 거리 일괄 · 재클릭=해제)</div>
@@ -471,6 +483,13 @@
             <span style="font-size:11px;color:var(--tx2);white-space:nowrap">거리</span>
             <input type="number" id="spDist" value="4" min="0.1" step="0.5" style="flex:1;min-width:0">
             <span style="font-size:11px;color:var(--tx2)">m</span>
+          </div>
+          <label style="font-size:11px;color:var(--tx2);display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:6px">
+            <input type="checkbox" id="spChainJoin" checked onchange="render()">
+            <span>맞닿은 선은 ㄱ자로 이어붙이기</span>
+          </label>
+          <div style="font-size:10px;color:var(--tx3);margin-bottom:6px;line-height:1.4">
+            켜면 꺾이는 데가 깔끔하게 만나요(도로용).<br>끄면 고른 선을 <b>따로따로</b> 밀어요(각각 지울 수 있어요).
           </div>
           <button class="btn btn-primary" onclick="splitEdgeConfirm()" style="margin-bottom:4px">✓ 오프셋 적용</button>
         </div>
@@ -491,13 +510,65 @@
         <button class="btn btn-ghost" onclick="splitCancelMode()">취소 (ESC)</button>
       </div>
 
+      <!-- 분할 모드 패널 — 실무에서 제일 많이 쓴다 -->
+      <div id="spMovePanel" style="display:none;margin:4px 0 10px;padding:9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px">
+        <div style="font-size:11px;color:var(--tx2);margin-bottom:7px;line-height:1.5">
+          밀 선: <b id="spMoveWhich" style="color:#38bdf8">선을 클릭하세요</b>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--tx2);white-space:nowrap">이동량</span>
+          <input type="number" id="spNudge2" value="0.5" min="0.01" step="0.1" style="flex:1;min-width:0"
+                 oninput="_spSyncNudge(this.value)">
+          <span style="font-size:11px;color:var(--tx2)">m</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-width:180px;margin:0 auto 8px">
+          <span></span>
+          <button class="btn g" onclick="_spNudgeBtn(0,1)" style="height:34px;font-size:16px">↑</button>
+          <span></span>
+          <button class="btn g" onclick="_spNudgeBtn(-1,0)" style="height:34px;font-size:16px">←</button>
+          <button class="btn g" onclick="splitUndo()" style="height:34px;font-size:13px" title="되돌리기">↩</button>
+          <button class="btn g" onclick="_spNudgeBtn(1,0)" style="height:34px;font-size:16px">→</button>
+          <span></span>
+          <button class="btn g" onclick="_spNudgeBtn(0,-1)" style="height:34px;font-size:16px">↓</button>
+          <span></span>
+        </div>
+        <div style="font-size:10px;color:var(--tx3);line-height:1.5;margin-bottom:6px">
+          키보드 <b>← → ↑ ↓</b> 도 됩니다 (Shift = 10배).<br>
+          움직이는 동안 <b style="color:#4ade80">면적이 바로 바뀝니다</b> — 오른쪽 표를 보세요.
+        </div>
+        <button class="btn btn-ghost" onclick="splitCancelMode()">끝내기 (ESC)</button>
+      </div>
+
+      <!-- 회전 모드 패널 -->
+      <div id="spRotPanel" style="display:none;margin:4px 0 10px;padding:9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px">
+        <div style="font-size:11px;color:var(--tx2);margin-bottom:7px;line-height:1.5">
+          ① 돌릴 선 클릭 → ② <b>기준점</b> 클릭<br>
+          <b id="spRotWhich" style="color:#38bdf8">선을 클릭하세요</b>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--tx2);white-space:nowrap">한 번에</span>
+          <input type="number" id="spRotStep" value="1" min="0.1" step="0.5" style="flex:1;min-width:0">
+          <span style="font-size:11px;color:var(--tx2)">도</span>
+        </div>
+        <div class="row" style="margin-bottom:8px">
+          <button class="btn g" onclick="_spRotBtn(1)" style="height:34px">↺ 왼쪽</button>
+          <button class="btn g" onclick="_spRotBtn(-1)" style="height:34px">↻ 오른쪽</button>
+        </div>
+        <div style="font-size:10px;color:var(--tx3);line-height:1.5;margin-bottom:6px">
+          한쪽 꼭짓점이 <b>이미 정해졌을 때</b> 씁니다.<br>
+          그 점을 기준점으로 찍고 돌리면 면적이 맞아 들어갑니다.
+        </div>
+        <button class="btn btn-ghost" onclick="splitCancelMode()">끝내기 (ESC)</button>
+      </div>
+
       <!-- 가각 패널 -->
       <div id="spCornerPanel" style="display:none;margin:4px 0 10px;padding:9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px">
-        <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;line-height:1.5">코너: <b id="spCornerAt" style="color:#38bdf8">두 분할선이 만나는 모서리를 클릭</b></div>
+        <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;line-height:1.5">코너: <b id="spCornerAt" style="color:#38bdf8">ㄱ자로 꺾인 꼭짓점을 클릭</b></div>
         <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
           <input type="number" id="spD1" value="3" min="0.1" step="0.5" style="flex:1;min-width:0"><span style="font-size:11px;color:var(--tx2)">m ×</span>
           <input type="number" id="spD2" value="3" min="0.1" step="0.5" style="flex:1;min-width:0"><span style="font-size:11px;color:var(--tx2)">m</span>
         </div>
+        <div id="spCornerHalf" style="font-size:10px;color:var(--tx3);margin-bottom:6px;line-height:1.4">가각은 보통 도로 폭의 반이에요 (8m 도로 → 4m)</div>
         <button class="btn btn-primary" onclick="splitCornerApply()" style="margin-bottom:4px">📐 가각 적용</button>
         <button class="btn btn-ghost" onclick="splitCancelMode()">취소 (ESC)</button>
       </div>
@@ -5515,7 +5586,11 @@ function cadHandleClick(worldPt){
   if(!ll){ toast('좌표 변환 실패','err'); return true; }
   var lng=ll[0], lat=ll[1];
   console.log('[지적선택] 클릭 → lng',lng.toFixed(6),'lat',lat.toFixed(6));
-  if(!CAD.geocoder){ console.log('[지적선택] geocoder 준비 대기'); _cadKakaoReady(function(ok){ if(ok) _cadFetchParcel(lng,lat); else toast('카카오 로드 실패 — 서버에서 열어주세요','err'); }); return true; }
+  /* ★ 카카오 없이 간다 (2026-09-25)
+     예전에는 카카오로 법정동코드+지번을 받아 PNU 를 만든 뒤 /api/wfs 를 불렀다.
+     그런데 /api/wfs 는 **좌표만 줘도** 그 자리 필지를 찾아 주고, 응답에 PNU 가 들어 있다.
+     카카오 키가 없으면 "카카오 로드 실패" 만 뜨고 필지 선택이 아예 안 됐다.
+     (판매판은 고객이 카카오 키를 안 넣을 수도 있다) */
   _cadFetchParcel(lng,lat);
   return true;
 }
@@ -5529,33 +5604,23 @@ function _cadBuildPnu(bcode, addr){
   return b+g+bun+ji;
 }
 function _cadFetchParcel(lng,lat){
-  CAD.geocoder.coord2RegionCode(lng,lat,function(rr,rs){
-    if(rs!==kakao.maps.services.Status.OK||!rr.length){ console.log('[지적선택] coord2RegionCode 실패',rs); toast('주소 조회 실패','err'); return; }
-    var bt=rr.find(function(r){return r.region_type==='B';}); if(!bt){ console.log('[지적선택] 법정동(B) 코드 없음'); toast('법정동코드 없음','err'); return; }
-    var bcode=bt.code;
-    console.log('[지적선택] 법정동코드',bcode);
-    CAD.geocoder.coord2Address(lng,lat,function(ar,as){
-      if(as!==kakao.maps.services.Status.OK||!ar.length||!ar[0].address){ console.log('[지적선택] coord2Address 실패',as); toast('지번 조회 실패','err'); return; }
-      var addr=ar[0].address;
-      var pnu=_cadBuildPnu(bcode, addr);
-      console.log('[지적선택] PNU',pnu,'/ 지번',addr.address_name);
-      fetch('/api/wfs?pnu='+pnu+'&lng='+lng+'&lat='+lat).then(function(r){return r.json();}).then(function(data){
-        var fs=(data&&data.response&&data.response.result&&data.response.result.featureCollection&&data.response.result.featureCollection.features)||(data&&data.features)||[];
-        console.log('[지적선택] /api/wfs 응답 필지수',fs.length);
-        if(!fs.length){ toast('필지 정보를 못 찾았어요 (PNU: '+pnu+')','err'); return; }
-        var f=fs[0], p=f.properties||{}, geom=f.geometry, thisPnu=p.pnu||pnu;
-        var idx=CAD.parcels.findIndex(function(sp){return sp.pnu===thisPnu;});
-        if(idx>=0){ CAD.parcels.splice(idx,1); toast('필지 해제: '+(p.jibun||thisPnu),'ok'); }
-        else {
-          var rings5186=_cadGeomTo5186(geom);
-          console.log('[지적선택] 링 변환 개수',rings5186.length);
-          CAD.parcels.push({pnu:thisPnu, jibun:p.jibun||(addr.address_name||'').split(' ').pop()||'', lng:lng, lat:lat, geom:geom, rings:rings5186});
-          toast('필지 추가: '+(p.jibun||'선택됨')+' (총 '+CAD.parcels.length+'개)','ok');
-        }
-        _cadUpdateBar(); render();
-      }).catch(function(e){ console.log('[지적선택] /api/wfs 예외',e); toast('필지 조회 실패','err'); });
-    });
-  });
+  /* 좌표만 보낸다. 서버가 그 자리 필지를 찾아 주고 PNU 도 같이 온다. */
+  fetch('/api/wfs?lng='+lng+'&lat='+lat).then(function(r){return r.json();}).then(function(data){
+    var fs=(data&&data.response&&data.response.result&&data.response.result.featureCollection&&data.response.result.featureCollection.features)||(data&&data.features)||[];
+    console.log('[지적선택] /api/wfs 응답 필지수',fs.length);
+    if(!fs.length){ toast('그 자리에 필지가 없어요 — 지적선 안쪽을 클릭해 주세요','err'); return; }
+    var f=fs[0], p=f.properties||{}, geom=f.geometry;
+    var thisPnu=p.pnu||p.PNU||(String(lng.toFixed(6))+','+String(lat.toFixed(6)));
+    var idx=CAD.parcels.findIndex(function(sp){return sp.pnu===thisPnu;});
+    if(idx>=0){ CAD.parcels.splice(idx,1); toast('필지 해제: '+(p.jibun||thisPnu),'ok'); }
+    else {
+      var rings5186=_cadGeomTo5186(geom);
+      console.log('[지적선택] 링 변환 개수',rings5186.length);
+      CAD.parcels.push({pnu:thisPnu, jibun:p.jibun||'', lng:lng, lat:lat, geom:geom, rings:rings5186});
+      toast('필지 추가: '+(p.jibun||'선택됨')+' (총 '+CAD.parcels.length+'개)','ok');
+    }
+    _cadUpdateBar(); render();
+  }).catch(function(e){ console.log('[지적선택] /api/wfs 예외',e); toast('필지 조회 실패 — 서버가 켜져 있는지 확인해 주세요','err'); });
 }
 /* GeoJSON 경위도 geometry → 5186 링 배열 [[{x,y}...], ...] */
 function _cadGeomTo5186(geom){
@@ -6134,7 +6199,8 @@ var SPLIT = {
   mode: null,       // 'draw'|'edge'|'edgeDir'|'target'|'corner'
   draw: null,       // 그리는 중 점들
   ghost: null,      // 그리기 고스트(스냅 반영)
-  snapKind: null,   // 'v'|'e'|null
+  snapKind: null,   // 'v'꼭짓점 'm'중간점 'p'직교 'e'선위 'o'직교스냅
+  snapLabel: null,  // 화면에 띄울 말 ('중간점' 등)
   sel: -1,          // 선택된 분할선
   hover: -1,
   drag: null,       // {idx, start:{x,y}, orig:[pts]}
@@ -6291,13 +6357,57 @@ function _spExtendEnds(pts, len){
   p[n-1]={x:e.x+(e.x-c.x)/L2*len, y:e.y+(e.y-c.y)/L2*len};
   return p;
 }
-/* 직교 스냅: 기준점 a에서 커서 w를 수평/수직/45도로 (Shift) */
-function _spOrtho(a,w){
-  var dx=w.x-a.x, dy=w.y-a.y, adx=Math.abs(dx), ady=Math.abs(dy);
+/* 고른 선의 방향을 가져온다 (a 에서 가장 가까운 구간 기준).
+ * 대각선 도로에 직각으로 선을 그을 때 쓴다. (2026-09-25) */
+function _spRefDir(a){
+  if(SPLIT.sel<0 || !SPLIT.lines[SPLIT.sel]) return null;
+  var pts=SPLIT.lines[SPLIT.sel].pts, best=null, bd=1e18;
+  for(var i=0;i<pts.length-1;i++){
+    var d=_spDistSeg(a, pts[i], pts[i+1]);
+    if(d<bd){ bd=d; best=[pts[i],pts[i+1]]; }
+  }
+  if(!best) return null;
+  var dx=best[1].x-best[0].x, dy=best[1].y-best[0].y, L=Math.hypot(dx,dy);
+  if(L<1e-9) return null;
+  return {x:dx/L, y:dy/L};
+}
+/* 직교 스냅: 기준점 a 에서 커서 w 를 45도 단위로.
+ *
+ *   ref 가 없으면  — 화면 기준 수평/수직/45도 (예전 그대로)
+ *   ref 가 있으면  — **고른 선을 0도로 보고** 45도 단위. 즉 그 선에 나란히·직각.
+ *                   대각선 도로에 직각으로 자를 때 이게 없으면 손으로 못 맞춘다.
+ */
+function _spOrtho(a,w,ref){
+  var dx=w.x-a.x, dy=w.y-a.y;
+  if(ref){
+    var base=Math.atan2(ref.y,ref.x);
+    var step=Math.PI/4;
+    var ang=Math.round((Math.atan2(dy,dx)-base)/step)*step + base;
+    var ux=Math.cos(ang), uy=Math.sin(ang);
+    var t=dx*ux+dy*uy;                             /* 커서를 그 방향에 투영 */
+    return {x:a.x+ux*t, y:a.y+uy*t};
+  }
+  var adx=Math.abs(dx), ady=Math.abs(dy);
   if(adx>ady*2.414) return {x:w.x, y:a.y};        /* 수평 (±22.5°) */
   if(ady>adx*2.414) return {x:a.x, y:w.y};        /* 수직 */
   var d=(adx+ady)/2;                               /* 45도 */
   return {x:a.x+(dx<0?-d:d), y:a.y+(dy<0?-d:d)};
+}
+/* 오프셋에 쓸 묶음을 정한다.
+ *
+ *   ㄱ자 도로는 맞닿은 선을 이어붙여야 꺾이는 데가 깔끔하다(miter).
+ *   그런데 그냥 두 선을 **따로** 밀고 싶을 때도 있다. 예전에는 늘 이어붙여서
+ *   두 선이 한 선처럼 계속 연장되고 **삭제도 같이 지워졌다** (2026-09-25 수정).
+ *   그래서 "맞닿은 선은 ㄱ자로 이어붙이기" 를 끄면 하나씩 따로 민다.
+ */
+function _spOffsetGroups(sels){
+  var box=document.getElementById('spChainJoin');
+  if(box && !box.checked){
+    return sels.map(function(s){
+      return [{x:s.a.x,y:s.a.y},{x:s.b.x,y:s.b.y}];
+    });
+  }
+  return _spChains(sels);
 }
 /* 선택 엣지들을 끝점 공유 기준으로 연속 체인으로 묶기 */
 function _spChains(sels){
@@ -6437,11 +6547,11 @@ function _spBuildTableRows(){
     +'<td style="text-align:right;padding:4px 2px;border-top:1px solid var(--line);color:var(--tx3)">'+_spN(sumCad)+'</td>'
     +'<td style="text-align:right;padding:4px 2px;border-top:1px solid var(--line);color:#4ade80;font-weight:700">'+_spN(sumCorr)+'</td>'
     +'<td style="text-align:right;padding:4px 2px;border-top:1px solid var(--line);color:var(--tx2)">'+_spPy(sumCorr)+'</td></tr>';
+  /* 가각은 면적을 따로 내지 않는다 — 이미 조각 면적에 들어가 있다.
+     무엇을 했는지만 남긴다. 되돌리기는 Ctrl+Z. */
   SPLIT.corners.forEach(function(c,i){
-    h+='<tr><td style="padding:3px 2px;color:#34d399">가각'+(i+1)+' ('+c.d1+'×'+c.d2+'m) <span onclick="splitDeleteCorner('+i+')" style="cursor:pointer;color:var(--tx3)">🗑</span></td>'
-      +'<td style="text-align:right;padding:3px 2px;color:var(--tx3)">'+_spN(c.areaCad)+'</td>'
-      +'<td style="text-align:right;padding:3px 2px;color:#34d399">'+_spN(c.areaCorr)+'</td>'
-      +'<td style="text-align:right;padding:3px 2px;color:var(--tx2)">'+_spPy(c.areaCorr)+'</td></tr>';
+    h+='<tr><td colspan="4" style="padding:2px 2px;color:#34d399;font-size:10px">'
+      +'📐 가각'+(i+1)+' '+c.d1+'×'+c.d2+'m — 면적은 조각에 포함됨</td></tr>';
   });
   return h;
 }
@@ -6453,11 +6563,9 @@ function splitRenderTable(){
   _spRenderTextList();
 }
 function splitDeleteCorner(i){
-  if(i<0||i>=SPLIT.corners.length) return;
-  _spUndoPush();
-  SPLIT.corners.splice(i,1);
-  splitRenderTable(); render();
-  toast('가각 삭제됨 (Ctrl+Z로 되살리기)','ok');
+  /* 가각은 이제 분할선 자체를 고친다. 기록만 지우면 선은 그대로라 뜻이 안 맞는다.
+     되돌리기는 Ctrl+Z 로만 한다. */
+  toast('가각은 Ctrl+Z 로 되돌려 주세요','err');
 }
 function _spRenderLineList(){
   var el=document.getElementById('spLineList'); if(!el) return;
@@ -6500,6 +6608,44 @@ function splitDeleteText(i){
   toast('글자 삭제됨','ok');
 }
 function splitSelectLine(i){ SPLIT.sel=(SPLIT.sel===i?-1:i); _spRenderLineList(); render(); }
+
+/* ── 화살표로 분할선 밀기 (2026-09-25) ───────────────────────────
+ *
+ *   영대님 설명: "1m·0.5m 이런 식으로 숫자를 입력해서 좌우 화살표로
+ *   딱딱딱딱 누르면 그쪽으로 이동. 그럼 실시간 면적이 나오는 거지."
+ *
+ *   반 자르기·30평/30평/40평 맞추기를 **눈으로 보면서** 하기 위한 것이다.
+ *   선 전체를 그 방향으로 그냥 밀기만 한다(평행이동). 그래야 예측이 된다.
+ *   Shift 를 같이 누르면 10배. 한 번 누를 때마다 면적표가 다시 계산된다.
+ */
+var _spNudgeT = null;
+function _spNudgeStep(){
+  var v = parseFloat((document.getElementById('spNudge')||{}).value);
+  return (v && v > 0) ? v : 0.5;
+}
+function _spNudge(dx, dy){
+  if(SPLIT.sel < 0 || !SPLIT.lines[SPLIT.sel]) return false;
+  /* 연속으로 누르면 실행취소가 수십 개 쌓인다 → 0.6초 안에 이어 누르면 한 번으로 묶는다 */
+  var now = Date.now();
+  if(!_spNudgeT || now - _spNudgeT > 600) _spUndoPush();
+  _spNudgeT = now;
+
+  SPLIT.lines[SPLIT.sel].pts.forEach(function(p){ p.x += dx; p.y += dy; });
+  splitRecompute();
+  render();
+  return true;
+}
+document.addEventListener('keydown', function(e){
+  if(SPLIT.sel < 0) return;
+  var t = e.target, tag = (t && t.tagName || '').toUpperCase();
+  if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;  /* 칸에 숫자 칠 때는 빼고 */
+  var d = _spNudgeStep() * (e.shiftKey ? 10 : 1), moved = false;
+  if(e.key === 'ArrowLeft')       moved = _spNudge(-d, 0);
+  else if(e.key === 'ArrowRight') moved = _spNudge( d, 0);
+  else if(e.key === 'ArrowUp')    moved = _spNudge( 0, d);   /* 세계좌표 Y = 북쪽 */
+  else if(e.key === 'ArrowDown')  moved = _spNudge( 0,-d);
+  if(moved) e.preventDefault();
+});
 function splitDeleteLine(i){
   if(i<0||i>=SPLIT.lines.length) return;
   _spUndoPush();
@@ -6525,7 +6671,7 @@ function _spHint(msg){
   if(msg){ el.textContent=msg; el.style.display=''; } else el.style.display='none';
 }
 function _spPanels(show){
-  ['spEdgePanel','spTargetPanel','spCornerPanel'].forEach(function(id){
+  ['spEdgePanel','spTargetPanel','spCornerPanel','spMovePanel','spRotPanel'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.style.display=(show===id)?'':'none';
   });
 }
@@ -6536,9 +6682,10 @@ function _spBtnActive(id){
   if(id){ var el2=document.getElementById(id); if(el2) el2.classList.add('active'); }
 }
 function splitCancelMode(silent){
-  SPLIT.mode=null; SPLIT.draw=null; SPLIT.ghost=null; SPLIT.snapKind=null;
+  SPLIT.mode=null; SPLIT.draw=null; SPLIT.ghost=null; SPLIT.snapKind=null; SPLIT.snapLabel=null;
   SPLIT.edgeSel=[]; SPLIT.edgeHover=null; SPLIT.targetPt=null; SPLIT.cornerPick=null;
   SPLIT.edgeDir=null; SPLIT.edgeGhost=null; SPLIT.edgeStage=1;
+  SPLIT.rotPivot=null; SPLIT.rotLabel=null;
   _spPanels(null); _spHint(null); _spBtnActive(null);
   var tr=document.getElementById('spTargetInputRow'); if(tr) tr.style.display='none';
   cv.style.cursor='grab';
@@ -6557,7 +6704,8 @@ function splitStartDraw(){
   splitCancelMode(true);
   SPLIT.mode='draw'; SPLIT.draw=[];
   _spBtnActive('spBtnDraw');
-  _spHint('✏️ 클릭=점 추가 · 우클릭=점 취소 · 더블클릭=완료 (꼭짓점·경계선에 자동 스냅) · ESC=취소');
+  _spHint('✏️ 클릭=점 추가 · 우클릭=점 취소 · 더블클릭=완료 · 자동 스냅(꼭짓점·경계선) · '
+        + 'Shift=직각 (선을 골라두면 그 선 기준 직각) · ESC=취소');
   cv.style.cursor='crosshair';
   render();
 }
@@ -6631,7 +6779,7 @@ function splitEdgeConfirm(){
   if(!d||d<=0){ toast('거리를 입력하세요 (m)','err'); return; }
   var w=SPLIT.edgeDir;
   _spUndoPush();
-  var chains=_spChains(SPLIT.edgeSel);
+  var chains=_spOffsetGroups(SPLIT.edgeSel);
   var ext=Math.min(_spExtentDiag()*0.35, _spExtentDiag());  /* 자투리 최소화: 필지 대각의 35%만 연장 */
   var added=0;
   chains.forEach(function(ch){
@@ -6747,72 +6895,308 @@ function splitFitArea(){
   toast('🎯 면적 맞춤 완료: '+_spN(fa)+'㎡ (목표 '+_spN(goal)+'㎡ · 오차 '+_spN(Math.abs(fa-goal))+'㎡)','ok');
 }
 
+/* ── 분할 모드 · 회전 모드 (2026-09-26) ─────────────────────────
+ *
+ *   영대님: "**실제로 이거랑 분할모드를 가장 많이 사용해.** 맞추기는 없거든."
+ *
+ *   분할 모드  선 고르고 → 화살표로 상하좌우 → 실시간 면적
+ *   회전 모드  선 고르고 → **기준점** 찍고 → 좌우로 돌리며 면적
+ *              한쪽 꼭짓점이 이미 정해졌을 때 쓴다.
+ *
+ *   면적은 움직이는 내내 갱신된다 (splitRecompute). 그게 이 두 모드의 전부다.
+ */
+function _spSyncNudge(v){                     /* 두 입력칸을 같은 값으로 */
+  var a=document.getElementById('spNudge'), b=document.getElementById('spNudge2');
+  if(a) a.value=v;
+  if(b) b.value=v;
+}
+function _spMoveWhich(){
+  var el=document.getElementById('spMoveWhich');
+  var el2=document.getElementById('spRotWhich');
+  var nm=(SPLIT.sel>=0 && SPLIT.lines[SPLIT.sel])
+         ? ((SPLIT.lines[SPLIT.sel].name||('분할선 '+(SPLIT.sel+1))))
+         : '선을 클릭하세요';
+  if(el) el.textContent=nm;
+  if(el2) el2.textContent=(SPLIT.sel<0) ? '선을 클릭하세요'
+          : (SPLIT.rotPivot ? nm+' · 기준점 정해짐 ✓' : nm+' · 기준점을 클릭하세요');
+}
+function splitStartMove(){
+  if(SPLIT.mode==='move'){ splitCancelMode(); return; }
+  if(!_spNeedParcels()) return;
+  if(!SPLIT.lines.length){ toast('먼저 분할선을 그려주세요','err'); return; }
+  var keep=SPLIT.sel;
+  splitCancelMode(true);
+  SPLIT.sel=keep;                             /* 골라둔 선은 그대로 */
+  SPLIT.mode='move';
+  _spBtnActive('spBtnMove'); _spPanels('spMovePanel');
+  _spSyncNudge((document.getElementById('spNudge')||{}).value || '0.5');
+  _spHint('✥ 선을 클릭해 고르고 → 화살표로 미세요. 면적이 실시간으로 바뀝니다. ESC=끝내기');
+  _spMoveWhich();
+  render();
+}
+function _spNudgeBtn(sx, sy){
+  if(SPLIT.sel<0){ toast('먼저 밀 선을 클릭하세요','err'); return; }
+  var d=_spNudgeStep();
+  _spNudge(sx*d, sy*d);
+}
+
+function splitStartRotate(){
+  if(SPLIT.mode==='rotate'){ splitCancelMode(); return; }
+  if(!_spNeedParcels()) return;
+  if(!SPLIT.lines.length){ toast('먼저 분할선을 그려주세요','err'); return; }
+  var keep=SPLIT.sel;
+  splitCancelMode(true);
+  SPLIT.sel=keep;
+  SPLIT.mode='rotate'; SPLIT.rotPivot=null;
+  _spBtnActive('spBtnRotate'); _spPanels('spRotPanel');
+  _spHint('🔄 선을 고르고 → 기준점을 클릭 → 좌우 버튼으로 돌리세요 (꼭짓점에 자동으로 붙습니다) · ESC=끝내기');
+  _spMoveWhich();
+  render();
+}
+function _spRotClick(w){
+  if(SPLIT.sel<0){                            /* 아직 선을 안 골랐으면 선부터 */
+    var h=_spHitLine(w);
+    if(h<0){ toast('돌릴 선을 클릭하세요','err'); return; }
+    SPLIT.sel=h; _spRenderLineList(); _spMoveWhich(); render();
+    return;
+  }
+  var sn=_spSnap(w);                          /* 꼭짓점·중간점에 붙는다 */
+  SPLIT.rotPivot = sn ? {x:sn.x, y:sn.y} : {x:w.x, y:w.y};
+  SPLIT.rotLabel = sn ? sn.label : null;
+  _spMoveWhich();
+  toast('기준점 정해짐' + (sn ? ' ('+sn.label+')' : ''), 'ok');
+  render();
+}
+var _spRotT=null;
+function _spRotBtn(sign){
+  if(SPLIT.sel<0){ toast('먼저 돌릴 선을 클릭하세요','err'); return; }
+  if(!SPLIT.rotPivot){ toast('기준점을 먼저 클릭하세요','err'); return; }
+  var deg=parseFloat((document.getElementById('spRotStep')||{}).value);
+  if(!deg||deg<=0) deg=1;
+  var now=Date.now();
+  if(!_spRotT || now-_spRotT>600) _spUndoPush();   /* 연타는 한 번으로 묶는다 */
+  _spRotT=now;
+
+  var a=sign*deg*Math.PI/180, cs=Math.cos(a), sn=Math.sin(a);
+  var P=SPLIT.rotPivot;
+  SPLIT.lines[SPLIT.sel].pts=SPLIT.lines[SPLIT.sel].pts.map(function(p){
+    var dx=p.x-P.x, dy=p.y-P.y;
+    return {x:P.x+dx*cs-dy*sn, y:P.y+dx*sn+dy*cs};
+  });
+  splitRecompute();
+  render();
+}
+
 /* 가각 (모서리 절취) */
 function splitStartCorner(){
   if(SPLIT.mode==='corner'){ splitCancelMode(); return; }
   if(!_spNeedParcels()) return;
-  if(SPLIT.lines.length<2){ toast('가각은 분할선 2개가 만나는 코너에 적용돼요 — 먼저 선 2개를 만드세요','err'); return; }
+  /* 꺾인 선이든 만나는 선이든 하나는 있어야 한다 */
+  var can=SPLIT.lines.some(function(l){ return l.pts && l.pts.length>=3; }) ||
+          SPLIT.lines.length>=2;
+  if(!can){ toast('선이 꺾이거나 두 개가 만나야 가각을 줄 수 있어요','err'); return; }
   splitCancelMode(true);
   SPLIT.mode='corner'; SPLIT.cornerPick=null;
   _spBtnActive('spBtnCorner'); _spPanels('spCornerPanel');
-  _spHint('📐 두 분할선이 만나는 코너(교차점)를 클릭 → 거리 입력 → 적용');
-  var at=document.getElementById('spCornerAt'); if(at) at.textContent='두 분할선이 만나는 모서리를 클릭';
+  _spHint('📐 선이 꺾이거나 만나는 자리를 클릭 → 마우스로 깎을 쪽 고르기 → 거리 입력 → 적용');
+  var at=document.getElementById('spCornerAt'); if(at) at.textContent='꺾이거나 만나는 자리를 클릭';
+
+  /* 가각은 거의 **도로 폭의 반**이다 (8m 도로 → 4m, 4m 도로 → 2m).
+     방금 오프셋에 쓴 도로 폭을 보고 미리 채워 둔다. 값은 사람이 바꾸면 된다. */
+  var rw=parseFloat((document.getElementById('spDist')||{}).value);
+  if(rw>0){
+    var half=Math.round(rw/2*10)/10;
+    var e1=document.getElementById('spD1'), e2=document.getElementById('spD2');
+    if(e1) e1.value=half;
+    if(e2) e2.value=half;
+    var hint=document.getElementById('spCornerHalf');
+    if(hint) hint.textContent='도로 '+rw+'m 의 반 → '+half+'m 로 채웠어요 (바꿔도 됩니다)';
+  }
   render();
 }
-function _spCornerClick(w){
-  var tol=15/S.scale, best=null;
+/* ★ 가각 = 대각선 (2026-09-25 재작업)
+ *
+ *   예전 방식(폐기): 두 선의 교차점에 **삼각형**을 그리고 면적을 따로 냈다.
+ *   실무와 다르다. 실무 가각은 **ㄱ자로 꺾인 꼭짓점을 대각선으로 잘라내는 것**이다.
+ *   삼각형이 남는 게 아니라, 대각선이 분할선의 일부가 되어 꺾인 선만 남고
+ *   **면적은 인접 조각에 자연스럽게 합쳐진다.** (별도 산정이 아니다)
+ *
+ *   그래서 하는 일은 하나뿐이다 —
+ *       폴리라인의 꼭짓점 1개  →  대각선 두 점(Q1, Q2)으로 교체
+ *   그러면 _spSplitPoly 가 그대로 잘라 주고 면적도 저절로 맞는다.
+ */
+/* ── 가각: 깎을 수 있는 자리 찾기 (2026-09-26 다시 만듦) ───────────
+ *
+ *   영대님: "그냥 **이 선 저 선 찍고** … 십자 모양이면 가각 선택이 4군데,
+ *            T자 모양이면 2군데. 할 수 있는 곳을 내가 마우스로 선택."
+ *
+ *   그래서 **꺾인 꼭짓점만** 받던 것을 넓힌다.
+ *       ㄱ자 꼭짓점 → 깎을 곳 1군데
+ *       T자        → 2군데
+ *       십자       → 4군데
+ *   마우스를 움직이면 가장 가까운 곳이 미리보기로 뜨고, 누르면 그걸로 정해진다.
+ *
+ *   깎는 방법은 그대로 **대각선**이다 (삼각형 아님).
+ *       고른 쪽을 이루는 두 반직선만 남기고, Q1·Q2 를 잇는다.
+ *       반대쪽으로 삐져나온 여유분(오프셋 연장분)은 버린다.
+ */
+function _spCornerSpots(w){
+  var tol=18/S.scale, spots=[];
+
+  /* ① 한 선이 꺾인 꼭짓점 — 깎을 곳 1군데 */
+  SPLIT.lines.forEach(function(ln, li){
+    var p=ln.pts;
+    for(var k=1;k<p.length-1;k++){
+      if(Math.hypot(w.x-p[k].x, w.y-p[k].y) > tol) continue;
+      spots.push({type:'bend', P:{x:p[k].x,y:p[k].y},
+                  arms:[{li:li, from:k, to:k-1}, {li:li, from:k, to:k+1}]});
+    }
+  });
+
+  /* ② 두 선이 만나는 곳 — 사방으로 뻗은 팔을 모은다 */
   for(var i=0;i<SPLIT.lines.length;i++){
     for(var j=i+1;j<SPLIT.lines.length;j++){
       var A=SPLIT.lines[i].pts, B=SPLIT.lines[j].pts;
       for(var ai=0;ai<A.length-1;ai++){
         for(var bi=0;bi<B.length-1;bi++){
-          var h=_spSegX(A[ai],A[ai+1],B[bi],B[bi+1]);
-          if(!h) continue;
-          var d=Math.hypot(w.x-h.x,w.y-h.y);
-          if(d<tol && (!best||d<best.d)){
-            var La=Math.hypot(A[ai+1].x-A[ai].x,A[ai+1].y-A[ai].y)||1;
-            var Lb=Math.hypot(B[bi+1].x-B[bi].x,B[bi+1].y-B[bi].y)||1;
-            best={d:d, P:{x:h.x,y:h.y},
-              da:{x:(A[ai+1].x-A[ai].x)/La, y:(A[ai+1].y-A[ai].y)/La},
-              db:{x:(B[bi+1].x-B[bi].x)/Lb, y:(B[bi+1].y-B[bi].y)/Lb}};
-          }
+          var X=_spSegX(A[ai],A[ai+1],B[bi],B[bi+1]);
+          if(!X) continue;
+          if(Math.hypot(w.x-X.x, w.y-X.y) > tol) continue;
+          var arms=[];
+          [[i,ai],[i,ai+1],[j,bi],[j,bi+1]].forEach(function(t){
+            var pts=SPLIT.lines[t[0]].pts, e=pts[t[1]];
+            var L=Math.hypot(e.x-X.x, e.y-X.y);
+            if(L>0.05) arms.push({li:t[0], endIdx:t[1],
+                                  u:{x:(e.x-X.x)/L, y:(e.y-X.y)/L}, len:L});
+          });
+          if(arms.length>=2) spots.push({type:'cross', P:{x:X.x,y:X.y}, arms:arms});
         }
       }
     }
   }
-  if(!best){ toast('근처에 분할선 교차점이 없어요 — 교차점을 클릭하세요','err'); return; }
-  best.click={x:w.x,y:w.y};
-  SPLIT.cornerPick=best;
+  return spots;
+}
+/* 고른 자리에서 **깎을 수 있는 모서리 목록**을 만든다 (팔 두 개씩 짝지어) */
+function _spCornerCandidates(spot){
+  var out=[];
+  if(spot.type==='bend'){
+    var p=SPLIT.lines[spot.arms[0].li].pts;
+    var a=p[spot.arms[0].to], b=p[spot.arms[1].to];
+    out.push({a:_spUnit(spot.P,a), b:_spUnit(spot.P,b), bend:true});
+    return out;
+  }
+  for(var i=0;i<spot.arms.length;i++){
+    for(var j=i+1;j<spot.arms.length;j++){
+      var u=spot.arms[i].u, v=spot.arms[j].u;
+      /* 거의 일직선(180도)인 짝은 모서리가 아니다 */
+      if(u.x*v.x + u.y*v.y < -0.97) continue;
+      out.push({a:spot.arms[i], b:spot.arms[j]});
+    }
+  }
+  return out;
+}
+function _spUnit(P, q){
+  var dx=q.x-P.x, dy=q.y-P.y, L=Math.hypot(dx,dy)||1;
+  return {u:{x:dx/L, y:dy/L}, len:L};
+}
+function _spCornerClick(w){
+  var spots=_spCornerSpots(w);
+  if(!spots.length){
+    toast('선이 꺾이거나 만나는 자리를 클릭하세요','err');
+    return;
+  }
+  /* 마우스에서 가장 가까운 자리 */
+  var spot=spots.reduce(function(m,s){
+    return (!m || Math.hypot(w.x-s.P.x,w.y-s.P.y) < Math.hypot(w.x-m.P.x,w.y-m.P.y)) ? s : m;
+  }, null);
+  var cands=_spCornerCandidates(spot);
+  if(!cands.length){ toast('여기는 깎을 모서리가 없어요','err'); return; }
+
+  /* 여러 군데면 마우스가 가리키는 쪽을 고른다 */
+  var pick=0, bestDot=-1e18;
+  cands.forEach(function(c, i){
+    var ax=c.bend?c.a.u.x:c.a.u.x, ay=c.bend?c.a.u.y:c.a.u.y;
+    var bx=c.bend?c.b.u.x:c.b.u.x, by=c.bend?c.b.u.y:c.b.u.y;
+    var mx=(ax+bx)/2, my=(ay+by)/2;
+    var dot=mx*(w.x-spot.P.x) + my*(w.y-spot.P.y);
+    if(dot>bestDot){ bestDot=dot; pick=i; }
+  });
+
+  SPLIT.cornerPick={spot:spot, cands:cands, pick:pick};
   var at=document.getElementById('spCornerAt');
-  if(at) at.textContent='X '+best.P.x.toFixed(1)+' · Y '+best.P.y.toFixed(1)+' ✓';
+  if(at) at.textContent=(spot.type==='bend' ? '꺾인 곳' :
+                         (cands.length>=4 ? '십자 — 4군데 중' :
+                          cands.length>=2 ? 'T자 — '+cands.length+'군데 중' : '')) +
+                        ' 선택됨 ✓' + (cands.length>1 ? ' (마우스로 바꿀 수 있어요)' : '');
   render();
+}
+/* 고른 모서리의 Q1·Q2 를 구한다 (미리보기와 적용이 같은 계산을 쓴다) */
+function _spCornerQ(cp, d1, d2){
+  var c=cp.cands[cp.pick], P=cp.spot.P;
+  var la=c.bend ? c.a.len : c.a.len;
+  var lb=c.bend ? c.b.len : c.b.len;
+  var ua=c.a.u, ub=c.b.u;
+  if(d1>=la || d2>=lb) return {bad:true, la:la, lb:lb};
+  return {P:P,
+          Q1:{x:P.x+ua.x*d1, y:P.y+ua.y*d1},
+          Q2:{x:P.x+ub.x*d2, y:P.y+ub.y*d2},
+          la:la, lb:lb, c:c};
 }
 function splitCornerApply(){
   var cp=SPLIT.cornerPick;
-  if(!cp){ toast('먼저 코너(교차점)를 클릭하세요','err'); return; }
+  if(!cp){ toast('먼저 선이 꺾이거나 만나는 자리를 클릭하세요','err'); return; }
   var d1=parseFloat(document.getElementById('spD1').value);
   var d2=parseFloat(document.getElementById('spD2').value);
   if(!d1||!d2||d1<=0||d2<=0){ toast('가각 거리를 입력하세요','err'); return; }
-  /* 방향 4조합 중 클릭점 쪽 조합 선택 */
-  var bestQ=null, bestDot=-1e18;
-  [1,-1].forEach(function(s1){ [1,-1].forEach(function(s2){
-    var Q1={x:cp.P.x+cp.da.x*d1*s1, y:cp.P.y+cp.da.y*d1*s1};
-    var Q2={x:cp.P.x+cp.db.x*d2*s2, y:cp.P.y+cp.db.y*d2*s2};
-    var mx=(Q1.x+Q2.x)/2-cp.P.x, my=(Q1.y+Q2.y)/2-cp.P.y;
-    var dot=mx*(cp.click.x-cp.P.x)+my*(cp.click.y-cp.P.y);
-    if(dot>bestDot){ bestDot=dot; bestQ={Q1:Q1,Q2:Q2}; }
-  });});
-  _spUndoPush();
-  var areaCad=Math.abs((bestQ.Q1.x-cp.P.x)*(bestQ.Q2.y-cp.P.y)-(bestQ.Q2.x-cp.P.x)*(bestQ.Q1.y-cp.P.y))/2;
-  var parcels=_spParcels(), coef=1;
-  for(var i=0;i<parcels.length;i++){
-    if(_spPinP(cp.click, parcels[i].ring)){ coef=_spCoef(parcels[i],parcels); break; }
+
+  var q=_spCornerQ(cp, d1, d2);
+  if(q.bad){
+    toast('가각 거리가 변보다 길어요 (변 '+q.la.toFixed(1)+'m · '+q.lb.toFixed(1)+'m)','err');
+    return;
   }
-  SPLIT.corners.push({P:cp.P, Q1:bestQ.Q1, Q2:bestQ.Q2, d1:d1, d2:d2, areaCad:areaCad, areaCorr:areaCad*coef});
+  var spot=cp.spot, c=q.c;
+  _spUndoPush();
+
+  if(spot.type==='bend'){
+    /* 꺾인 꼭짓점 — 그 점 하나를 두 점으로 바꾼다 */
+    var li=spot.arms[0].li, p=SPLIT.lines[li].pts, k=spot.arms[0].from;
+    p.splice(k, 1, q.Q1, q.Q2);
+  }else{
+    /* 두 선이 만나는 곳 — 고른 쪽 두 팔만 남기고 **한 줄로 합친다.**
+       반대쪽으로 삐져나온 여유분(오프셋 연장분)은 버린다. */
+    var la=SPLIT.lines[c.a.li], lb=SPLIT.lines[c.b.li];
+    var armA=_spArmTail(la.pts, c.a.endIdx, q.Q1);   /* Q1 → A 의 바깥 끝 */
+    var armB=_spArmTail(lb.pts, c.b.endIdx, q.Q2);   /* Q2 → B 의 바깥 끝 */
+    var merged=armA.slice().reverse().concat(armB);  /* …A끝 · Q1 · Q2 · B끝… */
+    var keep=SPLIT.lines[c.a.li];
+    keep.pts=merged;
+    keep.name=(keep.name||'분할선')+' (가각)';
+    if(c.b.li!==c.a.li){
+      SPLIT.lines.splice(c.b.li, 1);
+      if(SPLIT.sel===c.b.li) SPLIT.sel=-1;
+      else if(SPLIT.sel>c.b.li) SPLIT.sel--;
+    }
+  }
+
+  SPLIT.corners.push({x:spot.P.x, y:spot.P.y, d1:d1, d2:d2});  /* 기록만. 면적 없음 */
   splitRenderTable();
   splitCancelMode(true);
-  toast('가각 '+d1+'×'+d2+'m 적용 — '+_spN(areaCad*coef)+'㎡ (보정, 표에 별도 표기)','ok');
+  toast('가각 '+d1+'×'+d2+'m — 면적은 조각에 포함됐어요','ok');
   render();
+}
+/* 교차점에서 endIdx 쪽으로 뻗은 팔을, Q 에서 시작해 바깥 끝까지 */
+function _spArmTail(pts, endIdx, Q){
+  var out=[{x:Q.x, y:Q.y}];
+  if(endIdx===0){                      /* 앞쪽으로 뻗은 팔 */
+    out.push({x:pts[0].x, y:pts[0].y});
+  }else if(endIdx>=pts.length-1){      /* 뒤쪽으로 뻗은 팔 */
+    for(var i=pts.length-1;i>=endIdx;i--) out.push({x:pts[i].x, y:pts[i].y});
+    out.length=2;                      /* 직선 오프셋 선은 두 점이면 충분 */
+    out[1]={x:pts[pts.length-1].x, y:pts[pts.length-1].y};
+  }else{
+    out.push({x:pts[endIdx].x, y:pts[endIdx].y});
+  }
+  return out;
 }
 
 /* 글자 쓰기 */
@@ -6872,26 +7256,105 @@ function _spHitEdge(w){
   });
   return best;
 }
-function _spSnap(w){
-  var parcels=_spParcels();
-  var best=null, bd=12/S.scale;
-  parcels.forEach(function(par){ par.ring.forEach(function(v){
-    var d=Math.hypot(w.x-v.x,w.y-v.y);
-    if(d<bd){ bd=d; best={x:v.x,y:v.y,kind:'v'}; }
-  });});
-  if(best) return best;
-  bd=10/S.scale;
-  parcels.forEach(function(par){
+/* ── 스냅 (2026-09-26 새로 짬) ──────────────────────────────────
+ *
+ *   **캐드를 안 쓰는 분 기준**으로 만든다.
+ *   선에 갖다 대면 **"중간점" "직교점"** 처럼 **말이 떠야** 한다.
+ *   색만 바뀌면 그게 무슨 뜻인지 알 수가 없다.
+ *
+ *   보는 대상 : 필지 경계 + **내가 그린 분할선** (예전엔 필지만 봤다)
+ *   고르는 차례: 꼭짓점·끝점 → 중간점 → 직교점 → 선 위
+ *                (먼저 걸리는 것이 이긴다. 캐드와 같은 순서)
+ */
+function _spSnapTargets(){
+  var segs=[], pts=[];
+  _spParcels().forEach(function(par){
     var r=par.ring;
     for(var i=0;i<r.length;i++){
-      var a=r[i], b=r[(i+1)%r.length];
-      var d=_spDistSeg(w,a,b);
-      if(d<bd){ bd=d; var f=_spFootSeg(w,a,b); best={x:f.x,y:f.y,kind:'e'}; }
+      segs.push([r[i], r[(i+1)%r.length]]);
+      pts.push({p:r[i], t:'꼭짓점'});
     }
+  });
+  SPLIT.lines.forEach(function(ln){
+    var p=ln.pts;
+    for(var i=0;i<p.length-1;i++) segs.push([p[i], p[i+1]]);
+    if(p.length){
+      pts.push({p:p[0], t:'끝점'});
+      pts.push({p:p[p.length-1], t:'끝점'});
+      for(var k=1;k<p.length-1;k++) pts.push({p:p[k], t:'꺾인점'});
+    }
+  });
+  return {segs:segs, pts:pts};
+}
+function _spSnap(w, anchor){
+  var T=_spSnapTargets();
+  var tolPt=12/S.scale, tolLn=10/S.scale;
+  var best=null, bd;
+
+  bd=tolPt;                                   /* ① 꼭짓점 · 끝점 · 꺾인점 */
+  T.pts.forEach(function(o){
+    var d=Math.hypot(w.x-o.p.x, w.y-o.p.y);
+    if(d<bd){ bd=d; best={x:o.p.x, y:o.p.y, kind:'v', label:o.t}; }
+  });
+  if(best) return best;
+
+  bd=tolPt;                                   /* ② 중간점 */
+  T.segs.forEach(function(s){
+    var mx=(s[0].x+s[1].x)/2, my=(s[0].y+s[1].y)/2;
+    var d=Math.hypot(w.x-mx, w.y-my);
+    if(d<bd){ bd=d; best={x:mx, y:my, kind:'m', label:'중간점'}; }
+  });
+  if(best) return best;
+
+  if(anchor){                                 /* ③ 직교점 (직전 점에서 내린 수선) */
+    bd=tolLn;
+    T.segs.forEach(function(s){
+      var f=_spFootSeg(anchor, s[0], s[1]);
+      var d=Math.hypot(w.x-f.x, w.y-f.y);
+      if(d<bd){ bd=d; best={x:f.x, y:f.y, kind:'p', label:'직교점'}; }
+    });
+    if(best) return best;
+  }
+
+  bd=tolLn;                                   /* ④ 그냥 선 위 */
+  T.segs.forEach(function(s){
+    var d=_spDistSeg(w, s[0], s[1]);
+    if(d<bd){ bd=d; var f=_spFootSeg(w, s[0], s[1]);
+              best={x:f.x, y:f.y, kind:'e', label:'선 위'}; }
   });
   return best;
 }
 function _spActive(){ return (typeof BOOK!=='undefined' && BOOK.page===3) && !CAD.selMode; }
+
+/* 스냅 표시 — 모양도 다르고 **글자도 뜬다** (캐드 안 쓰는 분 기준)
+ *   꼭짓점·끝점 □ 초록 · 중간점 △ 민트 · 직교 ㄱ 노랑 · 선 위 ○ 파랑 */
+function _spDrawSnapMark(gs){
+  var C={v:'#4ade80', m:'#38f5c8', p:'#facc15', e:'#38bdf8', o:'#facc15'};
+  var col=C[SPLIT.snapKind]||'#f59e0b';
+  ctx.strokeStyle=col; ctx.lineWidth=2;
+  if(SPLIT.snapKind==='v'){
+    ctx.strokeRect(gs.x-5, gs.y-5, 10, 10);
+  }else if(SPLIT.snapKind==='m'){
+    ctx.beginPath(); ctx.moveTo(gs.x, gs.y-6);
+    ctx.lineTo(gs.x+6, gs.y+5); ctx.lineTo(gs.x-6, gs.y+5);
+    ctx.closePath(); ctx.stroke();
+  }else if(SPLIT.snapKind==='p' || SPLIT.snapKind==='o'){
+    ctx.beginPath();
+    ctx.moveTo(gs.x-6, gs.y+6); ctx.lineTo(gs.x-6, gs.y-6); ctx.lineTo(gs.x+6, gs.y-6);
+    ctx.stroke();
+  }else{
+    ctx.beginPath(); ctx.arc(gs.x, gs.y, 6, 0, 6.283); ctx.stroke();
+  }
+  var lb=SPLIT.snapLabel || (SPLIT.snapKind==='o' ? '직교' : '');
+  if(!lb) return;
+  ctx.font='bold 11px "Malgun Gothic",sans-serif';
+  var tw=ctx.measureText(lb).width;
+  ctx.fillStyle='rgba(8,14,26,.82)';
+  ctx.fillRect(gs.x+10, gs.y-22, tw+10, 16);
+  ctx.fillStyle=col; ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.fillText(lb, gs.x+15, gs.y-14);
+  ctx.textBaseline='alphabetic';
+}
 
 /* ── 오버레이 그리기 (render 래핑에서 호출) ── */
 function drawSplitOverlay(){
@@ -6936,6 +7399,27 @@ function drawSplitOverlay(){
     ctx.stroke();
     ctx.restore();
   });
+  /* 회전 기준점 — 어디를 축으로 도는지 보여준다 */
+  if(SPLIT.mode==='rotate' && SPLIT.rotPivot){
+    var rp=w2s(SPLIT.rotPivot);
+    ctx.save();
+    ctx.strokeStyle='#f472b6'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(rp.x, rp.y, 9, 0, 6.283); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(rp.x-13, rp.y); ctx.lineTo(rp.x+13, rp.y);
+    ctx.moveTo(rp.x, rp.y-13); ctx.lineTo(rp.x, rp.y+13);
+    ctx.stroke();
+    ctx.font='bold 11px "Malgun Gothic",sans-serif';
+    ctx.fillStyle='#f472b6'; ctx.textAlign='left';
+    ctx.fillText('기준점'+(SPLIT.rotLabel?' ('+SPLIT.rotLabel+')':''), rp.x+16, rp.y-6);
+    ctx.restore();
+  }
+  /* 점 하나를 끌고 있을 때도 스냅 표시를 보여준다 (그리기와 같은 모양·글자) */
+  if(SPLIT.drag && SPLIT.drag.vi>=0 && SPLIT.ghost){
+    ctx.save();
+    _spDrawSnapMark(w2s(SPLIT.ghost));
+    ctx.restore();
+  }
   /* 그리는 중 */
   if(SPLIT.mode==='draw' && SPLIT.draw){
     ctx.save();
@@ -6948,12 +7432,7 @@ function drawSplitOverlay(){
     SPLIT.draw.forEach(function(p){ var s=w2s(p); ctx.beginPath(); ctx.arc(s.x,s.y,3.5,0,6.283); ctx.fill(); });
     if(SPLIT.ghost){
       var gs=w2s(SPLIT.ghost);
-      ctx.strokeStyle=(SPLIT.snapKind==='v')?'#4ade80':(SPLIT.snapKind==='e')?'#38bdf8':(SPLIT.snapKind==='o')?'#facc15':'#f59e0b';
-      ctx.lineWidth=2; ctx.beginPath(); ctx.arc(gs.x,gs.y,6,0,6.283); ctx.stroke();
-      if(SPLIT.snapKind==='o'){
-        ctx.font='10px sans-serif'; ctx.fillStyle='#facc15'; ctx.textAlign='left';
-        ctx.fillText('직교', gs.x+9, gs.y-9);
-      }
+      _spDrawSnapMark(gs);
     }
     ctx.restore();
   }
@@ -6988,7 +7467,7 @@ function drawSplitOverlay(){
     var dirPt = SPLIT.edgeDir || (SPLIT.mode==='edgeDir'?SPLIT.edgeGhost:null);
     if(SPLIT.mode==='edgeDir' && dirPt && SPLIT.edgeSel.length){
       var dPrev=parseFloat((document.getElementById('spDist')||{}).value)||4;
-      var chainsP=_spChains(SPLIT.edgeSel);
+      var chainsP=_spOffsetGroups(SPLIT.edgeSel);
       var extP=Math.min(_spExtentDiag()*0.35, _spExtentDiag());
       ctx.globalAlpha=0.9; ctx.setLineDash([8,5]); ctx.lineWidth=2.4; ctx.strokeStyle='#38f5c8';
       chainsP.forEach(function(ch){
@@ -7009,20 +7488,47 @@ function drawSplitOverlay(){
     }
     ctx.restore();
   }
-  /* 가각 */
+  /* 가각 — 삼각형은 그리지 않는다. 대각선이 이미 분할선에 들어가 있다.
+     어디를 깎았는지만 작은 점으로 표시한다. */
   SPLIT.corners.forEach(function(c){
-    var P=w2s(c.P), Q1=w2s(c.Q1), Q2=w2s(c.Q2);
+    var s=w2s(c);
     ctx.save();
-    ctx.fillStyle='rgba(52,211,153,0.28)'; ctx.strokeStyle='#34d399'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(P.x,P.y); ctx.lineTo(Q1.x,Q1.y); ctx.lineTo(Q2.x,Q2.y); ctx.closePath();
-    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle='#34d399'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(s.x,s.y,4,0,6.283); ctx.stroke();
     ctx.restore();
   });
   if(SPLIT.mode==='corner' && SPLIT.cornerPick){
-    var cpS=w2s(SPLIT.cornerPick.P);
+    var cp=SPLIT.cornerPick, cpS=w2s(cp.spot.P);
     ctx.save();
     ctx.strokeStyle='#34d399'; ctx.lineWidth=2;
     ctx.beginPath(); ctx.arc(cpS.x,cpS.y,8,0,6.283); ctx.stroke();
+
+    /* 고를 수 있는 곳을 전부 흐리게, 지금 고른 곳만 진하게 — 어느 쪽인지 보이게 */
+    var d1=parseFloat((document.getElementById('spD1')||{}).value)||3;
+    var d2=parseFloat((document.getElementById('spD2')||{}).value)||3;
+    cp.cands.forEach(function(c, i){
+      var on=(i===cp.pick);
+      var la=Math.min(d1, c.a.len*0.95), lb=Math.min(d2, c.b.len*0.95);
+      var P=cp.spot.P;
+      var Q1=w2s({x:P.x+c.a.u.x*la, y:P.y+c.a.u.y*la});
+      var Q2=w2s({x:P.x+c.b.u.x*lb, y:P.y+c.b.u.y*lb});
+      ctx.globalAlpha = on ? 1 : 0.28;
+      ctx.strokeStyle = on ? '#34d399' : '#94a3b8';
+      ctx.lineWidth = on ? 2.6 : 1.6;
+      ctx.setLineDash(on ? [] : [5,4]);
+      ctx.beginPath(); ctx.moveTo(Q1.x,Q1.y); ctx.lineTo(Q2.x,Q2.y); ctx.stroke();
+      if(on){
+        ctx.fillStyle='#34d399';
+        [Q1,Q2].forEach(function(s){ ctx.beginPath(); ctx.arc(s.x,s.y,3.5,0,6.283); ctx.fill(); });
+      }
+      ctx.setLineDash([]);
+    });
+    ctx.globalAlpha=1;
+    if(cp.cands.length>1){
+      ctx.font='bold 11px "Malgun Gothic",sans-serif';
+      ctx.fillStyle='#34d399'; ctx.textAlign='left';
+      ctx.fillText('마우스로 깎을 쪽을 고르세요 ('+cp.cands.length+'군데)', cpS.x+12, cpS.y-12);
+    }
     ctx.restore();
   }
   /* 면적분할 기준점 */
@@ -7060,12 +7566,27 @@ cv.addEventListener('mousedown', function(e){
   var hit=_spHitLine(w);
   if(hit>=0){
     SPLIT.sel=hit;
-    SPLIT.drag={idx:hit, start:w, orig:SPLIT.lines[hit].pts.map(function(p){return {x:p.x,y:p.y};}), moved:false, snapshot:_spSnapState()};
+    /* ★ 점을 잡았으면 **그 점만** 옮긴다 (2026-09-26)
+       "선을 선택하면 이동이 가능한데, 한쪽만 조금 올리고 싶을 때가 있잖아" */
+    var vi=_spHitVertex(w, hit);
+    SPLIT.drag={idx:hit, vi:vi, start:w,
+                orig:SPLIT.lines[hit].pts.map(function(p){return {x:p.x,y:p.y};}),
+                moved:false, snapshot:_spSnapState()};
     _spRenderLineList();
-    cv.style.cursor='move';
+    cv.style.cursor=(vi>=0)?'crosshair':'move';
     render();
   }
 });
+/* 그 선의 점 중에 잡힌 것이 있나 (끝점·꺾인점) */
+function _spHitVertex(w, li){
+  if(li<0 || !SPLIT.lines[li]) return -1;
+  var pts=SPLIT.lines[li].pts, tol=10/S.scale, best=-1, bd=tol;
+  for(var i=0;i<pts.length;i++){
+    var d=Math.hypot(w.x-pts[i].x, w.y-pts[i].y);
+    if(d<bd){ bd=d; best=i; }
+  }
+  return best;
+}
 window.addEventListener('mousemove', function(e){
   if(!_spActive()){ return; }
   if(S.midPan) return;   /* 가운데 버튼 팬은 기존 로직 */
@@ -7083,7 +7604,21 @@ window.addEventListener('mousemove', function(e){
     var w=evWorld(e);
     var dx=w.x-SPLIT.drag.start.x, dy=w.y-SPLIT.drag.start.y;
     if(Math.abs(dx)+Math.abs(dy)>0.001) SPLIT.drag.moved=true;
-    SPLIT.lines[SPLIT.drag.idx].pts=SPLIT.drag.orig.map(function(p){return {x:p.x+dx, y:p.y+dy};});
+    if(SPLIT.drag.vi>=0){
+      /* 점 하나만 옮긴다. 끌고 가는 동안에도 스냅이 걸린다. */
+      var sn=_spSnap(w);
+      var np=SPLIT.lines[SPLIT.drag.idx].pts.map(function(p,i){
+        return (i===SPLIT.drag.vi)
+          ? (sn ? {x:sn.x, y:sn.y} : {x:w.x, y:w.y})
+          : {x:SPLIT.drag.orig[i].x, y:SPLIT.drag.orig[i].y};
+      });
+      SPLIT.lines[SPLIT.drag.idx].pts=np;
+      SPLIT.ghost = sn ? {x:sn.x,y:sn.y} : null;
+      SPLIT.snapKind = sn ? sn.kind : null;
+      SPLIT.snapLabel = sn ? sn.label : null;
+    }else{
+      SPLIT.lines[SPLIT.drag.idx].pts=SPLIT.drag.orig.map(function(p){return {x:p.x+dx, y:p.y+dy};});
+    }
     splitRecompute();
     render();
     e.stopImmediatePropagation();   /* 기존 팬 차단 */
@@ -7093,12 +7628,13 @@ window.addEventListener('mousemove', function(e){
     var w2=evWorld(e);
     var last=SPLIT.draw.length?SPLIT.draw[SPLIT.draw.length-1]:null;
     if(e.shiftKey && last){
-      var o=_spOrtho(last,w2);
+      var o=_spOrtho(last,w2,_spRefDir(last));
       SPLIT.ghost={x:o.x,y:o.y}; SPLIT.snapKind='o';
     }else{
-      var sn=_spSnap(w2);
+      var sn=_spSnap(w2, last);            /* last = 직전에 찍은 점 → 직교점 */
       SPLIT.ghost=sn?{x:sn.x,y:sn.y}:w2;
       SPLIT.snapKind=sn?sn.kind:null;
+      SPLIT.snapLabel=sn?sn.label:null;
     }
     render();
     return;   /* 팬 허용(기존 로직 계속) */
@@ -7116,6 +7652,18 @@ window.addEventListener('mousemove', function(e){
     SPLIT.edgeGhost=evWorld(e);   /* 방향 미리보기 */
     cv.style.cursor='crosshair';
     render();
+    return;
+  }
+  if(SPLIT.mode==='corner' && SPLIT.cornerPick && SPLIT.cornerPick.cands.length>1){
+    /* 자리를 고른 뒤에는 **마우스가 가리키는 쪽**으로 깎을 곳이 바뀐다 */
+    var wc=evWorld(e), cpx=SPLIT.cornerPick, np=cpx.pick, bd=-1e18;
+    cpx.cands.forEach(function(c, i){
+      var mx=(c.a.u.x+c.b.u.x)/2, my=(c.a.u.y+c.b.u.y)/2;
+      var dot=mx*(wc.x-cpx.spot.P.x) + my*(wc.y-cpx.spot.P.y);
+      if(dot>bd){ bd=dot; np=i; }
+    });
+    if(np!==cpx.pick){ cpx.pick=np; render(); }
+    cv.style.cursor='crosshair';
     return;
   }
   if(!SPLIT.mode && !S.isDown){
@@ -7139,6 +7687,7 @@ window.addEventListener('mouseup', function(e){
     return;
   }
   if(SPLIT.drag){
+    SPLIT.ghost=null; SPLIT.snapKind=null; SPLIT.snapLabel=null;   /* 스냅 표시 치우기 */
     var wasMoved=SPLIT.drag.moved;
     if(wasMoved) _spUndoPush(SPLIT.drag.snapshot);
     SPLIT.drag=null;
@@ -7157,10 +7706,10 @@ cv.addEventListener('click', function(e){
   if(SPLIT.mode==='draw'){
     var last=SPLIT.draw.length?SPLIT.draw[SPLIT.draw.length-1]:null;
     if(e.shiftKey && last){
-      var o=_spOrtho(last,w);
+      var o=_spOrtho(last,w,_spRefDir(last));
       SPLIT.draw.push({x:o.x,y:o.y});
     }else{
-      var sn=_spSnap(w);
+      var sn=_spSnap(w, last);
       SPLIT.draw.push(sn?{x:sn.x,y:sn.y}:{x:w.x,y:w.y});
     }
     render();
@@ -7181,10 +7730,11 @@ cv.addEventListener('click', function(e){
   if(SPLIT.mode==='edgeDir'){ _spEdgeDirClick(w); return; }
   if(SPLIT.mode==='target'){ _spTargetClick(w); return; }
   if(SPLIT.mode==='corner'){ _spCornerClick(w); return; }
-  /* 모드 없음: 선 선택/해제 */
+  if(SPLIT.mode==='rotate'){ _spRotClick(w); return; }   /* 선 고르기 → 기준점 찍기 */
+  /* 모드 없음(또는 분할 모드): 선 선택/해제 */
   var h2=_spHitLine(w);
-  if(h2>=0){ SPLIT.sel=h2; _spRenderLineList(); render(); }
-  else if(SPLIT.sel>=0){ SPLIT.sel=-1; _spRenderLineList(); render(); }
+  if(h2>=0){ SPLIT.sel=h2; _spRenderLineList(); _spMoveWhich(); render(); }
+  else if(SPLIT.sel>=0){ SPLIT.sel=-1; _spRenderLineList(); _spMoveWhich(); render(); }
 });
 cv.addEventListener('dblclick', function(e){
   if(!_spActive()) return;
@@ -7279,15 +7829,12 @@ function splitExportDxf(){
   push(0,'SECTION',2,'ENTITIES');
   parcels.forEach(function(par){ pline(par.ring,'PARCEL_ORG',2,true); });          /* 노랑 */
   SPLIT.lines.forEach(function(ln){ pline(ln.pts,'SPLIT_LINE',1,false); });        /* 빨강 */
-  SPLIT.corners.forEach(function(c){ pline([c.P,c.Q1,c.Q2],'CORNER_CUT',3,true); });/* 초록 */
+  /* 가각은 따로 안 내보낸다 — 대각선이 SPLIT_LINE 안에 이미 들어 있다 */
   SPLIT.pieces.forEach(function(pc,i){
     var ct=_spCentroid(pc.ring);
     text(ct,'AREA_TEXT',7,1.5,'['+(i+1)+'] '+pc.areaCorr.toFixed(2)+'m2 ('+(pc.areaCorr/3.30579).toFixed(2)+'py)');
   });
-  SPLIT.corners.forEach(function(c,i){
-    var ct=_spCentroid([c.P,c.Q1,c.Q2]);
-    text(ct,'AREA_TEXT',3,1.2,'CUT'+(i+1)+' '+c.areaCorr.toFixed(2)+'m2');
-  });
+  /* 가각 면적 글자도 없앴다 — 조각 면적에 이미 포함돼 있어 두 번 세는 꼴이 된다 */
   SPLIT.texts.forEach(function(t){
     text({x:t.x,y:t.y},'LABEL_TEXT',7,Math.max(0.5,t.size),t.str);
   });
@@ -7313,36 +7860,21 @@ try{ splitRecompute(); }catch(_e){}
 SPLIT.rotate = null;   // {idx, pivot:{x,y}, orig:[pts], baseAng, snapshot}
 SPLIT.measure = null;  // {a:{x,y}, b:{x,y}} 거리재기
 
-/* ── 이동: 선택 안내 (실제 이동은 기존 드래그로) ── */
-function splitStartMove(){
-  if(!_spNeedParcels()) return;
-  splitCancelMode(true);
-  if(SPLIT.sel<0 && SPLIT.lines.length===1) SPLIT.sel=0;
-  _spBtnActive('spBtnMove');
-  _spHint('✋ 이동할 선을 클릭한 뒤 드래그하세요 (선 위 어디서나 잡고 끌기 · 면적 실시간)');
-  _spRenderLineList();
-  render();
-  setTimeout(function(){ _spBtnActive(null); }, 1800);
-}
-
-/* ── 회전 ── */
-function splitStartRotate(){
-  if(!_spNeedParcels()) return;
-  if(SPLIT.sel<0){
-    if(SPLIT.lines.length===1) SPLIT.sel=0;
-    else { toast('먼저 회전할 선을 클릭해 선택하세요','err'); return; }
-  }
-  splitCancelMode(true);
-  var ln=SPLIT.lines[SPLIT.sel];
-  /* 회전 중심 = 선의 첫 점(기준점). 드래그로 각도 조절 */
-  var piv={x:ln.pts[0].x, y:ln.pts[0].y};
-  SPLIT.rotate={ idx:SPLIT.sel, pivot:piv, orig:ln.pts.map(function(p){return {x:p.x,y:p.y};}),
-                 snapshot:_spSnapState(), dragging:false };
-  SPLIT.mode='rotate';
-  _spBtnActive('spBtnRotate');
-  _spHint('🔄 마우스를 움직여 회전 (기준=선 시작점) · 클릭으로 확정 · Shift=15°단위 · ESC=취소');
-  render();
-}
+/* ── 이동 · 회전 — **위쪽 "분할 모드 · 회전 모드" 로 옮겼다** (2026-09-26)
+ *
+ *   여기 있던 것
+ *       이동 : 안내만 띄우고 실제 이동은 드래그
+ *       회전 : **선의 첫 점**을 축으로 마우스 드래그
+ *
+ *   영대님이 원하는 것 (실무에서 제일 많이 쓴다고 하심)
+ *       분할 모드 : 화살표로 상하좌우 · **이동량 입력** · 실시간 면적
+ *       회전 모드 : **기준점을 내가 찍고** 좌우 버튼으로 몇 도씩
+ *                  (한쪽 꼭짓점이 이미 정해졌을 때 쓴다 → 첫 점 고정은 안 맞다)
+ *
+ *   그래서 같은 이름 함수를 위에서 새로 만들었다. 여기 것은 지운다.
+ *   아래 _spRotateMove/_spRotateConfirm(드래그 회전)은 남겨 두되 아무도 안 부른다
+ *   (SPLIT.rotate 가 null 이라 걸림돌이 없다). 나중에 필요하면 되살릴 수 있다.
+ */
 function _spRotateMove(w){
   var r=SPLIT.rotate; if(!r) return;
   var ang=Math.atan2(w.y-r.pivot.y, w.x-r.pivot.x);

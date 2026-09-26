@@ -19,10 +19,10 @@ if (typeof ol !== 'undefined' && ol.proj && ol.proj.proj4) {
   ol.proj.proj4.register(proj4);
 }
 </script>
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=0f432d6e8470eed32f947e3c7db146b9&libraries=services"></script>
+<script src="/api/kakao/sdk.js?libraries=services"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
-<script src="https://ecvam.neins.go.kr/apiConfirm.do?APIKEY=CBWU-BC6J-OFI9-ONPR"></script>
+<script src="/api/ecvam/sdk.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -614,8 +614,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt)
 
 <script>
 var PROXY = localStorage.getItem('gdsp_crawl_server') || 'https://168-107-15-68.nip.io';
-if(localStorage.getItem('gdsp_kakao')==='0f432d6e8470eed32f947e3c7db146b9'){localStorage.setItem('gdsp_kakao','c670e0bc85874ef6267220f09882b379');}
-var KAKAO_KEY = localStorage.getItem('gdsp_kakao') || 'c670e0bc85874ef6267220f09882b379'; // REST API 키
+/* 예전에 잘못 저장된 값이 있을 수 있어 저장분을 쓰지 않는다 */
+var KAKAO_KEY = ''   /* 서버(/api/kakao/key)에서 받는다 */; // REST API 키
 // ⭐ 서버에서 최신 키 자동 로드 (모든 PC 공통)
 (function(){
   fetch('/api/kakao/key')
