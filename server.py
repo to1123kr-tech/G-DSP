@@ -2377,8 +2377,19 @@ def kakao_key_endpoint():
 #
 #   <script src="https://dapi.kakao.com/...?appkey=키"> 처럼 태그에 키를 박으면
 #   공개 저장소와 소스보기에 그대로 남는다.
-#   대신 <script src="/api/kakao/sdk.js"> 로 부르면 여기서 진짜 주소로 돌려보낸다.
+#   대신 <script src="/api/kakao/sdk.js"> 로 부르면 여기서 진짜 주소를 심어준다.
 #   브라우저가 따라가면서 Referer 는 우리 도메인 그대로라 카카오 도메인 검사도 통과한다.
+#
+#   302 로 돌려보내면 안 된다 (2026-09-29 발견)
+#       카카오 SDK 는 자기 <script> 태그를 페이지에서 이렇게 찾는다.
+#           dapi.kakao.com/v2/maps/sdk.js 와 맞는 src 를 가진 태그
+#       302 로 넘겨도 script.src 는 우리가 적은 /api/kakao/sdk.js 그대로라
+#       SDK 가 자기 태그를 못 찾는다. 그러면 거기 붙은 appkey·libraries·autoload
+#       를 하나도 못 읽어서 services.js 를 안 붙인다.
+#       그 바람에 kakao.maps 는 있는데 kakao.maps.services 만 없는 상태가 되어
+#       지번 검색·좌표→주소 변환이 전부 죽어 있었다.
+#   그래서 지금은 진짜 dapi 주소로 <script> 태그를 직접 심는다.
+#   키는 여기서 붙이므로 HTML 에는 여전히 키가 없다.
 
 @app.route('/api/kakao/sdk.js')
 def kakao_sdk_redirect():
@@ -2389,7 +2400,11 @@ def kakao_sdk_redirect():
         KAKAO_JS_KEY, request.args.get('libraries', 'services'))
     if request.args.get('autoload'):          # 화면에서 직접 초기화하는 경우
         q += '&autoload=' + request.args.get('autoload')
-    return redirect('https://dapi.kakao.com/v2/maps/sdk.js?' + q, code=302)
+    url = 'https://dapi.kakao.com/v2/maps/sdk.js?' + q
+    js = ("document.write('<script charset=\"UTF-8\" src=\"%s\"><\\/script>');"
+          % url.replace("'", "%27"))
+    return js, 200, {'Content-Type': 'application/javascript; charset=utf-8',
+                     'Cache-Control': 'no-store'}
 
 
 @app.route('/api/ecvam/sdk.js')
