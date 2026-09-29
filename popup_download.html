@@ -632,14 +632,19 @@ var _kakaoKey = (window.opener && window.opener.KAKAO_APP_KEY) || localStorage.g
 })();
 
 // 오라클 서버에서 VWorld 키 자동 로드 (지도 직접호출용)
+//   서버가 유일한 기준이다. localStorage 에 값이 있어도 건너뛰지 않고 매번 덮어쓴다.
+//   (옛 키가 캐시된 브라우저에서 지적도가 안 나오던 원인)
 (function(){
-  if(!VWORLD_KEY){
-    fetch(PROXY+'/api/vworld/key')
+  {
+    /* PROXY 는 아래쪽(1243행)에서 선언돼 이 시점엔 undefined 다.
+       어차피 같은 호스트이므로 상대경로로 직접 호출한다. */
+    fetch('/api/vworld/key')
       .then(function(r){ return r.json(); })
       .then(function(d){
         if(d&&d.key){
           VWORLD_KEY=d.key; _vwKey=d.key;
           localStorage.setItem('gdsp_vworld',d.key);
+          localStorage.removeItem('gdsp_vworld_key');   // 옛 이름으로 남아있는 죽은 키 제거
           if(!_olMap2loaded && document.getElementById('view-jideok') && document.getElementById('view-jideok').classList.contains('on')){
             initVmap2();
           }

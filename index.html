@@ -7738,16 +7738,38 @@
 
     var GDSP_SERVER = 'https://168-107-15-68.nip.io';
 
-    // VWorld 키 Oracle 서버에서 받아오기
-    function ndGetVwKey(cb) {
-      if (ndVwKey) { cb(ndVwKey); return; }
-      var saved = localStorage.getItem('gdsp_vworld');
-      if (saved) { ndVwKey = saved; cb(ndVwKey); return; }
-      var VW_FALLBACK = '';   // 키를 파일에 박지 않는다 (서버에서 받는다)
+    // ⭐ 페이지 열릴 때 서버 키로 localStorage 를 한 번 덮어쓴다.
+    //   예전에는 localStorage 에 값이 있으면 서버를 아예 안 물어봐서, 키가 바뀌기 전에
+    //   접속했던 브라우저는 죽은 키를 계속 쓰고 지적도가 안 나왔다.
+    (function(){
       fetch('/api/vworld/key')
         .then(function(r){ return r.json(); })
-        .then(function(d){ ndVwKey = d.key || VW_FALLBACK; cb(ndVwKey); })
-        .catch(function(){ ndVwKey = VW_FALLBACK; cb(ndVwKey); });
+        .then(function(d){
+          if (d && d.key) {
+            ndVwKey = d.key;
+            localStorage.setItem('gdsp_vworld', d.key);
+            localStorage.removeItem('gdsp_vworld_key');   // 옛 이름으로 남아있는 죽은 키 제거
+          }
+        })
+        .catch(function(){});
+    })();
+
+    // VWorld 키 Oracle 서버에서 받아오기 (서버가 유일한 기준, localStorage 는 실패시 대비용)
+    function ndGetVwKey(cb) {
+      if (ndVwKey) { cb(ndVwKey); return; }   // 이번 세션에서 이미 서버 값을 받아둔 경우
+      fetch('/api/vworld/key')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (d && d.key) {
+            ndVwKey = d.key;
+            localStorage.setItem('gdsp_vworld', d.key);
+            localStorage.removeItem('gdsp_vworld_key');
+          } else {
+            ndVwKey = localStorage.getItem('gdsp_vworld') || '';
+          }
+          cb(ndVwKey);
+        })
+        .catch(function(){ ndVwKey = localStorage.getItem('gdsp_vworld') || ''; cb(ndVwKey); });
     }
 
     // ⭐ 카카오 REST API 키 서버에서 자동 로드 (모든 PC에서 설정 없이 작동)
