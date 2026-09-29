@@ -16,6 +16,19 @@
 
   <script type="text/javascript"
     src="/api/kakao/sdk.js?libraries=services"></script>
+  <script>
+  /* 카카오 services 라이브러리 보정 — 없으면 지번 검색·좌표→주소가 전부 죽는다.
+     SDK 부트스트랩은 자기 script 태그를 /dapi\.kakao\.com\/v2\/maps\/sdk\.js/ 로 찾는다.
+     우리는 키를 감추려고 /api/kakao/sdk.js 로 부르기 때문에 이 정규식에 안 걸리고,
+     302 로 넘겨도 script.src 는 원래 주소 그대로라 결국 못 찾는다.
+     그러면 libraries=services 를 읽지 못해 services.js 를 안 붙인다.
+     → 안 붙었으면 여기서 직접 붙인다. (경로는 SDK 부트스트랩이 쓰는 것과 동일)
+     서버쪽 /api/kakao/sdk.js 를 고쳐 SDK 가 제 태그를 찾게 되면 이 블록은 그냥 통과한다. */
+  (function(){
+    if (window.kakao && kakao.maps && kakao.maps.services) return;
+    document.write('<script charset="UTF-8" src="https://t1.daumcdn.net/mapjsapi/js/libs/services/1.1.1/services.js"><\/script>');
+  })();
+  </script>
   <link
     href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Orbitron:wght@700;900&display=swap"
     rel="stylesheet">

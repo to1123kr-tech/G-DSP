@@ -7,6 +7,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
 <script src="/api/kakao/sdk.js?libraries=services&autoload=false"></script>
 <!-- 카카오 SDK — 키는 서버가 붙인다 (/api/kakao/sdk.js). 화면에 키를 두지 않는다 -->
+<script>
+/* 카카오 services 라이브러리 보정 — 설명은 index.html 같은 블록 참고.
+   SDK 가 자기 태그를 dapi.kakao.com 주소로만 찾아서 libraries=services 도 autoload=false 도
+   읽지 못한다. services.js 가 안 붙으면 여기서 직접 붙인다. */
+(function(){
+  if (window.kakao && kakao.maps && kakao.maps.services) return;
+  document.write('<script charset="UTF-8" src="https://t1.daumcdn.net/mapjsapi/js/libs/services/1.1.1/services.js"><\/script>');
+})();
+</script>
 <style>
 :root{
   --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --line:#1e2a44;

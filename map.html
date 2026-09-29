@@ -20,6 +20,14 @@ if (typeof ol !== 'undefined' && ol.proj && ol.proj.proj4) {
 }
 </script>
 <script src="/api/kakao/sdk.js?libraries=services"></script>
+<script>
+/* 카카오 services 라이브러리 보정 — 설명은 index.html 같은 블록 참고.
+   SDK 가 자기 태그를 dapi.kakao.com 주소로만 찾아서 libraries=services 가 무시된다. */
+(function(){
+  if (window.kakao && kakao.maps && kakao.maps.services) return;
+  document.write('<script charset="UTF-8" src="https://t1.daumcdn.net/mapjsapi/js/libs/services/1.1.1/services.js"><\/script>');
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
 <script src="/api/ecvam/sdk.js"></script>
