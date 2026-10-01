@@ -4180,7 +4180,10 @@
                 <div class="nd-irow"><span class="nd-ik">공시지가</span><span class="nd-iv nd-iv-m"
                     id="ndInfoGonsi">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">면적</span><span class="nd-iv" id="ndInfoArea">-</span></div>
-                <div class="nd-irow"><span class="nd-ik">소유구분</span><span class="nd-iv" id="ndInfoOwner">- <span style="font-size:9px;color:var(--txt3)">(등기 연동 예정)</span></span></div>
+                <!-- 소유구분(토지) 숨김 2026-10-01 — 인터넷등기소가 로그인 필수로 바뀌어
+                     /api/iros/list 가 "로그인 후 사용 가능합니다" 로 거부한다. 값이 영구히 "-" 라 가린다.
+                     다시 보이게 할 때는 아래 style="display:none" 만 지우면 된다. -->
+                <div class="nd-irow" style="display:none"><span class="nd-ik">소유구분</span><span class="nd-iv" id="ndInfoOwner">- <span style="font-size:9px;color:var(--txt3)">(등기 연동 예정)</span></span></div>
               </div>
               <div class="nd-info-block" style="margin-top:6px">
                 <div class="nd-info-block-title">건축물대장</div>
@@ -4191,7 +4194,9 @@
                 <div class="nd-irow"><span class="nd-ik">건폐율</span><span class="nd-iv nd-iv-g" id="ndInfoBcr">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">용적률</span><span class="nd-iv nd-iv-g" id="ndInfoFar">-</span></div>
                 <div class="nd-irow"><span class="nd-ik">건축년도</span><span class="nd-iv" id="ndInfoYear">-</span></div>
-                <div class="nd-irow"><span class="nd-ik">소유구분</span><span class="nd-iv" id="ndBldOwner">-</span></div>
+                <!-- 소유구분(건물) 숨김 2026-10-01 — 사유는 위 토지 소유구분과 동일.
+                     다시 보이게 할 때는 style="display:none" 만 지우면 된다. -->
+                <div class="nd-irow" style="display:none"><span class="nd-ik">소유구분</span><span class="nd-iv" id="ndBldOwner">-</span></div>
                 <button class="nd-bld-btn" onclick="openBldDownload()">건축물대장 상세보기</button>
               </div>
             </div>
@@ -4409,7 +4414,9 @@
                   <div class="ik">건축년도</div>
                   <div class="iv" id="gYear">-</div>
                 </div>
-                <div class="irow">
+                <!-- 소유구분 숨김 2026-10-01 — 사유는 토지·건축물 패널의 소유구분과 동일
+                     (인터넷등기소 로그인 필수). style="display:none" 만 지우면 다시 보인다. -->
+                <div class="irow" style="display:none">
                   <div class="ik">소유구분</div>
                   <div class="iv" id="gBldOwner">-</div>
                 </div>
