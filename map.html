@@ -21,10 +21,22 @@ if (typeof ol !== 'undefined' && ol.proj && ol.proj.proj4) {
 </script>
 <script src="/api/kakao/sdk.js?libraries=services"></script>
 <script>
-/* 카카오 services 라이브러리 보정 — 설명은 index.html 같은 블록 참고.
-   SDK 가 자기 태그를 dapi.kakao.com 주소로만 찾아서 libraries=services 가 무시된다. */
+/* 카카오 services 라이브러리 보정 — 자세한 설명은 index.html 의 같은 블록 참고.
+   SDK 가 자기 태그를 dapi.kakao.com 주소로만 찾아서 libraries 도 appkey 도 못 읽는다.
+   services.js 는 로드 시점의 kakao.maps.apikey 로 Authorization 헤더를 고정하므로
+   붙이기 전에 서버 키를 먼저 넣어야 한다. (없으면 카카오가 401 로 끊는다) */
 (function(){
   if (window.kakao && kakao.maps && kakao.maps.services) return;
+  if (!(window.kakao && kakao.maps)) return;
+  try {
+    var x = new XMLHttpRequest();
+    x.open('GET', '/api/kakao/key', false);
+    x.send(null);
+    if (x.status === 200) {
+      var k = (JSON.parse(x.responseText) || {}).key;
+      if (k) kakao.maps.apikey = k;
+    }
+  } catch (e) { console.error('카카오 키 로드 실패 - 지번 검색이 안 됩니다', e); }
   document.write('<script charset="UTF-8" src="https://t1.daumcdn.net/mapjsapi/js/libs/services/1.1.1/services.js"><\/script>');
 })();
 </script>
